@@ -7,11 +7,13 @@ that integrate with NodeResult for consistent error handling across the system.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from uuid import UUID
 
 from omnibase_core.core.errors.core_errors import OnexError as BaseOnexError
 from pydantic import BaseModel, Field
+
+from ..models.foundation import ModelMetadata
 
 
 # === ERROR CODES ===
@@ -171,7 +173,7 @@ class OmniMemoryError(BaseOnexError):
         self,
         error_code: OmniMemoryErrorCode,
         message: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[ModelMetadata] = None,
         correlation_id: Optional[UUID] = None,
         cause: Optional[Exception] = None,
         recovery_hint: Optional[str] = None,
@@ -242,7 +244,7 @@ class OmniMemoryError(BaseOnexError):
         """Get suggested backoff factor for retries."""
         return self.category_info.default_backoff_factor if self.category_info else 1.0
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, str]:
         """Convert error to dictionary for serialization."""
         base_dict = {
             "error_code": self.omnimemory_error_code.value,
@@ -579,7 +581,7 @@ def chain_errors(
     return primary_error
 
 
-def create_error_summary(errors: List[OmniMemoryError]) -> Dict[str, Any]:
+def create_error_summary(errors: list[OmniMemoryError]) -> dict[str, str]:
     """
     Create a summary of multiple errors for reporting.
     

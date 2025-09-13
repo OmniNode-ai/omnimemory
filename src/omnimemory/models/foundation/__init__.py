@@ -21,6 +21,23 @@ from .model_migration_progress import (
     MigrationProgressMetrics,
     MigrationProgressTracker,
 )
+from .model_typed_collections import (
+    ModelStringList,
+    ModelOptionalStringList,
+    ModelKeyValuePair,
+    ModelMetadata,
+    ModelStructuredField,
+    ModelStructuredData,
+    ModelConfigurationOption,
+    ModelConfiguration,
+    ModelEventData,
+    ModelEventCollection,
+    ModelResultItem,
+    ModelResultCollection,
+    convert_dict_to_metadata,
+    convert_list_to_string_list,
+    convert_list_of_dicts_to_structured_data,
+)
 
 __all__ = [
     "EnumErrorCode",
@@ -48,4 +65,21 @@ __all__ = [
     "FileProcessingInfo",
     "MigrationProgressMetrics",
     "MigrationProgressTracker",
+
+    # Typed collections replacing generic types
+    "ModelStringList",
+    "ModelOptionalStringList",
+    "ModelKeyValuePair",
+    "ModelMetadata",
+    "ModelStructuredField",
+    "ModelStructuredData",
+    "ModelConfigurationOption",
+    "ModelConfiguration",
+    "ModelEventData",
+    "ModelEventCollection",
+    "ModelResultItem",
+    "ModelResultCollection",
+    "convert_dict_to_metadata",
+    "convert_list_to_string_list",
+    "convert_list_of_dicts_to_structured_data",
 ]

@@ -12,10 +12,22 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ..models.foundation import (
+    ModelStringList,
+    ModelOptionalStringList,
+    ModelMetadata,
+    ModelStructuredData,
+    ModelConfiguration,
+    ModelEventCollection,
+    ModelResultCollection,
+    convert_dict_to_metadata,
+    convert_list_to_string_list,
+)
 
 
 # === ENUMS ===
@@ -92,20 +104,20 @@ class BaseMemoryModel(BaseModel):
 
 class UserContext(BaseMemoryModel):
     """User context and permissions for memory operations."""
-    
+
     user_id: UUID = Field(description="Unique user identifier")
     agent_id: UUID = Field(description="Agent performing the operation")
     session_id: Optional[UUID] = Field(None, description="Session identifier")
-    permissions: List[str] = Field(
-        default_factory=list,
+    permissions: ModelStringList = Field(
+        default_factory=ModelStringList,
         description="User permissions for memory operations"
     )
     access_level: AccessLevel = Field(
         AccessLevel.INTERNAL,
         description="User's maximum access level"
     )
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict,
+    metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata,
         description="Additional user context metadata"
     )
 
@@ -156,11 +168,11 @@ class SearchFilters(BaseMemoryModel):
         None,
         description="Filter by access levels"
     )
-    tags: Optional[List[str]] = Field(
+    tags: Optional[ModelOptionalStringList] = Field(
         None,
         description="Filter by tags (AND logic)"
     )
-    source_agents: Optional[List[str]] = Field(
+    source_agents: Optional[ModelOptionalStringList] = Field(
         None,
         description="Filter by source agents"
     )
@@ -196,12 +208,12 @@ class SearchResult(BaseMemoryModel):
         None,
         description="Full memory record (if requested)"
     )
-    highlight_snippets: List[str] = Field(
-        default_factory=list,
+    highlight_snippets: ModelStringList = Field(
+        default_factory=ModelStringList,
         description="Text snippets with search term highlights"
     )
-    match_metadata: Dict[str, Any] = Field(
-        default_factory=dict,
+    match_metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata,
         description="Additional match information"
     )
 
@@ -230,8 +242,7 @@ class BaseMemoryRequest(BaseMemoryModel):
         le=300000,
         description="Request timeout in milliseconds"
     )
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict,
+    metadata: ModelMetadata = Field(default_factory=ModelMetadata,
         description="Additional request metadata"
     )
 
@@ -249,8 +260,7 @@ class BaseMemoryResponse(BaseMemoryModel):
         ge=0,
         description="Execution time in milliseconds"
     )
-    provenance: List[str] = Field(
-        default_factory=list,
+    provenance: ModelStringList = Field(default_factory=ModelStringList,
         description="Operation provenance chain"
     )
     trust_score: float = Field(
@@ -259,16 +269,13 @@ class BaseMemoryResponse(BaseMemoryModel):
         le=1.0,
         description="Trust score (0.0 to 1.0)"
     )
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict,
+    metadata: ModelMetadata = Field(default_factory=ModelMetadata,
         description="Additional response metadata"
     )
-    warnings: List[str] = Field(
-        default_factory=list,
+    warnings: ModelStringList = Field(default_factory=ModelStringList,
         description="Non-fatal warnings"
     )
-    events: List[Dict[str, Any]] = Field(
-        default_factory=list,
+    events: ModelResultCollection = Field(default_factory=ModelResultCollection,
         description="Operation events for observability"
     )
 
@@ -302,8 +309,7 @@ class MemoryRecord(BaseMemoryModel):
         None,
         description="Model used to generate embedding"
     )
-    tags: List[str] = Field(
-        default_factory=list,
+    tags: ModelStringList = Field(default_factory=ModelStringList,
         description="Memory tags for categorization",
         max_length=100
     )
@@ -323,8 +329,7 @@ class MemoryRecord(BaseMemoryModel):
         None,
         description="Expiration timestamp (for temporal memory)"
     )
-    provenance: List[str] = Field(
-        default_factory=list,
+    provenance: ModelStringList = Field(default_factory=ModelStringList,
         description="Memory provenance chain"
     )
     source_agent: str = Field(description="Agent that created this memory")
@@ -573,7 +578,7 @@ class TemporalSearchResponse(BaseMemoryResponse):
 class ContextualSearchRequest(BaseMemoryRequest):
     """Request for context-aware memory retrieval."""
     
-    context: Dict[str, Any] = Field(description="Context parameters for search")
+    context: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Context parameters for search")
     context_weight: float = Field(
         0.5,
         ge=0.0,
@@ -596,8 +601,7 @@ class ContextualSearchResponse(BaseMemoryResponse):
     """Response from contextual search."""
     
     results: List[SearchResult] = Field(description="Context-matched results")
-    context_analysis: Dict[str, Any] = Field(
-        default_factory=dict,
+    context_analysis: ModelMetadata = Field(default_factory=ModelMetadata,
         description="Analysis of context matching"
     )
 
@@ -610,7 +614,7 @@ class PersistenceRequest(BaseMemoryRequest):
     """Request for memory persistence operations."""
     persistence_type: str = Field(description="Type of persistence operation")
     target_storage: str = Field(description="Target storage system")
-    options: Dict[str, Any] = Field(default_factory=dict)
+    options: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class PersistenceResponse(BaseMemoryResponse):
@@ -623,7 +627,7 @@ class BackupRequest(BaseMemoryRequest):
     """Request for memory backup operations."""
     backup_type: str = Field(description="Type of backup")
     target_location: str = Field(description="Backup target location")
-    options: Dict[str, Any] = Field(default_factory=dict)
+    options: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class BackupResponse(BaseMemoryResponse):
@@ -635,7 +639,7 @@ class BackupResponse(BaseMemoryResponse):
 class RestoreRequest(BaseMemoryRequest):
     """Request for memory restore operations."""
     backup_id: UUID = Field(description="Backup to restore from")
-    restore_options: Dict[str, Any] = Field(default_factory=dict)
+    restore_options: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class RestoreResponse(BaseMemoryResponse):
@@ -647,37 +651,37 @@ class RestoreResponse(BaseMemoryResponse):
 # Intelligence Processing Models
 class IntelligenceProcessRequest(BaseMemoryRequest):
     """Request for intelligence processing."""
-    raw_data: Any = Field(description="Raw intelligence data")
-    processing_options: Dict[str, Any] = Field(default_factory=dict)
+    raw_data: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Raw intelligence data")
+    processing_options: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class IntelligenceProcessResponse(BaseMemoryResponse):
     """Response from intelligence processing."""
-    processed_data: Any = Field(description="Processed intelligence data")
-    insights: List[Dict[str, Any]] = Field(default_factory=list)
+    processed_data: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Processed intelligence data")
+    insights: ModelResultCollection = Field(default_factory=ModelResultCollection)
 
 
 class PatternAnalysisRequest(BaseMemoryRequest):
     """Request for pattern analysis."""
-    data_set: List[Any] = Field(description="Data set to analyze")
+    data_set: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Data set to analyze")
     analysis_type: str = Field(description="Type of pattern analysis")
 
 
 class PatternAnalysisResponse(BaseMemoryResponse):
     """Response from pattern analysis."""
-    patterns: List[Dict[str, Any]] = Field(description="Discovered patterns")
+    patterns: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Discovered patterns")
     confidence_scores: List[float] = Field(description="Pattern confidence scores")
 
 
 class InsightExtractionRequest(BaseMemoryRequest):
     """Request for insight extraction."""
-    processed_data: Any = Field(description="Processed data to extract insights from")
-    extraction_criteria: Dict[str, Any] = Field(default_factory=dict)
+    processed_data: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Processed data to extract insights from")
+    extraction_criteria: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class InsightExtractionResponse(BaseMemoryResponse):
     """Response from insight extraction."""
-    insights: List[Dict[str, Any]] = Field(description="Extracted insights")
+    insights: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Extracted insights")
     insight_scores: List[float] = Field(description="Insight relevance scores")
 
 
@@ -690,8 +694,8 @@ class SemanticAnalysisRequest(BaseMemoryRequest):
 
 class SemanticAnalysisResponse(BaseMemoryResponse):
     """Response from semantic analysis."""
-    semantic_features: Dict[str, Any] = Field(description="Semantic features")
-    relationships: List[Dict[str, Any]] = Field(description="Semantic relationships")
+    semantic_features: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Semantic features")
+    relationships: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Semantic relationships")
 
 
 class EmbeddingRequest(BaseMemoryRequest):
@@ -717,43 +721,43 @@ class SemanticComparisonRequest(BaseMemoryRequest):
 class SemanticComparisonResponse(BaseMemoryResponse):
     """Response from semantic comparison."""
     similarity_score: float = Field(description="Semantic similarity score")
-    comparison_details: Dict[str, Any] = Field(description="Detailed comparison results")
+    comparison_details: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Detailed comparison results")
 
 
 # Pattern Recognition Models
 class PatternRecognitionRequest(BaseMemoryRequest):
     """Request for pattern recognition."""
-    data: List[Any] = Field(description="Data to analyze for patterns")
-    pattern_types: List[str] = Field(description="Types of patterns to look for")
+    data: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Data to analyze for patterns")
+    pattern_types: ModelStringList = Field(default_factory=ModelStringList, description="Types of patterns to look for")
 
 
 class PatternRecognitionResponse(BaseMemoryResponse):
     """Response from pattern recognition."""
-    recognized_patterns: List[Dict[str, Any]] = Field(description="Recognized patterns")
+    recognized_patterns: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Recognized patterns")
     pattern_confidence: List[float] = Field(description="Pattern confidence scores")
 
 
 class PatternLearningRequest(BaseMemoryRequest):
     """Request for pattern learning."""
-    training_data: List[Any] = Field(description="Training data for learning")
-    learning_parameters: Dict[str, Any] = Field(default_factory=dict)
+    training_data: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Training data for learning")
+    learning_parameters: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class PatternLearningResponse(BaseMemoryResponse):
     """Response from pattern learning."""
-    learned_patterns: List[Dict[str, Any]] = Field(description="Newly learned patterns")
-    learning_metrics: Dict[str, Any] = Field(description="Learning performance metrics")
+    learned_patterns: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Newly learned patterns")
+    learning_metrics: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Learning performance metrics")
 
 
 class PatternPredictionRequest(BaseMemoryRequest):
     """Request for pattern prediction."""
-    context_data: List[Any] = Field(description="Context data for prediction")
+    context_data: ModelStructuredData = Field(default_factory=ModelStructuredData, description="Context data for prediction")
     prediction_horizon: int = Field(description="Prediction time horizon")
 
 
 class PatternPredictionResponse(BaseMemoryResponse):
     """Response from pattern prediction."""
-    predictions: List[Dict[str, Any]] = Field(description="Pattern predictions")
+    predictions: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Pattern predictions")
     confidence_intervals: List[Dict[str, float]] = Field(description="Prediction confidence")
 
 
@@ -772,7 +776,7 @@ class ConsolidationResponse(BaseMemoryResponse):
 
 class DeduplicationRequest(BaseMemoryRequest):
     """Request for memory deduplication."""
-    memory_scope: Dict[str, Any] = Field(description="Scope of deduplication")
+    memory_scope: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Scope of deduplication")
     similarity_threshold: float = Field(0.95, description="Similarity threshold for duplicates")
 
 
@@ -797,14 +801,14 @@ class ContextMergeResponse(BaseMemoryResponse):
 # Memory Aggregation Models
 class AggregationRequest(BaseMemoryRequest):
     """Request for memory aggregation."""
-    aggregation_criteria: Dict[str, Any] = Field(description="Aggregation criteria")
+    aggregation_criteria: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Aggregation criteria")
     aggregation_type: str = Field(description="Type of aggregation")
 
 
 class AggregationResponse(BaseMemoryResponse):
     """Response from memory aggregation."""
-    aggregated_data: Dict[str, Any] = Field(description="Aggregated memory data")
-    aggregation_metadata: Dict[str, Any] = Field(description="Aggregation metadata")
+    aggregated_data: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Aggregated memory data")
+    aggregation_metadata: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Aggregation metadata")
 
 
 class SummarizationRequest(BaseMemoryRequest):
@@ -816,31 +820,31 @@ class SummarizationRequest(BaseMemoryRequest):
 class SummarizationResponse(BaseMemoryResponse):
     """Response from memory summarization."""
     summary: str = Field(description="Generated summary")
-    key_points: List[str] = Field(description="Key points from cluster")
+    key_points: ModelStringList = Field(default_factory=ModelStringList, description="Key points from cluster")
 
 
 class StatisticsRequest(BaseMemoryRequest):
     """Request for memory statistics."""
-    statistics_type: List[str] = Field(description="Types of statistics to generate")
+    statistics_type: ModelStringList = Field(default_factory=ModelStringList, description="Types of statistics to generate")
     time_window: Optional[Dict[str, datetime]] = Field(None, description="Time window for stats")
 
 
 class StatisticsResponse(BaseMemoryResponse):
     """Response from memory statistics."""
-    statistics: Dict[str, Any] = Field(description="Generated statistics")
-    charts_data: Optional[Dict[str, Any]] = Field(None, description="Data for visualization")
+    statistics: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Generated statistics")
+    charts_data: Optional[ModelMetadata] = Field(None, description="Data for visualization")
 
 
 # Memory Optimization Models
 class LayoutOptimizationRequest(BaseMemoryRequest):
     """Request for memory layout optimization."""
     optimization_target: str = Field(description="Optimization target (speed/space/balance)")
-    memory_scope: Dict[str, Any] = Field(description="Scope of optimization")
+    memory_scope: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Scope of optimization")
 
 
 class LayoutOptimizationResponse(BaseMemoryResponse):
     """Response from layout optimization."""
-    optimization_results: Dict[str, Any] = Field(description="Optimization results")
+    optimization_results: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Optimization results")
     performance_improvement: Dict[str, float] = Field(description="Performance gains")
 
 
@@ -859,70 +863,70 @@ class CompressionResponse(BaseMemoryResponse):
 class RetrievalOptimizationRequest(BaseMemoryRequest):
     """Request for retrieval optimization."""
     optimization_target: str = Field(description="Optimization target")
-    query_patterns: List[Dict[str, Any]] = Field(description="Common query patterns")
+    query_patterns: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Common query patterns")
 
 
 class RetrievalOptimizationResponse(BaseMemoryResponse):
     """Response from retrieval optimization."""
-    optimization_applied: List[str] = Field(description="Optimizations applied")
+    optimization_applied: ModelStringList = Field(default_factory=ModelStringList, description="Optimizations applied")
     expected_improvement: Dict[str, float] = Field(description="Expected performance gains")
 
 
 # Workflow Coordination Models
 class WorkflowExecutionRequest(BaseMemoryRequest):
     """Request for workflow execution."""
-    workflow_definition: Dict[str, Any] = Field(description="Workflow definition")
-    workflow_parameters: Dict[str, Any] = Field(default_factory=dict)
+    workflow_definition: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Workflow definition")
+    workflow_parameters: ModelConfiguration = Field(default_factory=ModelConfiguration)
 
 
 class WorkflowExecutionResponse(BaseMemoryResponse):
     """Response from workflow execution."""
     workflow_id: UUID = Field(description="Executed workflow ID")
-    execution_results: Dict[str, Any] = Field(description="Workflow execution results")
+    execution_results: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Workflow execution results")
 
 
 class ParallelCoordinationRequest(BaseMemoryRequest):
     """Request for parallel operation coordination."""
-    operations: List[Dict[str, Any]] = Field(description="Operations to coordinate")
+    operations: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Operations to coordinate")
     coordination_strategy: str = Field(description="Coordination strategy")
 
 
 class ParallelCoordinationResponse(BaseMemoryResponse):
     """Response from parallel coordination."""
-    coordination_results: List[Dict[str, Any]] = Field(description="Coordination results")
-    execution_summary: Dict[str, Any] = Field(description="Overall execution summary")
+    coordination_results: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Coordination results")
+    execution_summary: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Overall execution summary")
 
 
 class WorkflowStateRequest(BaseMemoryRequest):
     """Request for workflow state management."""
     workflow_id: UUID = Field(description="Workflow ID to manage")
     state_operation: str = Field(description="State operation (get/set/reset)")
-    state_data: Optional[Dict[str, Any]] = Field(None, description="State data")
+    state_data: Optional[ModelMetadata] = Field(None, description="State data")
 
 
 class WorkflowStateResponse(BaseMemoryResponse):
     """Response from workflow state management."""
-    current_state: Dict[str, Any] = Field(description="Current workflow state")
-    state_history: List[Dict[str, Any]] = Field(description="State change history")
+    current_state: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Current workflow state")
+    state_history: ModelResultCollection = Field(default_factory=ModelResultCollection, description="State change history")
 
 
 # Agent Coordination Models
 class AgentCoordinationRequest(BaseMemoryRequest):
     """Request for agent coordination."""
     agent_ids: List[UUID] = Field(description="Agents to coordinate")
-    coordination_task: Dict[str, Any] = Field(description="Coordination task definition")
+    coordination_task: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Coordination task definition")
 
 
 class AgentCoordinationResponse(BaseMemoryResponse):
     """Response from agent coordination."""
-    coordination_plan: Dict[str, Any] = Field(description="Coordination execution plan")
-    agent_assignments: Dict[UUID, Dict[str, Any]] = Field(description="Agent task assignments")
+    coordination_plan: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Coordination execution plan")
+    agent_assignments: ModelMetadata = Field(default_factory=ModelMetadata,description="Agent task assignments")
 
 
 class BroadcastRequest(BaseMemoryRequest):
     """Request for memory update broadcast."""
     update_type: str = Field(description="Type of update to broadcast")
-    update_data: Dict[str, Any] = Field(description="Update data to broadcast")
+    update_data: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Update data to broadcast")
     target_agents: Optional[List[UUID]] = Field(None, description="Target agents (None = all)")
 
 
@@ -936,43 +940,43 @@ class BroadcastResponse(BaseMemoryResponse):
 class StateSynchronizationRequest(BaseMemoryRequest):
     """Request for agent state synchronization."""
     agent_ids: List[UUID] = Field(description="Agents to synchronize")
-    synchronization_scope: Dict[str, Any] = Field(description="Scope of synchronization")
+    synchronization_scope: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Scope of synchronization")
 
 
 class StateSynchronizationResponse(BaseMemoryResponse):
     """Response from state synchronization."""
-    synchronization_results: Dict[UUID, Dict[str, Any]] = Field(description="Sync results per agent")
-    conflicts_resolved: List[Dict[str, Any]] = Field(description="Conflicts that were resolved")
+    synchronization_results: ModelMetadata = Field(default_factory=ModelMetadata,description="Sync results per agent")
+    conflicts_resolved: ModelResultCollection = Field(default_factory=ModelResultCollection, description="Conflicts that were resolved")
 
 
 # Memory Orchestration Models
 class LifecycleOrchestrationRequest(BaseMemoryRequest):
     """Request for memory lifecycle orchestration."""
     lifecycle_stage: str = Field(description="Lifecycle stage to orchestrate")
-    memory_scope: Dict[str, Any] = Field(description="Scope of memories to orchestrate")
+    memory_scope: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Scope of memories to orchestrate")
 
 
 class LifecycleOrchestrationResponse(BaseMemoryResponse):
     """Response from lifecycle orchestration."""
-    orchestration_plan: Dict[str, Any] = Field(description="Lifecycle orchestration plan")
+    orchestration_plan: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Lifecycle orchestration plan")
     affected_memories: List[UUID] = Field(description="Memories affected by orchestration")
 
 
 class QuotaManagementRequest(BaseMemoryRequest):
     """Request for quota management."""
     quota_type: str = Field(description="Type of quota to manage")
-    quota_parameters: Dict[str, Any] = Field(description="Quota parameters")
+    quota_parameters: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Quota parameters")
 
 
 class QuotaManagementResponse(BaseMemoryResponse):
     """Response from quota management."""
-    current_quotas: Dict[str, Any] = Field(description="Current quota status")
-    quota_adjustments: Dict[str, Any] = Field(description="Applied quota adjustments")
+    current_quotas: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Current quota status")
+    quota_adjustments: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Applied quota adjustments")
 
 
 class MigrationCoordinationRequest(BaseMemoryRequest):
     """Request for memory migration coordination."""
-    migration_plan: Dict[str, Any] = Field(description="Migration plan")
+    migration_plan: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Migration plan")
     source_storage: str = Field(description="Source storage system")
     target_storage: str = Field(description="Target storage system")
 
@@ -980,5 +984,5 @@ class MigrationCoordinationRequest(BaseMemoryRequest):
 class MigrationCoordinationResponse(BaseMemoryResponse):
     """Response from migration coordination."""
     migration_id: UUID = Field(description="Migration operation ID")
-    migration_status: Dict[str, Any] = Field(description="Migration status and progress")
+    migration_status: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Migration status and progress")
 

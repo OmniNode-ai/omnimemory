@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Optional, Protocol
 from uuid import UUID
 
 from omnibase_core.core.monadic.model_node_result import NodeResult
@@ -23,6 +23,11 @@ from omnibase_core.core.monadic.model_node_result import NodeResult
 from ..models.foundation import (
     ModelHealthResponse,
     ModelMetricsResponse,
+    ModelStringList,
+    ModelOptionalStringList,
+    ModelMetadata,
+    ModelConfiguration,
+    ModelResultCollection,
     ModelSystemConfiguration
 )
 
@@ -283,7 +288,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
     async def update_memory(
         self,
         memory_id: UUID,
-        updates: Dict[str, Any],
+        updates: ModelMetadata,
         correlation_id: Optional[UUID] = None,
     ) -> NodeResult[MemoryRecord]:
         """
@@ -302,7 +307,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
     @abstractmethod
     async def list_memories(
         self,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: Optional[ModelMetadata] = None,
         limit: int = 100,
         offset: int = 0,
         correlation_id: Optional[UUID] = None,
@@ -382,7 +387,7 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
     async def get_related_memories(
         self,
         memory_id: UUID,
-        relationship_types: Optional[List[str]] = None,
+        relationship_types: Optional[ModelOptionalStringList] = None,
         max_depth: int = 2,
         correlation_id: Optional[UUID] = None,
     ) -> NodeResult[List[MemoryRecord]]:
@@ -462,7 +467,7 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
         self,
         memory_ids: Optional[List[UUID]] = None,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Verify the integrity of stored memory data.
         
@@ -539,7 +544,7 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
     async def enrich_memory(
         self,
         memory: MemoryRecord,
-        enrichment_types: List[str],
+        enrichment_types: ModelStringList,
         correlation_id: Optional[UUID] = None,
     ) -> NodeResult[MemoryRecord]:
         """
@@ -615,10 +620,10 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
     @abstractmethod
     async def cluster_content(
         self,
-        content_items: List[str],
+        content_items: ModelStringList,
         num_clusters: Optional[int] = None,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Cluster content items by semantic similarity.
         
@@ -692,10 +697,10 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
     @abstractmethod
     async def validate_patterns(
         self,
-        patterns: List[Dict[str, Any]],
-        validation_data: List[Dict[str, Any]],
+        patterns: ModelResultCollection,
+        validation_data: ModelResultCollection,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Validate discovered patterns against validation data.
         
@@ -774,7 +779,7 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
         self,
         memories: List[MemoryRecord],
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[List[Dict[str, Any]]]:
+    ) -> NodeResult[ModelResultCollection]:
         """
         Detect conflicts between memory records.
         
@@ -847,9 +852,9 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
     @abstractmethod
     async def create_memory_views(
         self,
-        view_definition: Dict[str, Any],
+        view_definition: ModelConfiguration,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Create aggregated views of memory data.
         
@@ -924,7 +929,7 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
         self,
         time_window: datetime,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Analyze memory system performance over a time window.
         
@@ -1002,7 +1007,7 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
         self,
         workflow_id: UUID,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Monitor the progress of a running workflow.
         
@@ -1076,7 +1081,7 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
     async def register_agent(
         self,
         agent_id: UUID,
-        agent_capabilities: Dict[str, Any],
+        agent_capabilities: ModelMetadata,
         correlation_id: Optional[UUID] = None,
     ) -> NodeResult[bool]:
         """
@@ -1153,7 +1158,7 @@ class ProtocolMemoryOrchestrator(ProtocolMemoryOperations, Protocol):
     async def get_system_status(
         self,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetadata]:
         """
         Get comprehensive memory system status.
         
