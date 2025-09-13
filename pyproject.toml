@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "omnimemory", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 
 # Core MCP integration for Archon connectivity
 mcp = "^1.8.0"

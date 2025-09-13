@@ -18,7 +18,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Dict, Optional, Union
+from typing import Any, AsyncGenerator, Dict, Optional
 
 from pydantic import BaseModel, Field
 import structlog
@@ -334,7 +334,7 @@ async def correlation_context(
 @asynccontextmanager
 async def trace_operation(
     operation_name: str,
-    operation_type: Union[OperationType, str],
+    operation_type: OperationType | str,
     **context
 ):
     """Convenience function for operation tracing."""

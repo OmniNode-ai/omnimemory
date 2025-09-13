@@ -3,7 +3,7 @@ Base Protocol Definitions for OmniMemory ONEX Architecture
 
 This module defines all protocol interfaces following ONEX 4-node architecture:
 - Effect: Memory storage, retrieval, and persistence operations
-- Compute: Intelligence processing, semantic analysis, pattern recognition  
+- Compute: Intelligence processing, semantic analysis, pattern recognition
 - Reducer: Memory consolidation, aggregation, and optimization
 - Orchestrator: Workflow, agent, and memory coordination
 
@@ -11,9 +11,11 @@ All protocols use typing.Protocol for structural typing, avoiding isinstance
 checks and supporting ModelOnexContainer dependency injection patterns.
 """
 
+from __future__ import annotations
+
 from abc import abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, Union
+from typing import Any, Dict, List, Optional, Protocol
 from uuid import UUID
 
 from omnibase_core.core.monadic.model_node_result import NodeResult

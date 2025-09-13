@@ -8,12 +8,14 @@ All models support monadic patterns with NodeResult composition and provide
 comprehensive validation, serialization, and observability features.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # === ENUMS ===
@@ -980,6 +982,3 @@ class MigrationCoordinationResponse(BaseMemoryResponse):
     migration_id: UUID = Field(description="Migration operation ID")
     migration_status: Dict[str, Any] = Field(description="Migration status and progress")
 
-
-# Forward reference resolution
-SearchResult.model_rebuild()
