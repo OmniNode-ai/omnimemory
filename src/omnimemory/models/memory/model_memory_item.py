@@ -5,7 +5,7 @@ Memory item model following ONEX standards.
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .enum_memory_storage_type import EnumMemoryStorageType
 
@@ -125,3 +125,36 @@ class ModelMemoryItem(BaseModel):
         default=False,
         description="Whether this item has been indexed for search",
     )
+
+    # Validation using Pydantic v2 syntax
+    @field_validator('content')
+    @classmethod
+    def validate_content_size(cls, v):
+        """Validate content size to prevent oversized memory items."""
+        MAX_CONTENT_SIZE = 1_000_000  # 1MB max content size
+        if len(v.encode('utf-8')) > MAX_CONTENT_SIZE:
+            raise ValueError(f"Content exceeds maximum size of {MAX_CONTENT_SIZE} bytes")
+        return v
+
+    @field_validator('title')
+    @classmethod
+    def validate_title_length(cls, v):
+        """Validate title length for reasonable limits."""
+        if v is not None:
+            MAX_TITLE_LENGTH = 500
+            if len(v) > MAX_TITLE_LENGTH:
+                raise ValueError(f"Title exceeds maximum length of {MAX_TITLE_LENGTH} characters")
+        return v
+
+    @field_validator('tags', 'keywords')
+    @classmethod
+    def validate_tag_limits(cls, v):
+        """Validate tag and keyword limits to prevent abuse."""
+        MAX_TAGS = 100
+        MAX_TAG_LENGTH = 100
+        if len(v) > MAX_TAGS:
+            raise ValueError(f"Cannot have more than {MAX_TAGS} tags/keywords")
+        for tag in v:
+            if len(tag) > MAX_TAG_LENGTH:
+                raise ValueError(f"Tag '{tag}' exceeds maximum length of {MAX_TAG_LENGTH} characters")
+        return v

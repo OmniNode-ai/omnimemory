@@ -38,6 +38,7 @@ class ModelContainerConfig(BaseModel):
     supabase_anon_key: str | None = Field(
         default=None,
         description="Supabase anonymous key",
+        exclude=True  # Prevent serialization for security
     )
     redis_url: str = Field(
         default="redis://localhost:6379",
@@ -48,6 +49,7 @@ class ModelContainerConfig(BaseModel):
     pinecone_api_key: str | None = Field(
         default=None,
         description="Pinecone API key for vector database",
+        exclude=True  # Prevent serialization for security
     )
     pinecone_environment: str | None = Field(
         default=None,

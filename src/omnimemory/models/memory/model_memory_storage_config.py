@@ -43,10 +43,12 @@ class ModelMemoryStorageConfig(BaseModel):
     password_hash: str | None = Field(
         default=None,
         description="Hashed password for authentication",
+        exclude=True  # Prevent serialization for security
     )
     api_key: str | None = Field(
         default=None,
         description="API key for authentication",
+        exclude=True  # Prevent serialization for security
     )
 
     # Connection pool settings

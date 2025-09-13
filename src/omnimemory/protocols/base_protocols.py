@@ -18,6 +18,12 @@ from uuid import UUID
 
 from omnibase_core.core.monadic.model_node_result import NodeResult
 
+from ..models.foundation import (
+    ModelHealthResponse,
+    ModelMetricsResponse,
+    ModelSystemConfiguration
+)
+
 from .data_models import (
     # Requests and responses
     BaseMemoryRequest,
@@ -113,16 +119,17 @@ class ProtocolMemoryBase(Protocol):
     async def health_check(
         self,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelHealthResponse]:
         """
         Check the health status of the memory component.
-        
+
         Returns:
-            NodeResult containing health status information including:
-            - status: healthy/degraded/unhealthy
-            - latency: response time metrics
-            - resource_usage: memory, CPU, storage utilization
+            NodeResult containing ModelHealthResponse with:
+            - status: overall system health (healthy/degraded/unhealthy)
+            - latency_ms: response time metrics
+            - resource_usage: detailed system resource metrics
             - dependencies: status of external dependencies
+            - uptime, version, environment details
         """
         ...
     
@@ -130,31 +137,34 @@ class ProtocolMemoryBase(Protocol):
     async def get_metrics(
         self,
         correlation_id: Optional[UUID] = None,
-    ) -> NodeResult[Dict[str, Any]]:
+    ) -> NodeResult[ModelMetricsResponse]:
         """
         Get operational metrics for the memory component.
-        
+
         Returns:
-            NodeResult containing operational metrics including:
-            - operation_counts: number of operations by type
+            NodeResult containing ModelMetricsResponse with:
+            - operation_counts: detailed counts by operation type
             - performance_metrics: latency, throughput, error rates
-            - resource_metrics: memory usage, cache hit rates
+            - resource_metrics: memory usage, cache statistics, connections
+            - custom_metrics: application-specific measurements
+            - alerts: active performance warnings
         """
         ...
     
     @abstractmethod
     async def configure(
         self,
-        config: Dict[str, Any],
+        config: ModelSystemConfiguration,
         correlation_id: Optional[UUID] = None,
     ) -> NodeResult[bool]:
         """
         Configure the memory component with new settings.
-        
+
         Args:
-            config: Configuration parameters
+            config: ModelSystemConfiguration with database, cache, performance,
+                   and observability settings
             correlation_id: Request correlation ID
-            
+
         Returns:
             NodeResult indicating configuration success/failure
         """
