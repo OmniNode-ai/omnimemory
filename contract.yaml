@@ -1,0 +1,782 @@
+# === OmniNode:Metadata ===
+# metadata_version: 0.1.0
+# protocol_version: 1.1.0
+# owner: OmniNode Team
+# copyright: OmniNode Team
+# schema_version: 1.1.0
+# name: omnimemory_contract.yaml
+# version: 1.0.0
+# uuid: f8c5d12a-8947-4b7f-9c86-d5e7f2a9b1c3
+# author: OmniNode Team
+# created_at: 2025-09-13T16:35:00.000000
+# last_modified_at: 2025-09-13T16:35:00.000000
+# description: OmniMemory ONEX Contract Definition
+# state_contract: state_contract://default
+# lifecycle: active
+# hash: auto_generated
+# entrypoint: yaml@contract.yaml
+# runtime_language_hint: python>=3.12
+# namespace: onex.omnimemory.contract
+# meta_type: contract
+# === /OmniNode:Metadata ===
+
+# OmniMemory ONEX 4-Node Contract Definition
+# Version: 1.0.0
+# Compliance: ONEX 4.0 Architecture Standards
+
+contract:
+  name: "omnimemory"
+  version: "1.0.0"
+  description: "Advanced memory management system with ONEX 4-node architecture compliance"
+  author: "OmniNode Team"
+  license: "proprietary"
+  
+  # ONEX 4-Node Architecture Mapping
+  architecture:
+    pattern: "onex_4_node"
+    nodes:
+      effect:
+        description: "Memory storage, retrieval, and persistence operations"
+        protocols:
+          - "ProtocolMemoryStorage"
+          - "ProtocolMemoryRetrieval"
+          - "ProtocolMemoryPersistence"
+        implementations:
+          - "VectorMemoryService"
+          - "PersistentMemoryService"
+          - "TemporalMemoryService"
+      
+      compute:
+        description: "Intelligence processing, semantic analysis, pattern recognition"
+        protocols:
+          - "ProtocolIntelligenceProcessor" 
+          - "ProtocolSemanticAnalyzer"
+          - "ProtocolPatternRecognition"
+        implementations:
+          - "IntelligenceProcessorService"
+          - "SemanticAnalyzerService"
+          - "PatternRecognitionService"
+      
+      reducer:
+        description: "Memory consolidation, aggregation, and optimization"
+        protocols:
+          - "ProtocolMemoryConsolidator"
+          - "ProtocolMemoryAggregator"
+          - "ProtocolMemoryOptimizer"
+        implementations:
+          - "MemoryConsolidatorService"
+          - "MemoryAggregatorService" 
+          - "MemoryOptimizerService"
+      
+      orchestrator:
+        description: "Cross-agent coordination and workflow management"
+        protocols:
+          - "ProtocolWorkflowCoordinator"
+          - "ProtocolAgentCoordinator"
+          - "ProtocolMemoryOrchestrator"
+        implementations:
+          - "WorkflowCoordinatorService"
+          - "AgentCoordinatorService"
+          - "MemoryOrchestratorService"
+
+# Protocol Definitions
+protocols:
+
+  # === EFFECT NODE PROTOCOLS ===
+  
+  ProtocolMemoryStorage:
+    description: "Core memory storage operations with ONEX compliance"
+    methods:
+      store_memory:
+        description: "Store memory with metadata and provenance"
+        input_schema: "MemoryStoreRequest"
+        output_schema: "MemoryStoreResponse"
+        error_codes: ["MEMORY_STORE_FAILED", "VALIDATION_ERROR", "STORAGE_FULL"]
+        monadic: true
+        
+      retrieve_memory:
+        description: "Retrieve memory by identifier with context"
+        input_schema: "MemoryRetrieveRequest"
+        output_schema: "MemoryRetrieveResponse"
+        error_codes: ["MEMORY_NOT_FOUND", "ACCESS_DENIED", "CORRUPTED_DATA"]
+        monadic: true
+        
+      delete_memory:
+        description: "Soft delete memory with audit trail"
+        input_schema: "MemoryDeleteRequest"
+        output_schema: "MemoryDeleteResponse"
+        error_codes: ["MEMORY_NOT_FOUND", "DELETE_FAILED", "DEPENDENCY_EXISTS"]
+        monadic: true
+
+  ProtocolMemoryRetrieval:
+    description: "Advanced memory retrieval with semantic search"
+    methods:
+      semantic_search:
+        description: "Vector-based semantic similarity search"
+        input_schema: "SemanticSearchRequest"
+        output_schema: "SemanticSearchResponse"
+        error_codes: ["SEARCH_FAILED", "INDEX_UNAVAILABLE", "QUERY_INVALID"]
+        monadic: true
+        
+      temporal_search:
+        description: "Time-based memory retrieval with decay"
+        input_schema: "TemporalSearchRequest"
+        output_schema: "TemporalSearchResponse"
+        error_codes: ["TEMPORAL_SEARCH_FAILED", "TIME_RANGE_INVALID"]
+        monadic: true
+        
+      contextual_search:
+        description: "Context-aware memory retrieval"
+        input_schema: "ContextualSearchRequest"
+        output_schema: "ContextualSearchResponse"
+        error_codes: ["CONTEXT_SEARCH_FAILED", "CONTEXT_INVALID"]
+        monadic: true
+
+  ProtocolMemoryPersistence:
+    description: "Memory persistence and durability management"
+    methods:
+      persist_to_storage:
+        description: "Persist memory to durable storage"
+        input_schema: "PersistenceRequest"
+        output_schema: "PersistenceResponse"
+        error_codes: ["PERSISTENCE_FAILED", "STORAGE_UNAVAILABLE", "QUOTA_EXCEEDED"]
+        monadic: true
+        
+      backup_memory:
+        description: "Create memory backup with versioning"
+        input_schema: "BackupRequest"
+        output_schema: "BackupResponse"
+        error_codes: ["BACKUP_FAILED", "BACKUP_STORAGE_FULL", "VERSION_CONFLICT"]
+        monadic: true
+        
+      restore_memory:
+        description: "Restore memory from backup"
+        input_schema: "RestoreRequest"
+        output_schema: "RestoreResponse"
+        error_codes: ["RESTORE_FAILED", "BACKUP_NOT_FOUND", "VERSION_MISMATCH"]
+        monadic: true
+
+  # === COMPUTE NODE PROTOCOLS ===
+  
+  ProtocolIntelligenceProcessor:
+    description: "Intelligence processing with pattern analysis"
+    methods:
+      process_intelligence:
+        description: "Process raw intelligence data into structured memory"
+        input_schema: "IntelligenceProcessRequest"
+        output_schema: "IntelligenceProcessResponse"
+        error_codes: ["PROCESSING_FAILED", "INVALID_INPUT", "RESOURCE_EXHAUSTED"]
+        monadic: true
+        
+      analyze_patterns:
+        description: "Analyze patterns in intelligence data"
+        input_schema: "PatternAnalysisRequest"
+        output_schema: "PatternAnalysisResponse" 
+        error_codes: ["ANALYSIS_FAILED", "INSUFFICIENT_DATA", "MODEL_UNAVAILABLE"]
+        monadic: true
+        
+      extract_insights:
+        description: "Extract actionable insights from processed intelligence"
+        input_schema: "InsightExtractionRequest"
+        output_schema: "InsightExtractionResponse"
+        error_codes: ["EXTRACTION_FAILED", "NO_INSIGHTS_FOUND", "PROCESSING_ERROR"]
+        monadic: true
+
+  ProtocolSemanticAnalyzer:
+    description: "Semantic analysis and understanding"
+    methods:
+      analyze_semantics:
+        description: "Analyze semantic content and relationships"
+        input_schema: "SemanticAnalysisRequest"
+        output_schema: "SemanticAnalysisResponse"
+        error_codes: ["SEMANTIC_ANALYSIS_FAILED", "LANGUAGE_NOT_SUPPORTED"]
+        monadic: true
+        
+      generate_embeddings:
+        description: "Generate vector embeddings for semantic search"
+        input_schema: "EmbeddingRequest"
+        output_schema: "EmbeddingResponse"
+        error_codes: ["EMBEDDING_FAILED", "MODEL_UNAVAILABLE", "INPUT_TOO_LARGE"]
+        monadic: true
+        
+      compare_semantics:
+        description: "Compare semantic similarity between content"
+        input_schema: "SemanticComparisonRequest"
+        output_schema: "SemanticComparisonResponse"
+        error_codes: ["COMPARISON_FAILED", "INCOMPATIBLE_CONTENT"]
+        monadic: true
+
+  ProtocolPatternRecognition:
+    description: "Pattern recognition and learning"
+    methods:
+      recognize_patterns:
+        description: "Recognize patterns in memory data"
+        input_schema: "PatternRecognitionRequest"
+        output_schema: "PatternRecognitionResponse"
+        error_codes: ["PATTERN_RECOGNITION_FAILED", "TRAINING_DATA_INSUFFICIENT"]
+        monadic: true
+        
+      learn_patterns:
+        description: "Learn new patterns from memory data"
+        input_schema: "PatternLearningRequest" 
+        output_schema: "PatternLearningResponse"
+        error_codes: ["LEARNING_FAILED", "INVALID_TRAINING_DATA", "MODEL_UPDATE_FAILED"]
+        monadic: true
+        
+      predict_patterns:
+        description: "Predict future patterns based on learned data"
+        input_schema: "PatternPredictionRequest"
+        output_schema: "PatternPredictionResponse"
+        error_codes: ["PREDICTION_FAILED", "INSUFFICIENT_HISTORY", "MODEL_UNAVAILABLE"]
+        monadic: true
+
+  # === REDUCER NODE PROTOCOLS ===
+  
+  ProtocolMemoryConsolidator:
+    description: "Memory consolidation and deduplication"
+    methods:
+      consolidate_memories:
+        description: "Consolidate similar memories into unified representations"
+        input_schema: "ConsolidationRequest"
+        output_schema: "ConsolidationResponse"
+        error_codes: ["CONSOLIDATION_FAILED", "MEMORY_CONFLICT", "INTEGRITY_VIOLATION"]
+        monadic: true
+        
+      deduplicate_memories:
+        description: "Remove duplicate memories while preserving provenance"
+        input_schema: "DeduplicationRequest"
+        output_schema: "DeduplicationResponse"
+        error_codes: ["DEDUPLICATION_FAILED", "REFERENCE_INTEGRITY_ERROR"]
+        monadic: true
+        
+      merge_memory_contexts:
+        description: "Merge related memory contexts"
+        input_schema: "ContextMergeRequest"
+        output_schema: "ContextMergeResponse"
+        error_codes: ["MERGE_FAILED", "CONTEXT_CONFLICT", "DEPENDENCY_ERROR"]
+        monadic: true
+
+  ProtocolMemoryAggregator:
+    description: "Memory aggregation and summarization"
+    methods:
+      aggregate_memories:
+        description: "Aggregate memories by temporal or semantic criteria"
+        input_schema: "AggregationRequest"
+        output_schema: "AggregationResponse"
+        error_codes: ["AGGREGATION_FAILED", "CRITERIA_INVALID", "RESOURCE_EXHAUSTED"]
+        monadic: true
+        
+      summarize_memory_clusters:
+        description: "Create summaries of memory clusters"
+        input_schema: "SummarizationRequest"
+        output_schema: "SummarizationResponse"
+        error_codes: ["SUMMARIZATION_FAILED", "CLUSTER_INVALID", "MODEL_ERROR"]
+        monadic: true
+        
+      generate_memory_statistics:
+        description: "Generate statistical analysis of memory usage"
+        input_schema: "StatisticsRequest"
+        output_schema: "StatisticsResponse"
+        error_codes: ["STATISTICS_FAILED", "DATA_UNAVAILABLE", "CALCULATION_ERROR"]
+        monadic: true
+
+  ProtocolMemoryOptimizer:
+    description: "Memory performance optimization"
+    methods:
+      optimize_memory_layout:
+        description: "Optimize memory storage layout for performance"
+        input_schema: "LayoutOptimizationRequest"
+        output_schema: "LayoutOptimizationResponse"
+        error_codes: ["OPTIMIZATION_FAILED", "LAYOUT_INVALID", "MIGRATION_ERROR"]
+        monadic: true
+        
+      compress_memories:
+        description: "Compress memories while preserving semantic content"
+        input_schema: "CompressionRequest"
+        output_schema: "CompressionResponse"
+        error_codes: ["COMPRESSION_FAILED", "QUALITY_DEGRADATION", "ALGORITHM_ERROR"]
+        monadic: true
+        
+      optimize_retrieval_paths:
+        description: "Optimize memory retrieval performance"
+        input_schema: "RetrievalOptimizationRequest"
+        output_schema: "RetrievalOptimizationResponse"
+        error_codes: ["PATH_OPTIMIZATION_FAILED", "INDEX_CORRUPTION", "PERFORMANCE_REGRESSION"]
+        monadic: true
+
+  # === ORCHESTRATOR NODE PROTOCOLS ===
+  
+  ProtocolWorkflowCoordinator:
+    description: "Workflow coordination and execution"
+    methods:
+      execute_memory_workflow:
+        description: "Execute complex memory workflows"
+        input_schema: "WorkflowExecutionRequest"
+        output_schema: "WorkflowExecutionResponse"
+        error_codes: ["WORKFLOW_FAILED", "STEP_FAILURE", "DEPENDENCY_UNMET", "TIMEOUT"]
+        monadic: true
+        
+      coordinate_parallel_operations:
+        description: "Coordinate parallel memory operations"
+        input_schema: "ParallelCoordinationRequest"
+        output_schema: "ParallelCoordinationResponse"
+        error_codes: ["COORDINATION_FAILED", "DEADLOCK", "RESOURCE_CONTENTION"]
+        monadic: true
+        
+      manage_workflow_state:
+        description: "Manage workflow execution state and recovery"
+        input_schema: "WorkflowStateRequest"
+        output_schema: "WorkflowStateResponse"
+        error_codes: ["STATE_MANAGEMENT_FAILED", "STATE_CORRUPTION", "RECOVERY_FAILED"]
+        monadic: true
+
+  ProtocolAgentCoordinator:
+    description: "Cross-agent coordination and communication"
+    methods:
+      coordinate_agents:
+        description: "Coordinate memory operations across multiple agents"
+        input_schema: "AgentCoordinationRequest"
+        output_schema: "AgentCoordinationResponse"
+        error_codes: ["COORDINATION_FAILED", "AGENT_UNAVAILABLE", "COMMUNICATION_ERROR"]
+        monadic: true
+        
+      broadcast_memory_updates:
+        description: "Broadcast memory updates to subscribed agents"
+        input_schema: "BroadcastRequest"
+        output_schema: "BroadcastResponse"
+        error_codes: ["BROADCAST_FAILED", "SUBSCRIPTION_ERROR", "DELIVERY_FAILED"]
+        monadic: true
+        
+      synchronize_agent_state:
+        description: "Synchronize memory state across agents"
+        input_schema: "StateSynchronizationRequest"
+        output_schema: "StateSynchronizationResponse"
+        error_codes: ["SYNCHRONIZATION_FAILED", "STATE_CONFLICT", "NETWORK_ERROR"]
+        monadic: true
+
+  ProtocolMemoryOrchestrator:
+    description: "High-level memory system orchestration"
+    methods:
+      orchestrate_memory_lifecycle:
+        description: "Orchestrate complete memory lifecycle management"
+        input_schema: "LifecycleOrchestrationRequest"
+        output_schema: "LifecycleOrchestrationResponse"
+        error_codes: ["ORCHESTRATION_FAILED", "LIFECYCLE_VIOLATION", "DEPENDENCY_CYCLE"]
+        monadic: true
+        
+      manage_memory_quotas:
+        description: "Manage memory usage quotas and limits"
+        input_schema: "QuotaManagementRequest"
+        output_schema: "QuotaManagementResponse"
+        error_codes: ["QUOTA_EXCEEDED", "QUOTA_MANAGEMENT_FAILED", "POLICY_VIOLATION"]
+        monadic: true
+        
+      coordinate_memory_migrations:
+        description: "Coordinate memory migrations between storage systems"
+        input_schema: "MigrationCoordinationRequest"
+        output_schema: "MigrationCoordinationResponse"
+        error_codes: ["MIGRATION_FAILED", "DATA_LOSS", "MIGRATION_CONFLICT"]
+        monadic: true
+
+# Data Schemas (Pydantic Models)
+schemas:
+
+  # === BASE SCHEMAS ===
+  
+  BaseMemoryRequest:
+    description: "Base request schema for all memory operations"
+    fields:
+      correlation_id:
+        type: "UUID"
+        description: "Correlation ID for request tracking"
+        required: true
+      timestamp:
+        type: "datetime"
+        description: "Request timestamp"
+        required: true
+      user_context:
+        type: "UserContext"
+        description: "User context and permissions"
+        required: false
+      metadata:
+        type: "Dict[str, Any]"
+        description: "Additional request metadata"
+        required: false
+
+  BaseMemoryResponse:
+    description: "Base response schema for all memory operations"
+    fields:
+      correlation_id:
+        type: "UUID"
+        description: "Correlation ID matching request"
+        required: true
+      status:
+        type: "OperationStatus"
+        description: "Operation execution status"
+        required: true
+      timestamp:
+        type: "datetime"
+        description: "Response timestamp"
+        required: true
+      execution_time_ms:
+        type: "int"
+        description: "Execution time in milliseconds"
+        required: true
+      provenance:
+        type: "List[str]"
+        description: "Operation provenance chain"
+        required: true
+      trust_score:
+        type: "float"
+        description: "Trust score (0.0 to 1.0)"
+        required: true
+        constraints:
+          minimum: 0.0
+          maximum: 1.0
+      metadata:
+        type: "Dict[str, Any]"
+        description: "Additional response metadata"
+        required: false
+
+  # === MEMORY DATA MODELS ===
+  
+  MemoryRecord:
+    description: "Core memory record with ONEX compliance"
+    fields:
+      memory_id:
+        type: "UUID"
+        description: "Unique memory identifier"
+        required: true
+      content:
+        type: "str"
+        description: "Memory content"
+        required: true
+        constraints:
+          max_length: 1048576  # 1MB max content
+      content_type:
+        type: "ContentType"
+        description: "Type of memory content"
+        required: true
+      embedding:
+        type: "List[float]"
+        description: "Vector embedding for semantic search"
+        required: false
+        constraints:
+          min_items: 768
+          max_items: 4096
+      tags:
+        type: "List[str]"
+        description: "Memory tags for categorization"
+        required: false
+        constraints:
+          max_items: 100
+      priority:
+        type: "MemoryPriority"
+        description: "Memory priority level"
+        required: true
+      created_at:
+        type: "datetime"
+        description: "Creation timestamp"
+        required: true
+      updated_at:
+        type: "datetime"
+        description: "Last update timestamp"
+        required: true
+      expires_at:
+        type: "datetime"
+        description: "Expiration timestamp (for temporal memory)"
+        required: false
+      provenance:
+        type: "List[str]"
+        description: "Memory provenance chain"
+        required: true
+      source_agent:
+        type: "str"
+        description: "Agent that created this memory"
+        required: true
+      related_memories:
+        type: "List[UUID]"
+        description: "Related memory identifiers"
+        required: false
+      access_level:
+        type: "AccessLevel"
+        description: "Memory access control level"
+        required: true
+
+  # === REQUEST/RESPONSE SCHEMAS ===
+
+  MemoryStoreRequest:
+    extends: "BaseMemoryRequest"
+    description: "Request to store memory"
+    fields:
+      memory:
+        type: "MemoryRecord"
+        description: "Memory record to store"
+        required: true
+      storage_preferences:
+        type: "StoragePreferences"
+        description: "Storage location and durability preferences"
+        required: false
+
+  MemoryStoreResponse:
+    extends: "BaseMemoryResponse"
+    description: "Response from memory store operation"
+    fields:
+      memory_id:
+        type: "UUID"
+        description: "Generated memory identifier"
+        required: true
+      storage_location:
+        type: "str"
+        description: "Actual storage location"
+        required: true
+      indexing_status:
+        type: "IndexingStatus"
+        description: "Indexing completion status"
+        required: true
+
+  SemanticSearchRequest:
+    extends: "BaseMemoryRequest"
+    description: "Request for semantic similarity search"
+    fields:
+      query:
+        type: "str"
+        description: "Search query text"
+        required: true
+        constraints:
+          min_length: 1
+          max_length: 10000
+      limit:
+        type: "int"
+        description: "Maximum number of results"
+        required: false
+        default: 10
+        constraints:
+          minimum: 1
+          maximum: 1000
+      similarity_threshold:
+        type: "float"
+        description: "Minimum similarity score"
+        required: false
+        default: 0.7
+        constraints:
+          minimum: 0.0
+          maximum: 1.0
+      filters:
+        type: "SearchFilters"
+        description: "Additional search filters"
+        required: false
+      include_embeddings:
+        type: "bool"
+        description: "Include embeddings in response"
+        required: false
+        default: false
+
+  SemanticSearchResponse:
+    extends: "BaseMemoryResponse"
+    description: "Response from semantic search"
+    fields:
+      results:
+        type: "List[SearchResult]"
+        description: "Search results with similarity scores"
+        required: true
+      total_matches:
+        type: "int"
+        description: "Total number of matches found"
+        required: true
+      search_time_ms:
+        type: "int"
+        description: "Search execution time"
+        required: true
+      index_version:
+        type: "str"
+        description: "Search index version used"
+        required: true
+
+# Enums
+enums:
+  OperationStatus:
+    description: "Status of memory operations"
+    values:
+      - SUCCESS
+      - PARTIAL_SUCCESS
+      - FAILURE
+      - TIMEOUT
+      - CANCELLED
+
+  ContentType:
+    description: "Type of memory content"
+    values:
+      - TEXT
+      - JSON
+      - BINARY
+      - IMAGE
+      - AUDIO
+      - VIDEO
+      - STRUCTURED_DATA
+
+  MemoryPriority:
+    description: "Memory priority levels"
+    values:
+      - CRITICAL
+      - HIGH
+      - NORMAL
+      - LOW
+      - ARCHIVE
+
+  AccessLevel:
+    description: "Memory access control levels"
+    values:
+      - PUBLIC
+      - INTERNAL
+      - RESTRICTED
+      - CONFIDENTIAL
+      - SECRET
+
+  IndexingStatus:
+    description: "Memory indexing status"
+    values:
+      - PENDING
+      - IN_PROGRESS
+      - COMPLETED
+      - FAILED
+      - SKIPPED
+
+# Error Handling
+error_handling:
+  error_code_format: "ONEX_OMNIMEMORY_{COMPONENT}_{CODE}_{DESCRIPTION}"
+  
+  error_categories:
+    VALIDATION:
+      prefix: "ONEX_OMNIMEMORY_VAL"
+      description: "Input validation errors"
+      recoverable: false
+      
+    STORAGE:
+      prefix: "ONEX_OMNIMEMORY_STO"
+      description: "Storage system errors"
+      recoverable: true
+      
+    RETRIEVAL:
+      prefix: "ONEX_OMNIMEMORY_RET"
+      description: "Memory retrieval errors"
+      recoverable: true
+      
+    PROCESSING:
+      prefix: "ONEX_OMNIMEMORY_PRO"
+      description: "Intelligence processing errors"
+      recoverable: true
+      
+    COORDINATION:
+      prefix: "ONEX_OMNIMEMORY_COR"
+      description: "Coordination and workflow errors"
+      recoverable: true
+      
+    SYSTEM:
+      prefix: "ONEX_OMNIMEMORY_SYS"
+      description: "System-level errors"
+      recoverable: false
+
+  error_codes:
+    # Validation Errors
+    ONEX_OMNIMEMORY_VAL_001_INVALID_INPUT: "Invalid input parameters"
+    ONEX_OMNIMEMORY_VAL_002_SCHEMA_VIOLATION: "Schema validation failure"
+    ONEX_OMNIMEMORY_VAL_003_CONSTRAINT_VIOLATION: "Constraint validation failure"
+    
+    # Storage Errors
+    ONEX_OMNIMEMORY_STO_001_STORAGE_UNAVAILABLE: "Storage system unavailable"
+    ONEX_OMNIMEMORY_STO_002_QUOTA_EXCEEDED: "Storage quota exceeded"
+    ONEX_OMNIMEMORY_STO_003_CORRUPTION_DETECTED: "Data corruption detected"
+    
+    # Retrieval Errors
+    ONEX_OMNIMEMORY_RET_001_MEMORY_NOT_FOUND: "Memory record not found"
+    ONEX_OMNIMEMORY_RET_002_INDEX_UNAVAILABLE: "Search index unavailable"
+    ONEX_OMNIMEMORY_RET_003_ACCESS_DENIED: "Access denied to memory"
+    
+    # Processing Errors
+    ONEX_OMNIMEMORY_PRO_001_PROCESSING_FAILED: "Intelligence processing failed"
+    ONEX_OMNIMEMORY_PRO_002_MODEL_UNAVAILABLE: "AI model unavailable"
+    ONEX_OMNIMEMORY_PRO_003_RESOURCE_EXHAUSTED: "Processing resources exhausted"
+    
+    # Coordination Errors
+    ONEX_OMNIMEMORY_COR_001_WORKFLOW_FAILED: "Workflow execution failed"
+    ONEX_OMNIMEMORY_COR_002_DEADLOCK_DETECTED: "Resource deadlock detected"
+    ONEX_OMNIMEMORY_COR_003_SYNC_FAILED: "Synchronization failed"
+    
+    # System Errors
+    ONEX_OMNIMEMORY_SYS_001_INTERNAL_ERROR: "Internal system error"
+    ONEX_OMNIMEMORY_SYS_002_CONFIG_ERROR: "Configuration error"
+    ONEX_OMNIMEMORY_SYS_003_DEPENDENCY_FAILED: "External dependency failed"
+
+# Performance Requirements
+performance:
+  targets:
+    memory_operations:
+      response_time_p95: "100ms"
+      response_time_p99: "250ms"
+      throughput: "1000000 ops/hour"
+      
+    semantic_search:
+      response_time_p95: "50ms"
+      response_time_p99: "100ms"
+      throughput: "10000 queries/minute"
+      
+    storage_operations:
+      write_latency_p95: "10ms"
+      read_latency_p95: "5ms"
+      durability: "99.99%"
+
+  monitoring:
+    metrics:
+      - "operation_duration_seconds"
+      - "operation_count_total"
+      - "error_count_by_type"
+      - "memory_usage_bytes"
+      - "cache_hit_rate"
+      - "storage_utilization_percent"
+      - "concurrent_operations"
+      
+    health_checks:
+      - "storage_connectivity"
+      - "index_health"
+      - "dependency_availability"
+      - "resource_usage"
+
+# Security Requirements
+security:
+  authentication:
+    required: true
+    methods: ["oauth2", "api_key", "mutual_tls"]
+    
+  authorization:
+    model: "rbac"
+    permissions:
+      - "memory.read"
+      - "memory.write"
+      - "memory.delete"
+      - "memory.admin"
+      
+  encryption:
+    at_rest: "AES-256"
+    in_transit: "TLS 1.3"
+    key_rotation: "90 days"
+    
+  audit:
+    required: true
+    events:
+      - "memory_access"
+      - "memory_modification"
+      - "permission_changes"
+      - "system_events"
+
+# Compliance
+compliance:
+  onex_version: "4.0"
+  standards:
+    - "ONEX-ARCH-001: 4-Node Architecture"
+    - "ONEX-MONO-001: Monadic Patterns"
+    - "ONEX-CONT-001: Contract-Driven Development"
+    - "ONEX-ERR-001: Error Handling Standards"
+    - "ONEX-OBS-001: Observability Requirements"
+    - "ONEX-SEC-001: Security Standards"
+    - "ONEX-PERF-001: Performance Standards"
