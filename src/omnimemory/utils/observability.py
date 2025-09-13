@@ -8,6 +8,8 @@ This module provides:
 - Performance monitoring and metrics collection
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
 import uuid
@@ -20,6 +22,31 @@ from typing import Any, AsyncGenerator, Dict, Optional, Union
 
 from pydantic import BaseModel, Field
 import structlog
+
+
+def _sanitize_error(error: Exception) -> str:
+    """
+    Sanitize error messages to prevent information disclosure in logs.
+
+    Args:
+        error: Exception to sanitize
+
+    Returns:
+        Safe error message without sensitive information
+    """
+    error_type = type(error).__name__
+    # Only include safe, generic error information
+    if isinstance(error, (ConnectionError, TimeoutError, asyncio.TimeoutError)):
+        return f"{error_type}: Connection or timeout issue"
+    elif isinstance(error, ValueError):
+        return f"{error_type}: Invalid value"
+    elif isinstance(error, KeyError):
+        return f"{error_type}: Missing key"
+    elif isinstance(error, AttributeError):
+        return f"{error_type}: Missing attribute"
+    else:
+        return f"{error_type}: Operation failed"
+
 
 # Context variables for correlation tracking
 correlation_id_var: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
@@ -141,7 +168,7 @@ class ObservabilityManager:
             self._logger.error(
                 "correlation_context_error",
                 correlation_id=context.correlation_id,
-                error=str(e),
+                error=_sanitize_error(e),
                 error_type=type(e).__name__
             )
             raise
@@ -218,7 +245,7 @@ class ObservabilityManager:
                 correlation_id=correlation_id,
                 operation_name=operation_name,
                 operation_type=operation_type.value,
-                error=str(e),
+                error=_sanitize_error(e),
                 error_type=type(e).__name__,
                 **additional_context
             )
@@ -360,7 +387,7 @@ def inject_correlation_context(func):
             logger.error(
                 f"function_failed_{func.__name__}",
                 **context,
-                error=str(e),
+                error=_sanitize_error(e),
                 error_type=type(e).__name__
             )
             raise
@@ -388,7 +415,7 @@ async def inject_correlation_context_async(func):
             logger.error(
                 f"async_function_failed_{func.__name__}",
                 **context,
-                error=str(e),
+                error=_sanitize_error(e),
                 error_type=type(e).__name__
             )
             raise

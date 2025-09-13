@@ -8,7 +8,10 @@ This module provides:
 - Performance monitoring and alerting
 """
 
+from __future__ import annotations
+
 import asyncio
+import os
 import time
 from datetime import datetime
 from enum import Enum
@@ -17,6 +20,64 @@ import psutil
 
 from pydantic import BaseModel, Field
 import structlog
+
+
+def _sanitize_error(error: Exception) -> str:
+    """
+    Sanitize error messages to prevent information disclosure in logs.
+
+    Args:
+        error: Exception to sanitize
+
+    Returns:
+        Safe error message without sensitive information
+    """
+    error_type = type(error).__name__
+    # Only include safe, generic error information
+    if isinstance(error, (ConnectionError, TimeoutError, asyncio.TimeoutError)):
+        return f"{error_type}: Connection or timeout issue"
+    elif isinstance(error, ValueError):
+        return f"{error_type}: Invalid value"
+    elif isinstance(error, KeyError):
+        return f"{error_type}: Missing key"
+    elif isinstance(error, AttributeError):
+        return f"{error_type}: Missing attribute"
+    else:
+        return f"{error_type}: Operation failed"
+
+
+def _get_package_version() -> str:
+    """Get package version from metadata or fallback to default."""
+    try:
+        # Try to get version from package metadata
+        from importlib.metadata import version
+        return version("omnimemory")
+    except ImportError:
+        # Fallback for older Python versions
+        try:
+            import pkg_resources
+            return pkg_resources.get_distribution("omnimemory").version
+        except Exception:
+            return "0.1.0"  # Fallback version
+    except Exception:
+        return "0.1.0"  # Fallback version
+
+
+def _get_environment() -> str:
+    """Detect current environment from environment variables."""
+    # Check common environment variables
+    env = os.getenv("ENVIRONMENT", os.getenv("ENV", os.getenv("NODE_ENV", "development")))
+
+    # Normalize environment names
+    if env.lower() in ("prod", "production"):
+        return "production"
+    elif env.lower() in ("stage", "staging"):
+        return "staging"
+    elif env.lower() in ("test", "testing"):
+        return "testing"
+    else:
+        return "development"
+
 
 from ..models.foundation.model_health_response import (
     ModelHealthResponse,
@@ -204,7 +265,7 @@ class HealthCheckManager:
                     logger.error(
                         "health_check_failed",
                         dependency_name=name,
-                        error=str(e),
+                        error=_sanitize_error(e),
                         error_type=type(e).__name__,
                         latency_ms=latency_ms
                     )
@@ -303,7 +364,7 @@ class HealthCheckManager:
         except Exception as e:
             logger.error(
                 "resource_metrics_error",
-                error=str(e),
+                error=_sanitize_error(e),
                 error_type=type(e).__name__
             )
             # Return default metrics on error
@@ -387,8 +448,8 @@ class HealthCheckManager:
                 resource_usage=resource_metrics,
                 dependencies=dependencies,
                 uptime_seconds=uptime_seconds,
-                version="0.1.0",  # TODO: Get from package metadata
-                environment="development"  # TODO: Get from configuration
+                version=_get_package_version(),
+                environment=_get_environment()
             )
 
             logger.info(

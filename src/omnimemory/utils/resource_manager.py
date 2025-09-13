@@ -8,6 +8,8 @@ This module provides:
 - Timeout configurations for all async operations
 """
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import time
@@ -20,6 +22,31 @@ from pydantic import BaseModel, Field
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+
+def _sanitize_error(error: Exception) -> str:
+    """
+    Sanitize error messages to prevent information disclosure in logs.
+
+    Args:
+        error: Exception to sanitize
+
+    Returns:
+        Safe error message without sensitive information
+    """
+    error_type = type(error).__name__
+    # Only include safe, generic error information
+    if isinstance(error, (ConnectionError, TimeoutError, asyncio.TimeoutError)):
+        return f"{error_type}: Connection or timeout issue"
+    elif isinstance(error, ValueError):
+        return f"{error_type}: Invalid value"
+    elif isinstance(error, KeyError):
+        return f"{error_type}: Missing key"
+    elif isinstance(error, AttributeError):
+        return f"{error_type}: Missing attribute"
+    else:
+        return f"{error_type}: Operation failed"
+
 
 T = TypeVar('T')
 
@@ -247,7 +274,7 @@ class AsyncResourceManager:
             logger.error(
                 "resource_management_error",
                 resource_name=resource_name,
-                error=str(e),
+                error=_sanitize_error(e),
                 error_type=type(e).__name__
             )
             raise
@@ -268,7 +295,7 @@ class AsyncResourceManager:
                     logger.error(
                         "resource_cleanup_error",
                         resource_name=resource_name,
-                        error=str(e)
+                        error=_sanitize_error(e)
                     )
 
             # Release semaphore if acquired

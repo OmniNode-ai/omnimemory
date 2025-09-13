@@ -2,6 +2,8 @@
 Memory response model following ONEX standards.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
 

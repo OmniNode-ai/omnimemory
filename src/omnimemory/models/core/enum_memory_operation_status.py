@@ -2,6 +2,8 @@
 Enum for memory operation status following ONEX standards.
 """
 
+from __future__ import annotations
+
 from enum import Enum
 
 

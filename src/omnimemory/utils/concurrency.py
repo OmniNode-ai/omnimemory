@@ -8,6 +8,8 @@ This module provides:
 - Fair scheduling and priority-based access control
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
 from contextlib import asynccontextmanager
@@ -24,6 +26,31 @@ import structlog
 from .observability import correlation_context, trace_operation, OperationType
 
 logger = structlog.get_logger(__name__)
+
+
+def _sanitize_error(error: Exception) -> str:
+    """
+    Sanitize error messages to prevent information disclosure in logs.
+
+    Args:
+        error: Exception to sanitize
+
+    Returns:
+        Safe error message without sensitive information
+    """
+    error_type = type(error).__name__
+    # Only include safe, generic error information
+    if isinstance(error, (ConnectionError, TimeoutError, asyncio.TimeoutError)):
+        return f"{error_type}: Connection or timeout issue"
+    elif isinstance(error, ValueError):
+        return f"{error_type}: Invalid value"
+    elif isinstance(error, KeyError):
+        return f"{error_type}: Missing key"
+    elif isinstance(error, AttributeError):
+        return f"{error_type}: Missing attribute"
+    else:
+        return f"{error_type}: Operation failed"
+
 
 class LockPriority(Enum):
     """Priority levels for lock acquisition."""
@@ -382,7 +409,8 @@ class AsyncConnectionPool:
     async def acquire(
         self,
         timeout: Optional[float] = None,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        _retry_count: int = 0
     ) -> AsyncGenerator[Any, None]:
         """
         Acquire a connection from the pool.
@@ -390,9 +418,13 @@ class AsyncConnectionPool:
         Args:
             timeout: Maximum time to wait for connection
             correlation_id: Correlation ID for tracing
+            _retry_count: Internal retry counter to prevent infinite recursion
 
         Yields:
             Connection object from the pool
+
+        Raises:
+            RuntimeError: If maximum retry attempts exceeded
         """
         connection_id = str(uuid4())
         connection = None
@@ -452,11 +484,30 @@ class AsyncConnectionPool:
                         logger.warning(
                             "connection_invalid",
                             pool_name=self.config.name,
-                            connection_id=connection_id
+                            connection_id=connection_id,
+                            retry_count=_retry_count
                         )
                         await self._destroy_connection(connection)
-                        # Recursively try again (this could be improved with retry limit)
-                        async with self.acquire(timeout=timeout, correlation_id=correlation_id) as new_conn:
+
+                        # Prevent infinite recursion with retry limit
+                        max_retries = 3
+                        if _retry_count >= max_retries:
+                            logger.error(
+                                "connection_validation_max_retries_exceeded",
+                                pool_name=self.config.name,
+                                connection_id=connection_id,
+                                max_retries=max_retries
+                            )
+                            raise RuntimeError(
+                                f"Failed to acquire valid connection after {max_retries} attempts"
+                            )
+
+                        # Retry with incremented counter
+                        async with self.acquire(
+                            timeout=timeout,
+                            correlation_id=correlation_id,
+                            _retry_count=_retry_count + 1
+                        ) as new_conn:
                             yield new_conn
                             return
 
@@ -487,7 +538,7 @@ class AsyncConnectionPool:
                         "connection_acquisition_failed",
                         pool_name=self.config.name,
                         connection_id=connection_id,
-                        error=str(e),
+                        error=_sanitize_error(e),
                         error_type=type(e).__name__
                     )
                     raise
