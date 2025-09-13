@@ -14,9 +14,29 @@ OmniMemory is an advanced unified memory and intelligence system designed to mig
 
 ## Architecture & Design Patterns
 
-### ONEX 4-Node Architecture Integration
+### ONEX Standards Compliance
 
-OmniMemory follows the ONEX 4-node architecture pattern:
+OmniMemory strictly follows ONEX standards from omnibase_core:
+
+**Directory Structure Standards:**
+- ✅ **models/** directory (NOT core/) - all models in `src/omnimemory/models/`
+- ✅ **Pydantic BaseModel** - all models inherit from `BaseModel`
+- ✅ **Strong Typing** - zero `Any` types throughout codebase
+- ✅ **Field Documentation** - `Field(..., description="...")` pattern
+- ✅ **Domain Organization** - models organized by functional domain
+
+**Current Model Structure:**
+```
+src/omnimemory/models/         # 26 Pydantic models, zero Any types
+├── core/                      # Foundation models (4 models)
+├── memory/                    # Memory-specific models (6 models)
+├── intelligence/              # Intelligence processing (5 models)
+├── service/                   # Service configuration (4 models)
+├── container/                 # Container and DI models (4 models)
+└── foundation/                # Base architectural models (3 models)
+```
+
+### ONEX 4-Node Architecture Integration
 
 ```
 EFFECT → COMPUTE → REDUCER → ORCHESTRATOR
