@@ -2,7 +2,7 @@
 Foundation domain models for OmniMemory following ONEX standards.
 
 This module provides foundation models for base implementations,
-error handling, and system-level operations.
+error handling, migration progress tracking, and system-level operations.
 """
 
 from .enum_error_code import EnumErrorCode
@@ -12,6 +12,15 @@ from .model_system_health import ModelSystemHealth
 from .model_health_response import ModelHealthResponse, ModelDependencyStatus, ModelResourceMetrics
 from .model_metrics_response import ModelMetricsResponse, ModelOperationCounts, ModelPerformanceMetrics, ModelResourceMetricsDetailed
 from .model_configuration import ModelSystemConfiguration, ModelDatabaseConfig, ModelCacheConfig, ModelPerformanceConfig, ModelObservabilityConfig
+from .model_migration_progress import (
+    MigrationStatus,
+    MigrationPriority,
+    FileProcessingStatus,
+    BatchProcessingMetrics,
+    FileProcessingInfo,
+    MigrationProgressMetrics,
+    MigrationProgressTracker,
+)
 
 __all__ = [
     "EnumErrorCode",
@@ -30,4 +39,13 @@ __all__ = [
     "ModelCacheConfig",
     "ModelPerformanceConfig",
     "ModelObservabilityConfig",
+
+    # Migration progress tracking
+    "MigrationStatus",
+    "MigrationPriority",
+    "FileProcessingStatus",
+    "BatchProcessingMetrics",
+    "FileProcessingInfo",
+    "MigrationProgressMetrics",
+    "MigrationProgressTracker",
 ]
