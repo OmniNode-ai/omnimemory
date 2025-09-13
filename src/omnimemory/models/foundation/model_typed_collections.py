@@ -43,12 +43,15 @@ class ModelStringList(BaseModel):
             raise ValueError("values must be a list")
 
         # Remove empty strings and duplicates while preserving order
+        # Use O(1) set operations for efficient deduplication
         seen = set()
         result = []
         for item in v:
-            if item and item.strip() and item not in seen:
-                seen.add(item)
-                result.append(item.strip())
+            if item:
+                stripped_item = item.strip()
+                if stripped_item and stripped_item not in seen:
+                    seen.add(stripped_item)
+                    result.append(stripped_item)
 
         return result
 
@@ -77,12 +80,15 @@ class ModelOptionalStringList(BaseModel):
             raise ValueError("values must be a list or None")
 
         # Remove empty strings and duplicates while preserving order
+        # Use O(1) set operations for efficient deduplication
         seen = set()
         result = []
         for item in v:
-            if item and item.strip() and item not in seen:
-                seen.add(item)
-                result.append(item.strip())
+            if item:
+                stripped_item = item.strip()
+                if stripped_item and stripped_item not in seen:
+                    seen.add(stripped_item)
+                    result.append(stripped_item)
 
         return result if result else None
 

@@ -543,9 +543,19 @@ class AsyncConnectionPool:
                     )
                     raise
                 finally:
-                    # Return connection to pool
+                    # Return connection to pool with shielded cleanup to prevent resource leaks
                     if connection:
-                        await self._return_connection(connection_id, connection)
+                        try:
+                            # Shield the cleanup operation to ensure it completes even if cancelled
+                            await asyncio.shield(self._return_connection(connection_id, connection))
+                        except Exception as cleanup_error:
+                            # Log cleanup errors but don't propagate them
+                            logger.error(
+                                "connection_cleanup_failed",
+                                pool_name=self.config.name,
+                                connection_id=connection_id,
+                                error=str(cleanup_error)
+                            )
 
     async def _create_new_connection(self) -> Any:
         """Create a new connection."""

@@ -48,6 +48,8 @@ from .observability import (
     log_with_correlation,
     inject_correlation_context,
     inject_correlation_context_async,
+    validate_correlation_id,
+    sanitize_metadata_value,
 )
 
 from .concurrency import (
@@ -73,6 +75,7 @@ from .health_manager import (
     HealthCheckResult,
     HealthCheckManager,
     health_manager,
+    RateLimiter,
     create_postgresql_health_check,
     create_redis_health_check,
     create_pinecone_health_check,
@@ -114,6 +117,8 @@ __all__ = [
     "log_with_correlation",
     "inject_correlation_context",
     "inject_correlation_context_async",
+    "validate_correlation_id",
+    "sanitize_metadata_value",
 
     # Concurrency
     "LockPriority",
@@ -137,6 +142,7 @@ __all__ = [
     "HealthCheckResult",
     "HealthCheckManager",
     "health_manager",
+    "RateLimiter",
     "create_postgresql_health_check",
     "create_redis_health_check",
     "create_pinecone_health_check",

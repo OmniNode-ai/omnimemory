@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import re
 import uuid
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -22,6 +23,50 @@ from typing import Any, AsyncGenerator, Dict, Optional
 
 from pydantic import BaseModel, Field
 import structlog
+
+
+# === SECURITY VALIDATION FUNCTIONS ===
+
+def validate_correlation_id(correlation_id: str) -> bool:
+    """
+    Validate correlation ID format to prevent injection attacks.
+
+    Args:
+        correlation_id: Correlation ID to validate
+
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    if not correlation_id or not isinstance(correlation_id, str):
+        return False
+
+    # Allow UUIDs (with or without hyphens) and alphanumeric strings up to 64 chars
+    # This prevents injection while allowing reasonable correlation ID formats
+    pattern = r'^[a-zA-Z0-9\-_]{1,64}$'
+    return re.match(pattern, correlation_id) is not None
+
+
+def sanitize_metadata_value(value: Any) -> Any:
+    """
+    Sanitize metadata values to prevent injection attacks.
+
+    Args:
+        value: Value to sanitize
+
+    Returns:
+        Sanitized value
+    """
+    if isinstance(value, str):
+        # Remove potential injection patterns and limit length
+        sanitized = re.sub(r'[<>"\'\\\n\r\t]', '', value)
+        return sanitized[:1000]  # Limit string length
+    elif isinstance(value, (int, float, bool)):
+        return value
+    elif value is None:
+        return None
+    else:
+        # Convert to string and sanitize
+        return sanitize_metadata_value(str(value))
 
 
 def _sanitize_error(error: Exception) -> str:
@@ -134,6 +179,16 @@ class ObservabilityManager:
             trace_level: Tracing level
             **metadata: Additional metadata
         """
+        # Validate correlation ID if provided
+        if correlation_id and not validate_correlation_id(correlation_id):
+            raise ValueError(f"Invalid correlation ID format: {correlation_id}")
+
+        # Sanitize metadata values
+        sanitized_metadata = {
+            key: sanitize_metadata_value(value)
+            for key, value in metadata.items()
+        }
+
         # Create context
         context = CorrelationContext(
             correlation_id=correlation_id or str(uuid.uuid4()),
@@ -142,7 +197,7 @@ class ObservabilityManager:
             operation=operation,
             parent_correlation_id=correlation_id_var.get(),
             trace_level=trace_level,
-            metadata=metadata
+            metadata=sanitized_metadata
         )
 
         # Set context variables

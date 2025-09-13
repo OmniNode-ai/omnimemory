@@ -22,6 +22,59 @@ from pydantic import BaseModel, Field
 import structlog
 
 
+# === RATE LIMITING ===
+
+class RateLimiter:
+    """Simple rate limiter for API endpoints."""
+
+    def __init__(self, max_requests: int = 100, window_seconds: int = 60):
+        """
+        Initialize rate limiter.
+
+        Args:
+            max_requests: Maximum requests allowed in the time window
+            window_seconds: Time window in seconds
+        """
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._requests: Dict[str, List[float]] = {}
+        self._lock = asyncio.Lock()
+
+    async def is_allowed(self, identifier: str) -> bool:
+        """
+        Check if request is allowed for the given identifier.
+
+        Args:
+            identifier: Client identifier (IP, user ID, etc.)
+
+        Returns:
+            bool: True if request is allowed, False if rate limited
+        """
+        async with self._lock:
+            current_time = time.time()
+
+            # Initialize or get existing requests list
+            if identifier not in self._requests:
+                self._requests[identifier] = []
+
+            requests = self._requests[identifier]
+
+            # Remove old requests outside the window
+            cutoff_time = current_time - self.window_seconds
+            self._requests[identifier] = [
+                req_time for req_time in requests
+                if req_time > cutoff_time
+            ]
+
+            # Check if we can accept this request
+            if len(self._requests[identifier]) >= self.max_requests:
+                return False
+
+            # Add current request
+            self._requests[identifier].append(current_time)
+            return True
+
+
 def _sanitize_error(error: Exception) -> str:
     """
     Sanitize error messages to prevent information disclosure in logs.
@@ -149,6 +202,8 @@ class HealthCheckManager:
         self._configs: Dict[str, HealthCheckConfig] = {}
         self._circuit_breakers: Dict[str, AsyncCircuitBreaker] = {}
         self._last_results: Dict[str, HealthCheckResult] = {}
+        self._results_lock = asyncio.Lock()  # Prevent race conditions on metric updates
+        self._rate_limiter = RateLimiter(max_requests=30, window_seconds=60)  # Rate limit health checks
         self._system_start_time = time.time()
 
     def register_health_check(
@@ -222,7 +277,9 @@ class HealthCheckManager:
                     # Ensure result has correct latency
                     result.latency_ms = (time.time() - start_time) * 1000
 
-                    self._last_results[name] = result
+                    # Thread-safe update of results to prevent race conditions
+                    async with self._results_lock:
+                        self._last_results[name] = result
 
                     logger.debug(
                         "health_check_completed",
@@ -242,7 +299,9 @@ class HealthCheckManager:
                         error_message=f"Health check timeout after {config.timeout}s"
                     )
 
-                    self._last_results[name] = result
+                    # Thread-safe update of results to prevent race conditions
+                    async with self._results_lock:
+                        self._last_results[name] = result
                     logger.warning(
                         "health_check_timeout",
                         dependency_name=name,
@@ -261,7 +320,9 @@ class HealthCheckManager:
                         error_message=str(e)
                     )
 
-                    self._last_results[name] = result
+                    # Thread-safe update of results to prevent race conditions
+                    async with self._results_lock:
+                        self._last_results[name] = result
                     logger.error(
                         "health_check_failed",
                         dependency_name=name,
@@ -476,6 +537,27 @@ class HealthCheckManager:
                 "state_changed_at": circuit_breaker.stats.state_changed_at.isoformat()
             }
         return stats
+
+    async def rate_limited_health_check(self, client_identifier: str) -> Dict[str, Any]:
+        """
+        Rate-limited health check endpoint for API exposure.
+
+        Args:
+            client_identifier: Client identifier (IP address, API key, etc.)
+
+        Returns:
+            Health check result or rate limit error
+
+        Raises:
+            ValueError: If rate limit exceeded
+        """
+        # Check rate limit
+        if not await self._rate_limiter.is_allowed(client_identifier):
+            raise ValueError(f"Rate limit exceeded for client: {client_identifier}")
+
+        # Perform health check
+        return await self.comprehensive_health_check()
+
 
 # Global health manager instance
 health_manager = HealthCheckManager()
