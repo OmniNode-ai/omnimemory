@@ -2,6 +2,17 @@
 
 **Status**: Active Development | **Architecture**: ONEX 4.0 Compliant | **Performance Target**: Sub-100ms Operations
 
+## 🚫 CRITICAL POLICY: NO BACKWARDS COMPATIBILITY
+
+**NEVER KEEP BACKWARDS COMPATIBILITY EVER EVER EVER**
+
+This project follows a **ZERO BACKWARDS COMPATIBILITY** policy:
+- **Breaking changes are always acceptable**
+- **No deprecated code maintenance**
+- **All models MUST conform to current protocols**
+- **Clean, modern architecture only**
+- **Remove old patterns immediately**
+
 ## Project Overview
 
 OmniMemory is an advanced unified memory and intelligence system designed to migrate and modernize 274+ intelligence modules from legacy omnibase_3 into a comprehensive, ONEX-compliant memory architecture. This system accelerates development across all omni agents through systematic memory management, retrieval operations, and cross-modal intelligence patterns.
