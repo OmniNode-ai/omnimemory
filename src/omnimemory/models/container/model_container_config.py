@@ -2,7 +2,7 @@
 Container configuration model following ONEX standards.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class ModelContainerConfig(BaseModel):
@@ -35,10 +35,9 @@ class ModelContainerConfig(BaseModel):
         default=None,
         description="Supabase URL for cloud database",
     )
-    supabase_anon_key: str | None = Field(
+    supabase_anon_key: SecretStr | None = Field(
         default=None,
-        description="Supabase anonymous key",
-        exclude=True  # Prevent serialization for security
+        description="Supabase anonymous key - protected with SecretStr",
     )
     redis_url: str = Field(
         default="redis://localhost:6379",
@@ -46,10 +45,9 @@ class ModelContainerConfig(BaseModel):
     )
 
     # Vector database configuration
-    pinecone_api_key: str | None = Field(
+    pinecone_api_key: SecretStr | None = Field(
         default=None,
-        description="Pinecone API key for vector database",
-        exclude=True  # Prevent serialization for security
+        description="Pinecone API key for vector database - protected with SecretStr",
     )
     pinecone_environment: str | None = Field(
         default=None,

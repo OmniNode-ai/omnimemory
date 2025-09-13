@@ -352,10 +352,18 @@ class FairSemaphore:
                             self._stats.available_permits += 1
                             self._stats.total_releases += 1
 
-                            # Update hold time statistics
-                            current_avg = self._stats.average_hold_time
+                            # Update hold time statistics (optimized calculation)
                             releases = self._stats.total_releases
-                            self._stats.average_hold_time = ((current_avg * (releases - 1)) + hold_time) / releases
+                            if releases == 1:
+                                # First release, set average directly
+                                self._stats.average_hold_time = hold_time
+                            else:
+                                # Use exponential moving average for better performance
+                                alpha = min(0.1, 2.0 / (releases + 1))  # Adaptive smoothing factor
+                                self._stats.average_hold_time = (
+                                    (1 - alpha) * self._stats.average_hold_time +
+                                    alpha * hold_time
+                                )
                             self._stats.max_hold_time = max(self._stats.max_hold_time, hold_time)
 
                         self._semaphore.release()

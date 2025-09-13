@@ -2,7 +2,7 @@
 Memory storage configuration model following ONEX standards.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from .enum_memory_storage_type import EnumMemoryStorageType
 
@@ -40,15 +40,13 @@ class ModelMemoryStorageConfig(BaseModel):
         default=None,
         description="Username for authentication",
     )
-    password_hash: str | None = Field(
+    password_hash: SecretStr | None = Field(
         default=None,
-        description="Hashed password for authentication",
-        exclude=True  # Prevent serialization for security
+        description="Hashed password for authentication - protected with SecretStr",
     )
-    api_key: str | None = Field(
+    api_key: SecretStr | None = Field(
         default=None,
-        description="API key for authentication",
-        exclude=True  # Prevent serialization for security
+        description="API key for authentication - protected with SecretStr",
     )
 
     # Connection pool settings

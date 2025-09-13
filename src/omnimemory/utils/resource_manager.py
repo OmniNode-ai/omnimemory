@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import random
 import time
 from enum import Enum
 from typing import Any, AsyncGenerator, Callable, Dict, Optional, TypeVar
@@ -60,6 +61,7 @@ class CircuitBreakerConfig(BaseModel):
     """Configuration for circuit breaker behavior."""
     failure_threshold: int = Field(default=5, description="Number of failures before opening circuit")
     recovery_timeout: int = Field(default=60, description="Seconds to wait before trying half-open")
+    recovery_timeout_jitter: float = Field(default=0.1, description="Jitter factor (0.0-1.0) to prevent thundering herd")
     success_threshold: int = Field(default=3, description="Successful calls needed to close circuit")
     timeout: float = Field(default=30.0, description="Default timeout for operations")
 
@@ -72,6 +74,17 @@ class CircuitBreakerStats:
     state_changed_at: datetime = field(default_factory=datetime.now)
     total_calls: int = 0
     total_timeouts: int = 0
+
+
+class CircuitBreakerStatsResponse(BaseModel):
+    """Typed response model for circuit breaker statistics."""
+    state: str = Field(description="Current circuit breaker state")
+    failure_count: int = Field(description="Number of failures recorded")
+    success_count: int = Field(description="Number of successful calls")
+    total_calls: int = Field(description="Total number of calls attempted")
+    total_timeouts: int = Field(description="Total number of timeout failures")
+    last_failure_time: Optional[str] = Field(description="ISO timestamp of last failure")
+    state_changed_at: str = Field(description="ISO timestamp when state last changed")
 
 class CircuitBreakerError(Exception):
     """Exception raised when circuit breaker is open."""
@@ -123,12 +136,18 @@ class AsyncCircuitBreaker:
             raise
 
     def _should_attempt_reset(self) -> bool:
-        """Check if enough time has passed to attempt circuit reset."""
+        """Check if enough time has passed to attempt circuit reset with jitter."""
         if self.stats.last_failure_time is None:
             return True
 
+        # Calculate recovery timeout with jitter to prevent thundering herd
+        base_timeout = self.config.recovery_timeout
+        jitter_range = base_timeout * self.config.recovery_timeout_jitter
+        jitter = random.uniform(-jitter_range, jitter_range)
+        effective_timeout = base_timeout + jitter
+
         time_since_failure = datetime.now() - self.stats.last_failure_time
-        return time_since_failure.total_seconds() >= self.config.recovery_timeout
+        return time_since_failure.total_seconds() >= effective_timeout
 
     async def _transition_to_half_open(self):
         """Transition circuit breaker to half-open state."""
@@ -302,19 +321,19 @@ class AsyncResourceManager:
             if semaphore:
                 semaphore.release()
 
-    def get_circuit_breaker_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get statistics for all circuit breakers."""
+    def get_circuit_breaker_stats(self) -> Dict[str, CircuitBreakerStatsResponse]:
+        """Get typed statistics for all circuit breakers."""
         stats = {}
         for name, cb in self._circuit_breakers.items():
-            stats[name] = {
-                "state": cb.state.value,
-                "failure_count": cb.stats.failure_count,
-                "success_count": cb.stats.success_count,
-                "total_calls": cb.stats.total_calls,
-                "total_timeouts": cb.stats.total_timeouts,
-                "last_failure_time": cb.stats.last_failure_time.isoformat() if cb.stats.last_failure_time else None,
-                "state_changed_at": cb.stats.state_changed_at.isoformat()
-            }
+            stats[name] = CircuitBreakerStatsResponse(
+                state=cb.state.value,
+                failure_count=cb.stats.failure_count,
+                success_count=cb.stats.success_count,
+                total_calls=cb.stats.total_calls,
+                total_timeouts=cb.stats.total_timeouts,
+                last_failure_time=cb.stats.last_failure_time.isoformat() if cb.stats.last_failure_time else None,
+                state_changed_at=cb.stats.state_changed_at.isoformat()
+            )
         return stats
 
 # Global resource manager instance

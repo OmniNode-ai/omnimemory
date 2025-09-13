@@ -207,7 +207,7 @@ async def validate_async_patterns() -> Dict[str, Any]:
         # Import async components
         from omnimemory.core.container import OmniMemoryContainer
         from omnimemory.protocols.data_models import UserContext
-        from omnibase_core.models.core.model_node_result import NodeResult
+        from omnibase_core.core.monadic.model_node_result import NodeResult
 
         # Create container and test async method signatures
         container = OmniMemoryContainer()
