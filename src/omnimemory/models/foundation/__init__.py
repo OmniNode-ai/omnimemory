@@ -5,7 +5,9 @@ This module provides foundation models for base implementations,
 error handling, migration progress tracking, and system-level operations.
 """
 
-from ...enums.enum_error_code import EnumErrorCode
+from ...enums.enum_error_code import OmniMemoryErrorCode
+# Backward compatibility alias
+EnumErrorCode = OmniMemoryErrorCode
 from ...enums.enum_severity import EnumSeverity
 from .model_error_details import ModelErrorDetails
 from .model_system_health import ModelSystemHealth

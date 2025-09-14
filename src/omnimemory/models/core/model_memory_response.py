@@ -13,6 +13,7 @@ from ...enums.enum_operation_status import EnumOperationStatus
 from .model_memory_metadata import ModelMemoryMetadata
 from .model_processing_metrics import ModelProcessingMetrics
 from .model_operation_metadata import ModelOperationMetadata
+from .model_provenance import ModelProvenanceChain
 from ..foundation.model_memory_data import ModelMemoryResponseData
 from ..foundation.model_error_details import ModelErrorDetails
 from ..foundation.model_trust_score import ModelTrustScore
@@ -75,10 +76,10 @@ class ModelMemoryResponse(BaseModel):
         description="When the request was processed",
     )
 
-    # Provenance tracking
-    provenance: list[str] = Field(
-        default_factory=list,
-        description="Provenance chain for traceability",
+    # Provenance tracking - using structured model instead of list[str]
+    provenance: ModelProvenanceChain | None = Field(
+        default=None,
+        description="Comprehensive provenance chain for traceability following ONEX standards",
     )
 
     # Quality indicators

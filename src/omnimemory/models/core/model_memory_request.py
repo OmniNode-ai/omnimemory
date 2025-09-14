@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
 from .model_memory_context import ModelMemoryContext
+from .model_memory_parameters import ModelMemoryParameters, ModelMemoryOptions
 from ..foundation.model_memory_data import ModelMemoryRequestData
 
 
@@ -33,24 +34,14 @@ class ModelMemoryRequest(BaseModel):
         description="Structured request data payload following ONEX standards",
     )
 
-    # Request parameters
-    parameters: dict[str, str] = Field(
-        default_factory=dict,
-        description="Operation parameters with string values for type safety",
+    # Request parameters - using structured model instead of dict
+    parameters: ModelMemoryParameters = Field(
+        default_factory=ModelMemoryParameters,
+        description="Structured operation parameters following ONEX standards",
     )
 
-    # Request options
-    options: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Boolean options for the request",
-    )
-
-    # Validation requirements
-    validate_input: bool = Field(
-        default=True,
-        description="Whether to validate input data",
-    )
-    require_confirmation: bool = Field(
-        default=False,
-        description="Whether the operation requires explicit confirmation",
+    # Request options - using structured model instead of dict
+    options: ModelMemoryOptions = Field(
+        default_factory=ModelMemoryOptions,
+        description="Boolean options for the request following ONEX standards",
     )
