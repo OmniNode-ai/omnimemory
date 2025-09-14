@@ -17,7 +17,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from .error_sanitizer import ErrorSanitizer, SanitizationLevel
+
 logger = logging.getLogger(__name__)
+
+# Initialize error sanitizer for secure logging
+_error_sanitizer = ErrorSanitizer(
+    default_level=SanitizationLevel.STANDARD,
+    enable_stack_trace_filter=True
+)
 
 T = TypeVar('T')
 
@@ -244,16 +252,22 @@ async def retry_with_backoff(
 
             # Check if we should retry
             if attempt < config.max_attempts and is_retryable_exception(e, config.retryable_exceptions):
+                # Sanitize error message to prevent information disclosure
+                sanitized_error = _error_sanitizer.sanitize_error_message(str(e))
                 logger.warning(
-                    f"Attempt {attempt}/{config.max_attempts} failed with {type(e).__name__}: {str(e)} "
+                    f"Attempt {attempt}/{config.max_attempts} failed with {type(e).__name__}: {sanitized_error} "
                     f"(correlation_id: {correlation_id})"
                 )
                 continue
             else:
                 # Final failure or non-retryable exception
+                # Use stricter sanitization for final failures
+                sanitized_error = _error_sanitizer.sanitize_error_message(
+                    str(e), level=SanitizationLevel.STRICT
+                )
                 logger.error(
                     f"Operation failed permanently after {attempt} attempts "
-                    f"with {type(e).__name__}: {str(e)} "
+                    f"with {type(e).__name__}: {sanitized_error} "
                     f"(correlation_id: {correlation_id})"
                 )
                 break

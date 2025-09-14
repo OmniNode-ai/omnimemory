@@ -19,6 +19,13 @@ from .model_typed_collections import ModelMetadata, ModelConfiguration
 from .model_progress_summary import ProgressSummaryResponse
 
 from omnimemory.enums import MigrationStatus, MigrationPriority, FileProcessingStatus
+from ...utils.error_sanitizer import ErrorSanitizer, SanitizationLevel
+
+# Initialize error sanitizer for secure logging
+_error_sanitizer = ErrorSanitizer(
+    default_level=SanitizationLevel.STANDARD,
+    enable_stack_trace_filter=True
+)
 
 class BatchProcessingMetrics(BaseModel):
     """Metrics for batch processing operations."""
@@ -324,7 +331,10 @@ class MigrationProgressTracker(BaseModel):
             failed_items=self.metrics.failed_files,
             current_batch_id=getattr(self.metrics, 'current_batch', None),
             active_workers=len([b for b in self.metrics.batch_metrics if b.end_time is None]),
-            recent_errors=[str(e) for e in self.error_summary[-5:]] if self.error_summary else [],
+            recent_errors=[
+                _error_sanitizer.sanitize_error_message(str(e), level=SanitizationLevel.STRICT)
+                for e in self.error_summary[-5:]
+            ] if self.error_summary else [],
             performance_metrics={
                 "files_per_second": self.metrics.files_per_second,
                 "bytes_per_second": self.metrics.bytes_per_second,
