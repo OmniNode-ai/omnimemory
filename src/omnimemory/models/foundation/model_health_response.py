@@ -2,8 +2,10 @@
 Health response model following ONEX standards.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -83,4 +85,71 @@ class ModelHealthResponse(BaseModel):
     )
     environment: str = Field(
         description="Deployment environment"
+    )
+
+
+class ModelCircuitBreakerStats(BaseModel):
+    """Circuit breaker statistics for a single dependency."""
+
+    state: Literal["closed", "open", "half_open"] = Field(
+        description="Current circuit breaker state"
+    )
+    failure_count: int = Field(
+        ge=0,
+        description="Number of consecutive failures"
+    )
+    success_count: int = Field(
+        ge=0,
+        description="Total number of successful calls"
+    )
+    total_calls: int = Field(
+        ge=0,
+        description="Total number of calls made"
+    )
+    total_timeouts: int = Field(
+        ge=0,
+        description="Total number of timeout failures"
+    )
+    last_failure_time: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of the last failure"
+    )
+    state_changed_at: datetime = Field(
+        description="When the circuit breaker state last changed"
+    )
+
+
+class ModelCircuitBreakerStatsCollection(BaseModel):
+    """Collection of circuit breaker statistics for all dependencies."""
+
+    stats: dict[str, ModelCircuitBreakerStats] = Field(
+        description="Circuit breaker statistics keyed by dependency name"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="When the statistics were collected"
+    )
+
+
+class ModelRateLimitedHealthCheckResponse(BaseModel):
+    """Rate-limited health check response."""
+
+    health_check: Optional[ModelHealthResponse] = Field(
+        default=None,
+        description="Health check result if within rate limit"
+    )
+    rate_limited: bool = Field(
+        description="Whether the request was rate limited"
+    )
+    rate_limit_reset_time: Optional[datetime] = Field(
+        default=None,
+        description="When the rate limit will reset"
+    )
+    remaining_requests: Optional[int] = Field(
+        default=None,
+        description="Number of requests remaining in the current window"
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="Error message if rate limited"
     )

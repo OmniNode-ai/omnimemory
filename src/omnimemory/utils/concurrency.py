@@ -445,79 +445,88 @@ class AsyncConnectionPool:
                 pool_name=self.config.name,
                 connection_id=connection_id
             ):
-                try:
-                    # Try to get existing connection first
-                    try:
-                        connection = self._available.get_nowait()
-                        logger.debug(
-                            "connection_reused",
-                            pool_name=self.config.name,
-                            connection_id=connection_id
-                        )
-                    except asyncio.QueueEmpty:
-                        # No available connections, check if we can create new one
-                        async with self._lock:
-                            total_connections = len(self._active) + self._available.qsize()
+                max_retries = 3
+                current_retry = _retry_count
 
-                            if total_connections < self.config.max_connections:
-                                # Create new connection
-                                connection = await self._create_new_connection()
+                try:
+                    # Use iterative retry loop instead of recursion to prevent stack overflow
+                    while current_retry <= max_retries:
+                        try:
+                            # Try to get existing connection first
+                            try:
+                                connection = self._available.get_nowait()
                                 logger.debug(
-                                    "connection_created",
+                                    "connection_reused",
+                                    pool_name=self.config.name,
+                                    connection_id=connection_id
+                                )
+                            except asyncio.QueueEmpty:
+                                # No available connections, check if we can create new one
+                                async with self._lock:
+                                    total_connections = len(self._active) + self._available.qsize()
+
+                                    if total_connections < self.config.max_connections:
+                                        # Create new connection
+                                        connection = await self._create_new_connection()
+                                        logger.debug(
+                                            "connection_created",
+                                            pool_name=self.config.name,
+                                            connection_id=connection_id,
+                                            total_connections=total_connections + 1
+                                        )
+                                    else:
+                                        # Pool is at capacity, wait for available connection
+                                        self._metrics.pool_exhaustions += 1
+                                        self._metrics.last_exhaustion = datetime.now()
+                                        self._status = PoolStatus.EXHAUSTED
+
+                                        logger.warning(
+                                            "connection_pool_exhausted",
+                                            pool_name=self.config.name,
+                                            max_connections=self.config.max_connections
+                                        )
+
+                                        # Wait for connection with timeout
+                                        wait_timeout = timeout or self.config.connection_timeout
+                                        connection = await asyncio.wait_for(
+                                            self._available.get(),
+                                            timeout=wait_timeout
+                                        )
+
+                            # Validate connection before use
+                            if not self._validate_connection(connection):
+                                logger.warning(
+                                    "connection_invalid",
                                     pool_name=self.config.name,
                                     connection_id=connection_id,
-                                    total_connections=total_connections + 1
+                                    retry_count=current_retry
                                 )
-                            else:
-                                # Pool is at capacity, wait for available connection
-                                self._metrics.pool_exhaustions += 1
-                                self._metrics.last_exhaustion = datetime.now()
-                                self._status = PoolStatus.EXHAUSTED
+                                await self._destroy_connection(connection)
 
-                                logger.warning(
-                                    "connection_pool_exhausted",
-                                    pool_name=self.config.name,
-                                    max_connections=self.config.max_connections
-                                )
+                                # Check retry limit
+                                if current_retry >= max_retries:
+                                    logger.error(
+                                        "connection_validation_max_retries_exceeded",
+                                        pool_name=self.config.name,
+                                        connection_id=connection_id,
+                                        max_retries=max_retries
+                                    )
+                                    raise RuntimeError(
+                                        f"Failed to acquire valid connection after {max_retries} attempts"
+                                    )
 
-                                # Wait for connection with timeout
-                                wait_timeout = timeout or self.config.connection_timeout
-                                connection = await asyncio.wait_for(
-                                    self._available.get(),
-                                    timeout=wait_timeout
-                                )
+                                # Increment retry counter and continue the loop
+                                current_retry += 1
+                                continue
 
-                    # Validate connection before use
-                    if not self._validate_connection(connection):
-                        logger.warning(
-                            "connection_invalid",
-                            pool_name=self.config.name,
-                            connection_id=connection_id,
-                            retry_count=_retry_count
-                        )
-                        await self._destroy_connection(connection)
+                            # Connection is valid, break out of retry loop
+                            break
 
-                        # Prevent infinite recursion with retry limit
-                        max_retries = 3
-                        if _retry_count >= max_retries:
-                            logger.error(
-                                "connection_validation_max_retries_exceeded",
-                                pool_name=self.config.name,
-                                connection_id=connection_id,
-                                max_retries=max_retries
-                            )
-                            raise RuntimeError(
-                                f"Failed to acquire valid connection after {max_retries} attempts"
-                            )
-
-                        # Retry with incremented counter
-                        async with self.acquire(
-                            timeout=timeout,
-                            correlation_id=correlation_id,
-                            _retry_count=_retry_count + 1
-                        ) as new_conn:
-                            yield new_conn
-                            return
+                        except Exception as e:
+                            # Handle unexpected exceptions during connection acquisition
+                            if connection:
+                                await self._destroy_connection(connection)
+                            raise
 
                     # Track active connection
                     async with self._lock:
@@ -562,7 +571,7 @@ class AsyncConnectionPool:
                                 "connection_cleanup_failed",
                                 pool_name=self.config.name,
                                 connection_id=connection_id,
-                                error=str(cleanup_error)
+                                error=_sanitize_error(cleanup_error)
                             )
 
     async def _create_new_connection(self) -> Any:
@@ -576,7 +585,7 @@ class AsyncConnectionPool:
             logger.error(
                 "connection_creation_failed",
                 pool_name=self.config.name,
-                error=str(e)
+                error=_sanitize_error(e)
             )
             raise
 
@@ -608,7 +617,7 @@ class AsyncConnectionPool:
                 "connection_return_failed",
                 pool_name=self.config.name,
                 connection_id=connection_id,
-                error=str(e)
+                error=_sanitize_error(e)
             )
             # Try to destroy the connection on error
             try:
@@ -629,7 +638,7 @@ class AsyncConnectionPool:
             logger.error(
                 "connection_destruction_failed",
                 pool_name=self.config.name,
-                error=str(e)
+                error=_sanitize_error(e)
             )
 
     def _start_health_check(self):
@@ -648,7 +657,7 @@ class AsyncConnectionPool:
                 logger.error(
                     "health_check_error",
                     pool_name=self.config.name,
-                    error=str(e)
+                    error=_sanitize_error(e)
                 )
 
     async def _perform_health_check(self):

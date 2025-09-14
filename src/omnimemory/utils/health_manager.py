@@ -21,6 +21,12 @@ import psutil
 from pydantic import BaseModel, Field
 import structlog
 
+from ..models.foundation.model_health_response import (
+    ModelCircuitBreakerStats,
+    ModelCircuitBreakerStatsCollection,
+    ModelRateLimitedHealthCheckResponse,
+)
+
 
 # === RATE LIMITING ===
 
@@ -317,7 +323,7 @@ class HealthCheckManager:
                         config=config,
                         status=HealthStatus.UNHEALTHY,
                         latency_ms=latency_ms,
-                        error_message=str(e)
+                        error_message=_sanitize_error(e)
                     )
 
                     # Thread-safe update of results to prevent race conditions
@@ -379,7 +385,7 @@ class HealthCheckManager:
                         logger.error(
                             "health_check_gather_exception",
                             dependency_name=dependency_name,
-                            error=str(result),
+                            error=_sanitize_error(result),
                             error_type=type(result).__name__
                         )
                     else:
@@ -523,22 +529,22 @@ class HealthCheckManager:
 
             return response
 
-    def get_circuit_breaker_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_circuit_breaker_stats(self) -> ModelCircuitBreakerStatsCollection:
         """Get circuit breaker statistics for all dependencies."""
         stats = {}
         for name, circuit_breaker in self._circuit_breakers.items():
-            stats[name] = {
-                "state": circuit_breaker.state.value,
-                "failure_count": circuit_breaker.stats.failure_count,
-                "success_count": circuit_breaker.stats.success_count,
-                "total_calls": circuit_breaker.stats.total_calls,
-                "total_timeouts": circuit_breaker.stats.total_timeouts,
-                "last_failure_time": circuit_breaker.stats.last_failure_time.isoformat() if circuit_breaker.stats.last_failure_time else None,
-                "state_changed_at": circuit_breaker.stats.state_changed_at.isoformat()
-            }
-        return stats
+            stats[name] = ModelCircuitBreakerStats(
+                state=circuit_breaker.state.value,
+                failure_count=circuit_breaker.stats.failure_count,
+                success_count=circuit_breaker.stats.success_count,
+                total_calls=circuit_breaker.stats.total_calls,
+                total_timeouts=circuit_breaker.stats.total_timeouts,
+                last_failure_time=circuit_breaker.stats.last_failure_time,
+                state_changed_at=circuit_breaker.stats.state_changed_at
+            )
+        return ModelCircuitBreakerStatsCollection(stats=stats)
 
-    async def rate_limited_health_check(self, client_identifier: str) -> Dict[str, Any]:
+    async def rate_limited_health_check(self, client_identifier: str) -> ModelRateLimitedHealthCheckResponse:
         """
         Rate-limited health check endpoint for API exposure.
 
@@ -546,17 +552,26 @@ class HealthCheckManager:
             client_identifier: Client identifier (IP address, API key, etc.)
 
         Returns:
-            Health check result or rate limit error
-
-        Raises:
-            ValueError: If rate limit exceeded
+            Rate-limited health check response with proper typing
         """
         # Check rate limit
         if not await self._rate_limiter.is_allowed(client_identifier):
-            raise ValueError(f"Rate limit exceeded for client: {client_identifier}")
+            return ModelRateLimitedHealthCheckResponse(
+                health_check=None,
+                rate_limited=True,
+                error_message=f"Rate limit exceeded for client: {client_identifier}",
+                rate_limit_reset_time=None,  # Could be calculated from rate limiter
+                remaining_requests=0
+            )
 
         # Perform health check
-        return await self.comprehensive_health_check()
+        health_check_result = await self.comprehensive_health_check()
+        return ModelRateLimitedHealthCheckResponse(
+            health_check=health_check_result,
+            rate_limited=False,
+            rate_limit_reset_time=None,
+            remaining_requests=None
+        )
 
 
 # Global health manager instance
@@ -588,7 +603,7 @@ async def create_postgresql_health_check(connection_string: str) -> Callable[[],
                 config=config,
                 status=HealthStatus.UNHEALTHY,
                 latency_ms=0.0,
-                error_message=str(e)
+                error_message=_sanitize_error(e)
             )
 
     return check_postgresql
@@ -618,7 +633,7 @@ async def create_redis_health_check(redis_url: str) -> Callable[[], Awaitable[He
                 config=config,
                 status=HealthStatus.UNHEALTHY,
                 latency_ms=0.0,
-                error_message=str(e)
+                error_message=_sanitize_error(e)
             )
 
     return check_redis
@@ -645,7 +660,7 @@ async def create_pinecone_health_check(api_key: str, environment: str) -> Callab
                 config=config,
                 status=HealthStatus.UNHEALTHY,
                 latency_ms=0.0,
-                error_message=str(e)
+                error_message=_sanitize_error(e)
             )
 
     return check_pinecone
