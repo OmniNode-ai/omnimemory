@@ -247,3 +247,6 @@ docs_archived/
 memory_storage/
 vector_index/
 cache/
+
+# Claude Code configuration (contains sensitive MCP permissions)
+.claude/settings.local.json
