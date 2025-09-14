@@ -5,6 +5,11 @@ This module provides comprehensive error sanitization to prevent information
 disclosure while maintaining useful debugging information for developers.
 """
 
+__all__ = [
+    "SanitizationLevel",
+    "ErrorSanitizer"
+]
+
 import re
 from typing import Dict, List, Optional, Set
 from enum import Enum

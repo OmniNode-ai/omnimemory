@@ -81,6 +81,19 @@ from .health_manager import (
     create_pinecone_health_check,
 )
 
+from .pii_detector import (
+    PIIType,
+    PIIMatch,
+    PIIDetectionResult,
+    PIIDetectorConfig,
+    PIIDetector,
+)
+
+from .error_sanitizer import (
+    SanitizationLevel,
+    ErrorSanitizer,
+)
+
 __all__ = [
     # Retry utilities
     "RetryConfig",
@@ -146,4 +159,15 @@ __all__ = [
     "create_postgresql_health_check",
     "create_redis_health_check",
     "create_pinecone_health_check",
+
+    # PII Detection
+    "PIIType",
+    "PIIMatch",
+    "PIIDetectionResult",
+    "PIIDetectorConfig",
+    "PIIDetector",
+
+    # Error Sanitization
+    "SanitizationLevel",
+    "ErrorSanitizer",
 ]

@@ -5,6 +5,16 @@ This module provides retry decorators and utilities for handling transient
 failures in OmniMemory operations with configurable backoff strategies.
 """
 
+__all__ = [
+    "RetryConfig",
+    "RetryAttempt",
+    "RetryResult",
+    "RetryStats",
+    "is_retryable_exception",
+    "execute_with_retry",
+    "retry_decorator"
+]
+
 from __future__ import annotations
 
 import asyncio
