@@ -13,20 +13,10 @@ from typing import Dict, Any
 from uuid import UUID, uuid4
 
 from omnimemory import (
-    # Container and services
-    OmniMemoryContainer,
-    create_omnimemory_container,
-    OmniMemoryServiceProvider,
-    MemoryServiceRegistry,
-    
-    # Base implementations
-    BaseMemoryService,
-    BaseEffectService,
-    
     # Protocols
     ProtocolMemoryBase,
     ProtocolMemoryStorage,
-    
+
     # Data models
     MemoryRecord,
     ContentType,
@@ -34,7 +24,7 @@ from omnimemory import (
     AccessLevel,
     MemoryStoreRequest,
     MemoryStoreResponse,
-    
+
     # Error handling
     OmniMemoryError,
     OmniMemoryErrorCode,
@@ -43,10 +33,11 @@ from omnimemory import (
 )
 
 from omnibase_core.core.monadic.model_node_result import NodeResult
+from omnibase_core.core.model_onex_container import ModelOnexContainer
 from omnibase_spi import ProtocolLogger
 
 
-class MockMemoryStorageService(BaseEffectService):
+class MockMemoryStorageNode:
     """Mock implementation of memory storage service for testing."""
     
     async def _check_storage_connectivity(self) -> bool:
@@ -113,11 +104,11 @@ class MockMemoryStorageService(BaseEffectService):
 
 class TestFoundationArchitecture:
     """Test suite for ONEX foundation architecture."""
-    
+
     @pytest.fixture
-    async def container(self) -> OmniMemoryContainer:
+    def container(self) -> ModelOnexContainer:
         """Create a test container instance."""
-        return await create_omnimemory_container()
+        return ModelOnexContainer()
     
     @pytest.fixture
     def sample_memory_record(self) -> MemoryRecord:
@@ -131,90 +122,24 @@ class TestFoundationArchitecture:
             tags=["test", "validation", "onex"],
         )
     
-    def test_container_initialization(self, container: OmniMemoryContainer):
-        """Test that the container initializes properly."""
+    def test_container_initialization(self, container: ModelOnexContainer):
+        """Test that the ONEX container initializes properly."""
         assert container is not None
-        assert container.service_provider is not None
-        assert container.settings is not None
-        assert hasattr(container, 'get_service_async')
-        assert hasattr(container, 'get_service_sync')
-        assert hasattr(container, 'health_check')
+        assert hasattr(container, 'register_singleton')
+        assert hasattr(container, 'register_transient')
+        assert hasattr(container, 'resolve')
     
-    def test_container_settings(self, container: OmniMemoryContainer):
-        """Test that container settings are properly configured."""
-        settings = container.settings
-        assert settings.log_level == "INFO"
-        assert settings.max_concurrent_operations > 0
-        assert settings.operation_timeout_ms > 0
-        assert settings.cache_ttl_seconds > 0
-    
-    async def test_container_health_check(self, container: OmniMemoryContainer):
-        """Test container health check functionality."""
-        health = await container.health_check()
-        
-        assert health is not None
-        assert "container" in health
-        assert "timestamp" in health
-        assert "services" in health
-        assert "performance" in health
-        assert health["container"] == "healthy"
-    
-    def test_service_provider_creation(self):
-        """Test service provider creation and initialization."""
-        from omnibase_core.enums.enum_log_level import EnumLogLevel
-        
-        # Create mock logger
-        class MockLogger:
-            def emit_log_event_sync(self, level, message, event_type="generic", **kwargs):
-                pass
-            
-            async def emit_log_event_async(self, level, message, event_type="generic", **kwargs):
-                pass
-        
-        logger = MockLogger()
-        provider = OmniMemoryServiceProvider(logger)
-        
-        assert provider.provider_id is not None
-        assert provider.logger is logger
-        assert isinstance(provider.descriptors, dict)
-        assert isinstance(provider.instances, dict)
-    
-    async def test_service_registration_and_resolution(self):
-        """Test service registration and resolution functionality."""
-        from omnibase_core.enums.enum_log_level import EnumLogLevel
-        
-        # Create mock logger
-        class MockLogger:
-            def emit_log_event_sync(self, level, message, event_type="generic", **kwargs):
-                pass
-            
-            async def emit_log_event_async(self, level, message, event_type="generic", **kwargs):
-                pass
-        
-        logger = MockLogger()
-        provider = OmniMemoryServiceProvider(logger)
-        
-        # Register mock service
-        registration_result = await provider.register_service(
-            protocol_type=ProtocolMemoryStorage,
-            service_class=MockMemoryStorageService,
-            service_name="mock_storage",
-            singleton=True,
-        )
-        
-        assert registration_result.is_success
-        assert "mock_storage" in provider.descriptors
-        
-        # Resolve service
-        resolution_result = await provider.resolve_service(
-            protocol_type=ProtocolMemoryStorage,
-            service_name="mock_storage",
-        )
-        
-        assert resolution_result.is_success
-        service = resolution_result.value
-        assert isinstance(service, MockMemoryStorageService)
-        assert service.service_name == "mock_storage"
+    def test_node_registration_and_resolution(self, container: ModelOnexContainer):
+        """Test ONEX node registration and resolution functionality."""
+
+        # Register mock storage node
+        container.register_singleton(ProtocolMemoryStorage, MockMemoryStorageNode)
+
+        # Resolve node
+        storage_node = container.resolve(ProtocolMemoryStorage)
+
+        assert storage_node is not None
+        assert isinstance(storage_node, MockMemoryStorageNode)
     
     def test_memory_record_validation(self, sample_memory_record: MemoryRecord):
         """Test memory record creation and validation."""
@@ -285,71 +210,6 @@ class TestFoundationArchitecture:
         assert storage_category.recoverable is True
         assert storage_category.default_retry_count > 0
     
-    async def test_service_health_monitoring(self):
-        """Test service health monitoring functionality."""
-        from omnibase_core.enums.enum_log_level import EnumLogLevel
-        
-        # Create mock logger
-        class MockLogger:
-            def emit_log_event_sync(self, level, message, event_type="generic", **kwargs):
-                pass
-            
-            async def emit_log_event_async(self, level, message, event_type="generic", **kwargs):
-                pass
-        
-        logger = MockLogger()
-        service = MockMemoryStorageService(
-            service_name="test_service",
-            logger=logger,
-        )
-        
-        # Test health check
-        health_result = await service.health_check()
-        assert health_result.is_success
-        
-        health_data = health_result.value
-        assert health_data["service_name"] == "test_service"
-        assert health_data["status"] == "healthy"
-        assert "uptime_seconds" in health_data
-        assert "operation_count" in health_data
-        
-        # Test metrics collection
-        metrics_result = await service.get_metrics()
-        assert metrics_result.is_success
-        
-        metrics = metrics_result.value
-        assert metrics["service_name"] == "test_service"
-        assert "uptime_seconds" in metrics
-        assert "storage_operations" in metrics
-        assert "cache_hit_rate" in metrics
-    
-    async def test_configuration_management(self):
-        """Test service configuration management."""
-        from omnibase_core.enums.enum_log_level import EnumLogLevel
-        
-        # Create mock logger
-        class MockLogger:
-            def emit_log_event_sync(self, level, message, event_type="generic", **kwargs):
-                pass
-            
-            async def emit_log_event_async(self, level, message, event_type="generic", **kwargs):
-                pass
-        
-        logger = MockLogger()
-        service = MockMemoryStorageService(
-            service_name="test_service",
-            logger=logger,
-        )
-        
-        # Test valid configuration
-        valid_config = {"cache_size": 1000, "timeout": 30}
-        config_result = await service.configure(valid_config)
-        assert config_result.is_success
-        
-        # Test invalid configuration
-        invalid_config = {"invalid_key": "should_fail"}
-        invalid_result = await service.configure(invalid_config)
-        assert invalid_result.is_failure
     
     def test_monadic_patterns(self):
         """Test monadic patterns and NodeResult composition."""
@@ -408,47 +268,25 @@ class TestFoundationArchitecture:
         assert "reducer" in architecture["nodes"]
         assert "orchestrator" in architecture["nodes"]
     
-    async def test_end_to_end_memory_operation(self, sample_memory_record: MemoryRecord):
-        """Test end-to-end memory operation using mock services."""
-        from omnibase_core.enums.enum_log_level import EnumLogLevel
-        
-        # Create mock logger
-        class MockLogger:
-            def emit_log_event_sync(self, level, message, event_type="generic", **kwargs):
-                pass
-            
-            async def emit_log_event_async(self, level, message, event_type="generic", **kwargs):
-                pass
-        
-        logger = MockLogger()
-        provider = OmniMemoryServiceProvider(logger)
-        
-        # Register mock storage service
-        await provider.register_service(
-            protocol_type=ProtocolMemoryStorage,
-            service_class=MockMemoryStorageService,
-            service_name="storage_service",
-        )
-        
-        # Resolve storage service
-        resolution_result = await provider.resolve_service(
-            protocol_type=ProtocolMemoryStorage,
-            service_name="storage_service",
-        )
-        
-        assert resolution_result.is_success
-        storage_service = resolution_result.value
-        
+    async def test_end_to_end_memory_operation(self, container: ModelOnexContainer, sample_memory_record: MemoryRecord):
+        """Test end-to-end memory operation using ONEX nodes."""
+
+        # Register mock storage node
+        container.register_singleton(ProtocolMemoryStorage, MockMemoryStorageNode)
+
+        # Resolve storage node
+        storage_node = container.resolve(ProtocolMemoryStorage)
+
         # Create store request
         store_request = MemoryStoreRequest(
             memory=sample_memory_record,
             generate_embedding=True,
             index_immediately=True,
         )
-        
+
         # Perform store operation
-        store_result = await storage_service.store_memory(store_request)
-        
+        store_result = await storage_node.store_memory(store_request)
+
         assert store_result.is_success
         response = store_result.value
         assert response.memory_id == sample_memory_record.memory_id

@@ -132,31 +132,30 @@ def validate_error_handling() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 def validate_container_creation() -> Dict[str, Any]:
-    """Validate container creation and basic functionality."""
-    print("🔍 Testing container creation...")
+    """Validate ONEX container creation and basic functionality."""
+    print("🔍 Testing ONEX container creation...")
 
     try:
-        from omnimemory.core.container import OmniMemoryContainer
-        from omnimemory.core.service_providers import OmniMemoryServiceProvider
+        from omnibase_core.core.model_onex_container import ModelOnexContainer
 
         # Test container creation
-        container = OmniMemoryContainer()
+        container = ModelOnexContainer()
 
-        # Verify container has expected attributes
-        has_base_container = hasattr(container, 'base_container')
-        has_service_provider = hasattr(container, 'service_provider')
-        has_get_service_async = hasattr(container, 'get_service_async')
+        # Verify container has expected ONEX methods
+        has_register_singleton = hasattr(container, 'register_singleton')
+        has_register_transient = hasattr(container, 'register_transient')
+        has_resolve = hasattr(container, 'resolve')
 
-        print("✅ Container creation successful")
+        print("✅ ONEX Container creation successful")
         return {
             "success": True,
-            "has_base_container": has_base_container,
-            "has_service_provider": has_service_provider,
-            "has_get_service_async": has_get_service_async
+            "has_register_singleton": has_register_singleton,
+            "has_register_transient": has_register_transient,
+            "has_resolve": has_resolve
         }
 
     except Exception as e:
-        print(f"❌ Container validation failed: {str(e)}")
+        print(f"❌ ONEX Container validation failed: {str(e)}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -205,20 +204,22 @@ async def validate_async_patterns() -> Dict[str, Any]:
 
     try:
         # Import async components
-        from omnimemory.core.container import OmniMemoryContainer
+        from omnibase_core.core.model_onex_container import ModelOnexContainer
         from omnimemory.protocols.data_models import UserContext
         from omnibase_core.core.monadic.model_node_result import NodeResult
 
-        # Create container and test async method signatures
-        container = OmniMemoryContainer()
+        # Create container and test ONEX patterns
+        container = ModelOnexContainer()
 
-        # Verify async method exists
-        has_async_methods = hasattr(container, 'get_service_async')
+        # Verify ONEX methods exist
+        has_resolve_method = hasattr(container, 'resolve')
+        has_register_methods = hasattr(container, 'register_singleton')
 
         print("✅ Async patterns validation successful")
         return {
             "success": True,
-            "has_async_methods": has_async_methods,
+            "has_resolve_method": has_resolve_method,
+            "has_register_methods": has_register_methods,
             "container_created": True
         }
 

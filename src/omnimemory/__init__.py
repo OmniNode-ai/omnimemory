@@ -32,7 +32,6 @@ from .models import (
     memory,
     intelligence,
     service,
-    container,
     foundation,
 )
 
@@ -85,7 +84,6 @@ __all__ = [
     "memory",
     "intelligence",
     "service",
-    "container",
     "foundation",
 
     # Base protocols
