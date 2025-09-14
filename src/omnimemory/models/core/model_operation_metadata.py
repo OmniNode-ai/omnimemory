@@ -7,6 +7,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ..foundation.model_typed_collections import (
+    ModelConfiguration,
+    ModelMetadata,
+)
+
 
 class ModelOperationMetadata(BaseModel):
     """Operation metadata for tracking operation-specific information."""
@@ -44,8 +49,8 @@ class ModelOperationMetadata(BaseModel):
     )
 
     # Configuration
-    operation_config: Dict[str, Any] = Field(
-        default_factory=dict,
+    operation_config: ModelConfiguration = Field(
+        default_factory=ModelConfiguration,
         description="Configuration parameters used for the operation"
     )
 
@@ -80,8 +85,8 @@ class ModelOperationMetadata(BaseModel):
     )
 
     # Additional custom metadata
-    custom_metadata: Dict[str, Any] = Field(
-        default_factory=dict,
+    custom_metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata,
         description="Additional operation-specific metadata"
     )
 

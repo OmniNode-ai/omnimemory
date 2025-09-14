@@ -7,6 +7,8 @@ from typing import Dict, Any
 
 from pydantic import BaseModel, Field, computed_field
 
+from ..foundation.model_typed_collections import ModelMetadata
+
 
 class ModelProcessingMetrics(BaseModel):
     """Processing metrics for tracking operation timing and performance."""
@@ -61,8 +63,8 @@ class ModelProcessingMetrics(BaseModel):
     )
 
     # Additional performance metadata
-    performance_metadata: Dict[str, Any] = Field(
-        default_factory=dict,
+    performance_metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata,
         description="Additional performance-related metadata"
     )
 

@@ -28,11 +28,6 @@ class ModelMemoryContext(BaseModel):
         default=None,
         description="User information for authorization and personalization",
     )
-    user_id: UUID | None = Field(
-        default=None,
-        description="Legacy user identifier (use user field for new implementations)",
-        deprecated=True,
-    )
 
     # ONEX node information
     source_node_type: EnumNodeType = Field(
@@ -79,10 +74,10 @@ class ModelMemoryContext(BaseModel):
     # Helper methods for working with typed models
 
     def get_effective_user_id(self) -> UUID | None:
-        """Get user ID from either user model or legacy user_id field."""
+        """Get user ID from the user model."""
         if self.user:
             return self.user.user_id
-        return self.user_id
+        return None
 
     def get_user_display_name(self) -> str:
         """Get display name for the user."""

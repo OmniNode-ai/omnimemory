@@ -4,6 +4,7 @@ Trust score model with time decay following ONEX standards.
 
 import math
 from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import Optional
 from uuid import UUID
 
@@ -76,6 +77,23 @@ class ModelTrustScore(BaseModel):
         ge=0,
         description="Number of trust violations recorded",
     )
+
+    # Performance optimization caching
+    _cached_score: Optional[float] = Field(
+        default=None,
+        exclude=True,
+        description="Cached current score to avoid expensive recalculation",
+    )
+    _cache_timestamp: Optional[datetime] = Field(
+        default=None,
+        exclude=True,
+        description="Timestamp when the score was cached",
+    )
+    _cache_ttl_seconds: int = Field(
+        default=300,  # 5 minutes cache TTL
+        exclude=True,
+        description="Cache time-to-live in seconds",
+    )
     
     @field_validator('trust_level')
     @classmethod
@@ -102,21 +120,29 @@ class ModelTrustScore(BaseModel):
         else:
             return EnumTrustLevel.UNTRUSTED
     
-    def calculate_current_score(self, as_of: Optional[datetime] = None) -> float:
-        """Calculate current trust score with time decay."""
+    def calculate_current_score(self, as_of: Optional[datetime] = None, force_recalculate: bool = False) -> float:
+        """Calculate current trust score with time decay and caching for performance."""
         if as_of is None:
             as_of = datetime.utcnow()
-            
+
+        # Check cache validity if not forcing recalculation
+        if not force_recalculate and self._is_cache_valid(as_of):
+            return self._cached_score
+
         if self.decay_function == EnumDecayFunction.NONE:
-            return self.base_score
-            
+            score = self.base_score
+            self._update_cache(score, as_of)
+            return score
+
         # Calculate time elapsed
         time_elapsed = as_of - self.last_updated
         days_elapsed = time_elapsed.total_seconds() / 86400  # Convert to days
-        
+
         if days_elapsed <= 0:
-            return self.base_score
-            
+            score = self.base_score
+            self._update_cache(score, as_of)
+            return score
+
         # Apply decay function
         if self.decay_function == EnumDecayFunction.LINEAR:
             decay_factor = max(0, 1 - (days_elapsed * self.decay_rate))
@@ -126,12 +152,37 @@ class ModelTrustScore(BaseModel):
             decay_factor = max(0, 1 - (math.log(1 + days_elapsed) * self.decay_rate))
         else:
             decay_factor = 1.0
-            
+
         decayed_score = self.base_score * decay_factor
-        return max(0.0, min(1.0, decayed_score))
+        score = max(0.0, min(1.0, decayed_score))
+
+        # Cache the calculated score
+        self._update_cache(score, as_of)
+        return score
+
+    def _is_cache_valid(self, as_of: datetime) -> bool:
+        """Check if cached score is still valid."""
+        if self._cached_score is None or self._cache_timestamp is None:
+            return False
+
+        cache_age = (as_of - self._cache_timestamp).total_seconds()
+        return cache_age < self._cache_ttl_seconds
+
+    def _update_cache(self, score: float, timestamp: datetime) -> None:
+        """Update cached score and timestamp."""
+        self._cached_score = score
+        self._cache_timestamp = timestamp
+
+    def invalidate_cache(self) -> None:
+        """Manually invalidate the score cache."""
+        self._cached_score = None
+        self._cache_timestamp = None
     
     def update_score(self, new_base_score: float, verified: bool = False) -> None:
-        """Update the trust score."""
+        """Update the trust score and invalidate cache."""
+        # Invalidate cache since base parameters changed
+        self.invalidate_cache()
+
         self.base_score = new_base_score
         self.current_score = self.calculate_current_score()
         self.trust_level = self._score_to_level(self.current_score)

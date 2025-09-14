@@ -21,10 +21,17 @@ import psutil
 from pydantic import BaseModel, Field
 import structlog
 
+from .error_sanitizer import sanitize_error, SanitizationLevel
+
 from ..models.foundation.model_health_response import (
     ModelCircuitBreakerStats,
     ModelCircuitBreakerStatsCollection,
     ModelRateLimitedHealthCheckResponse,
+)
+from ..models.foundation.model_health_metadata import (
+    HealthCheckMetadata,
+    AggregateHealthMetadata,
+    ConfigurationChangeMetadata,
 )
 
 
@@ -85,24 +92,9 @@ def _sanitize_error(error: Exception) -> str:
     """
     Sanitize error messages to prevent information disclosure in logs.
 
-    Args:
-        error: Exception to sanitize
-
-    Returns:
-        Safe error message without sensitive information
+    Uses the enhanced centralized error sanitizer for improved security.
     """
-    error_type = type(error).__name__
-    # Only include safe, generic error information
-    if isinstance(error, (ConnectionError, TimeoutError, asyncio.TimeoutError)):
-        return f"{error_type}: Connection or timeout issue"
-    elif isinstance(error, ValueError):
-        return f"{error_type}: Invalid value"
-    elif isinstance(error, KeyError):
-        return f"{error_type}: Missing key"
-    elif isinstance(error, AttributeError):
-        return f"{error_type}: Missing attribute"
-    else:
-        return f"{error_type}: Operation failed"
+    return sanitize_error(error, context="health_check", level=SanitizationLevel.STANDARD)
 
 
 def _get_package_version() -> str:
@@ -171,7 +163,7 @@ class HealthCheckConfig(BaseModel):
     timeout: float = Field(default=5.0, description="Health check timeout in seconds")
     critical: bool = Field(default=True, description="Whether failure affects overall health")
     circuit_breaker_config: Optional[CircuitBreakerConfig] = Field(default=None)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: HealthCheckMetadata = Field(default_factory=HealthCheckMetadata)
 
 class HealthCheckResult(BaseModel):
     """Result of an individual health check."""
@@ -180,7 +172,7 @@ class HealthCheckResult(BaseModel):
     latency_ms: float = Field(description="Check latency in milliseconds")
     timestamp: datetime = Field(default_factory=datetime.now)
     error_message: Optional[str] = Field(default=None)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: HealthCheckMetadata = Field(default_factory=HealthCheckMetadata)
 
     def to_dependency_status(self) -> ModelDependencyStatus:
         """Convert to ModelDependencyStatus for API response."""

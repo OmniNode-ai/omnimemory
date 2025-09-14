@@ -18,6 +18,12 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, AsyncGenerator, Dict, List, Optional, Callable, Union
 from collections import deque
+
+from ..models.foundation.model_connection_metadata import (
+    ConnectionMetadata,
+    ConnectionPoolStats,
+    SemaphoreMetrics,
+)
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -74,7 +80,7 @@ class LockRequest:
     requested_at: datetime = field(default_factory=datetime.now)
     correlation_id: Optional[str] = None
     timeout: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: ConnectionMetadata = field(default_factory=ConnectionMetadata)
 
 @dataclass
 class SemaphoreStats:
@@ -93,7 +99,7 @@ class ConnectionPoolConfig(BaseModel):
     """Configuration for connection pools."""
     name: str = Field(description="Pool name")
     min_connections: int = Field(default=1, ge=0, description="Minimum connections")
-    max_connections: int = Field(default=10, ge=1, description="Maximum connections")
+    max_connections: int = Field(default=50, ge=1, description="Maximum connections (increased for production load)")
     connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout")
     idle_timeout: float = Field(default=300.0, gt=0, description="Idle connection timeout")
     health_check_interval: float = Field(default=60.0, gt=0, description="Health check interval")
@@ -404,7 +410,7 @@ class AsyncConnectionPool:
         self._close_connection = close_connection or (lambda conn: None)
 
         self._available: asyncio.Queue = asyncio.Queue(maxsize=config.max_connections)
-        self._active: Dict[str, Any] = {}
+        self._active: Dict[str, ConnectionMetadata] = {}
         self._metrics = PoolMetrics()
         self._status = PoolStatus.HEALTHY
         self._lock = asyncio.Lock()

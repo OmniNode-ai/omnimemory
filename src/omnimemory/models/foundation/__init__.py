@@ -50,6 +50,25 @@ from .model_memory_data import (
     ModelMemoryResponseData,
 )
 
+# New metadata models for replacing Dict[str, Any]
+from .model_health_metadata import (
+    HealthCheckMetadata,
+    AggregateHealthMetadata,
+    ConfigurationChangeMetadata,
+)
+from .model_audit_metadata import (
+    AuditEventDetails,
+    ResourceUsageMetadata,
+    SecurityAuditDetails,
+    PerformanceAuditDetails,
+)
+from .model_connection_metadata import (
+    ConnectionMetadata,
+    ConnectionPoolStats,
+    SemaphoreMetrics,
+)
+from .model_progress_summary import ProgressSummaryResponse
+
 __all__ = [
     "EnumErrorCode",
     "EnumSeverity",
@@ -105,4 +124,17 @@ __all__ = [
     "ModelMemoryDataContent",
     "ModelMemoryRequestData",
     "ModelMemoryResponseData",
+
+    # New typed metadata models
+    "HealthCheckMetadata",
+    "AggregateHealthMetadata",
+    "ConfigurationChangeMetadata",
+    "AuditEventDetails",
+    "ResourceUsageMetadata",
+    "SecurityAuditDetails",
+    "PerformanceAuditDetails",
+    "ConnectionMetadata",
+    "ConnectionPoolStats",
+    "SemaphoreMetrics",
+    "ProgressSummaryResponse",
 ]

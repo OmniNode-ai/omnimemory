@@ -22,6 +22,8 @@ from enum import Enum
 from typing import Any, AsyncGenerator, Dict, Optional
 
 from pydantic import BaseModel, Field
+
+from ..models.foundation.model_typed_collections import ModelMetadata
 import structlog
 
 
@@ -140,7 +142,7 @@ class CorrelationContext(BaseModel):
     operation: Optional[str] = Field(default=None)
     parent_correlation_id: Optional[str] = Field(default=None)
     trace_level: TraceLevel = Field(default=TraceLevel.INFO)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: ModelMetadata = Field(default_factory=ModelMetadata)
     created_at: datetime = Field(default_factory=datetime.now)
 
 class ObservabilityManager:

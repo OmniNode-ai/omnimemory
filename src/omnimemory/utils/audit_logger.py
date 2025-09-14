@@ -15,6 +15,13 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from ..models.foundation.model_audit_metadata import (
+    AuditEventDetails,
+    ResourceUsageMetadata,
+    SecurityAuditDetails,
+    PerformanceAuditDetails,
+)
+
 
 class AuditEventType(str, Enum):
     """Types of auditable events."""
@@ -58,7 +65,7 @@ class AuditEvent(BaseModel):
 
     # Event details
     message: str = Field(description="Human-readable event description")
-    details: Dict[str, Any] = Field(default_factory=dict, description="Additional event details")
+    details: AuditEventDetails = Field(default_factory=AuditEventDetails, description="Additional event details")
 
     # Security context
     source_ip: Optional[str] = Field(default=None, description="Source IP address")
@@ -66,7 +73,7 @@ class AuditEvent(BaseModel):
 
     # Performance data
     duration_ms: Optional[float] = Field(default=None, description="Operation duration")
-    resource_usage: Optional[Dict[str, Any]] = Field(default=None, description="Resource usage metrics")
+    resource_usage: Optional[ResourceUsageMetadata] = Field(default=None, description="Resource usage metrics")
 
     # Compliance tracking
     data_classification: Optional[str] = Field(default=None, description="Data classification level")
@@ -194,7 +201,7 @@ class AuditLogger:
                            memory_id: str,
                            success: bool,
                            duration_ms: Optional[float] = None,
-                           details: Optional[Dict[str, Any]] = None,
+                           details: Optional[AuditEventDetails] = None,
                            user_context: Optional[str] = None) -> None:
         """Log a memory operation event."""
         event_type_map = {
@@ -222,7 +229,7 @@ class AuditLogger:
                          pii_types: list,
                          content_length: int,
                          sanitized: bool = False,
-                         details: Optional[Dict[str, Any]] = None) -> None:
+                         details: Optional[AuditEventDetails] = None) -> None:
         """Log PII detection event."""
         severity = AuditSeverity.HIGH if pii_types else AuditSeverity.LOW
 
@@ -251,7 +258,7 @@ class AuditLogger:
                               description: str,
                               source_ip: Optional[str] = None,
                               user_context: Optional[str] = None,
-                              details: Optional[Dict[str, Any]] = None) -> None:
+                              details: Optional[AuditEventDetails] = None) -> None:
         """Log security violation event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
@@ -273,7 +280,7 @@ class AuditLogger:
                          old_value: Optional[str],
                          new_value: str,
                          user_context: Optional[str] = None,
-                         details: Optional[Dict[str, Any]] = None) -> None:
+                         details: Optional[AuditEventDetails] = None) -> None:
         """Log configuration change event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),

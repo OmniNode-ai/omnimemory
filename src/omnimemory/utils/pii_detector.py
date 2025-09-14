@@ -85,8 +85,8 @@ class PIIDetector:
                     "mask_template": "***-**-****"
                 },
                 {
-                    "pattern": r'\b\d{9}\b',
-                    "confidence": 0.70,  # Lower confidence for 9-digit numbers
+                    "pattern": r'\b(?!(?:000|666|9\d{2}))\d{3}(?!00)\d{2}(?!0000)\d{4}\b',  # More restrictive SSN pattern
+                    "confidence": 0.75,  # Reduced false positives with better validation
                     "mask_template": "*********"
                 }
             ],
@@ -119,6 +119,26 @@ class PIIDetector:
                     "pattern": r'[Tt]oken["\s]*[:=]["\s]*([A-Za-z0-9\-_]{20,})',
                     "confidence": 0.90,
                     "mask_template": "token=***REDACTED***"
+                },
+                {
+                    "pattern": r'sk-[A-Za-z0-9]{32,}',  # OpenAI API keys
+                    "confidence": 0.98,
+                    "mask_template": "sk-***REDACTED***"
+                },
+                {
+                    "pattern": r'ghp_[A-Za-z0-9]{36}',  # GitHub personal access tokens
+                    "confidence": 0.98,
+                    "mask_template": "ghp_***REDACTED***"
+                },
+                {
+                    "pattern": r'AIza[A-Za-z0-9\-_]{35}',  # Google API keys
+                    "confidence": 0.98,
+                    "mask_template": "AIza***REDACTED***"
+                },
+                {
+                    "pattern": r'AWS[A-Z0-9]{16,}',  # AWS access keys
+                    "confidence": 0.95,
+                    "mask_template": "AWS***REDACTED***"
                 }
             ],
             PIIType.PASSWORD_HASH: [

@@ -9,12 +9,14 @@ This module provides models for tracking migration progress across the system:
 """
 
 from datetime import datetime, timedelta
+from functools import cached_property
 from typing import Dict, List, Optional, Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field
 
 from .model_typed_collections import ModelMetadata, ModelConfiguration
+from .model_progress_summary import ProgressSummaryResponse
 
 from omnimemory.enums import MigrationStatus, MigrationPriority, FileProcessingStatus
 
@@ -84,22 +86,62 @@ class MigrationProgressMetrics(BaseModel):
     current_batch: Optional[str] = Field(default=None, description="Current batch being processed")
     batch_metrics: List[BatchProcessingMetrics] = Field(default_factory=list, description="Batch processing metrics")
 
+    # Performance optimization: Cache expensive calculations
+    _cached_completion_percentage: Optional[float] = Field(
+        default=None,
+        exclude=True,
+        description="Cached completion percentage to avoid recalculation",
+    )
+    _cached_success_rate: Optional[float] = Field(
+        default=None,
+        exclude=True,
+        description="Cached success rate to avoid recalculation",
+    )
+    _cache_invalidated_at: Optional[datetime] = Field(
+        default=None,
+        exclude=True,
+        description="Timestamp when cache was last invalidated",
+    )
+    _cache_ttl_seconds: int = Field(
+        default=60,  # 1 minute cache TTL
+        exclude=True,
+        description="Cache time-to-live in seconds for metrics",
+    )
+
     @computed_field
     @property
     def completion_percentage(self) -> float:
-        """Calculate completion percentage."""
+        """Calculate completion percentage with caching for performance."""
+        # Check cache validity
+        if self._is_cache_valid() and self._cached_completion_percentage is not None:
+            return self._cached_completion_percentage
+
+        # Calculate and cache
         if self.total_files == 0:
-            return 0.0
-        return (self.processed_files / self.total_files) * 100
+            result = 0.0
+        else:
+            result = (self.processed_files / self.total_files) * 100
+
+        self._cached_completion_percentage = result
+        return result
 
     @computed_field
     @property
     def success_rate(self) -> float:
-        """Calculate overall success rate."""
+        """Calculate overall success rate with caching for performance."""
+        # Check cache validity
+        if self._is_cache_valid() and self._cached_success_rate is not None:
+            return self._cached_success_rate
+
+        # Calculate and cache
         if self.processed_files == 0:
-            return 0.0
-        successful_files = self.processed_files - self.failed_files
-        return (successful_files / self.processed_files) * 100
+            result = 0.0
+        else:
+            successful_files = self.processed_files - self.failed_files
+            result = (successful_files / self.processed_files) * 100
+
+        self._cached_success_rate = result
+        return result
 
     @computed_field
     @property
@@ -129,6 +171,20 @@ class MigrationProgressMetrics(BaseModel):
         remaining_seconds = self.remaining_files / self.files_per_second
         self.estimated_completion = self.last_update_time + timedelta(seconds=remaining_seconds)
         return self.estimated_completion
+
+    def _is_cache_valid(self) -> bool:
+        """Check if cached metrics are still valid."""
+        if self._cache_invalidated_at is None:
+            return False
+
+        cache_age = (datetime.now() - self._cache_invalidated_at).total_seconds()
+        return cache_age < self._cache_ttl_seconds
+
+    def invalidate_cache(self) -> None:
+        """Manually invalidate the metrics cache."""
+        self._cached_completion_percentage = None
+        self._cached_success_rate = None
+        self._cache_invalidated_at = datetime.now()
 
 class MigrationProgressTracker(BaseModel):
     """
@@ -251,31 +307,30 @@ class MigrationProgressTracker(BaseModel):
                 self.metrics.current_batch = None
             self._update_timestamp()
 
-    def get_progress_summary(self) -> Dict[str, Any]:
+    def get_progress_summary(self) -> ProgressSummaryResponse:
         """Get a comprehensive progress summary."""
-        return {
-            "migration_id": str(self.migration_id),
-            "name": self.name,
-            "status": self.status.value,
-            "priority": self.priority.value,
-            "completion_percentage": self.metrics.completion_percentage,
-            "success_rate": self.metrics.success_rate,
-            "elapsed_time": str(self.metrics.elapsed_time),
-            "estimated_completion": self.metrics.estimated_completion.isoformat() if self.metrics.estimated_completion else None,
-            "processing_rates": {
+        return ProgressSummaryResponse(
+            migration_id=str(self.migration_id),
+            name=self.name,
+            status=self.status,
+            priority=self.priority,
+            completion_percentage=self.metrics.completion_percentage,
+            success_rate=self.metrics.success_rate,
+            elapsed_time=str(self.metrics.elapsed_time),
+            estimated_completion=self.metrics.estimated_completion,
+            total_items=self.metrics.total_files,
+            processed_items=self.metrics.processed_files,
+            successful_items=self.metrics.processed_files - self.metrics.failed_files,
+            failed_items=self.metrics.failed_files,
+            current_batch_id=getattr(self.metrics, 'current_batch', None),
+            active_workers=len([b for b in self.metrics.batch_metrics if b.end_time is None]),
+            recent_errors=[str(e) for e in self.error_summary[-5:]] if self.error_summary else [],
+            performance_metrics={
                 "files_per_second": self.metrics.files_per_second,
-                "bytes_per_second": self.metrics.bytes_per_second
-            },
-            "file_counts": {
-                "total": self.metrics.total_files,
-                "processed": self.metrics.processed_files,
-                "failed": self.metrics.failed_files,
-                "skipped": self.metrics.skipped_files,
-                "remaining": self.metrics.remaining_files
-            },
-            "error_summary": self.error_summary,
-            "active_batches": len([b for b in self.metrics.batch_metrics if b.end_time is None])
-        }
+                "bytes_per_second": self.metrics.bytes_per_second,
+                "average_processing_time": getattr(self.metrics, 'average_processing_time_ms', 0.0)
+            }
+        )
 
     def _find_file(self, file_path: str) -> Optional[FileProcessingInfo]:
         """Find file info by path."""
@@ -286,7 +341,10 @@ class MigrationProgressTracker(BaseModel):
         return next((b for b in self.metrics.batch_metrics if b.batch_id == batch_id), None)
 
     def _update_progress_metrics(self):
-        """Update progress metrics and estimates."""
+        """Update progress metrics and estimates with cache invalidation."""
+        # Invalidate cache since metrics are changing
+        self.metrics.invalidate_cache()
+
         self.metrics.last_update_time = datetime.now()
         self.metrics.update_processing_rates()
         self.metrics.estimate_completion_time()
