@@ -8,10 +8,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ...enums.enum_node_type import EnumNodeType
-from omnimemory.models.foundation.model_user import ModelUser
-from omnimemory.models.foundation.model_priority import ModelPriority
-from omnimemory.models.foundation.model_tags import ModelTagCollection
-from omnimemory.models.foundation.model_trust_score import ModelTrustScore
+from ..foundation.model_user import ModelUser
+from ..foundation.model_priority import ModelPriority
+from ..foundation.model_tags import ModelTagCollection
+from ..foundation.model_trust_score import ModelTrustScore
 
 
 class ModelMemoryContext(BaseModel):

@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # === STRING COLLECTIONS ===
@@ -36,7 +36,8 @@ class ModelStringList(BaseModel):
         description="List of string values with validation and deduplication"
     )
 
-    @validator('values')
+    @field_validator('values')
+    @classmethod
     def validate_strings(cls, v):
         """Validate and deduplicate string values."""
         if not isinstance(v, list):
@@ -70,7 +71,8 @@ class ModelOptionalStringList(BaseModel):
         description="Optional list of string values, None if not set"
     )
 
-    @validator('values')
+    @field_validator('values')
+    @classmethod
     def validate_optional_strings(cls, v):
         """Validate optional string values."""
         if v is None:
@@ -108,7 +110,8 @@ class ModelKeyValuePair(BaseModel):
     key: str = Field(description="Metadata key identifier")
     value: str = Field(description="Metadata value content")
 
-    @validator('key')
+    @field_validator('key')
+    @classmethod
     def validate_key(cls, v):
         """Validate metadata key format."""
         if not v or not v.strip():
@@ -180,7 +183,8 @@ class ModelStructuredField(BaseModel):
         description="Field type indicator (string, number, boolean, etc.)"
     )
 
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """Validate field name format."""
         if not v or not v.strip():
@@ -251,7 +255,8 @@ class ModelConfigurationOption(BaseModel):
         description="Whether this option contains sensitive data"
     )
 
-    @validator('key')
+    @field_validator('key')
+    @classmethod
     def validate_key(cls, v):
         """Validate configuration key format."""
         if not v or not v.strip():
@@ -329,14 +334,16 @@ class ModelEventData(BaseModel):
         description="Correlation ID for tracking related events"
     )
 
-    @validator('event_type')
+    @field_validator('event_type')
+    @classmethod
     def validate_event_type(cls, v):
         """Validate event type format."""
         if not v or not v.strip():
             raise ValueError("event_type cannot be empty")
         return v.strip().lower()
 
-    @validator('severity')
+    @field_validator('severity')
+    @classmethod
     def validate_severity(cls, v):
         """Validate severity level."""
         valid_levels = {"debug", "info", "warning", "error", "critical"}
@@ -407,7 +414,8 @@ class ModelResultItem(BaseModel):
         description="Structured data associated with this item"
     )
 
-    @validator('status')
+    @field_validator('status')
+    @classmethod
     def validate_status(cls, v):
         """Validate status values."""
         valid_statuses = {"success", "failure", "pending", "partial", "cancelled"}

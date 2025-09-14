@@ -29,7 +29,7 @@ class ModelOperationMetadata(BaseModel):
         default=None,
         description="Session ID for multi-operation sessions"
     )
-    user_id: Optional[str] = Field(
+    user_id: Optional[UUID] = Field(
         default=None,
         description="User identifier who initiated the operation"
     )
@@ -64,7 +64,7 @@ class ModelOperationMetadata(BaseModel):
         default="production",
         description="Environment where operation was executed"
     )
-    node_id: Optional[str] = Field(
+    node_id: Optional[UUID] = Field(
         default=None,
         description="ONEX node identifier that processed the operation"
     )

@@ -14,6 +14,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field
 
+from .model_typed_collections import ModelMetadata, ModelConfiguration
+
 from omnimemory.enums import MigrationStatus, MigrationPriority, FileProcessingStatus
 
 class BatchProcessingMetrics(BaseModel):
@@ -52,7 +54,7 @@ class FileProcessingInfo(BaseModel):
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     retry_count: int = Field(default=0, description="Number of retry attempts")
     batch_id: Optional[str] = Field(default=None, description="Associated batch ID")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional file metadata")
+    metadata: ModelMetadata = Field(default_factory=ModelMetadata, description="Additional file metadata")
 
     @computed_field
     @property
@@ -153,15 +155,25 @@ class MigrationProgressTracker(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
     updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
 
-    configuration: Dict[str, Any] = Field(default_factory=dict, description="Migration configuration")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    configuration: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Migration configuration")
+    metadata: ModelMetadata = Field(default_factory=ModelMetadata, description="Additional metadata")
 
     def add_file(self, file_path: str, file_size: Optional[int] = None, **metadata) -> FileProcessingInfo:
         """Add a file to be tracked for processing."""
+        from .model_typed_collections import ModelKeyValuePair
+        
+        # Convert dict metadata to ModelMetadata
+        metadata_obj = ModelMetadata()
+        if metadata:
+            metadata_obj.pairs = [
+                ModelKeyValuePair(key=str(k), value=str(v)) 
+                for k, v in metadata.items()
+            ]
+        
         file_info = FileProcessingInfo(
             file_path=file_path,
             file_size=file_size,
-            metadata=metadata
+            metadata=metadata_obj
         )
         self.files.append(file_info)
         self.metrics.total_files = len(self.files)
