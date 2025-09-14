@@ -1,13 +1,13 @@
 """
-Enum for ONEX node types in memory architecture.
+Node type enumeration following ONEX standards.
 """
 
 from enum import Enum
 
 
 class EnumNodeType(str, Enum):
-    """ONEX 4-node architecture types for memory operations."""
-
+    """ONEX node types for the 4-node architecture."""
+    
     EFFECT = "effect"
     COMPUTE = "compute"
     REDUCER = "reducer"

@@ -4,7 +4,7 @@ Memory storage configuration model following ONEX standards.
 
 from pydantic import BaseModel, Field, SecretStr
 
-from .enum_memory_storage_type import EnumMemoryStorageType
+from ...enums.enum_memory_storage_type import EnumMemoryStorageType
 
 
 class ModelMemoryStorageConfig(BaseModel):

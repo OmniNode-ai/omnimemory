@@ -6,7 +6,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .enum_memory_operation_type import EnumMemoryOperationType
+from ...enums.enum_memory_operation_type import EnumMemoryOperationType
+from ..foundation.model_semver import ModelSemVer
+from ..foundation.model_success_metrics import ModelSuccessRate, ModelConfidenceScore
+from ..foundation.model_notes import ModelNotesCollection
+from ..foundation.model_error_details import ModelErrorDetails
 
 
 class ModelMemoryMetadata(BaseModel):
@@ -16,9 +20,9 @@ class ModelMemoryMetadata(BaseModel):
     operation_type: EnumMemoryOperationType = Field(
         description="Type of memory operation being performed",
     )
-    operation_version: str = Field(
-        default="1.0",
-        description="Version of the operation schema",
+    operation_version: ModelSemVer = Field(
+        default_factory=lambda: ModelSemVer.from_string("1.0.0"),
+        description="Version of the operation schema following semantic versioning",
     )
 
     # Performance tracking
@@ -46,17 +50,13 @@ class ModelMemoryMetadata(BaseModel):
     )
 
     # Quality metrics
-    success_rate: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Success rate for this type of operation",
+    success_rate: ModelSuccessRate | None = Field(
+        default=None,
+        description="Success rate metrics for this type of operation",
     )
-    confidence_score: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Confidence score for the operation result",
+    confidence_score: ModelConfidenceScore | None = Field(
+        default=None,
+        description="Confidence score metrics for the operation result",
     )
 
     # Audit information
@@ -70,11 +70,11 @@ class ModelMemoryMetadata(BaseModel):
     )
 
     # Additional context
-    notes: str | None = Field(
+    notes: ModelNotesCollection | None = Field(
         default=None,
-        description="Additional notes or context",
+        description="Additional notes or context as a structured collection",
     )
-    error_details: str | None = Field(
+    last_error: ModelErrorDetails | None = Field(
         default=None,
-        description="Error details if operation failed",
+        description="Full error details if operation failed",
     )

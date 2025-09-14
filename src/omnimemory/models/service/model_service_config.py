@@ -4,8 +4,8 @@ Service configuration model following ONEX standards.
 
 from pydantic import BaseModel, Field
 
-from ..core.enum_node_type import EnumNodeType
-from .enum_service_status import EnumServiceStatus
+from omnibase_core.enums.node import EnumNodeType
+from omnibase_core.enums.node import EnumHealthStatus
 
 
 class ModelServiceConfig(BaseModel):

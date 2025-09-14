@@ -6,8 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .enum_memory_operation_type import EnumMemoryOperationType
+from ...enums.enum_memory_operation_type import EnumMemoryOperationType
 from .model_memory_context import ModelMemoryContext
+from ..foundation.model_memory_data import ModelMemoryRequestData
 
 
 class ModelMemoryRequest(BaseModel):
@@ -27,9 +28,9 @@ class ModelMemoryRequest(BaseModel):
     )
 
     # Request payload
-    data: dict[str, str] = Field(
-        default_factory=dict,
-        description="Request data payload with string values for type safety",
+    data: ModelMemoryRequestData | None = Field(
+        default=None,
+        description="Structured request data payload following ONEX standards",
     )
 
     # Request parameters

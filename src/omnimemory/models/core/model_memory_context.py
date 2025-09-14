@@ -7,11 +7,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .enum_node_type import EnumNodeType
+from ...enums.enum_node_type import EnumNodeType
+from omnimemory.models.foundation.model_user import ModelUser
+from omnimemory.models.foundation.model_priority import ModelPriority
+from omnimemory.models.foundation.model_tags import ModelTagCollection
+from omnimemory.models.foundation.model_trust_score import ModelTrustScore
 
 
 class ModelMemoryContext(BaseModel):
-    """Context information for memory operations following ONEX standards."""
+    """Context information for memory operations following ONEX standards with typed models."""
 
     correlation_id: UUID = Field(
         description="Unique correlation identifier for tracing operations across nodes",
@@ -20,16 +24,21 @@ class ModelMemoryContext(BaseModel):
         default=None,
         description="Session identifier for grouping related operations",
     )
-    user_id: str | None = Field(
+    user: ModelUser | None = Field(
         default=None,
-        description="User identifier for authorization and personalization",
+        description="User information for authorization and personalization",
+    )
+    user_id: UUID | None = Field(
+        default=None,
+        description="Legacy user identifier (use user field for new implementations)",
+        deprecated=True,
     )
 
     # ONEX node information
     source_node_type: EnumNodeType = Field(
         description="Type of ONEX node initiating the operation",
     )
-    source_node_id: str = Field(
+    source_node_id: UUID = Field(
         description="Identifier of the source node",
     )
 
@@ -42,17 +51,15 @@ class ModelMemoryContext(BaseModel):
         default=30000,
         description="Timeout for the operation in milliseconds",
     )
-    priority: int = Field(
-        default=5,
-        ge=1,
-        le=10,
-        description="Operation priority (1=lowest, 10=highest)",
+    priority: ModelPriority = Field(
+        default_factory=lambda: ModelPriority.create_normal("Default operation priority"),
+        description="Operation priority with comprehensive metadata",
     )
 
     # Context tags and metadata
-    tags: list[str] = Field(
-        default_factory=list,
-        description="Tags for categorizing and filtering operations",
+    tags: ModelTagCollection = Field(
+        default_factory=ModelTagCollection,
+        description="Tags for categorizing and filtering operations with metadata",
     )
     metadata: dict[str, str] = Field(
         default_factory=dict,
@@ -60,13 +67,111 @@ class ModelMemoryContext(BaseModel):
     )
 
     # Trust and validation
-    trust_score: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Trust score for the operation source",
+    trust_score: ModelTrustScore = Field(
+        default_factory=lambda: ModelTrustScore.create_from_float(1.0),
+        description="Trust score with time decay and comprehensive validation",
     )
     validation_required: bool = Field(
         default=False,
         description="Whether the operation requires additional validation",
     )
+
+    # Helper methods for working with typed models
+
+    def get_effective_user_id(self) -> UUID | None:
+        """Get user ID from either user model or legacy user_id field."""
+        if self.user:
+            return self.user.user_id
+        return self.user_id
+
+    def get_user_display_name(self) -> str:
+        """Get display name for the user."""
+        if self.user:
+            return self.user.display_name or self.user.username
+        return "Unknown User"
+
+    def get_effective_priority_score(self) -> float:
+        """Get numeric priority score considering boosts and expiration."""
+        return self.priority.get_effective_priority()
+
+    def is_high_priority(self) -> bool:
+        """Check if this context has high priority."""
+        return self.priority.is_high_priority()
+
+    def get_current_trust_score(self) -> float:
+        """Get current trust score with time decay applied."""
+        self.trust_score.refresh_current_score()
+        return self.trust_score.current_score
+
+    def add_context_tag(self, tag_name: str, category: str | None = None) -> bool:
+        """Add a tag to the context."""
+        return self.tags.add_tag(tag_name, category=category)
+
+    def has_context_tag(self, tag_name: str) -> bool:
+        """Check if context has a specific tag."""
+        return self.tags.has_tag(tag_name)
+
+    def get_tag_names(self) -> list[str]:
+        """Get list of all tag names."""
+        return self.tags.get_tag_names()
+
+    @classmethod
+    def create_for_user(
+        cls,
+        user: ModelUser,
+        source_node_type: EnumNodeType,
+        source_node_id: UUID,
+        correlation_id: UUID | None = None,
+        priority_level: str = "normal"
+    ) -> "ModelMemoryContext":
+        """Factory method to create context for a specific user."""
+        from uuid import uuid4
+
+        if correlation_id is None:
+            correlation_id = uuid4()
+
+        # Create appropriate priority
+        if priority_level == "high":
+            priority = ModelPriority.create_high("User operation", user.username)
+        elif priority_level == "critical":
+            priority = ModelPriority.create_critical("Critical user operation", user.username)
+        else:
+            priority = ModelPriority.create_normal("User operation")
+
+        return cls(
+            correlation_id=correlation_id,
+            user=user,
+            source_node_type=source_node_type,
+            source_node_id=source_node_id,
+            priority=priority
+        )
+
+    @classmethod
+    def create_system_context(
+        cls,
+        source_node_type: EnumNodeType,
+        source_node_id: UUID,
+        correlation_id: UUID | None = None
+    ) -> "ModelMemoryContext":
+        """Factory method to create system context."""
+        from uuid import uuid4
+
+        if correlation_id is None:
+            correlation_id = uuid4()
+
+        system_user = ModelUser.create_system_user()
+        priority = ModelPriority.create_normal("System operation")
+
+        context = cls(
+            correlation_id=correlation_id,
+            user=system_user,
+            source_node_type=source_node_type,
+            source_node_id=source_node_id,
+            priority=priority
+        )
+
+        # Add system tags
+        context.add_context_tag("system", "source")
+        context.add_context_tag("automated", "source")
+
+        return context

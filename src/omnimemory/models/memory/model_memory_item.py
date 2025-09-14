@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from .enum_memory_storage_type import EnumMemoryStorageType
+from ...enums.enum_memory_storage_type import EnumMemoryStorageType
 
 
 class ModelMemoryItem(BaseModel):

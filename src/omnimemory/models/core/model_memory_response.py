@@ -9,8 +9,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .enum_memory_operation_status import EnumMemoryOperationStatus
+from ...enums.enum_operation_status import EnumOperationStatus
 from .model_memory_metadata import ModelMemoryMetadata
+from .model_processing_metrics import ModelProcessingMetrics
+from .model_operation_metadata import ModelOperationMetadata
+from ..foundation.model_memory_data import ModelMemoryResponseData
+from ..foundation.model_error_details import ModelErrorDetails
+from ..foundation.model_trust_score import ModelTrustScore
 
 
 class ModelMemoryResponse(BaseModel):
@@ -25,7 +30,7 @@ class ModelMemoryResponse(BaseModel):
     )
 
     # Response status
-    status: EnumMemoryOperationStatus = Field(
+    status: EnumOperationStatus = Field(
         description="Status of the memory operation",
     )
     success: bool = Field(
@@ -33,28 +38,31 @@ class ModelMemoryResponse(BaseModel):
     )
 
     # Response data
-    data: dict[str, str] = Field(
-        default_factory=dict,
-        description="Response data with string values for type safety",
-    )
-    results: dict[str, str] = Field(
-        default_factory=dict,
-        description="Operation results with string values for type safety",
+    data: ModelMemoryResponseData | None = Field(
+        default=None,
+        description="Structured response data following ONEX standards",
     )
 
-    # Error information
-    error_code: str | None = Field(
+    # Error information - replaced individual error fields with comprehensive error model
+    error: ModelErrorDetails | None = Field(
         default=None,
-        description="Error code if operation failed",
+        description="Comprehensive error details if operation failed",
     )
-    error_message: str | None = Field(
+
+    # Processing metrics - new model for timing and performance tracking
+    processing_metrics: ModelProcessingMetrics | None = Field(
         default=None,
-        description="Error message if operation failed",
+        description="Processing timing and performance metrics",
+    )
+
+    # Operation metadata - new model for operation-specific information
+    operation_metadata: ModelOperationMetadata = Field(
+        description="Operation-specific metadata and context",
     )
 
     # Response metadata
     metadata: ModelMemoryMetadata = Field(
-        description="Metadata for the response",
+        description="Memory-specific metadata for the response",
     )
 
     # Timing information
@@ -74,9 +82,7 @@ class ModelMemoryResponse(BaseModel):
     )
 
     # Quality indicators
-    trust_score: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Trust score for the response",
+    trust_score: ModelTrustScore | None = Field(
+        default=None,
+        description="Trust score metrics for the response",
     )

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .enum_memory_storage_type import EnumMemoryStorageType
+from ...enums.enum_memory_storage_type import EnumMemoryStorageType
 
 
 class ModelMemoryQuery(BaseModel):

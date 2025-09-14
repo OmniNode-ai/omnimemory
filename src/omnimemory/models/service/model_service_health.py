@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .enum_service_status import EnumServiceStatus
+from omnibase_core.enums.node import EnumHealthStatus
 
 
 class ModelServiceHealth(BaseModel):
@@ -21,7 +21,7 @@ class ModelServiceHealth(BaseModel):
     )
 
     # Health status
-    status: EnumServiceStatus = Field(
+    status: EnumHealthStatus = Field(
         description="Current status of the service",
     )
     is_healthy: bool = Field(

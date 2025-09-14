@@ -9,35 +9,12 @@ This module provides models for tracking migration progress across the system:
 """
 
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import Dict, List, Optional, Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field
 
-class MigrationStatus(Enum):
-    """Migration status enumeration."""
-    PENDING = "pending"
-    RUNNING = "running"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-class MigrationPriority(Enum):
-    """Migration priority levels."""
-    LOW = "low"
-    NORMAL = "normal"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-class FileProcessingStatus(Enum):
-    """File processing status enumeration."""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
+from omnimemory.enums import MigrationStatus, MigrationPriority, FileProcessingStatus
 
 class BatchProcessingMetrics(BaseModel):
     """Metrics for batch processing operations."""

@@ -7,8 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .enum_error_code import EnumErrorCode
-from .enum_error_severity import EnumErrorSeverity
+from ...enums.enum_error_code import EnumErrorCode
+from ...enums.enum_severity import EnumSeverity
 
 
 class ModelErrorDetails(BaseModel):
@@ -33,7 +33,7 @@ class ModelErrorDetails(BaseModel):
         default=None,
         description="Detailed technical error message",
     )
-    severity: EnumErrorSeverity = Field(
+    severity: EnumSeverity = Field(
         description="Severity level of the error",
     )
 
