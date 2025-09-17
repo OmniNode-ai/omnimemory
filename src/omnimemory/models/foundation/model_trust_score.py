@@ -10,12 +10,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from omnimemory.enums import EnumTrustLevel, EnumDecayFunction
+from ...enums import EnumDecayFunction, EnumTrustLevel
 
 
 class ModelTrustScore(BaseModel):
     """Trust score with time-based decay and validation."""
-    
+
     base_score: float = Field(
         ge=0.0,
         le=1.0,
@@ -29,7 +29,7 @@ class ModelTrustScore(BaseModel):
     trust_level: EnumTrustLevel = Field(
         description="Categorical trust level",
     )
-    
+
     # Time decay configuration
     decay_function: EnumDecayFunction = Field(
         default=EnumDecayFunction.EXPONENTIAL,
@@ -47,7 +47,7 @@ class ModelTrustScore(BaseModel):
         le=3650,
         description="Days for trust score to decay to half value",
     )
-    
+
     # Temporal information
     initial_timestamp: datetime = Field(
         default_factory=datetime.utcnow,
@@ -61,7 +61,7 @@ class ModelTrustScore(BaseModel):
         default=None,
         description="When the trust was last externally verified",
     )
-    
+
     # Metadata
     source_node_id: Optional[UUID] = Field(
         default=None,
@@ -79,33 +79,35 @@ class ModelTrustScore(BaseModel):
     )
 
     # Performance optimization caching
-    _cached_score: Optional[float] = Field(
+    cached_score: Optional[float] = Field(
         default=None,
         exclude=True,
         description="Cached current score to avoid expensive recalculation",
     )
-    _cache_timestamp: Optional[datetime] = Field(
+    cache_timestamp: Optional[datetime] = Field(
         default=None,
         exclude=True,
         description="Timestamp when the score was cached",
     )
-    _cache_ttl_seconds: int = Field(
+    cache_ttl_seconds: int = Field(
         default=300,  # 5 minutes cache TTL
         exclude=True,
         description="Cache time-to-live in seconds",
     )
-    
-    @field_validator('trust_level')
+
+    @field_validator("trust_level")
     @classmethod
     def validate_trust_level_matches_score(cls, v, info):
         """Ensure trust level matches base score."""
-        if 'current_score' in info.data:
-            score = info.data['current_score']
+        if "current_score" in info.data:
+            score = info.data["current_score"]
             expected_level = cls._score_to_level(score)
             if v != expected_level:
-                raise ValueError(f"Trust level {v} doesn't match score {score}, expected {expected_level}")
+                raise ValueError(
+                    f"Trust level {v} doesn't match score {score}, expected {expected_level}"
+                )
         return v
-    
+
     @staticmethod
     def _score_to_level(score: float) -> EnumTrustLevel:
         """Convert numeric score to trust level."""
@@ -119,15 +121,17 @@ class ModelTrustScore(BaseModel):
             return EnumTrustLevel.LOW
         else:
             return EnumTrustLevel.UNTRUSTED
-    
-    def calculate_current_score(self, as_of: Optional[datetime] = None, force_recalculate: bool = False) -> float:
+
+    def calculate_current_score(
+        self, as_of: Optional[datetime] = None, force_recalculate: bool = False
+    ) -> float:
         """Calculate current trust score with time decay and caching for performance."""
         if as_of is None:
             as_of = datetime.utcnow()
 
         # Check cache validity if not forcing recalculation
         if not force_recalculate and self._is_cache_valid(as_of):
-            return self._cached_score
+            return self.cached_score
 
         if self.decay_function == EnumDecayFunction.NONE:
             score = self.base_score
@@ -162,22 +166,22 @@ class ModelTrustScore(BaseModel):
 
     def _is_cache_valid(self, as_of: datetime) -> bool:
         """Check if cached score is still valid."""
-        if self._cached_score is None or self._cache_timestamp is None:
+        if self.cached_score is None or self.cache_timestamp is None:
             return False
 
-        cache_age = (as_of - self._cache_timestamp).total_seconds()
-        return cache_age < self._cache_ttl_seconds
+        cache_age = (as_of - self.cache_timestamp).total_seconds()
+        return cache_age < self.cache_ttl_seconds
 
     def _update_cache(self, score: float, timestamp: datetime) -> None:
         """Update cached score and timestamp."""
-        self._cached_score = score
-        self._cache_timestamp = timestamp
+        self.cached_score = score
+        self.cache_timestamp = timestamp
 
     def invalidate_cache(self) -> None:
         """Manually invalidate the score cache."""
-        self._cached_score = None
-        self._cache_timestamp = None
-    
+        self.cached_score = None
+        self.cache_timestamp = None
+
     def update_score(self, new_base_score: float, verified: bool = False) -> None:
         """Update the trust score and invalidate cache."""
         # Invalidate cache since base parameters changed
@@ -187,11 +191,11 @@ class ModelTrustScore(BaseModel):
         self.current_score = self.calculate_current_score()
         self.trust_level = self._score_to_level(self.current_score)
         self.last_updated = datetime.utcnow()
-        
+
         if verified:
             self.last_verified = datetime.utcnow()
             self.verification_count += 1
-    
+
     def record_violation(self, penalty: float = 0.1) -> None:
         """Record a trust violation with penalty."""
         self.violation_count += 1
@@ -200,14 +204,16 @@ class ModelTrustScore(BaseModel):
         self.current_score = self.calculate_current_score()
         self.trust_level = self._score_to_level(self.current_score)
         self.last_updated = datetime.utcnow()
-    
+
     def refresh_current_score(self) -> None:
         """Refresh the current score based on time decay."""
         self.current_score = self.calculate_current_score()
         self.trust_level = self._score_to_level(self.current_score)
-    
+
     @classmethod
-    def create_from_float(cls, score: float, source_node_id: Optional[UUID] = None) -> "ModelTrustScore":
+    def create_from_float(
+        cls, score: float, source_node_id: Optional[UUID] = None
+    ) -> "ModelTrustScore":
         """Create trust score model from legacy float value."""
         trust_level = cls._score_to_level(score)
         return cls(

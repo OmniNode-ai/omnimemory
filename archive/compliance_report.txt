@@ -1,0 +1,37 @@
+EVENT-DRIVEN ARCHITECTURE COMPLIANCE REPORT
+==================================================
+
+❌ COMPLIANCE FAILED - 5 violations detected
+
+⚠️  MEDIUM SEVERITY VIOLATIONS:
+------------------------------
+File: /Volumes/PRO-G40/Code/omnimemory/src/omnimemory/adapters/postgres_adapter_integration.py
+Line: 74
+Issue: Database operation pattern: CREATE TABLE IF NOT EXISTS omnimemory_persistent_storage (
+Type: raw_pattern
+
+File: /Volumes/PRO-G40/Code/omnimemory/src/omnimemory/adapters/postgres_adapter_integration.py
+Line: 114
+Issue: Database operation pattern: DELETE FROM omnimemory_persistent_storage
+Type: raw_pattern
+
+File: /Volumes/PRO-G40/Code/omnimemory/src/omnimemory/adapters/postgres_adapter_integration.py
+Line: 185
+Issue: Database operation pattern: INSERT INTO omnimemory_persistent_storage
+Type: raw_pattern
+
+File: /Volumes/PRO-G40/Code/omnimemory/src/omnimemory/adapters/__init__.py
+Line: 4
+Issue: Suspicious import containing database library: redis_adapter_integration
+Type: suspicious_import
+
+File: /Volumes/PRO-G40/Code/omnimemory/src/omnimemory/adapters/__init__.py
+Line: 4
+Issue: Suspicious import containing database library: redis_adapter_integration.RedisAdapterIntegration
+Type: suspicious_import
+
+COMPLIANCE REQUIREMENTS:
+- Use event bus for all database operations
+- Import only ONEX event publishing components
+- Use adapter integrations for infrastructure
+- Maintain correlation ID traceability

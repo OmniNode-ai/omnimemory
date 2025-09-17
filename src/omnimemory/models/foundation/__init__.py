@@ -1,93 +1,82 @@
 """
 Foundation domain models for OmniMemory following ONEX standards.
 
-This module provides foundation models for base implementations,
-error handling, migration progress tracking, and system-level operations.
+ONEX Compliance: One model per file, zero backwards compatibility.
 """
 
-from ...enums.enum_error_code import OmniMemoryErrorCode
-# Backward compatibility alias
-EnumErrorCode = OmniMemoryErrorCode
-from ...enums.enum_severity import EnumSeverity
+from .model_audit_metadata import (
+    AuditEventDetails,
+    ModelResourceUsageMetadata,
+    PerformanceAuditDetails,
+    SecurityAuditDetails,
+)
+from .model_confidence_score import ModelConfidenceScore
+from .model_configuration import (
+    ModelCacheConfig,
+    ModelDatabaseConfig,
+    ModelObservabilityConfig,
+    ModelPerformanceConfig,
+    ModelSystemConfiguration,
+)
+from .model_connection_metadata import (
+    ConnectionPoolStats,
+    ModelConnectionMetadata,
+    SemaphoreMetrics,
+)
+
+# Individual model imports (ONEX compliant - one model per file)
 from .model_error_details import ModelErrorDetails
-from .model_system_health import ModelSystemHealth
-from .model_health_response import ModelHealthResponse, ModelDependencyStatus, ModelResourceMetrics
-from .model_metrics_response import ModelMetricsResponse, ModelOperationCounts, ModelPerformanceMetrics, ModelResourceMetricsDetailed
-from .model_configuration import ModelSystemConfiguration, ModelDatabaseConfig, ModelCacheConfig, ModelPerformanceConfig, ModelObservabilityConfig
-from .model_migration_progress import (
-    MigrationStatus,
-    MigrationPriority,
-    FileProcessingStatus,
-    BatchProcessingMetrics,
-    FileProcessingInfo,
-    MigrationProgressMetrics,
-    MigrationProgressTracker,
+from .model_health_metadata import (
+    ModelAggregateHealthMetadata,
+    ModelConfigurationChangeMetadata,
+    ModelHealthCheckMetadata,
 )
-from .model_typed_collections import (
-    ModelStringList,
-    ModelOptionalStringList,
-    ModelKeyValuePair,
-    ModelMetadata,
-    ModelStructuredField,
-    ModelStructuredData,
-    ModelConfigurationOption,
-    ModelConfiguration,
-    ModelEventData,
-    ModelEventCollection,
-    ModelResultItem,
-    ModelResultCollection,
-    convert_dict_to_metadata,
-    convert_list_to_string_list,
-    convert_list_of_dicts_to_structured_data,
+from .model_health_response import (
+    ModelDependencyStatus,
+    ModelHealthResponse,
+    ModelResourceMetrics,
 )
-from .model_semver import ModelSemVer
-from .model_success_metrics import ModelSuccessRate, ModelConfidenceScore, ModelQualityMetrics
-from .model_notes import ModelNote, ModelNotesCollection
+from .model_key_value_pair import ModelKeyValuePair
 from .model_memory_data import (
-    ModelMemoryDataValue,
     ModelMemoryDataContent,
+    ModelMemoryDataValue,
     ModelMemoryRequestData,
     ModelMemoryResponseData,
 )
-
-# New metadata models for replacing Dict[str, Any]
-from .model_health_metadata import (
-    HealthCheckMetadata,
-    AggregateHealthMetadata,
-    ConfigurationChangeMetadata,
+from .model_metrics_response import ModelMetricsResponse
+from .model_migration_progress import (
+    BatchProcessingMetrics,
+    FileProcessingInfo,
+    FileProcessingStatus,
+    MigrationPriority,
+    MigrationProgressMetrics,
+    MigrationProgressTracker,
+    MigrationStatus,
 )
-from .model_audit_metadata import (
-    AuditEventDetails,
-    ResourceUsageMetadata,
-    SecurityAuditDetails,
-    PerformanceAuditDetails,
-)
-from .model_connection_metadata import (
-    ConnectionMetadata,
-    ConnectionPoolStats,
-    SemaphoreMetrics,
-)
+from .model_notes import ModelNote, ModelNotesCollection
+from .model_operation_counts import ModelOperationCounts
+from .model_optional_string_list import ModelOptionalStringList
+from .model_performance_metrics import ModelPerformanceMetrics
 from .model_progress_summary import ProgressSummaryResponse
+from .model_quality_metrics import ModelQualityMetrics
+from .model_resource_metrics_detailed import ModelResourceMetricsDetailed
+from .model_string_list import ModelStringList
+from .model_success_rate import ModelSuccessRate
+from .model_system_health import ModelSystemHealth
+from .model_tag import ModelTag
+from .model_tag_collection import ModelTagCollection
 
 __all__ = [
-    "EnumErrorCode",
-    "EnumSeverity",
     "ModelErrorDetails",
     "ModelSystemHealth",
     "ModelHealthResponse",
     "ModelDependencyStatus",
     "ModelResourceMetrics",
-    "ModelMetricsResponse",
-    "ModelOperationCounts",
-    "ModelPerformanceMetrics",
-    "ModelResourceMetricsDetailed",
     "ModelSystemConfiguration",
     "ModelDatabaseConfig",
     "ModelCacheConfig",
     "ModelPerformanceConfig",
     "ModelObservabilityConfig",
-
-    # Migration progress tracking
     "MigrationStatus",
     "MigrationPriority",
     "FileProcessingStatus",
@@ -95,45 +84,32 @@ __all__ = [
     "FileProcessingInfo",
     "MigrationProgressMetrics",
     "MigrationProgressTracker",
-
-    # Typed collections replacing generic types
-    "ModelStringList",
-    "ModelOptionalStringList",
-    "ModelKeyValuePair",
-    "ModelMetadata",
-    "ModelStructuredField",
-    "ModelStructuredData",
-    "ModelConfigurationOption",
-    "ModelConfiguration",
-    "ModelEventData",
-    "ModelEventCollection",
-    "ModelResultItem",
-    "ModelResultCollection",
-    "convert_dict_to_metadata",
-    "convert_list_to_string_list",
-    "convert_list_of_dicts_to_structured_data",
-
-    # New foundation models
-    "ModelSemVer",
+    "ModelOperationCounts",
+    "ModelPerformanceMetrics",
+    "ModelResourceMetricsDetailed",
+    "ModelMetricsResponse",
     "ModelSuccessRate",
     "ModelConfidenceScore",
     "ModelQualityMetrics",
+    "ModelTag",
+    "ModelTagCollection",
+    "ModelStringList",
+    "ModelOptionalStringList",
+    "ModelKeyValuePair",
     "ModelNote",
     "ModelNotesCollection",
     "ModelMemoryDataValue",
     "ModelMemoryDataContent",
     "ModelMemoryRequestData",
     "ModelMemoryResponseData",
-
-    # New typed metadata models
-    "HealthCheckMetadata",
-    "AggregateHealthMetadata",
-    "ConfigurationChangeMetadata",
+    "ModelHealthCheckMetadata",
+    "ModelAggregateHealthMetadata",
+    "ModelConfigurationChangeMetadata",
     "AuditEventDetails",
-    "ResourceUsageMetadata",
+    "ModelResourceUsageMetadata",
     "SecurityAuditDetails",
     "PerformanceAuditDetails",
-    "ConnectionMetadata",
+    "ModelConnectionMetadata",
     "ConnectionPoolStats",
     "SemaphoreMetrics",
     "ProgressSummaryResponse",
