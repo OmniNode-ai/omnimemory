@@ -225,7 +225,10 @@ class AuditLogger:
             severity=AuditSeverity.LOW if success else AuditSeverity.HIGH,
             operation=f"memory_{operation_type}",
             component="memory_manager",
-            message=f"Memory {operation_type} {'succeeded' if success else 'failed'} for ID: {memory_id}",
+            message=(
+                f"Memory {operation_type} "
+                f"{'succeeded' if success else 'failed'} for ID: {memory_id}"
+            ),
             details=details or {},
             duration_ms=duration_ms,
             user_context=user_context,
@@ -254,7 +257,10 @@ class AuditLogger:
             severity=severity,
             operation="pii_scan",
             component="pii_detector",
-            message=f"PII detection scan found {len(pii_types)} PII types in {content_length} chars",
+            message=(
+                f"PII detection scan found {len(pii_types)} PII types "
+                f"in {content_length} chars"
+            ),
             details={
                 "pii_types_detected": pii_types,
                 "content_length": content_length,
