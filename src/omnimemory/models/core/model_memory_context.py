@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ...enums.enum_node_type import EnumNodeType
+from ...enums import EnumNodeType, NodeType
 from ..foundation.model_priority import ModelPriority
 from ..foundation.model_tags import ModelTagCollection
 from ..foundation.model_trust_score import ModelTrustScore

@@ -37,7 +37,7 @@ except ImportError:
 from pydantic import BaseModel, Field, field_validator
 
 # Local omnimemory-specific error codes
-from ...enums.enum_error_code import OmniMemoryErrorCode as EnumErrorCode
+from ...enums import EnumErrorCode
 
 # Type aliases for error codes and severity
 ErrorCodeType = Union[CoreErrorCode, EnumErrorCode, str]

@@ -5,8 +5,7 @@ This module provides foundation models for base implementations,
 error handling, migration progress tracking, and system-level operations.
 """
 
-from ...enums.enum_error_code import OmniMemoryErrorCode as EnumErrorCode
-from ...enums.enum_severity import EnumSeverity
+from ...enums import EnumErrorCode, EnumSeverity
 from .model_audit_metadata import (
     ModelAuditEventDetails,
     ModelPerformanceAuditDetails,

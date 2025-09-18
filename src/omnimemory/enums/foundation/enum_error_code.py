@@ -1,0 +1,24 @@
+"""
+Error code enumerations.
+"""
+
+from enum import Enum
+
+
+class OmniMemoryErrorCode(Enum):
+    """OmniMemory error codes."""
+
+    INVALID_INPUT = "INVALID_INPUT"
+    NOT_FOUND = "NOT_FOUND"
+    PERMISSION_DENIED = "PERMISSION_DENIED"
+    RESOURCE_EXHAUSTED = "RESOURCE_EXHAUSTED"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+    SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+    TIMEOUT = "TIMEOUT"
+    VALIDATION_FAILED = "VALIDATION_FAILED"
+    CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
+    DEPENDENCY_FAILED = "DEPENDENCY_FAILED"
+
+
+# Alias for compatibility
+EnumErrorCode = OmniMemoryErrorCode

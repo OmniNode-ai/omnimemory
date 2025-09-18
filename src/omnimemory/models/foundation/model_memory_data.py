@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ...enums.enum_data_type import EnumDataType
+from ...enums import EnumDataType
 
 
 class ModelMemoryDataValue(BaseModel):
@@ -274,7 +274,9 @@ class ModelMemoryResponseData(BaseModel):
         """Add response metadata."""
         self.metadata[key] = value
 
-    def set_pagination_info(self, total: int, offset: int = 0, limit: int = 100) -> None:
+    def set_pagination_info(
+        self, total: int, offset: int = 0, limit: int = 100
+    ) -> None:
         """Set pagination information."""
         self.pagination_info = {
             "total": total,

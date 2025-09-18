@@ -14,8 +14,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field
 
-from omnimemory.enums import FileProcessingStatus, MigrationPriority, MigrationStatus
-
+from ...enums import FileProcessingStatus, MigrationPriority, MigrationStatus
 from ...utils.error_sanitizer import ErrorSanitizer, SanitizationLevel
 from .model_progress_summary import ModelProgressSummaryResponse
 from .model_typed_collections import ModelConfiguration, ModelMetadata

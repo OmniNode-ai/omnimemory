@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
-from ...enums.enum_severity import EnumSeverity
+from ...enums import EnumSeverity
 
 
 class ModelNote(BaseModel):
@@ -200,9 +200,13 @@ class ModelNotesCollection(BaseModel):
     @property
     def has_critical_notes(self) -> bool:
         """Check if collection has any critical notes."""
-        return any(note.severity == EnumSeverity.CRITICAL for note in self.get_active_notes())
+        return any(
+            note.severity == EnumSeverity.CRITICAL for note in self.get_active_notes()
+        )
 
     @property
     def has_error_notes(self) -> bool:
         """Check if collection has any error notes."""
-        return any(note.severity == EnumSeverity.ERROR for note in self.get_active_notes())
+        return any(
+            note.severity == EnumSeverity.ERROR for note in self.get_active_notes()
+        )

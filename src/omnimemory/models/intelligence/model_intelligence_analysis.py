@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ...enums.enum_intelligence_operation_type import EnumIntelligenceOperationType
+from ...enums import EnumIntelligenceOperationType
 
 
 class ModelIntelligenceAnalysis(BaseModel):
