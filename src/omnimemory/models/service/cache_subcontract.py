@@ -39,10 +39,10 @@ class ModelCacheEntry(BaseModel):
     """Individual cache entry with metadata."""
 
     value: Any = Field(description="Cached value")
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = Field(default=None)
     access_count: int = Field(default=0)
-    last_accessed: datetime = Field(default_factory=datetime.now)
+    last_accessed: datetime = Field(default_factory=datetime.utcnow)
     size_bytes: int = Field(default=0, description="Approximate size in bytes")
 
 
@@ -87,7 +87,13 @@ class ModelCachingSubcontract:
         self._circuit_breaker = ModelCircuitBreakerState()
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task] = None
-        self._start_cleanup_task()
+        self._cleanup_task_started = False
+
+    async def _ensure_cleanup_task_started(self) -> None:
+        """Safely start cleanup task if not already started."""
+        if not self._cleanup_task_started:
+            self._start_cleanup_task()
+            self._cleanup_task_started = True
 
     async def get(self, key: str) -> Optional[Any]:
         """
@@ -99,6 +105,8 @@ class ModelCachingSubcontract:
         Returns:
             Cached value or None if not found/expired
         """
+        await self._ensure_cleanup_task_started()
+
         async with self._lock:
             entry = self._cache.get(key)
 
@@ -108,7 +116,7 @@ class ModelCachingSubcontract:
                 return None
 
             # Check expiration
-            if entry.expires_at and datetime.now() > entry.expires_at:
+            if entry.expires_at and datetime.utcnow() > entry.expires_at:
                 await self._remove_entry(key)
                 self._stats.misses += 1
                 logger.debug("cache_expired", key=key, expired_at=entry.expires_at)
@@ -116,7 +124,7 @@ class ModelCachingSubcontract:
 
             # Update access tracking
             entry.access_count += 1
-            entry.last_accessed = datetime.now()
+            entry.last_accessed = datetime.utcnow()
             self._access_order[key] = time.time()
             self._stats.hits += 1
 
@@ -137,6 +145,8 @@ class ModelCachingSubcontract:
         Returns:
             True if successfully stored
         """
+        await self._ensure_cleanup_task_started()
+
         try:
             # Check circuit breaker
             if self._is_circuit_breaker_open():
@@ -184,9 +194,9 @@ class ModelCachingSubcontract:
                 # Calculate expiration
                 expires_at = None
                 if ttl_seconds is not None:
-                    expires_at = datetime.now() + timedelta(seconds=ttl_seconds)
+                    expires_at = datetime.utcnow() + timedelta(seconds=ttl_seconds)
                 elif self.config.ttl_seconds > 0:
-                    expires_at = datetime.now() + timedelta(
+                    expires_at = datetime.utcnow() + timedelta(
                         seconds=self.config.ttl_seconds
                     )
 
@@ -330,7 +340,7 @@ class ModelCachingSubcontract:
         if not self._cache:
             return
 
-        now = datetime.now()
+        now = datetime.utcnow()
         expired_keys = []
 
         async with self._lock:
@@ -373,7 +383,7 @@ class ModelCachingSubcontract:
         # Check if we should retry
         if (
             self._circuit_breaker.next_retry_time
-            and datetime.now() > self._circuit_breaker.next_retry_time
+            and datetime.utcnow() > self._circuit_breaker.next_retry_time
         ):
             self._circuit_breaker.is_open = False
             logger.info("circuit_breaker_half_open")
@@ -395,7 +405,7 @@ class ModelCachingSubcontract:
             return
 
         self._circuit_breaker.failure_count += 1
-        self._circuit_breaker.last_failure_time = datetime.now()
+        self._circuit_breaker.last_failure_time = datetime.utcnow()
 
         if (
             self._circuit_breaker.failure_count
@@ -404,7 +414,7 @@ class ModelCachingSubcontract:
             self._circuit_breaker.is_open = True
             # Retry after exponential backoff (max 5 minutes)
             backoff_seconds = min(300, 2**self._circuit_breaker.failure_count)
-            self._circuit_breaker.next_retry_time = datetime.now() + timedelta(
+            self._circuit_breaker.next_retry_time = datetime.utcnow() + timedelta(
                 seconds=backoff_seconds
             )
             self._stats.circuit_breaker_trips += 1

@@ -10,8 +10,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from ..enums.enum_migration_status import MigrationStatus
-from ..enums.enum_priority_level import PriorityLevel
+from ...enums.enum_migration_status import MigrationStatus
+from ...enums.enum_priority_level import EnumPriorityLevel as PriorityLevel
 
 
 class ModelProgressSummaryResponse(BaseModel):

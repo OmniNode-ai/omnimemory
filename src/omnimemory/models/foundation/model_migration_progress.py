@@ -119,22 +119,22 @@ class ModelMigrationProgressMetrics(BaseModel):
     )
 
     # Performance optimization: Cache expensive calculations
-    _cached_completion_percentage: Optional[float] = Field(
+    cached_completion_percentage: Optional[float] = Field(
         default=None,
         exclude=True,
         description="Cached completion percentage to avoid recalculation",
     )
-    _cached_success_rate: Optional[float] = Field(
+    cached_success_rate: Optional[float] = Field(
         default=None,
         exclude=True,
         description="Cached success rate to avoid recalculation",
     )
-    _cache_invalidated_at: Optional[datetime] = Field(
+    cache_invalidated_at: Optional[datetime] = Field(
         default=None,
         exclude=True,
         description="Timestamp when cache was last invalidated",
     )
-    _cache_ttl_seconds: int = Field(
+    cache_ttl_seconds: int = Field(
         default=60,  # 1 minute cache TTL
         exclude=True,
         description="Cache time-to-live in seconds for metrics",
@@ -144,8 +144,8 @@ class ModelMigrationProgressMetrics(BaseModel):
     def completion_percentage(self) -> float:
         """Calculate completion percentage with caching for performance."""
         # Check cache validity
-        if self._is_cache_valid() and self._cached_completion_percentage is not None:
-            return self._cached_completion_percentage
+        if self._is_cache_valid() and self.cached_completion_percentage is not None:
+            return self.cached_completion_percentage
 
         # Calculate and cache
         if self.total_files == 0:
@@ -153,15 +153,15 @@ class ModelMigrationProgressMetrics(BaseModel):
         else:
             result = (self.processed_files / self.total_files) * 100
 
-        self._cached_completion_percentage = result
+        self.cached_completion_percentage = result
         return result
 
     @computed_field
     def success_rate(self) -> float:
         """Calculate overall success rate with caching for performance."""
         # Check cache validity
-        if self._is_cache_valid() and self._cached_success_rate is not None:
-            return self._cached_success_rate
+        if self._is_cache_valid() and self.cached_success_rate is not None:
+            return self.cached_success_rate
 
         # Calculate and cache
         if self.processed_files == 0:
@@ -170,7 +170,7 @@ class ModelMigrationProgressMetrics(BaseModel):
             successful_files = self.processed_files - self.failed_files
             result = (successful_files / self.processed_files) * 100
 
-        self._cached_success_rate = result
+        self.cached_success_rate = result
         return result
 
     @computed_field
@@ -205,17 +205,17 @@ class ModelMigrationProgressMetrics(BaseModel):
 
     def _is_cache_valid(self) -> bool:
         """Check if cached metrics are still valid."""
-        if self._cache_invalidated_at is None:
+        if self.cache_invalidated_at is None:
             return False
 
-        cache_age = (datetime.now() - self._cache_invalidated_at).total_seconds()
-        return cache_age < self._cache_ttl_seconds
+        cache_age = (datetime.now() - self.cache_invalidated_at).total_seconds()
+        return cache_age < self.cache_ttl_seconds
 
     def invalidate_cache(self) -> None:
         """Manually invalidate the metrics cache."""
-        self._cached_completion_percentage = None
-        self._cached_success_rate = None
-        self._cache_invalidated_at = datetime.now()
+        self.cached_completion_percentage = None
+        self.cached_success_rate = None
+        self.cache_invalidated_at = datetime.now()
 
 
 class ModelMigrationProgressTracker(BaseModel):

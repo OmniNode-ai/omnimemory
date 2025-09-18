@@ -9,16 +9,35 @@ from typing import Union
 from uuid import UUID
 
 # Import standard ONEX error types from omnibase_core
-from omnibase_core.core.errors.core_errors import (
-    OnexErrorCode as CoreErrorCode,  # type: ignore[import-untyped]
-)
-from omnibase_core.enums.enum_log_level import (
-    EnumLogLevel as CoreSeverity,  # type: ignore[import-untyped]
-)
+try:
+    from omnibase_core.core.errors.core_errors import (
+        OnexErrorCode as CoreErrorCode,  # type: ignore[import-untyped]
+    )
+    from omnibase_core.enums.enum_log_level import (
+        EnumLogLevel as CoreSeverity,  # type: ignore[import-untyped]
+    )
+except ImportError:
+    # Fallback for development environments without omnibase_core
+    from enum import Enum
+
+    class CoreErrorCode(str, Enum):
+        """Base class for ONEX error codes (fallback implementation)."""
+
+        pass
+
+    class CoreSeverity(str, Enum):
+        """Base class for severity levels (fallback implementation)."""
+
+        INFO = "INFO"
+        WARNING = "WARNING"
+        ERROR = "ERROR"
+        CRITICAL = "CRITICAL"
+
+
 from pydantic import BaseModel, Field, field_validator
 
 # Local omnimemory-specific error codes
-from ...enums.enum_error_code import EnumErrorCode
+from ...enums.enum_error_code import OmniMemoryErrorCode as EnumErrorCode
 
 # Type aliases for error codes and severity
 ErrorCodeType = Union[CoreErrorCode, EnumErrorCode, str]

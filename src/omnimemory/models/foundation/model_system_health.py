@@ -6,7 +6,19 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from omnibase_core.enums.node import EnumHealthStatus
+try:
+    from omnibase_core.enums.node import EnumHealthStatus
+except ImportError:
+    # Fallback for development environments without omnibase_core
+    from enum import Enum
+
+    class EnumHealthStatus(str, Enum):
+        """Health status enumeration (fallback implementation)."""
+
+        HEALTHY = "healthy"
+        DEGRADED = "degraded"
+        UNHEALTHY = "unhealthy"
+        UNKNOWN = "unknown"
 
 
 class ModelSystemHealth(BaseModel):

@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.omnimemory.models.foundation.model_configuration import ModelCacheConfig
-from src.omnimemory.models.service.cache_subcontract import (
+from omnimemory.models.foundation.model_configuration import ModelCacheConfig
+from omnimemory.models.service.cache_subcontract import (
     ModelCacheEntry,
     ModelCacheStats,
     ModelCachingSubcontract,

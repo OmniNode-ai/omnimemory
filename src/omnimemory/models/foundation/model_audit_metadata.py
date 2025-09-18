@@ -57,6 +57,44 @@ class ModelAuditEventDetails(BaseModel):
         default=None, description="User agent string from the request"
     )
 
+    @field_validator("ip_address")
+    @classmethod
+    def validate_ip_address(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and sanitize IP address for security."""
+        if v is None:
+            return v
+        # Basic IP address format validation and sanitization
+        if len(v) > 45:  # Max IPv6 length
+            return v[:45] + "[TRUNCATED]"
+        return v
+
+    @field_validator("user_agent")
+    @classmethod
+    def validate_user_agent(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and sanitize user agent string."""
+        if v is None:
+            return v
+        # Limit user agent length to prevent abuse
+        if len(v) > 512:
+            return v[:512] + "[TRUNCATED]"
+        return v
+
+    @field_validator("old_value", "new_value")
+    @classmethod
+    def validate_sensitive_values(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize potentially sensitive values for audit logging."""
+        if v is None:
+            return v
+        # Check for potential sensitive data patterns
+        v_lower = v.lower()
+        sensitive_patterns = ["password", "secret", "key", "token", "credential"]
+        if any(pattern in v_lower for pattern in sensitive_patterns):
+            return "[REDACTED_SENSITIVE_DATA]"
+        # Limit value length for security
+        if len(v) > 1000:
+            return v[:1000] + "[TRUNCATED]"
+        return v
+
 
 class ModelResourceUsageMetadata(BaseModel):
     """Strongly typed resource usage metrics."""
@@ -165,41 +203,3 @@ class ModelPerformanceAuditDetails(BaseModel):
         le=1.0,
         description="Cache hit ratio (0.0-1.0 where 1.0 is 100% hit rate)",
     )
-
-    @field_validator("ip_address")
-    @classmethod
-    def validate_ip_address(cls, v: Optional[str]) -> Optional[str]:
-        """Validate and sanitize IP address for security."""
-        if v is None:
-            return v
-        # Basic IP address format validation and sanitization
-        if len(v) > 45:  # Max IPv6 length
-            return v[:45] + "[TRUNCATED]"
-        return v
-
-    @field_validator("user_agent")
-    @classmethod
-    def validate_user_agent(cls, v: Optional[str]) -> Optional[str]:
-        """Validate and sanitize user agent string."""
-        if v is None:
-            return v
-        # Limit user agent length to prevent abuse
-        if len(v) > 512:
-            return v[:512] + "[TRUNCATED]"
-        return v
-
-    @field_validator("old_value", "new_value")
-    @classmethod
-    def validate_sensitive_values(cls, v: Optional[str]) -> Optional[str]:
-        """Sanitize potentially sensitive values for audit logging."""
-        if v is None:
-            return v
-        # Check for potential sensitive data patterns
-        v_lower = v.lower()
-        sensitive_patterns = ["password", "secret", "key", "token", "credential"]
-        if any(pattern in v_lower for pattern in sensitive_patterns):
-            return "[REDACTED_SENSITIVE_DATA]"
-        # Limit value length for security
-        if len(v) > 1000:
-            return v[:1000] + "[TRUNCATED]"
-        return v
