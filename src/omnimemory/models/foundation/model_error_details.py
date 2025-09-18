@@ -5,10 +5,30 @@ Uses the standard ONEX error patterns from omnibase_core when available.
 """
 
 from datetime import datetime
-from typing import Union
-from uuid import UUID
 
 # Import standard ONEX error types from omnibase_core
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Union
+from uuid import UUID
+
+
+# Define fallback classes first
+class _FallbackErrorCode(str, Enum):
+    """Base class for ONEX error codes (fallback implementation)."""
+
+    pass
+
+
+class _FallbackSeverity(str, Enum):
+    """Base class for severity levels (fallback implementation)."""
+
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+# Import or use fallbacks
 try:
     from omnibase_core.core.errors.core_errors import (
         OnexErrorCode as CoreErrorCode,  # type: ignore[import-untyped]
@@ -17,27 +37,18 @@ try:
         EnumLogLevel as CoreSeverity,  # type: ignore[import-untyped]
     )
 except ImportError:
-    # Fallback for development environments without omnibase_core
-    from enum import Enum
-
-    class CoreErrorCode(str, Enum):
-        """Base class for ONEX error codes (fallback implementation)."""
-
-        pass
-
-    class CoreSeverity(str, Enum):
-        """Base class for severity levels (fallback implementation)."""
-
-        INFO = "INFO"
-        WARNING = "WARNING"
-        ERROR = "ERROR"
-        CRITICAL = "CRITICAL"
+    # Use fallback implementations when omnibase_core is not available
+    CoreErrorCode = _FallbackErrorCode  # type: ignore[misc,assignment]
+    CoreSeverity = _FallbackSeverity  # type: ignore[misc,assignment]
 
 
 from pydantic import BaseModel, Field, field_validator
 
 # Local omnimemory-specific error codes
 from ...enums import EnumErrorCode
+from ...enums.foundation.enum_component import EnumComponent
+from ...enums.foundation.enum_error_type import EnumErrorType
+from ...enums.foundation.enum_operation_context import EnumOperationContext
 
 # Type aliases for error codes and severity
 ErrorCodeType = Union[CoreErrorCode, EnumErrorCode, str]
@@ -56,9 +67,8 @@ class ModelErrorDetails(BaseModel):
     error_code: ErrorCodeType = Field(
         description="Standardized error code (core or omnimemory-specific)",
     )
-    error_type: str = Field(
-        max_length=100,
-        description="Type or category of the error (VALIDATION, AUTHENTICATION, etc.)",
+    error_type: EnumErrorType = Field(
+        description="Type or category of the error using standardized error types",
     )
 
     # Error information
@@ -75,12 +85,11 @@ class ModelErrorDetails(BaseModel):
     )
 
     # Context information
-    component: str = Field(
-        max_length=100,
-        description="System component where the error occurred (cache, database, etc.)",
+    component: EnumComponent = Field(
+        description="System component where the error occurred using standardized component types",
     )
-    operation: str = Field(
-        description="Operation that was being performed",
+    operation: EnumOperationContext = Field(
+        description="Operation that was being performed using standardized operation contexts",
     )
     context: dict[str, str] = Field(
         default_factory=dict,
@@ -96,7 +105,7 @@ class ModelErrorDetails(BaseModel):
         default=None,
         description="ID of parent error if this is a cascading error",
     )
-    trace_id: str | None = Field(
+    trace_id: UUID | None = Field(
         default=None,
         description="Distributed tracing identifier",
     )

@@ -18,7 +18,7 @@ import structlog
 from pydantic import BaseModel, Field, field_validator
 
 from ...utils.error_sanitizer import SanitizationLevel, sanitize_error
-from ..foundation.model_configuration import ModelCacheConfig
+from ..foundation.model_cache_config import ModelCacheConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -97,16 +97,28 @@ class ModelCacheValue(BaseModel):
     def to_raw_value(self) -> Union[str, int, float, bool, Dict, List]:
         """Convert back to raw Python value."""
         if self.value_type == "string":
+            if self.string_value is None:
+                raise ValueError("string_value is None but value_type is 'string'")
             return self.string_value
         elif self.value_type == "integer":
+            if self.integer_value is None:
+                raise ValueError("integer_value is None but value_type is 'integer'")
             return self.integer_value
         elif self.value_type == "float":
+            if self.float_value is None:
+                raise ValueError("float_value is None but value_type is 'float'")
             return self.float_value
         elif self.value_type == "boolean":
+            if self.boolean_value is None:
+                raise ValueError("boolean_value is None but value_type is 'boolean'")
             return self.boolean_value
         elif self.value_type == "dict":
+            if self.dict_value is None:
+                raise ValueError("dict_value is None but value_type is 'dict'")
             return self.dict_value
         elif self.value_type == "list":
+            if self.list_value is None:
+                raise ValueError("list_value is None but value_type is 'list'")
             return self.list_value
         else:
             raise ValueError(f"Invalid value_type: {self.value_type}")
@@ -618,7 +630,7 @@ class ModelCachingSubcontract:
 
         # Convert sensitive types to safe representations
         if isinstance(value, dict):
-            sanitized = {}
+            sanitized: Dict[Any, Any] = {}
             for k, v in value.items():
                 # Skip potentially sensitive keys
                 key_lower = str(k).lower()

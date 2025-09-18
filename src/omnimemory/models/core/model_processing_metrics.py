@@ -7,7 +7,7 @@ from typing import Dict
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
-from ..foundation.model_typed_collections import ModelMetadata
+from ..foundation.model_metadata import ModelMetadata
 
 
 class ModelProcessingMetrics(BaseModel):

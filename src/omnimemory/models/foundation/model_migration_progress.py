@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field, computed_field, field_validator
 
 from ...enums import FileProcessingStatus, MigrationPriority, MigrationStatus
 from ...utils.error_sanitizer import ErrorSanitizer, SanitizationLevel
+from .model_configuration import ModelConfiguration
+from .model_metadata import ModelMetadata
 from .model_progress_summary import ModelProgressSummaryResponse
-from .model_typed_collections import ModelConfiguration, ModelMetadata
 
 # Initialize error sanitizer for secure logging
 _error_sanitizer = ErrorSanitizer(level=SanitizationLevel.STANDARD)
@@ -316,7 +317,7 @@ class ModelMigrationProgressTracker(BaseModel):
         **metadata: Union[str, int, float, bool],
     ) -> ModelFileProcessingInfo:
         """Add a file to be tracked for processing with strongly typed file information."""
-        from .model_typed_collections import ModelKeyValuePair
+        from .model_key_value_pair import ModelKeyValuePair
 
         # Convert dict metadata to ModelMetadata
         metadata_obj = ModelMetadata()

@@ -12,19 +12,19 @@ from .model_audit_metadata import (
     ModelResourceUsageMetadata,
     ModelSecurityAuditDetails,
 )
-from .model_configuration import (
-    ModelCacheConfig,
-    ModelDatabaseConfig,
-    ModelObservabilityConfig,
-    ModelPerformanceConfig,
-    ModelSystemConfiguration,
-)
+
+# Import strongly typed collections from individual files
+# Configuration model imported from separate file
+from .model_configuration import ModelConfiguration
+from .model_configuration_option import ModelConfigurationOption
 from .model_connection_metadata import (
     ModelConnectionMetadata,
     ModelConnectionPoolStats,
     ModelSemaphoreMetrics,
 )
 from .model_error_details import ModelErrorDetails
+from .model_event_collection import ModelEventCollection
+from .model_event_data import ModelEventData
 
 # New metadata models for replacing Dict[str, Any]
 from .model_health_metadata import (
@@ -37,12 +37,14 @@ from .model_health_response import (
     ModelHealthResponse,
     ModelResourceMetrics,
 )
+from .model_key_value_pair import ModelKeyValuePair
 from .model_memory_data import (
     ModelMemoryDataContent,
     ModelMemoryDataValue,
     ModelMemoryRequestData,
     ModelMemoryResponseData,
 )
+from .model_metadata import ModelMetadata
 from .model_metrics_response import (
     ModelMetricsResponse,
     ModelOperationCounts,
@@ -59,27 +61,23 @@ from .model_migration_progress import (
     ModelMigrationProgressTracker,
 )
 from .model_notes import ModelNote, ModelNotesCollection
+from .model_optional_string_list import ModelOptionalStringList
 from .model_progress_summary import ModelProgressSummaryResponse
+from .model_result_collection import ModelResultCollection
+from .model_result_item import ModelResultItem
 from .model_semver import ModelSemVer
+from .model_string_list import ModelStringList
+from .model_structured_data import ModelStructuredData
+from .model_structured_field import ModelStructuredField
 from .model_success_metrics import (
     ModelConfidenceScore,
     ModelQualityMetrics,
     ModelSuccessRate,
 )
 from .model_system_health import ModelSystemHealth
+
+# Import utility functions from model_typed_collections
 from .model_typed_collections import (
-    ModelConfiguration,
-    ModelConfigurationOption,
-    ModelEventCollection,
-    ModelEventData,
-    ModelKeyValuePair,
-    ModelMetadata,
-    ModelOptionalStringList,
-    ModelResultCollection,
-    ModelResultItem,
-    ModelStringList,
-    ModelStructuredData,
-    ModelStructuredField,
     convert_dict_to_metadata,
     convert_list_of_dicts_to_structured_data,
     convert_list_to_string_list,
@@ -97,11 +95,6 @@ __all__ = [
     "ModelOperationCounts",
     "ModelPerformanceMetrics",
     "ModelResourceMetricsDetailed",
-    "ModelSystemConfiguration",
-    "ModelDatabaseConfig",
-    "ModelCacheConfig",
-    "ModelPerformanceConfig",
-    "ModelObservabilityConfig",
     # Migration progress tracking
     "MigrationStatus",
     "MigrationPriority",
