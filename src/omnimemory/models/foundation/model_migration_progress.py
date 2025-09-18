@@ -9,10 +9,11 @@ This module provides models for tracking migration progress across the system:
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional, Union
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from ...enums import FileProcessingStatus, MigrationPriority, MigrationStatus
 from ...utils.error_sanitizer import ErrorSanitizer, SanitizationLevel
@@ -21,6 +22,50 @@ from .model_typed_collections import ModelConfiguration, ModelMetadata
 
 # Initialize error sanitizer for secure logging
 _error_sanitizer = ErrorSanitizer(level=SanitizationLevel.STANDARD)
+
+
+class ModelFileInfo(BaseModel):
+    """Strongly typed file information wrapper."""
+
+    path: Path = Field(description="File path as Path object")
+    size_bytes: Optional[int] = Field(
+        default=None, ge=0, description="File size in bytes"
+    )
+    checksum: Optional[str] = Field(
+        default=None, description="File checksum for integrity"
+    )
+    mime_type: Optional[str] = Field(default=None, description="MIME type of the file")
+    encoding: Optional[str] = Field(
+        default=None, description="Text encoding if applicable"
+    )
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: Path) -> Path:
+        """Validate and resolve file path."""
+        if isinstance(v, str):
+            v = Path(v)
+        return v.resolve()
+
+    @property
+    def exists(self) -> bool:
+        """Check if file exists."""
+        return self.path.exists()
+
+    @property
+    def name(self) -> str:
+        """Get file name."""
+        return self.path.name
+
+    @property
+    def suffix(self) -> str:
+        """Get file extension."""
+        return self.path.suffix
+
+    @property
+    def size_mb(self) -> Optional[float]:
+        """Get size in megabytes."""
+        return self.size_bytes / (1024 * 1024) if self.size_bytes else None
 
 
 class ModelBatchProcessingMetrics(BaseModel):
@@ -52,10 +97,9 @@ class ModelBatchProcessingMetrics(BaseModel):
 
 
 class ModelFileProcessingInfo(BaseModel):
-    """Information about individual file processing."""
+    """Information about individual file processing with strongly typed file info."""
 
-    file_path: str = Field(description="Path to the file being processed")
-    file_size: Optional[int] = Field(default=None, description="File size in bytes")
+    file_info: ModelFileInfo = Field(description="Strongly typed file information")
     status: FileProcessingStatus = Field(default=FileProcessingStatus.PENDING)
     start_time: Optional[datetime] = Field(
         default=None, description="Processing start time"
@@ -66,10 +110,12 @@ class ModelFileProcessingInfo(BaseModel):
     error_message: Optional[str] = Field(
         default=None, description="Error message if failed"
     )
-    retry_count: int = Field(default=0, description="Number of retry attempts")
+    retry_count: int = Field(
+        default=0, ge=0, le=10, description="Number of retry attempts (0-10)"
+    )
     batch_id: Optional[str] = Field(default=None, description="Associated batch ID")
     metadata: ModelMetadata = Field(
-        default_factory=ModelMetadata, description="Additional file metadata"
+        default_factory=ModelMetadata, description="Additional processing metadata"
     )
 
     @computed_field
@@ -264,9 +310,12 @@ class ModelMigrationProgressTracker(BaseModel):
     )
 
     def add_file(
-        self, file_path: str, file_size: Optional[int] = None, **metadata: Any
+        self,
+        file_path: Union[str, Path],
+        file_size: Optional[int] = None,
+        **metadata: Union[str, int, float, bool],
     ) -> ModelFileProcessingInfo:
-        """Add a file to be tracked for processing."""
+        """Add a file to be tracked for processing with strongly typed file information."""
         from .model_typed_collections import ModelKeyValuePair
 
         # Convert dict metadata to ModelMetadata
@@ -276,10 +325,16 @@ class ModelMigrationProgressTracker(BaseModel):
                 ModelKeyValuePair(key=str(k), value=str(v)) for k, v in metadata.items()
             ]
 
-        file_info = ModelFileProcessingInfo(
-            file_path=file_path, file_size=file_size, metadata=metadata_obj
+        # Create strongly typed file info
+        file_info_obj = ModelFileInfo(
+            path=Path(file_path) if isinstance(file_path, str) else file_path,
+            size_bytes=file_size,
         )
-        self.files.append(file_info)
+
+        file_processing_info = ModelFileProcessingInfo(
+            file_info=file_info_obj, metadata=metadata_obj
+        )
+        self.files.append(file_processing_info)
         self.metrics.total_files = len(self.files)
 
         if file_size:
@@ -288,10 +343,10 @@ class ModelMigrationProgressTracker(BaseModel):
             self.metrics.total_size_bytes += file_size
 
         self._update_timestamp()
-        return file_info
+        return file_processing_info
 
     def start_file_processing(
-        self, file_path: str, batch_id: Optional[str] = None
+        self, file_path: Union[str, Path], batch_id: Optional[str] = None
     ) -> bool:
         """Mark a file as started processing."""
         file_info = self._find_file(file_path)
@@ -304,7 +359,10 @@ class ModelMigrationProgressTracker(BaseModel):
         return False
 
     def complete_file_processing(
-        self, file_path: str, success: bool = True, error_message: Optional[str] = None
+        self,
+        file_path: Union[str, Path],
+        success: bool = True,
+        error_message: Optional[str] = None,
     ) -> None:
         """Mark a file as completed processing."""
         file_info = self._find_file(file_path)
@@ -314,8 +372,8 @@ class ModelMigrationProgressTracker(BaseModel):
             if success:
                 file_info.status = FileProcessingStatus.COMPLETED
                 self.metrics.processed_files += 1
-                if file_info.file_size:
-                    self.metrics.processed_size_bytes += file_info.file_size
+                if file_info.file_info.size_bytes:
+                    self.metrics.processed_size_bytes += file_info.file_info.size_bytes
             else:
                 file_info.status = FileProcessingStatus.FAILED
                 file_info.error_message = error_message
@@ -331,7 +389,7 @@ class ModelMigrationProgressTracker(BaseModel):
             self._update_progress_metrics()
             self._update_timestamp()
 
-    def skip_file_processing(self, file_path: str, reason: str) -> None:
+    def skip_file_processing(self, file_path: Union[str, Path], reason: str) -> None:
         """Mark a file as skipped."""
         file_info = self._find_file(file_path)
         if file_info:
@@ -411,9 +469,12 @@ class ModelMigrationProgressTracker(BaseModel):
             },
         )
 
-    def _find_file(self, file_path: str) -> Optional[ModelFileProcessingInfo]:
+    def _find_file(
+        self, file_path: Union[str, Path]
+    ) -> Optional[ModelFileProcessingInfo]:
         """Find file info by path."""
-        return next((f for f in self.files if f.file_path == file_path), None)
+        search_path = Path(file_path) if isinstance(file_path, str) else file_path
+        return next((f for f in self.files if f.file_info.path == search_path), None)
 
     def _find_batch(self, batch_id: str) -> Optional[ModelBatchProcessingMetrics]:
         """Find batch metrics by ID."""

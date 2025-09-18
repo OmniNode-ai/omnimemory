@@ -3,7 +3,7 @@ Processing metrics model for operation timing and performance tracking.
 """
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Dict
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
@@ -140,7 +140,7 @@ class ModelProcessingMetrics(BaseModel):
 
     @field_validator("performance_metadata")
     @classmethod
-    def validate_performance_metadata(cls, v: Any) -> Any:
+    def validate_performance_metadata(cls, v: ModelMetadata) -> ModelMetadata:
         """Validate performance metadata for security and size limits."""
         if hasattr(v, "metadata") and isinstance(v.metadata, dict):
             # Limit metadata size to prevent memory issues

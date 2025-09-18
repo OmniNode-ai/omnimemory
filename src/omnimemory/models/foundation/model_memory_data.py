@@ -3,7 +3,7 @@ Memory data models following ONEX standards.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Dict, List, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ from ...enums import EnumDataType
 class ModelMemoryDataValue(BaseModel):
     """Individual memory data value following ONEX standards."""
 
-    value: Any = Field(
+    value: Union[str, int, float, bool, Dict, List] = Field(
         description="The actual data value",
     )
     data_type: EnumDataType = Field(

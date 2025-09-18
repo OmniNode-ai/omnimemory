@@ -13,7 +13,7 @@ All models follow ONEX standards with:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Union
+from typing import Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -142,7 +142,7 @@ class ModelMetadata(BaseModel):
         return {pair.key: pair.value for pair in self.pairs}
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ModelMetadata:
+    def from_dict(cls, data: Dict[str, Union[str, int, float, bool]]) -> ModelMetadata:
         """Create from dictionary, converting values to strings."""
         pairs = [
             ModelKeyValuePair(key=str(k), value=str(v))
@@ -424,7 +424,9 @@ class ModelResultCollection(BaseModel):
 # === UTILITY FUNCTIONS ===
 
 
-def convert_dict_to_metadata(data: dict[str, Any]) -> ModelMetadata:
+def convert_dict_to_metadata(
+    data: Dict[str, Union[str, int, float, bool]]
+) -> ModelMetadata:
     """Convert a dictionary to ModelMetadata."""
     return ModelMetadata.from_dict(data)
 
@@ -435,7 +437,7 @@ def convert_list_to_string_list(data: List[str]) -> ModelStringList:
 
 
 def convert_list_of_dicts_to_structured_data(
-    data: List[dict[str, Any]]
+    data: List[Dict[str, Union[str, int, float, bool]]]
 ) -> ModelResultCollection:
     """Convert a list of dictionaries to structured result collection."""
     collection = ModelResultCollection()

@@ -100,7 +100,7 @@ class ModelCachingSubcontract:
                 self._start_cleanup_task()
                 self._cleanup_task_started = True
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Optional[Union[str, int, float, bool, Dict, List]]:
         """
         Retrieve value from cache.
 
@@ -138,7 +138,10 @@ class ModelCachingSubcontract:
             return entry.value
 
     async def set(
-        self, key: str, value: Any, ttl_seconds: Optional[int] = None
+        self,
+        key: str,
+        value: Union[str, int, float, bool, Dict, List],
+        ttl_seconds: Optional[int] = None,
     ) -> bool:
         """
         Store value in cache with security and performance validation.
