@@ -12,15 +12,121 @@ import sys
 import time
 from collections import OrderedDict
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ...utils.error_sanitizer import SanitizationLevel, sanitize_error
 from ..foundation.model_configuration import ModelCacheConfig
 
 logger = structlog.get_logger(__name__)
+
+
+class ModelCacheValue(BaseModel):
+    """Strongly typed cache value with validation and serialization support."""
+
+    model_config = {"extra": "forbid", "validate_assignment": True}
+
+    # Value type and content
+    value_type: Literal[
+        "string", "integer", "float", "boolean", "dict", "list"
+    ] = Field(description="Type of the cached value for runtime validation")
+    string_value: Optional[str] = Field(default=None, description="String value")
+    integer_value: Optional[int] = Field(default=None, description="Integer value")
+    float_value: Optional[float] = Field(default=None, description="Float value")
+    boolean_value: Optional[bool] = Field(default=None, description="Boolean value")
+    dict_value: Optional[Dict[str, Any]] = Field(
+        default=None, description="Dictionary value"
+    )
+    list_value: Optional[List[Any]] = Field(default=None, description="List value")
+
+    # Metadata
+    is_sanitized: bool = Field(default=False, description="Whether value was sanitized")
+    original_type: str = Field(description="Original Python type name")
+
+    @field_validator("value_type")
+    @classmethod
+    def validate_value_type(cls, v: str) -> str:
+        """Validate value type is supported."""
+        valid_types = {"string", "integer", "float", "boolean", "dict", "list"}
+        if v not in valid_types:
+            raise ValueError(f"value_type must be one of: {valid_types}")
+        return v
+
+    @classmethod
+    def from_raw_value(
+        cls, value: Union[str, int, float, bool, Dict, List]
+    ) -> "ModelCacheValue":
+        """Create ModelCacheValue from raw Python value."""
+        if isinstance(value, str):
+            return cls(
+                value_type="string",
+                string_value=value,
+                original_type=type(value).__name__,
+            )
+        elif isinstance(value, int):
+            return cls(
+                value_type="integer",
+                integer_value=value,
+                original_type=type(value).__name__,
+            )
+        elif isinstance(value, float):
+            return cls(
+                value_type="float",
+                float_value=value,
+                original_type=type(value).__name__,
+            )
+        elif isinstance(value, bool):
+            return cls(
+                value_type="boolean",
+                boolean_value=value,
+                original_type=type(value).__name__,
+            )
+        elif isinstance(value, dict):
+            return cls(
+                value_type="dict", dict_value=value, original_type=type(value).__name__
+            )
+        elif isinstance(value, list):
+            return cls(
+                value_type="list", list_value=value, original_type=type(value).__name__
+            )
+        else:
+            raise ValueError(f"Unsupported cache value type: {type(value)}")
+
+    def to_raw_value(self) -> Union[str, int, float, bool, Dict, List]:
+        """Convert back to raw Python value."""
+        if self.value_type == "string":
+            return self.string_value
+        elif self.value_type == "integer":
+            return self.integer_value
+        elif self.value_type == "float":
+            return self.float_value
+        elif self.value_type == "boolean":
+            return self.boolean_value
+        elif self.value_type == "dict":
+            return self.dict_value
+        elif self.value_type == "list":
+            return self.list_value
+        else:
+            raise ValueError(f"Invalid value_type: {self.value_type}")
+
+    def validate_value_consistency(self) -> None:
+        """Validate that exactly one value field is set and matches value_type."""
+        value_fields = [
+            self.string_value,
+            self.integer_value,
+            self.float_value,
+            self.boolean_value,
+            self.dict_value,
+            self.list_value,
+        ]
+        non_none_count = sum(1 for v in value_fields if v is not None)
+
+        if non_none_count != 1:
+            raise ValueError(
+                f"Exactly one value field must be set, found {non_none_count}"
+            )
 
 
 class ModelCircuitBreakerState(BaseModel):
@@ -39,7 +145,7 @@ class ModelCircuitBreakerState(BaseModel):
 class ModelCacheEntry(BaseModel):
     """Individual cache entry with metadata."""
 
-    value: Union[str, int, float, bool, Dict, List] = Field(description="Cached value")
+    value: ModelCacheValue = Field(description="Strongly typed cached value")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = Field(default=None)
     access_count: int = Field(default=0)
@@ -65,6 +171,21 @@ class ModelCacheStats(BaseModel):
         """Calculate cache hit rate percentage."""
         total = self.hits + self.misses
         return (self.hits / total * 100.0) if total > 0 else 0.0
+
+
+class ModelCacheInfo(BaseModel):
+    """Strongly typed cache information for monitoring."""
+
+    enabled: bool = Field(description="Whether caching is enabled")
+    max_size_mb: float = Field(description="Maximum cache size in megabytes")
+    current_size_mb: float = Field(description="Current cache size in megabytes")
+    entry_count: int = Field(description="Number of entries in cache")
+    hit_rate_percent: float = Field(description="Cache hit rate percentage")
+    total_hits: int = Field(description="Total cache hits")
+    total_misses: int = Field(description="Total cache misses")
+    total_evictions: int = Field(description="Total cache evictions")
+    eviction_policy: str = Field(description="Eviction policy in use")
+    default_ttl_seconds: int = Field(description="Default TTL in seconds")
 
 
 class ModelCachingSubcontract:
@@ -127,15 +248,30 @@ class ModelCachingSubcontract:
                 logger.debug("cache_expired", key=key, expired_at=entry.expires_at)
                 return None
 
-            # Update access tracking
+            # Update access tracking with bounds checking
             entry.access_count += 1
             entry.last_accessed = datetime.utcnow()
+
             # Move to end of OrderedDict for O(1) LRU tracking
             self._access_order.move_to_end(key)
+
+            # Bounds checking: prevent _access_order from growing too large
+            if len(self._access_order) > self.config.max_entries * 1.2:
+                # Remove 20% oldest access entries to prevent memory bloat
+                entries_to_remove = int(self.config.max_entries * 0.2)
+                for _ in range(entries_to_remove):
+                    if self._access_order:
+                        # Remove oldest access record that's not in current cache
+                        oldest_key = next(iter(self._access_order))
+                        if oldest_key not in self._cache:
+                            self._access_order.pop(oldest_key, None)
+                        else:
+                            break
+
             self._stats.hits += 1
 
             logger.debug("cache_hit", key=key, access_count=entry.access_count)
-            return entry.value
+            return entry.value.to_raw_value()
 
     async def set(
         self,
@@ -148,7 +284,7 @@ class ModelCachingSubcontract:
 
         Args:
             key: Cache key
-            value: Value to cache
+            value: Value to cache (will be validated and converted to ModelCacheValue)
             ttl_seconds: Time to live in seconds (uses config default if None)
 
         Returns:
@@ -157,6 +293,19 @@ class ModelCachingSubcontract:
         await self._ensure_cleanup_task_started()
 
         try:
+            # Type validation and conversion to strongly typed model
+            try:
+                typed_value = ModelCacheValue.from_raw_value(value)
+                typed_value.validate_value_consistency()
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    "cache_set_rejected_invalid_type",
+                    key=key,
+                    value_type=type(value).__name__,
+                    error=str(e),
+                )
+                return False
+
             # Check circuit breaker
             if self._is_circuit_breaker_open():
                 logger.warning("cache_set_rejected_circuit_breaker_open", key=key)
@@ -176,18 +325,31 @@ class ModelCachingSubcontract:
                         return False
 
                 # Security: Sanitize value if enabled
-                sanitized_value = (
+                sanitized_raw_value = (
                     self._sanitize_value(value)
                     if self.config.sanitize_values
                     else value
                 )
 
+                # Create final typed value (re-validate after sanitization)
+                try:
+                    final_typed_value = ModelCacheValue.from_raw_value(
+                        sanitized_raw_value
+                    )
+                    final_typed_value.is_sanitized = self.config.sanitize_values
+                    final_typed_value.validate_value_consistency()
+                except (ValueError, TypeError) as e:
+                    logger.warning(
+                        "cache_set_rejected_sanitization_failed", key=key, error=str(e)
+                    )
+                    return False
+
                 # Performance: Better size calculation using sys.getsizeof
                 try:
-                    size_bytes = sys.getsizeof(sanitized_value)
+                    size_bytes = sys.getsizeof(sanitized_raw_value)
                 except (TypeError, OSError):
                     # Fallback to string encoding for complex objects
-                    size_bytes = len(str(sanitized_value).encode("utf-8"))
+                    size_bytes = len(str(sanitized_raw_value).encode("utf-8"))
 
                 # Security: Check individual entry size limit
                 size_mb = size_bytes / 1024 / 1024
@@ -214,9 +376,11 @@ class ModelCachingSubcontract:
                 if projected_size > self.config.max_size_mb:
                     await self._evict_lru_entries()
 
-                # Create entry with sanitized value
+                # Create entry with strongly typed value
                 entry = ModelCacheEntry(
-                    value=sanitized_value, expires_at=expires_at, size_bytes=size_bytes
+                    value=final_typed_value,
+                    expires_at=expires_at,
+                    size_bytes=size_bytes,
                 )
 
                 # Update existing or add new
@@ -229,6 +393,20 @@ class ModelCachingSubcontract:
                 self._cache[key] = entry
                 # Add to end of OrderedDict for O(1) LRU tracking
                 self._access_order[key] = time.time()
+
+                # Bounds checking: prevent _access_order from growing too large
+                if len(self._access_order) > self.config.max_entries * 1.2:
+                    # Remove 20% oldest access entries to prevent memory bloat
+                    entries_to_remove = int(self.config.max_entries * 0.2)
+                    for _ in range(entries_to_remove):
+                        if self._access_order:
+                            # Remove oldest access record that's not in current cache
+                            oldest_key = next(iter(self._access_order))
+                            if oldest_key not in self._cache:
+                                self._access_order.pop(oldest_key, None)
+                            else:
+                                break
+
                 self._stats.current_size_mb += size_mb
 
                 # Reset circuit breaker on success
@@ -302,21 +480,21 @@ class ModelCachingSubcontract:
         """Get current cache statistics."""
         return self._stats.model_copy()
 
-    async def get_info(self) -> Dict[str, Any]:
+    async def get_info(self) -> ModelCacheInfo:
         """Get cache information for monitoring."""
         stats = self.get_stats()
-        return {
-            "enabled": self.config.enabled,
-            "max_size_mb": stats.max_size_mb,
-            "current_size_mb": round(stats.current_size_mb, 2),
-            "entry_count": stats.entry_count,
-            "hit_rate_percent": round(stats.hit_rate, 2),
-            "total_hits": stats.hits,
-            "total_misses": stats.misses,
-            "total_evictions": stats.evictions,
-            "eviction_policy": self.config.eviction_policy,
-            "default_ttl_seconds": self.config.ttl_seconds,
-        }
+        return ModelCacheInfo(
+            enabled=self.config.enabled,
+            max_size_mb=stats.max_size_mb,
+            current_size_mb=round(stats.current_size_mb, 2),
+            entry_count=stats.entry_count,
+            hit_rate_percent=round(stats.hit_rate, 2),
+            total_hits=stats.hits,
+            total_misses=stats.misses,
+            total_evictions=stats.evictions,
+            eviction_policy=self.config.eviction_policy,
+            default_ttl_seconds=self.config.ttl_seconds,
+        )
 
     async def _remove_entry(self, key: str) -> None:
         """Remove entry and update stats (must be called with lock)."""
