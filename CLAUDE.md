@@ -68,7 +68,7 @@ graph TB
     A --> E[Cross-Modal Memory]
 
     B --> F[Pinecone Vector DB]
-    C --> G[Redis Cache]
+    C --> G[ModelCachingSubcontract]
     D --> H[PostgreSQL/Supabase]
     E --> I[Multi-Modal Index]
 
@@ -81,7 +81,7 @@ graph TB
 
 **Storage Layer:**
 - PostgreSQL + Supabase: Persistent memory and relational data
-- Redis: High-speed caching and temporal memory patterns
+- ModelCachingSubcontract: Standardized high-speed caching and temporal memory patterns
 - Pinecone: Vector-based semantic memory and similarity search
 
 **Framework & API:**
@@ -98,7 +98,7 @@ graph TB
 
 ### Memory System Design Patterns
 
-1. **Memory Hierarchy**: Implement tiered memory (L1: Redis, L2: PostgreSQL, L3: Vector DB)
+1. **Memory Hierarchy**: Implement tiered memory (L1: ModelCachingSubcontract, L2: PostgreSQL, L3: Vector DB)
 2. **Semantic Indexing**: Vector-based memory retrieval with similarity matching
 3. **Temporal Patterns**: Time-aware memory decay and consolidation
 4. **Cross-Modal Integration**: Multi-modal memory bridging different data types
@@ -218,8 +218,8 @@ SUPABASE_ANON_KEY="your-anon-key"
 PINECONE_API_KEY="your-pinecone-key"
 PINECONE_ENVIRONMENT="your-environment"
 
-# Cache and temporary storage
-REDIS_URL="redis://localhost:6379"
+# Memory cache configuration (using ModelCachingSubcontract)
+MEMORY_CACHE_ENABLED="true"
 
 # ONEX integration
 OMNIBASE_SPI_VERSION="latest"
@@ -297,7 +297,7 @@ async def mcp_memory_retrieve(
 - **Slow Vector Search**: Increase Pinecone index replicas, optimize embedding dimensions
 - **Memory Leaks**: Use async context managers, implement proper cleanup in finally blocks
 - **Database Connections**: Configure connection pooling, implement circuit breakers
-- **Cache Misses**: Tune Redis configuration, implement intelligent prefetching
+- **Cache Misses**: Tune ModelCachingSubcontract configuration, implement intelligent prefetching
 
 ### Migration Issues
 

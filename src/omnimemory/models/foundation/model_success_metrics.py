@@ -4,7 +4,7 @@ Success metrics models following ONEX standards.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class ModelSuccessRate(BaseModel):
@@ -35,7 +35,7 @@ class ModelSuccessRate(BaseModel):
 
     @field_validator("successful_operations")
     @classmethod
-    def validate_successful_operations(cls, v: int, info) -> int:
+    def validate_successful_operations(cls, v: int, info: ValidationInfo) -> int:
         """Validate successful operations doesn't exceed total."""
         if hasattr(info, "data") and "total_operations" in info.data:
             total = info.data["total_operations"]
@@ -67,7 +67,8 @@ class ModelConfidenceScore(BaseModel):
         description="Confidence score as a decimal between 0.0 and 1.0",
     )
     measurement_basis: str = Field(
-        description="Basis for confidence measurement (e.g., 'data_quality', 'algorithm_certainty')",
+        description="Basis for confidence measurement "
+        "(e.g., 'data_quality', 'algorithm_certainty')",
     )
     contributing_factors: list[str] = Field(
         default_factory=list,
@@ -83,7 +84,8 @@ class ModelConfidenceScore(BaseModel):
         description="Sample size used for confidence calculation",
     )
     calculation_method: str = Field(
-        description="Method used to calculate confidence (e.g., 'statistical', 'heuristic', 'ml_based')",
+        description="Method used to calculate confidence "
+        "(e.g., 'statistical', 'heuristic', 'ml_based')",
     )
     measured_at: datetime = Field(
         default_factory=datetime.utcnow,

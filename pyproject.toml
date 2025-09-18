@@ -32,8 +32,7 @@ psycopg2-binary = "^2.9.10"
 sqlalchemy = "^2.0.0"
 alembic = "^1.13.0"
 
-# Redis support for caching and ephemeral memory
-redis = "^6.4.0"
+# Memory caching via standardized ModelCachingSubcontract (no external Redis dependency)
 
 # Vector database support
 # Pinecone for vector memory storage
@@ -73,6 +72,8 @@ pytest-cov = "^6.0.0"
 detect-secrets = "^1.5.0"
 memory-profiler = "^0.61.0"
 docker = "^7.1.0"
+types-pyyaml = "^6.0.12.20250915"
+# types-redis removed - using standardized ModelCachingSubcontract
 
 [build-system]
 requires = ["poetry-core"]
@@ -85,6 +86,9 @@ target-version = ['py312']
 [tool.isort]
 profile = "black"
 line_length = 88
+
+[tool.flake8]
+max-line-length = 88
 
 [tool.mypy]
 python_version = "3.12"

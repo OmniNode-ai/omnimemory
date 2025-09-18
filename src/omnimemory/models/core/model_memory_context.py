@@ -8,10 +8,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ...enums.enum_node_type import EnumNodeType
-from ..foundation.model_user import ModelUser
 from ..foundation.model_priority import ModelPriority
 from ..foundation.model_tags import ModelTagCollection
 from ..foundation.model_trust_score import ModelTrustScore
+from ..foundation.model_user import ModelUser
 
 
 class ModelMemoryContext(BaseModel):
@@ -47,7 +47,9 @@ class ModelMemoryContext(BaseModel):
         description="Timeout for the operation in milliseconds",
     )
     priority: ModelPriority = Field(
-        default_factory=lambda: ModelPriority.create_normal("Default operation priority"),
+        default_factory=lambda: ModelPriority.create_normal(
+            "Default operation priority"
+        ),
         description="Operation priority with comprehensive metadata",
     )
 
@@ -100,11 +102,12 @@ class ModelMemoryContext(BaseModel):
 
     def add_context_tag(self, tag_name: str, category: str | None = None) -> bool:
         """Add a tag to the context."""
-        return self.tags.add_tag(tag_name, category=category)
+        self.tags.add_tag(tag_name, category=category)
+        return True
 
     def has_context_tag(self, tag_name: str) -> bool:
         """Check if context has a specific tag."""
-        return self.tags.has_tag(tag_name)
+        return tag_name in self.tags.get_tag_names()
 
     def get_tag_names(self) -> list[str]:
         """Get list of all tag names."""
@@ -117,7 +120,7 @@ class ModelMemoryContext(BaseModel):
         source_node_type: EnumNodeType,
         source_node_id: UUID,
         correlation_id: UUID | None = None,
-        priority_level: str = "normal"
+        priority_level: str = "normal",
     ) -> "ModelMemoryContext":
         """Factory method to create context for a specific user."""
         from uuid import uuid4
@@ -129,7 +132,9 @@ class ModelMemoryContext(BaseModel):
         if priority_level == "high":
             priority = ModelPriority.create_high("User operation", user.username)
         elif priority_level == "critical":
-            priority = ModelPriority.create_critical("Critical user operation", user.username)
+            priority = ModelPriority.create_critical(
+                "Critical user operation", user.username
+            )
         else:
             priority = ModelPriority.create_normal("User operation")
 
@@ -138,7 +143,7 @@ class ModelMemoryContext(BaseModel):
             user=user,
             source_node_type=source_node_type,
             source_node_id=source_node_id,
-            priority=priority
+            priority=priority,
         )
 
     @classmethod
@@ -146,7 +151,7 @@ class ModelMemoryContext(BaseModel):
         cls,
         source_node_type: EnumNodeType,
         source_node_id: UUID,
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> "ModelMemoryContext":
         """Factory method to create system context."""
         from uuid import uuid4
@@ -162,7 +167,7 @@ class ModelMemoryContext(BaseModel):
             user=system_user,
             source_node_type=source_node_type,
             source_node_id=source_node_id,
-            priority=priority
+            priority=priority,
         )
 
         # Add system tags

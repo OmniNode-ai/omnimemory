@@ -129,28 +129,32 @@ class ModelMemoryItem(BaseModel):
     )
 
     # Validation using Pydantic v2 syntax
-    @field_validator('content')
+    @field_validator("content")
     @classmethod
-    def validate_content_size(cls, v):
+    def validate_content_size(cls, v: str) -> str:
         """Validate content size to prevent oversized memory items."""
         MAX_CONTENT_SIZE = 1_000_000  # 1MB max content size
-        if len(v.encode('utf-8')) > MAX_CONTENT_SIZE:
-            raise ValueError(f"Content exceeds maximum size of {MAX_CONTENT_SIZE} bytes")
+        if len(v.encode("utf-8")) > MAX_CONTENT_SIZE:
+            raise ValueError(
+                f"Content exceeds maximum size of {MAX_CONTENT_SIZE} bytes"
+            )
         return v
 
-    @field_validator('title')
+    @field_validator("title")
     @classmethod
-    def validate_title_length(cls, v):
+    def validate_title_length(cls, v: str | None) -> str | None:
         """Validate title length for reasonable limits."""
         if v is not None:
             MAX_TITLE_LENGTH = 500
             if len(v) > MAX_TITLE_LENGTH:
-                raise ValueError(f"Title exceeds maximum length of {MAX_TITLE_LENGTH} characters")
+                raise ValueError(
+                    f"Title exceeds maximum length of " f"{MAX_TITLE_LENGTH} characters"
+                )
         return v
 
-    @field_validator('tags', 'keywords')
+    @field_validator("tags", "keywords")
     @classmethod
-    def validate_tag_limits(cls, v):
+    def validate_tag_limits(cls, v: list[str]) -> list[str]:
         """Validate tag and keyword limits to prevent abuse."""
         MAX_TAGS = 100
         MAX_TAG_LENGTH = 100
@@ -158,5 +162,8 @@ class ModelMemoryItem(BaseModel):
             raise ValueError(f"Cannot have more than {MAX_TAGS} tags/keywords")
         for tag in v:
             if len(tag) > MAX_TAG_LENGTH:
-                raise ValueError(f"Tag '{tag}' exceeds maximum length of {MAX_TAG_LENGTH} characters")
+                raise ValueError(
+                    f"Tag '{tag}' exceeds maximum length of "
+                    f"{MAX_TAG_LENGTH} characters"
+                )
         return v

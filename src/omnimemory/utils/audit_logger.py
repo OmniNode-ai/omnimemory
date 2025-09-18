@@ -16,10 +16,8 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 from ..models.foundation.model_audit_metadata import (
-    AuditEventDetails,
-    ResourceUsageMetadata,
-    SecurityAuditDetails,
-    PerformanceAuditDetails,
+    ModelAuditEventDetails,
+    ModelResourceUsageMetadata,
 )
 
 
@@ -60,12 +58,17 @@ class AuditEvent(BaseModel):
     # Context information
     operation: str = Field(description="Operation being performed")
     component: str = Field(description="Component generating the event")
-    user_context: Optional[str] = Field(default=None, description="User context if available")
+    user_context: Optional[str] = Field(
+        default=None, description="User context if available"
+    )
     session_id: Optional[str] = Field(default=None, description="Session identifier")
 
     # Event details
     message: str = Field(description="Human-readable event description")
-    details: AuditEventDetails = Field(default_factory=AuditEventDetails, description="Additional event details")
+    details: ModelAuditEventDetails = Field(
+        default_factory=lambda: ModelAuditEventDetails(operation_type="unknown"),
+        description="Additional event details",
+    )
 
     # Security context
     source_ip: Optional[str] = Field(default=None, description="Source IP address")
@@ -73,27 +76,32 @@ class AuditEvent(BaseModel):
 
     # Performance data
     duration_ms: Optional[float] = Field(default=None, description="Operation duration")
-    resource_usage: Optional[ResourceUsageMetadata] = Field(default=None, description="Resource usage metrics")
+    resource_usage: Optional[ModelResourceUsageMetadata] = Field(
+        default=None, description="Resource usage metrics"
+    )
 
     # Compliance tracking
-    data_classification: Optional[str] = Field(default=None, description="Data classification level")
+    data_classification: Optional[str] = Field(
+        default=None, description="Data classification level"
+    )
     pii_detected: bool = Field(default=False, description="Whether PII was detected")
     sanitized: bool = Field(default=False, description="Whether data was sanitized")
 
     class Config:
         """Pydantic config for audit events."""
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+
+        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class AuditLogger:
     """Advanced audit logger with structured logging and security features."""
 
-    def __init__(self,
-                 log_file: Optional[Path] = None,
-                 console_output: bool = True,
-                 json_format: bool = True):
+    def __init__(
+        self,
+        log_file: Optional[Path] = None,
+        console_output: bool = True,
+        json_format: bool = True,
+    ):
         """
         Initialize audit logger.
 
@@ -127,24 +135,29 @@ class AuditLogger:
         # Add console handler if specified
         if console_output:
             console_handler = logging.StreamHandler()
-            console_handler.setLevel(logging.WARNING)  # Only show warnings and above on console
+            console_handler.setLevel(
+                logging.WARNING
+            )  # Only show warnings and above on console
             console_handler.setFormatter(self._text_formatter())
             self.logger.addHandler(console_handler)
 
     def _json_formatter(self) -> logging.Formatter:
         """Create JSON log formatter."""
+
         class JSONFormatter(logging.Formatter):
-            def format(self, record):
+            def format(self, record: logging.LogRecord) -> str:
                 log_data = {
-                    'timestamp': datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
-                    'level': record.levelname,
-                    'logger': record.name,
-                    'message': record.getMessage()
+                    "timestamp": datetime.fromtimestamp(
+                        record.created, tz=timezone.utc
+                    ).isoformat(),
+                    "level": record.levelname,
+                    "logger": record.name,
+                    "message": record.getMessage(),
                 }
 
                 # Add audit event data if present
-                if hasattr(record, 'audit_event'):
-                    log_data['audit_event'] = record.audit_event
+                if hasattr(record, "audit_event"):
+                    log_data["audit_event"] = record.audit_event
 
                 return json.dumps(log_data)
 
@@ -152,9 +165,7 @@ class AuditLogger:
 
     def _text_formatter(self) -> logging.Formatter:
         """Create human-readable log formatter."""
-        return logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        return logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     def log_event(self, event: AuditEvent) -> None:
         """
@@ -177,7 +188,7 @@ class AuditLogger:
             lno=0,
             msg=message,
             args=(),
-            exc_info=None
+            exc_info=None,
         )
 
         # Attach audit event data
@@ -192,22 +203,24 @@ class AuditLogger:
             AuditSeverity.LOW: logging.INFO,
             AuditSeverity.MEDIUM: logging.WARNING,
             AuditSeverity.HIGH: logging.ERROR,
-            AuditSeverity.CRITICAL: logging.CRITICAL
+            AuditSeverity.CRITICAL: logging.CRITICAL,
         }
         return mapping.get(severity, logging.INFO)
 
-    def log_memory_operation(self,
-                           operation_type: str,
-                           memory_id: str,
-                           success: bool,
-                           duration_ms: Optional[float] = None,
-                           details: Optional[AuditEventDetails] = None,
-                           user_context: Optional[str] = None) -> None:
+    def log_memory_operation(
+        self,
+        operation_type: str,
+        memory_id: str,
+        success: bool,
+        duration_ms: Optional[float] = None,
+        details: Optional[ModelAuditEventDetails] = None,
+        user_context: Optional[str] = None,
+    ) -> None:
         """Log a memory operation event."""
         event_type_map = {
-            'store': AuditEventType.MEMORY_STORE,
-            'retrieve': AuditEventType.MEMORY_RETRIEVE,
-            'delete': AuditEventType.MEMORY_DELETE
+            "store": AuditEventType.MEMORY_STORE,
+            "retrieve": AuditEventType.MEMORY_RETRIEVE,
+            "delete": AuditEventType.MEMORY_DELETE,
         }
 
         event = AuditEvent(
@@ -217,48 +230,66 @@ class AuditLogger:
             severity=AuditSeverity.LOW if success else AuditSeverity.HIGH,
             operation=f"memory_{operation_type}",
             component="memory_manager",
-            message=f"Memory {operation_type} {'succeeded' if success else 'failed'} for ID: {memory_id}",
-            details=details or {},
+            message=(
+                f"Memory {operation_type} "
+                f"{'succeeded' if success else 'failed'} for ID: {memory_id}"
+            ),
+            details=(
+                details
+                if details is not None
+                else ModelAuditEventDetails(operation_type="memory_operation")
+            ),
             duration_ms=duration_ms,
-            user_context=user_context
+            user_context=user_context,
         )
 
         self.log_event(event)
 
-    def log_pii_detection(self,
-                         pii_types: list,
-                         content_length: int,
-                         sanitized: bool = False,
-                         details: Optional[AuditEventDetails] = None) -> None:
+    def log_pii_detection(
+        self,
+        pii_types: list,
+        content_length: int,
+        sanitized: bool = False,
+        details: Optional[ModelAuditEventDetails] = None,
+    ) -> None:
         """Log PII detection event."""
         severity = AuditSeverity.HIGH if pii_types else AuditSeverity.LOW
 
         event = AuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
-            event_type=AuditEventType.PII_DETECTED if pii_types else AuditEventType.PII_SANITIZED,
+            event_type=AuditEventType.PII_DETECTED
+            if pii_types
+            else AuditEventType.PII_SANITIZED,
             severity=severity,
             operation="pii_scan",
             component="pii_detector",
-            message=f"PII detection scan found {len(pii_types)} PII types in {content_length} chars",
-            details={
-                "pii_types_detected": pii_types,
-                "content_length": content_length,
-                "sanitized": sanitized,
-                **(details or {})
-            },
+            message=(
+                f"PII detection scan found {len(pii_types)} PII types "
+                f"in {content_length} chars"
+            ),
+            details=ModelAuditEventDetails(
+                operation_type="pii_detection",
+                resource_type="content",
+                response_status=f"detected_{len(pii_types)}_types",
+                error_details=(
+                    None if not pii_types else f"PII found: {', '.join(pii_types)}"
+                ),
+            ),
             pii_detected=bool(pii_types),
-            sanitized=sanitized
+            sanitized=sanitized,
         )
 
         self.log_event(event)
 
-    def log_security_violation(self,
-                              violation_type: str,
-                              description: str,
-                              source_ip: Optional[str] = None,
-                              user_context: Optional[str] = None,
-                              details: Optional[AuditEventDetails] = None) -> None:
+    def log_security_violation(
+        self,
+        violation_type: str,
+        description: str,
+        source_ip: Optional[str] = None,
+        user_context: Optional[str] = None,
+        details: Optional[ModelAuditEventDetails] = None,
+    ) -> None:
         """Log security violation event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
@@ -268,19 +299,25 @@ class AuditLogger:
             operation="security_check",
             component="security_monitor",
             message=f"Security violation: {violation_type} - {description}",
-            details=details or {},
+            details=(
+                details
+                if details is not None
+                else ModelAuditEventDetails(operation_type="memory_operation")
+            ),
             source_ip=source_ip,
-            user_context=user_context
+            user_context=user_context,
         )
 
         self.log_event(event)
 
-    def log_config_change(self,
-                         config_key: str,
-                         old_value: Optional[str],
-                         new_value: str,
-                         user_context: Optional[str] = None,
-                         details: Optional[AuditEventDetails] = None) -> None:
+    def log_config_change(
+        self,
+        config_key: str,
+        old_value: Optional[str],
+        new_value: str,
+        user_context: Optional[str] = None,
+        details: Optional[ModelAuditEventDetails] = None,
+    ) -> None:
         """Log configuration change event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
@@ -290,13 +327,20 @@ class AuditLogger:
             operation="config_update",
             component="config_manager",
             message=f"Configuration changed: {config_key}",
-            details={
-                "config_key": config_key,
-                "old_value": "***REDACTED***" if old_value and "secret" in config_key.lower() else old_value,
-                "new_value": "***REDACTED***" if "secret" in config_key.lower() else new_value,
-                **(details or {})
-            },
-            user_context=user_context
+            details=ModelAuditEventDetails(
+                operation_type="config_change",
+                resource_type="configuration",
+                resource_id=config_key,
+                old_value=(
+                    "***REDACTED***"
+                    if old_value and "secret" in config_key.lower()
+                    else old_value
+                ),
+                new_value=(
+                    "***REDACTED***" if "secret" in config_key.lower() else new_value
+                ),
+            ),
+            user_context=user_context,
         )
 
         self.log_event(event)
@@ -304,6 +348,7 @@ class AuditLogger:
     def _generate_event_id(self) -> str:
         """Generate unique event ID."""
         import uuid
+
         return str(uuid.uuid4())
 
 
@@ -318,20 +363,18 @@ def get_audit_logger() -> AuditLogger:
         # Initialize with default settings
         log_file = Path("logs/audit.log")
         _audit_logger = AuditLogger(
-            log_file=log_file,
-            console_output=True,
-            json_format=True
+            log_file=log_file, console_output=True, json_format=True
         )
     return _audit_logger
 
 
-def configure_audit_logger(log_file: Optional[Path] = None,
-                          console_output: bool = True,
-                          json_format: bool = True) -> None:
+def configure_audit_logger(
+    log_file: Optional[Path] = None,
+    console_output: bool = True,
+    json_format: bool = True,
+) -> None:
     """Configure the global audit logger."""
     global _audit_logger
     _audit_logger = AuditLogger(
-        log_file=log_file,
-        console_output=console_output,
-        json_format=json_format
+        log_file=log_file, console_output=console_output, json_format=json_format
     )

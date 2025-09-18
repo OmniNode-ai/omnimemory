@@ -140,7 +140,7 @@ async with correlation_context(
 **Location**: `src/omnimemory/utils/health_manager.py`
 
 **Features Implemented**:
-- **Comprehensive Health Checks**: Aggregate status from PostgreSQL, Redis, Pinecone
+- **Comprehensive Health Checks**: Aggregate status from PostgreSQL, ModelCachingSubcontract, Pinecone
 - **Failure Isolation**: Uses `asyncio.gather(return_exceptions=True)` to prevent cascade failures
 - **Circuit Breaker Integration**: Health checks protected by circuit breakers
 - **Resource Monitoring**: CPU, memory, disk, and network usage tracking

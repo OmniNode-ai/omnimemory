@@ -40,6 +40,6 @@ git log --oneline -10      # Recent commits
 ```bash
 # Database setup
 export DATABASE_URL="postgresql://..."
-export REDIS_URL="redis://localhost:6379"
+# REDIS_URL no longer needed - using ModelCachingSubcontract
 export PINECONE_API_KEY="..."
 ```

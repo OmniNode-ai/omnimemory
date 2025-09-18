@@ -5,27 +5,30 @@ Uses the standard ONEX error patterns from omnibase_core when available.
 """
 
 from datetime import datetime
+from typing import Union
 from uuid import UUID
 
+# Import standard ONEX error types from omnibase_core
+from omnibase_core.core.errors.core_errors import (
+    OnexErrorCode as CoreErrorCode,  # type: ignore[import-untyped]
+)
+from omnibase_core.enums.enum_log_level import (
+    EnumLogLevel as CoreSeverity,  # type: ignore[import-untyped]
+)
 from pydantic import BaseModel, Field
 
-# Import standard ONEX error types from omnibase_core
-try:
-    from omnibase_core.core.errors.core_errors import OnexErrorCode as CoreErrorCode
-    from omnibase_core.enums.enum_log_level import EnumLogLevel as CoreSeverity
-    # Local omnimemory-specific error codes
-    from ...enums.enum_error_code import OmniMemoryErrorCode
-    # Union type for error codes
-    ErrorCodeType = CoreErrorCode | OmniMemoryErrorCode | str
-    SeverityType = CoreSeverity
-except ImportError:
-    # Fallback for development environments
-    from ...enums.enum_error_code import OmniMemoryErrorCode as ErrorCodeType
-    from ...enums.enum_severity import EnumSeverity as SeverityType
+# Local omnimemory-specific error codes
+from ...enums.enum_error_code import EnumErrorCode
+
+# Type aliases for error codes and severity
+ErrorCodeType = Union[CoreErrorCode, EnumErrorCode, str]
+SeverityType = Union[CoreSeverity, str]  # Type alias instead of variable
 
 
 class ModelErrorDetails(BaseModel):
-    """Error details model following ONEX standards with omnibase_core integration."""
+    """
+    Error details model following ONEX standards with omnibase_core integration.
+    """
 
     # Error identification
     error_id: UUID = Field(
@@ -47,7 +50,7 @@ class ModelErrorDetails(BaseModel):
         description="Detailed technical error message",
     )
     severity: SeverityType = Field(
-        description="Severity level of the error (using core severity levels)",
+        description="Severity level of the error (using core severity)",
     )
 
     # Context information

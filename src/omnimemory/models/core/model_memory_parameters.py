@@ -15,7 +15,7 @@ class ModelMemoryParameters(BaseModel):
     )
     storage_backend: str | None = Field(
         default=None,
-        description="Storage backend to use (redis, postgresql, pinecone)",
+        description="Storage backend to use (memory_cache, postgresql, pinecone)",
     )
     encoding_format: str | None = Field(
         default=None,
