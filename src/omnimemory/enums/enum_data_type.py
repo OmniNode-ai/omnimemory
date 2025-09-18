@@ -7,7 +7,7 @@ from enum import Enum
 
 class EnumDataType(str, Enum):
     """Data types for memory data values."""
-    
+
     STRING = "string"
     INTEGER = "integer"
     FLOAT = "float"

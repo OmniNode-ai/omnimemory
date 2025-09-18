@@ -11,25 +11,19 @@ This module provides:
 from __future__ import annotations
 
 import asyncio
-import time
+from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Dict, List, Optional, Callable, Union
-from collections import deque
-
-from ..models.foundation.model_connection_metadata import (
-    ConnectionMetadata,
-    ConnectionPoolStats,
-    SemaphoreMetrics,
-)
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
 import structlog
+from pydantic import BaseModel, Field
 
-from .observability import correlation_context, trace_operation, OperationType
+from ..models.foundation.model_connection_metadata import ConnectionMetadata
+from .observability import OperationType, correlation_context, trace_operation
 
 logger = structlog.get_logger(__name__)
 
@@ -60,21 +54,26 @@ def _sanitize_error(error: Exception) -> str:
 
 class LockPriority(Enum):
     """Priority levels for lock acquisition."""
+
     LOW = 1
     NORMAL = 2
     HIGH = 3
     CRITICAL = 4
 
+
 class PoolStatus(Enum):
     """Connection pool status."""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     EXHAUSTED = "exhausted"
     FAILED = "failed"
 
+
 @dataclass
 class LockRequest:
     """Request for lock acquisition with priority and metadata."""
+
     request_id: str = field(default_factory=lambda: str(uuid4()))
     priority: LockPriority = LockPriority.NORMAL
     requested_at: datetime = field(default_factory=datetime.now)
@@ -82,9 +81,11 @@ class LockRequest:
     timeout: Optional[float] = None
     metadata: ConnectionMetadata = field(default_factory=ConnectionMetadata)
 
+
 @dataclass
 class SemaphoreStats:
     """Statistics for semaphore usage."""
+
     total_permits: int
     available_permits: int
     waiting_count: int
@@ -95,19 +96,35 @@ class SemaphoreStats:
     max_hold_time: float = 0.0
     created_at: datetime = field(default_factory=datetime.now)
 
+
 class ConnectionPoolConfig(BaseModel):
     """Configuration for connection pools."""
+
     name: str = Field(description="Pool name")
     min_connections: int = Field(default=1, ge=0, description="Minimum connections")
-    max_connections: int = Field(default=50, ge=1, description="Maximum connections (increased for production load)")
-    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout")
-    idle_timeout: float = Field(default=300.0, gt=0, description="Idle connection timeout")
-    health_check_interval: float = Field(default=60.0, gt=0, description="Health check interval")
-    retry_attempts: int = Field(default=3, ge=0, description="Retry attempts for failed connections")
+    max_connections: int = Field(
+        default=50,
+        ge=1,
+        description="Maximum connections (increased for production load)",
+    )
+    connection_timeout: float = Field(
+        default=30.0, gt=0, description="Connection timeout"
+    )
+    idle_timeout: float = Field(
+        default=300.0, gt=0, description="Idle connection timeout"
+    )
+    health_check_interval: float = Field(
+        default=60.0, gt=0, description="Health check interval"
+    )
+    retry_attempts: int = Field(
+        default=3, ge=0, description="Retry attempts for failed connections"
+    )
+
 
 @dataclass
 class PoolMetrics:
     """Metrics for connection pool monitoring."""
+
     active_connections: int = 0
     idle_connections: int = 0
     failed_connections: int = 0
@@ -116,6 +133,7 @@ class PoolMetrics:
     pool_exhaustions: int = 0
     average_wait_time: float = 0.0
     last_exhaustion: Optional[datetime] = None
+
 
 class PriorityLock:
     """
@@ -135,7 +153,7 @@ class PriorityLock:
             "total_releases": 0,
             "total_timeouts": 0,
             "average_hold_time": 0.0,
-            "max_hold_time": 0.0
+            "max_hold_time": 0.0,
         }
 
     @asynccontextmanager
@@ -144,7 +162,7 @@ class PriorityLock:
         priority: LockPriority = LockPriority.NORMAL,
         timeout: Optional[float] = None,
         correlation_id: Optional[str] = None,
-        **metadata
+        **metadata,
     ) -> AsyncGenerator[None, None]:
         """
         Acquire the lock with priority and timeout support.
@@ -159,7 +177,7 @@ class PriorityLock:
             priority=priority,
             timeout=timeout,
             correlation_id=correlation_id,
-            metadata=metadata
+            metadata=metadata,
         )
 
         acquired_at: Optional[datetime] = None
@@ -169,7 +187,7 @@ class PriorityLock:
                 f"priority_lock_acquire_{self.name}",
                 OperationType.EXTERNAL_API,  # Using as generic operation type
                 lock_name=self.name,
-                priority=priority.name
+                priority=priority.name,
             ):
                 try:
                     # Add request to priority queue
@@ -187,7 +205,7 @@ class PriorityLock:
                         lock_name=self.name,
                         request_id=request.request_id,
                         priority=priority.name,
-                        wait_time=(acquired_at - request.requested_at).total_seconds()
+                        wait_time=(acquired_at - request.requested_at).total_seconds(),
                     )
 
                     yield
@@ -198,7 +216,7 @@ class PriorityLock:
                         "priority_lock_timeout",
                         lock_name=self.name,
                         request_id=request.request_id,
-                        timeout=timeout
+                        timeout=timeout,
                     )
                     raise
                 finally:
@@ -235,12 +253,16 @@ class PriorityLock:
             if request.timeout:
                 elapsed = (datetime.now() - request.requested_at).total_seconds()
                 if elapsed >= request.timeout:
-                    raise asyncio.TimeoutError(f"Lock acquisition timeout after {request.timeout}s")
+                    raise asyncio.TimeoutError(
+                        f"Lock acquisition timeout after {request.timeout}s"
+                    )
 
             # Wait a bit before checking again
             await asyncio.sleep(0.001)  # 1ms
 
-    async def _cleanup_request(self, request: LockRequest, acquired_at: Optional[datetime]):
+    async def _cleanup_request(
+        self, request: LockRequest, acquired_at: Optional[datetime]
+    ):
         """Clean up after lock release."""
         async with self._lock:
             # Calculate hold time if lock was acquired
@@ -251,17 +273,25 @@ class PriorityLock:
                 # Update average hold time
                 current_avg = self._stats["average_hold_time"]
                 releases = self._stats["total_releases"]
-                self._stats["average_hold_time"] = ((current_avg * (releases - 1)) + hold_time) / releases
+                self._stats["average_hold_time"] = (
+                    (current_avg * (releases - 1)) + hold_time
+                ) / releases
 
                 # Update max hold time
-                self._stats["max_hold_time"] = max(self._stats["max_hold_time"], hold_time)
+                self._stats["max_hold_time"] = max(
+                    self._stats["max_hold_time"], hold_time
+                )
 
             # Remove from queue if still there (timeout case)
             self._queue = [r for r in self._queue if r.request_id != request.request_id]
 
             # Clear current holder
-            if self._current_holder and self._current_holder.request_id == request.request_id:
+            if (
+                self._current_holder
+                and self._current_holder.request_id == request.request_id
+            ):
                 self._current_holder = None
+
 
 class FairSemaphore:
     """
@@ -278,17 +308,13 @@ class FairSemaphore:
         self._waiting_queue: deque = deque()
         self._active_holders: Dict[str, datetime] = {}
         self._stats = SemaphoreStats(
-            total_permits=value,
-            available_permits=value,
-            waiting_count=0
+            total_permits=value, available_permits=value, waiting_count=0
         )
         self._lock = asyncio.Lock()
 
     @asynccontextmanager
     async def acquire(
-        self,
-        timeout: Optional[float] = None,
-        correlation_id: Optional[str] = None
+        self, timeout: Optional[float] = None, correlation_id: Optional[str] = None
     ) -> AsyncGenerator[None, None]:
         """
         Acquire semaphore permit with timeout and tracking.
@@ -305,7 +331,7 @@ class FairSemaphore:
                 f"semaphore_acquire_{self.name}",
                 OperationType.EXTERNAL_API,
                 semaphore_name=self.name,
-                holder_id=holder_id
+                holder_id=holder_id,
             ):
                 try:
                     # Update waiting count
@@ -314,7 +340,9 @@ class FairSemaphore:
 
                     # Acquire with timeout
                     if timeout:
-                        await asyncio.wait_for(self._semaphore.acquire(), timeout=timeout)
+                        await asyncio.wait_for(
+                            self._semaphore.acquire(), timeout=timeout
+                        )
                     else:
                         await self._semaphore.acquire()
 
@@ -331,7 +359,7 @@ class FairSemaphore:
                         "semaphore_acquired",
                         semaphore_name=self.name,
                         holder_id=holder_id,
-                        available_permits=self._stats.available_permits
+                        available_permits=self._stats.available_permits,
                     )
 
                     yield
@@ -345,7 +373,7 @@ class FairSemaphore:
                         "semaphore_timeout",
                         semaphore_name=self.name,
                         holder_id=holder_id,
-                        timeout=timeout
+                        timeout=timeout,
                     )
                     raise
                 finally:
@@ -365,12 +393,16 @@ class FairSemaphore:
                                 self._stats.average_hold_time = hold_time
                             else:
                                 # Use exponential moving average for better performance
-                                alpha = min(0.1, 2.0 / (releases + 1))  # Adaptive smoothing factor
+                                alpha = min(
+                                    0.1, 2.0 / (releases + 1)
+                                )  # Adaptive smoothing factor
                                 self._stats.average_hold_time = (
-                                    (1 - alpha) * self._stats.average_hold_time +
-                                    alpha * hold_time
+                                    (1 - alpha) * self._stats.average_hold_time
+                                    + alpha * hold_time
                                 )
-                            self._stats.max_hold_time = max(self._stats.max_hold_time, hold_time)
+                            self._stats.max_hold_time = max(
+                                self._stats.max_hold_time, hold_time
+                            )
 
                         self._semaphore.release()
 
@@ -379,12 +411,13 @@ class FairSemaphore:
                             semaphore_name=self.name,
                             holder_id=holder_id,
                             hold_time=hold_time,
-                            available_permits=self._stats.available_permits
+                            available_permits=self._stats.available_permits,
                         )
 
     def get_stats(self) -> SemaphoreStats:
         """Get current semaphore statistics."""
         return self._stats
+
 
 class AsyncConnectionPool:
     """
@@ -402,7 +435,7 @@ class AsyncConnectionPool:
         config: ConnectionPoolConfig,
         create_connection: Callable[[], Any],
         validate_connection: Optional[Callable[[Any], bool]] = None,
-        close_connection: Optional[Callable[[Any], None]] = None
+        close_connection: Optional[Callable[[Any], None]] = None,
     ):
         self.config = config
         self._create_connection = create_connection
@@ -424,7 +457,7 @@ class AsyncConnectionPool:
         self,
         timeout: Optional[float] = None,
         correlation_id: Optional[str] = None,
-        _retry_count: int = 0
+        _retry_count: int = 0,
     ) -> AsyncGenerator[Any, None]:
         """
         Acquire a connection from the pool.
@@ -449,7 +482,7 @@ class AsyncConnectionPool:
                 f"connection_pool_acquire_{self.config.name}",
                 OperationType.EXTERNAL_API,
                 pool_name=self.config.name,
-                connection_id=connection_id
+                connection_id=connection_id,
             ):
                 max_retries = 3
                 current_retry = _retry_count
@@ -464,12 +497,14 @@ class AsyncConnectionPool:
                                 logger.debug(
                                     "connection_reused",
                                     pool_name=self.config.name,
-                                    connection_id=connection_id
+                                    connection_id=connection_id,
                                 )
                             except asyncio.QueueEmpty:
                                 # No available connections, check if we can create new one
                                 async with self._lock:
-                                    total_connections = len(self._active) + self._available.qsize()
+                                    total_connections = (
+                                        len(self._active) + self._available.qsize()
+                                    )
 
                                     if total_connections < self.config.max_connections:
                                         # Create new connection
@@ -478,7 +513,7 @@ class AsyncConnectionPool:
                                             "connection_created",
                                             pool_name=self.config.name,
                                             connection_id=connection_id,
-                                            total_connections=total_connections + 1
+                                            total_connections=total_connections + 1,
                                         )
                                     else:
                                         # Pool is at capacity, wait for available connection
@@ -489,14 +524,15 @@ class AsyncConnectionPool:
                                         logger.warning(
                                             "connection_pool_exhausted",
                                             pool_name=self.config.name,
-                                            max_connections=self.config.max_connections
+                                            max_connections=self.config.max_connections,
                                         )
 
                                         # Wait for connection with timeout
-                                        wait_timeout = timeout or self.config.connection_timeout
+                                        wait_timeout = (
+                                            timeout or self.config.connection_timeout
+                                        )
                                         connection = await asyncio.wait_for(
-                                            self._available.get(),
-                                            timeout=wait_timeout
+                                            self._available.get(), timeout=wait_timeout
                                         )
 
                             # Validate connection before use
@@ -505,7 +541,7 @@ class AsyncConnectionPool:
                                     "connection_invalid",
                                     pool_name=self.config.name,
                                     connection_id=connection_id,
-                                    retry_count=current_retry
+                                    retry_count=current_retry,
                                 )
                                 await self._destroy_connection(connection)
 
@@ -515,7 +551,7 @@ class AsyncConnectionPool:
                                         "connection_validation_max_retries_exceeded",
                                         pool_name=self.config.name,
                                         connection_id=connection_id,
-                                        max_retries=max_retries
+                                        max_retries=max_retries,
                                     )
                                     raise RuntimeError(
                                         f"Failed to acquire valid connection after {max_retries} attempts"
@@ -528,7 +564,7 @@ class AsyncConnectionPool:
                             # Connection is valid, break out of retry loop
                             break
 
-                        except Exception as e:
+                        except Exception:
                             # Handle unexpected exceptions during connection acquisition
                             if connection:
                                 await self._destroy_connection(connection)
@@ -543,7 +579,9 @@ class AsyncConnectionPool:
                     if wait_time > 0:
                         current_avg = self._metrics.average_wait_time
                         acquisitions = len(self._active)
-                        self._metrics.average_wait_time = ((current_avg * (acquisitions - 1)) + wait_time) / acquisitions
+                        self._metrics.average_wait_time = (
+                            (current_avg * (acquisitions - 1)) + wait_time
+                        ) / acquisitions
 
                     yield connection
 
@@ -552,7 +590,7 @@ class AsyncConnectionPool:
                         "connection_acquisition_timeout",
                         pool_name=self.config.name,
                         connection_id=connection_id,
-                        timeout=timeout or self.config.connection_timeout
+                        timeout=timeout or self.config.connection_timeout,
                     )
                     raise
                 except Exception as e:
@@ -562,7 +600,7 @@ class AsyncConnectionPool:
                         pool_name=self.config.name,
                         connection_id=connection_id,
                         error=_sanitize_error(e),
-                        error_type=type(e).__name__
+                        error_type=type(e).__name__,
                     )
                     raise
                 finally:
@@ -570,14 +608,16 @@ class AsyncConnectionPool:
                     if connection:
                         try:
                             # Shield the cleanup operation to ensure it completes even if cancelled
-                            await asyncio.shield(self._return_connection(connection_id, connection))
+                            await asyncio.shield(
+                                self._return_connection(connection_id, connection)
+                            )
                         except Exception as cleanup_error:
                             # Log cleanup errors but don't propagate them
                             logger.error(
                                 "connection_cleanup_failed",
                                 pool_name=self.config.name,
                                 connection_id=connection_id,
-                                error=_sanitize_error(cleanup_error)
+                                error=_sanitize_error(cleanup_error),
                             )
 
     async def _create_new_connection(self) -> Any:
@@ -591,7 +631,7 @@ class AsyncConnectionPool:
             logger.error(
                 "connection_creation_failed",
                 pool_name=self.config.name,
-                error=_sanitize_error(e)
+                error=_sanitize_error(e),
             )
             raise
 
@@ -609,7 +649,7 @@ class AsyncConnectionPool:
                     logger.debug(
                         "connection_returned",
                         pool_name=self.config.name,
-                        connection_id=connection_id
+                        connection_id=connection_id,
                     )
                 except asyncio.QueueFull:
                     # Pool is full, destroy excess connection
@@ -623,7 +663,7 @@ class AsyncConnectionPool:
                 "connection_return_failed",
                 pool_name=self.config.name,
                 connection_id=connection_id,
-                error=_sanitize_error(e)
+                error=_sanitize_error(e),
             )
             # Try to destroy the connection on error
             try:
@@ -644,7 +684,7 @@ class AsyncConnectionPool:
             logger.error(
                 "connection_destruction_failed",
                 pool_name=self.config.name,
-                error=_sanitize_error(e)
+                error=_sanitize_error(e),
             )
 
     def _start_health_check(self):
@@ -663,7 +703,7 @@ class AsyncConnectionPool:
                 logger.error(
                     "health_check_error",
                     pool_name=self.config.name,
-                    error=_sanitize_error(e)
+                    error=_sanitize_error(e),
                 )
 
     async def _perform_health_check(self):
@@ -684,7 +724,7 @@ class AsyncConnectionPool:
             status=self._status.value,
             active_connections=len(self._active),
             available_connections=self._available.qsize(),
-            total_connections=total_connections
+            total_connections=total_connections,
         )
 
     def get_metrics(self) -> PoolMetrics:
@@ -716,11 +756,13 @@ class AsyncConnectionPool:
 
         self._active.clear()
 
+
 # Global managers
 _locks: Dict[str, PriorityLock] = {}
 _semaphores: Dict[str, FairSemaphore] = {}
 _pools: Dict[str, AsyncConnectionPool] = {}
 _manager_lock = asyncio.Lock()
+
 
 async def get_priority_lock(name: str) -> PriorityLock:
     """Get or create a priority lock by name."""
@@ -729,6 +771,7 @@ async def get_priority_lock(name: str) -> PriorityLock:
             _locks[name] = PriorityLock(name)
         return _locks[name]
 
+
 async def get_fair_semaphore(name: str, permits: int) -> FairSemaphore:
     """Get or create a fair semaphore by name."""
     async with _manager_lock:
@@ -736,12 +779,13 @@ async def get_fair_semaphore(name: str, permits: int) -> FairSemaphore:
             _semaphores[name] = FairSemaphore(permits, name)
         return _semaphores[name]
 
+
 async def register_connection_pool(
     name: str,
     config: ConnectionPoolConfig,
     create_connection: Callable[[], Any],
     validate_connection: Optional[Callable[[Any], bool]] = None,
-    close_connection: Optional[Callable[[Any], None]] = None
+    close_connection: Optional[Callable[[Any], None]] = None,
 ) -> AsyncConnectionPool:
     """Register a new connection pool."""
     async with _manager_lock:
@@ -752,43 +796,40 @@ async def register_connection_pool(
             config=config,
             create_connection=create_connection,
             validate_connection=validate_connection,
-            close_connection=close_connection
+            close_connection=close_connection,
         )
         _pools[name] = pool
         return pool
 
+
 async def get_connection_pool(name: str) -> Optional[AsyncConnectionPool]:
     """Get a connection pool by name."""
     return _pools.get(name)
+
 
 # Convenience functions
 @asynccontextmanager
 async def with_priority_lock(
     name: str,
     priority: LockPriority = LockPriority.NORMAL,
-    timeout: Optional[float] = None
+    timeout: Optional[float] = None,
 ):
     """Context manager for priority lock acquisition."""
     lock = await get_priority_lock(name)
     async with lock.acquire(priority=priority, timeout=timeout):
         yield
 
+
 @asynccontextmanager
-async def with_fair_semaphore(
-    name: str,
-    permits: int,
-    timeout: Optional[float] = None
-):
+async def with_fair_semaphore(name: str, permits: int, timeout: Optional[float] = None):
     """Context manager for fair semaphore acquisition."""
     semaphore = await get_fair_semaphore(name, permits)
     async with semaphore.acquire(timeout=timeout):
         yield
 
+
 @asynccontextmanager
-async def with_connection_pool(
-    name: str,
-    timeout: Optional[float] = None
-):
+async def with_connection_pool(name: str, timeout: Optional[float] = None):
     """Context manager for connection pool usage."""
     pool = await get_connection_pool(name)
     if not pool:

@@ -15,7 +15,8 @@ Architecture:
     - Effect Nodes: Memory storage, retrieval, and persistence operations
     - Compute Nodes: Intelligence processing, semantic analysis, pattern recognition
     - Reducer Nodes: Memory consolidation, aggregation, and optimization
-    - Orchestrator Nodes: Workflow coordination, agent coordination, system orchestration
+    - Orchestrator Nodes: Workflow coordination, agent coordination,
+      system orchestration
 
 Usage:
     >>> from omnimemory.models import core, memory, intelligence
@@ -26,98 +27,45 @@ __version__ = "0.1.0"
 __author__ = "OmniNode-ai"
 __email__ = "contact@omninode.ai"
 
+# Import enums for public API
+from .enums import (
+    EnumDataType,
+    EnumErrorCode,
+    EnumIntelligenceOperationType,
+    EnumMemoryOperationType,
+    EnumMemoryStorageType,
+    EnumNodeType,
+    EnumOperationStatus,
+    EnumPriorityLevel,
+    EnumSeverity,
+    EnumTrustLevel,
+    MigrationStatus,
+)
+
 # Import ONEX-compliant model domains
-from .models import (
-    core,
-    memory,
-    intelligence,
-    service,
-    foundation,
-)
-
-# Import protocol definitions
-from .protocols import (
-    # Base protocols
-    ProtocolMemoryBase,
-    ProtocolMemoryOperations,
-
-    # Effect node protocols (memory storage, retrieval, persistence)
-    ProtocolMemoryStorage,
-    ProtocolMemoryRetrieval,
-    ProtocolMemoryPersistence,
-
-    # Compute node protocols (intelligence processing, semantic analysis)
-    ProtocolIntelligenceProcessor,
-    ProtocolSemanticAnalyzer,
-    ProtocolPatternRecognition,
-
-    # Reducer node protocols (consolidation, aggregation, optimization)
-    ProtocolMemoryConsolidator,
-    ProtocolMemoryAggregator,
-    ProtocolMemoryOptimizer,
-
-    # Orchestrator node protocols (workflow, agent, memory coordination)
-    ProtocolWorkflowCoordinator,
-    ProtocolAgentCoordinator,
-    ProtocolMemoryOrchestrator,
-
-    # Data models
-    BaseMemoryRequest,
-    BaseMemoryResponse,
-
-    # Enums
-    OperationStatus,
-
-    # Error handling
-    OmniMemoryError,
-    OmniMemoryErrorCode,
-)
+from .models import core, foundation, intelligence, memory, service
 
 __all__ = [
     # Version and metadata
     "__version__",
     "__author__",
     "__email__",
-
     # ONEX model domains
     "core",
     "memory",
     "intelligence",
     "service",
     "foundation",
-
-    # Base protocols
-    "ProtocolMemoryBase",
-    "ProtocolMemoryOperations",
-
-    # Effect node protocols
-    "ProtocolMemoryStorage",
-    "ProtocolMemoryRetrieval",
-    "ProtocolMemoryPersistence",
-
-    # Compute node protocols
-    "ProtocolIntelligenceProcessor",
-    "ProtocolSemanticAnalyzer",
-    "ProtocolPatternRecognition",
-
-    # Reducer node protocols
-    "ProtocolMemoryConsolidator",
-    "ProtocolMemoryAggregator",
-    "ProtocolMemoryOptimizer",
-
-    # Orchestrator node protocols
-    "ProtocolWorkflowCoordinator",
-    "ProtocolAgentCoordinator",
-    "ProtocolMemoryOrchestrator",
-
-    # Data models
-    "BaseMemoryRequest",
-    "BaseMemoryResponse",
-
     # Enums
-    "OperationStatus",
-
-    # Error handling
-    "OmniMemoryError",
-    "OmniMemoryErrorCode",
+    "EnumDataType",
+    "EnumErrorCode",
+    "EnumIntelligenceOperationType",
+    "EnumMemoryOperationType",
+    "EnumMemoryStorageType",
+    "EnumNodeType",
+    "EnumOperationStatus",
+    "EnumPriorityLevel",
+    "EnumSeverity",
+    "EnumTrustLevel",
+    "MigrationStatus",
 ]

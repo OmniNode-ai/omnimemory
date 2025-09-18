@@ -9,6 +9,7 @@ from enum import Enum
 
 class MigrationStatus(Enum):
     """Migration status enumeration."""
+
     PENDING = "pending"
     RUNNING = "running"
     PAUSED = "paused"
@@ -19,6 +20,7 @@ class MigrationStatus(Enum):
 
 class MigrationPriority(Enum):
     """Migration priority levels."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -27,6 +29,7 @@ class MigrationPriority(Enum):
 
 class FileProcessingStatus(Enum):
     """File processing status enumeration."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"

@@ -7,9 +7,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
-from .model_memory_context import ModelMemoryContext
-from .model_memory_parameters import ModelMemoryParameters, ModelMemoryOptions
 from ..foundation.model_memory_data import ModelMemoryRequestData
+from .model_memory_context import ModelMemoryContext
+from .model_memory_parameters import ModelMemoryOptions, ModelMemoryParameters
 
 
 class ModelMemoryRequest(BaseModel):

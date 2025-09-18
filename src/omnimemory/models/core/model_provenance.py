@@ -115,7 +115,9 @@ class ModelProvenanceChain(BaseModel):
         """Get the most recent provenance entry."""
         return self.entries[-1] if self.entries else None
 
-    def get_entry_by_operation_id(self, operation_id: UUID) -> ModelProvenanceEntry | None:
+    def get_entry_by_operation_id(
+        self, operation_id: UUID
+    ) -> ModelProvenanceEntry | None:
         """Find a provenance entry by operation ID."""
         for entry in self.entries:
             if entry.operation_id == operation_id:

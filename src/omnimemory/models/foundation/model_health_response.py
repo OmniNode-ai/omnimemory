@@ -13,21 +13,14 @@ from pydantic import BaseModel, Field
 class ModelDependencyStatus(BaseModel):
     """Status of a system dependency."""
 
-    name: str = Field(
-        description="Name of the dependency"
-    )
+    name: str = Field(description="Name of the dependency")
     status: Literal["healthy", "degraded", "unhealthy"] = Field(
         description="Health status of the dependency"
     )
-    latency_ms: float = Field(
-        description="Response latency in milliseconds"
-    )
-    last_check: datetime = Field(
-        description="When the dependency was last checked"
-    )
+    latency_ms: float = Field(description="Response latency in milliseconds")
+    last_check: datetime = Field(description="When the dependency was last checked")
     error_message: str | None = Field(
-        default=None,
-        description="Error message if unhealthy"
+        default=None, description="Error message if unhealthy"
     )
 
 
@@ -35,22 +28,14 @@ class ModelResourceMetrics(BaseModel):
     """System resource utilization metrics."""
 
     cpu_usage_percent: float = Field(
-        ge=0.0,
-        le=100.0,
-        description="CPU usage percentage"
+        ge=0.0, le=100.0, description="CPU usage percentage"
     )
-    memory_usage_mb: float = Field(
-        description="Memory usage in megabytes"
-    )
+    memory_usage_mb: float = Field(description="Memory usage in megabytes")
     memory_usage_percent: float = Field(
-        ge=0.0,
-        le=100.0,
-        description="Memory usage percentage"
+        ge=0.0, le=100.0, description="Memory usage percentage"
     )
     disk_usage_percent: float = Field(
-        ge=0.0,
-        le=100.0,
-        description="Disk usage percentage"
+        ge=0.0, le=100.0, description="Disk usage percentage"
     )
     network_throughput_mbps: float = Field(
         description="Network throughput in megabits per second"
@@ -63,29 +48,20 @@ class ModelHealthResponse(BaseModel):
     status: Literal["healthy", "degraded", "unhealthy"] = Field(
         description="Overall system health status"
     )
-    latency_ms: float = Field(
-        description="Health check response time in milliseconds"
-    )
+    latency_ms: float = Field(description="Health check response time in milliseconds")
     timestamp: datetime = Field(
         default_factory=datetime.utcnow,
-        description="When the health check was performed"
+        description="When the health check was performed",
     )
     resource_usage: ModelResourceMetrics = Field(
         description="Current resource utilization"
     )
     dependencies: list[ModelDependencyStatus] = Field(
-        default_factory=list,
-        description="Status of system dependencies"
+        default_factory=list, description="Status of system dependencies"
     )
-    uptime_seconds: int = Field(
-        description="System uptime in seconds"
-    )
-    version: str = Field(
-        description="System version information"
-    )
-    environment: str = Field(
-        description="Deployment environment"
-    )
+    uptime_seconds: int = Field(description="System uptime in seconds")
+    version: str = Field(description="System version information")
+    environment: str = Field(description="Deployment environment")
 
 
 class ModelCircuitBreakerStats(BaseModel):
@@ -94,25 +70,12 @@ class ModelCircuitBreakerStats(BaseModel):
     state: Literal["closed", "open", "half_open"] = Field(
         description="Current circuit breaker state"
     )
-    failure_count: int = Field(
-        ge=0,
-        description="Number of consecutive failures"
-    )
-    success_count: int = Field(
-        ge=0,
-        description="Total number of successful calls"
-    )
-    total_calls: int = Field(
-        ge=0,
-        description="Total number of calls made"
-    )
-    total_timeouts: int = Field(
-        ge=0,
-        description="Total number of timeout failures"
-    )
+    failure_count: int = Field(ge=0, description="Number of consecutive failures")
+    success_count: int = Field(ge=0, description="Total number of successful calls")
+    total_calls: int = Field(ge=0, description="Total number of calls made")
+    total_timeouts: int = Field(ge=0, description="Total number of timeout failures")
     last_failure_time: Optional[datetime] = Field(
-        default=None,
-        description="Timestamp of the last failure"
+        default=None, description="Timestamp of the last failure"
     )
     state_changed_at: datetime = Field(
         description="When the circuit breaker state last changed"
@@ -127,7 +90,7 @@ class ModelCircuitBreakerStatsCollection(BaseModel):
     )
     timestamp: datetime = Field(
         default_factory=datetime.utcnow,
-        description="When the statistics were collected"
+        description="When the statistics were collected",
     )
 
 
@@ -135,21 +98,15 @@ class ModelRateLimitedHealthCheckResponse(BaseModel):
     """Rate-limited health check response."""
 
     health_check: Optional[ModelHealthResponse] = Field(
-        default=None,
-        description="Health check result if within rate limit"
+        default=None, description="Health check result if within rate limit"
     )
-    rate_limited: bool = Field(
-        description="Whether the request was rate limited"
-    )
+    rate_limited: bool = Field(description="Whether the request was rate limited")
     rate_limit_reset_time: Optional[datetime] = Field(
-        default=None,
-        description="When the rate limit will reset"
+        default=None, description="When the rate limit will reset"
     )
     remaining_requests: Optional[int] = Field(
-        default=None,
-        description="Number of requests remaining in the current window"
+        default=None, description="Number of requests remaining in the current window"
     )
     error_message: Optional[str] = Field(
-        default=None,
-        description="Error message if rate limited"
+        default=None, description="Error message if rate limited"
     )

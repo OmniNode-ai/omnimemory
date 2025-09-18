@@ -5,17 +5,18 @@ Tests for concurrency utilities following ONEX standards.
 from __future__ import annotations
 
 import asyncio
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
+import pytest
+
 from omnimemory.utils.concurrency import (
-    ConnectionPool,
     CircuitBreaker,
     CircuitBreakerState,
+    ConnectionPool,
     with_circuit_breaker,
+    with_retry,
     with_timeout,
-    with_retry
 )
 
 
@@ -66,6 +67,7 @@ class TestConnectionPool:
 
         # Mock connection factory that fails first few times
         call_count = 0
+
         def create_failing_connection():
             nonlocal call_count
             call_count += 1
@@ -134,6 +136,7 @@ class TestCircuitBreaker:
         cb = CircuitBreaker(failure_threshold=1, recovery_timeout=0.1)
 
         call_count = 0
+
         @with_circuit_breaker(cb)
         async def recovering_operation():
             nonlocal call_count
@@ -162,6 +165,7 @@ class TestTimeoutDecorator:
     @pytest.mark.asyncio
     async def test_with_timeout_success(self):
         """Test timeout decorator allows fast operations."""
+
         @with_timeout(1.0)
         async def fast_operation():
             await asyncio.sleep(0.1)
@@ -173,6 +177,7 @@ class TestTimeoutDecorator:
     @pytest.mark.asyncio
     async def test_with_timeout_failure(self):
         """Test timeout decorator cancels slow operations."""
+
         @with_timeout(0.1)
         async def slow_operation():
             await asyncio.sleep(1.0)
@@ -188,6 +193,7 @@ class TestRetryDecorator:
     @pytest.mark.asyncio
     async def test_with_retry_success(self):
         """Test retry decorator allows successful operations."""
+
         @with_retry(max_attempts=3, delay=0.1)
         async def successful_operation():
             return "success"
@@ -249,7 +255,7 @@ class TestRetryDecorator:
 
         # Second delay should be roughly twice the first
         assert 0.18 < delay2 < 0.22  # ~0.2s (0.1 * 2)
-        assert 0.08 < delay1 < 0.12   # ~0.1s
+        assert 0.08 < delay1 < 0.12  # ~0.1s
 
 
 @pytest.mark.integration
@@ -264,6 +270,7 @@ class TestConcurrencyIntegration:
 
         # Mock connection that fails first few times
         fail_count = 0
+
         def create_connection():
             nonlocal fail_count
             fail_count += 1

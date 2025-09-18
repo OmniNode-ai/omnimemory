@@ -274,7 +274,9 @@ class ModelMemoryResponseData(BaseModel):
         """Add response metadata."""
         self.metadata[key] = value
 
-    def set_pagination_info(self, total: int, offset: int = 0, limit: int = 100) -> None:
+    def set_pagination_info(
+        self, total: int, offset: int = 0, limit: int = 100
+    ) -> None:
         """Set pagination information."""
         self.pagination_info = {
             "total": total,

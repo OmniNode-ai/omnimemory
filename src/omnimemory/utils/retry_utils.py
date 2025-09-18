@@ -5,24 +5,24 @@ This module provides retry decorators and utilities for handling transient
 failures in OmniMemory operations with configurable backoff strategies.
 """
 
+from __future__ import annotations
+
 __all__ = [
     "RetryConfig",
-    "RetryAttempt",
-    "RetryResult",
-    "RetryStats",
+    "RetryAttemptInfo",
+    "RetryStatistics",
     "is_retryable_exception",
-    "execute_with_retry",
-    "retry_decorator"
+    "retry_with_backoff",
+    "retry_decorator",
+    "RetryManager",
 ]
-
-from __future__ import annotations
 
 import asyncio
 import functools
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -33,75 +33,60 @@ logger = logging.getLogger(__name__)
 
 # Initialize error sanitizer for secure logging
 _error_sanitizer = ErrorSanitizer(
-    default_level=SanitizationLevel.STANDARD,
-    enable_stack_trace_filter=True
+    default_level=SanitizationLevel.STANDARD, enable_stack_trace_filter=True
 )
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class RetryConfig(BaseModel):
     """Configuration for retry behavior."""
 
     max_attempts: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Maximum number of retry attempts"
+        default=3, ge=1, le=10, description="Maximum number of retry attempts"
     )
     base_delay_ms: int = Field(
         default=1000,
         ge=100,
         le=60000,
-        description="Base delay between attempts in milliseconds"
+        description="Base delay between attempts in milliseconds",
     )
     max_delay_ms: int = Field(
         default=30000,
         ge=1000,
         le=300000,
-        description="Maximum delay between attempts in milliseconds"
+        description="Maximum delay between attempts in milliseconds",
     )
     exponential_multiplier: float = Field(
-        default=2.0,
-        ge=1.0,
-        le=5.0,
-        description="Exponential backoff multiplier"
+        default=2.0, ge=1.0, le=5.0, description="Exponential backoff multiplier"
     )
     jitter: bool = Field(
-        default=True,
-        description="Whether to add random jitter to delays"
+        default=True, description="Whether to add random jitter to delays"
     )
     retryable_exceptions: List[str] = Field(
         default_factory=lambda: [
             "ConnectionError",
             "TimeoutError",
             "HTTPError",
-            "TemporaryFailure"
+            "TemporaryFailure",
         ],
-        description="Exception types that should trigger retries"
+        description="Exception types that should trigger retries",
     )
 
 
 class RetryAttemptInfo(BaseModel):
     """Information about a retry attempt."""
 
-    attempt_number: int = Field(
-        description="Current attempt number (1-indexed)"
-    )
-    delay_ms: int = Field(
-        description="Delay before this attempt in milliseconds"
-    )
+    attempt_number: int = Field(description="Current attempt number (1-indexed)")
+    delay_ms: int = Field(description="Delay before this attempt in milliseconds")
     exception: Optional[str] = Field(
-        default=None,
-        description="Exception that triggered the retry"
+        default=None, description="Exception that triggered the retry"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="When the attempt was made"
+        default_factory=datetime.utcnow, description="When the attempt was made"
     )
     correlation_id: Optional[UUID] = Field(
-        default=None,
-        description="Request correlation ID"
+        default=None, description="Request correlation ID"
     )
 
 
@@ -109,34 +94,25 @@ class RetryStatistics(BaseModel):
     """Statistics about retry operations."""
 
     total_operations: int = Field(
-        default=0,
-        description="Total number of operations attempted"
+        default=0, description="Total number of operations attempted"
     )
     successful_operations: int = Field(
-        default=0,
-        description="Number of successful operations"
+        default=0, description="Number of successful operations"
     )
     failed_operations: int = Field(
-        default=0,
-        description="Number of permanently failed operations"
+        default=0, description="Number of permanently failed operations"
     )
-    total_retries: int = Field(
-        default=0,
-        description="Total number of retry attempts"
-    )
+    total_retries: int = Field(default=0, description="Total number of retry attempts")
     average_attempts: float = Field(
-        default=0.0,
-        description="Average number of attempts per operation"
+        default=0.0, description="Average number of attempts per operation"
     )
     common_exceptions: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Count of common exceptions encountered"
+        default_factory=dict, description="Count of common exceptions encountered"
     )
 
 
 def is_retryable_exception(
-    exception: Exception,
-    retryable_exceptions: List[str]
+    exception: Exception, retryable_exceptions: List[str]
 ) -> bool:
     """
     Check if an exception should trigger a retry.
@@ -162,10 +138,7 @@ def is_retryable_exception(
     return False
 
 
-def calculate_delay(
-    attempt: int,
-    config: RetryConfig
-) -> int:
+def calculate_delay(attempt: int, config: RetryConfig) -> int:
     """
     Calculate delay for a retry attempt with exponential backoff.
 
@@ -199,7 +172,7 @@ async def retry_with_backoff(
     config: RetryConfig,
     correlation_id: Optional[UUID] = None,
     *args,
-    **kwargs
+    **kwargs,
 ) -> T:
     """
     Execute an operation with retry and exponential backoff.
@@ -233,9 +206,7 @@ async def retry_with_backoff(
 
             # Record attempt
             attempt_info = RetryAttemptInfo(
-                attempt_number=attempt,
-                delay_ms=delay_ms,
-                correlation_id=correlation_id
+                attempt_number=attempt, delay_ms=delay_ms, correlation_id=correlation_id
             )
             attempts.append(attempt_info)
 
@@ -261,7 +232,9 @@ async def retry_with_backoff(
             attempts[-1].exception = type(e).__name__
 
             # Check if we should retry
-            if attempt < config.max_attempts and is_retryable_exception(e, config.retryable_exceptions):
+            if attempt < config.max_attempts and is_retryable_exception(
+                e, config.retryable_exceptions
+            ):
                 # Sanitize error message to prevent information disclosure
                 sanitized_error = _error_sanitizer.sanitize_error_message(str(e))
                 logger.warning(
@@ -296,7 +269,7 @@ def retry_decorator(
     max_delay_ms: int = 30000,
     exponential_multiplier: float = 2.0,
     jitter: bool = True,
-    retryable_exceptions: Optional[List[str]] = None
+    retryable_exceptions: Optional[List[str]] = None,
 ) -> Callable:
     """
     Decorator for adding retry behavior to functions.
@@ -320,33 +293,25 @@ def retry_decorator(
             max_delay_ms=max_delay_ms,
             exponential_multiplier=exponential_multiplier,
             jitter=jitter,
-            retryable_exceptions=retryable_exceptions or []
+            retryable_exceptions=retryable_exceptions or [],
         )
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs) -> T:
-            correlation_id = kwargs.pop('correlation_id', None)
+            correlation_id = kwargs.pop("correlation_id", None)
             return await retry_with_backoff(
-                func,
-                config,
-                correlation_id,
-                *args,
-                **kwargs
+                func, config, correlation_id, *args, **kwargs
             )
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs) -> T:
             # For sync functions, run in event loop
-            correlation_id = kwargs.pop('correlation_id', None)
+            correlation_id = kwargs.pop("correlation_id", None)
 
             async def async_operation():
                 return await retry_with_backoff(
-                    func,
-                    config,
-                    correlation_id,
-                    *args,
-                    **kwargs
+                    func, config, correlation_id, *args, **kwargs
                 )
 
             try:
@@ -392,7 +357,7 @@ class RetryManager:
         config: Optional[RetryConfig] = None,
         correlation_id: Optional[UUID] = None,
         *args,
-        **kwargs
+        **kwargs,
     ) -> T:
         """
         Execute an operation with retry and track statistics.
@@ -409,15 +374,10 @@ class RetryManager:
             Operation result
         """
         retry_config = config or self.default_config
-        start_time = datetime.utcnow()
 
         try:
             result = await retry_with_backoff(
-                operation,
-                retry_config,
-                correlation_id,
-                *args,
-                **kwargs
+                operation, retry_config, correlation_id, *args, **kwargs
             )
 
             # Update success statistics

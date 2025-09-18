@@ -7,10 +7,10 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
-from ..foundation.model_semver import ModelSemVer
-from ..foundation.model_success_metrics import ModelSuccessRate, ModelConfidenceScore
-from ..foundation.model_notes import ModelNotesCollection
 from ..foundation.model_error_details import ModelErrorDetails
+from ..foundation.model_notes import ModelNotesCollection
+from ..foundation.model_semver import ModelSemVer
+from ..foundation.model_success_metrics import ModelConfidenceScore, ModelSuccessRate
 
 
 class ModelMemoryMetadata(BaseModel):

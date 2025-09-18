@@ -13,8 +13,10 @@ from pydantic import BaseModel, Field
 try:
     from omnibase_core.core.errors.core_errors import OnexErrorCode as CoreErrorCode
     from omnibase_core.enums.enum_log_level import EnumLogLevel as CoreSeverity
+
     # Local omnimemory-specific error codes
     from ...enums.enum_error_code import OmniMemoryErrorCode
+
     # Union type for error codes
     ErrorCodeType = CoreErrorCode | OmniMemoryErrorCode | str
     SeverityType = CoreSeverity

@@ -13,11 +13,9 @@ All models follow ONEX standards with:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Union
-from uuid import UUID
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 
 # === STRING COLLECTIONS ===
 
@@ -26,17 +24,15 @@ class ModelStringList(BaseModel):
     """Strongly typed list of strings following ONEX standards."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
     values: List[str] = Field(
         default_factory=list,
-        description="List of string values with validation and deduplication"
+        description="List of string values with validation and deduplication",
     )
 
-    @field_validator('values')
+    @field_validator("values")
     @classmethod
     def validate_strings(cls, v):
         """Validate and deduplicate string values."""
@@ -61,17 +57,14 @@ class ModelOptionalStringList(BaseModel):
     """Optional strongly typed list of strings."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
     values: Optional[List[str]] = Field(
-        default=None,
-        description="Optional list of string values, None if not set"
+        default=None, description="Optional list of string values, None if not set"
     )
 
-    @field_validator('values')
+    @field_validator("values")
     @classmethod
     def validate_optional_strings(cls, v):
         """Validate optional string values."""
@@ -102,15 +95,13 @@ class ModelKeyValuePair(BaseModel):
     """Strongly typed key-value pair for metadata."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
     key: str = Field(description="Metadata key identifier")
     value: str = Field(description="Metadata value content")
 
-    @field_validator('key')
+    @field_validator("key")
     @classmethod
     def validate_key(cls, v):
         """Validate metadata key format."""
@@ -122,14 +113,10 @@ class ModelKeyValuePair(BaseModel):
 class ModelMetadata(BaseModel):
     """Strongly typed metadata collection replacing Dict[str, Any]."""
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid"
-    )
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     pairs: List[ModelKeyValuePair] = Field(
-        default_factory=list,
-        description="List of key-value pairs for metadata storage"
+        default_factory=list, description="List of key-value pairs for metadata storage"
     )
 
     def get_value(self, key: str) -> Optional[str]:
@@ -150,7 +137,7 @@ class ModelMetadata(BaseModel):
         self.pairs.append(ModelKeyValuePair(key=key, value=value))
 
     def to_dict(self) -> dict[str, str]:
-        """Convert to dictionary format for backward compatibility."""
+        """Convert to dictionary format for interoperability."""
         return {pair.key: pair.value for pair in self.pairs}
 
     @classmethod
@@ -171,19 +158,17 @@ class ModelStructuredField(BaseModel):
     """Strongly typed field for structured data."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
     name: str = Field(description="Field name identifier")
     value: str = Field(description="Field value content")
     field_type: str = Field(
         default="string",
-        description="Field type indicator (string, number, boolean, etc.)"
+        description="Field type indicator (string, number, boolean, etc.)",
     )
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def validate_name(cls, v):
         """Validate field name format."""
@@ -195,18 +180,14 @@ class ModelStructuredField(BaseModel):
 class ModelStructuredData(BaseModel):
     """Strongly typed structured data replacing List[Dict[str, Any]]."""
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid"
-    )
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     fields: List[ModelStructuredField] = Field(
         default_factory=list,
-        description="List of structured fields with type information"
+        description="List of structured fields with type information",
     )
     schema_version: str = Field(
-        default="1.0",
-        description="Schema version for compatibility tracking"
+        default="1.0", description="Schema version for data structure evolution"
     )
 
     def get_field_value(self, name: str) -> Optional[str]:
@@ -216,7 +197,9 @@ class ModelStructuredData(BaseModel):
                 return field.value
         return None
 
-    def set_field_value(self, name: str, value: str, field_type: str = "string") -> None:
+    def set_field_value(
+        self, name: str, value: str, field_type: str = "string"
+    ) -> None:
         """Set field value by name."""
         # Update existing or add new
         for field in self.fields:
@@ -225,11 +208,9 @@ class ModelStructuredData(BaseModel):
                 field.field_type = field_type
                 return
 
-        self.fields.append(ModelStructuredField(
-            name=name,
-            value=value,
-            field_type=field_type
-        ))
+        self.fields.append(
+            ModelStructuredField(name=name, value=value, field_type=field_type)
+        )
 
 
 # === CONFIGURATION COLLECTIONS ===
@@ -239,23 +220,19 @@ class ModelConfigurationOption(BaseModel):
     """Strongly typed configuration option."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
     key: str = Field(description="Configuration option key")
     value: str = Field(description="Configuration option value")
     description: Optional[str] = Field(
-        default=None,
-        description="Option description for documentation"
+        default=None, description="Option description for documentation"
     )
     is_sensitive: bool = Field(
-        default=False,
-        description="Whether this option contains sensitive data"
+        default=False, description="Whether this option contains sensitive data"
     )
 
-    @field_validator('key')
+    @field_validator("key")
     @classmethod
     def validate_key(cls, v):
         """Validate configuration key format."""
@@ -267,14 +244,10 @@ class ModelConfigurationOption(BaseModel):
 class ModelConfiguration(BaseModel):
     """Strongly typed configuration replacing Dict[str, Any]."""
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid"
-    )
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     options: List[ModelConfigurationOption] = Field(
-        default_factory=list,
-        description="List of configuration options with metadata"
+        default_factory=list, description="List of configuration options with metadata"
     )
 
     def get_option(self, key: str) -> Optional[str]:
@@ -289,7 +262,7 @@ class ModelConfiguration(BaseModel):
         key: str,
         value: str,
         description: Optional[str] = None,
-        is_sensitive: bool = False
+        is_sensitive: bool = False,
     ) -> None:
         """Set configuration option with metadata."""
         # Update existing or add new
@@ -301,12 +274,11 @@ class ModelConfiguration(BaseModel):
                 option.is_sensitive = is_sensitive
                 return
 
-        self.options.append(ModelConfigurationOption(
-            key=key,
-            value=value,
-            description=description,
-            is_sensitive=is_sensitive
-        ))
+        self.options.append(
+            ModelConfigurationOption(
+                key=key, value=value, description=description, is_sensitive=is_sensitive
+            )
+        )
 
 
 # === EVENT AND LOG COLLECTIONS ===
@@ -316,25 +288,24 @@ class ModelEventData(BaseModel):
     """Strongly typed event data for system events."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
-    event_type: str = Field(description="Type of event (creation, update, deletion, etc.)")
+    event_type: str = Field(
+        description="Type of event (creation, update, deletion, etc.)"
+    )
     timestamp: str = Field(description="ISO 8601 timestamp of the event")
     source: str = Field(description="Source system or component generating the event")
     severity: str = Field(
         default="info",
-        description="Event severity level (debug, info, warning, error, critical)"
+        description="Event severity level (debug, info, warning, error, critical)",
     )
     message: str = Field(description="Human-readable event message")
     correlation_id: Optional[str] = Field(
-        default=None,
-        description="Correlation ID for tracking related events"
+        default=None, description="Correlation ID for tracking related events"
     )
 
-    @field_validator('event_type')
+    @field_validator("event_type")
     @classmethod
     def validate_event_type(cls, v):
         """Validate event type format."""
@@ -342,7 +313,7 @@ class ModelEventData(BaseModel):
             raise ValueError("event_type cannot be empty")
         return v.strip().lower()
 
-    @field_validator('severity')
+    @field_validator("severity")
     @classmethod
     def validate_severity(cls, v):
         """Validate severity level."""
@@ -355,14 +326,10 @@ class ModelEventData(BaseModel):
 class ModelEventCollection(BaseModel):
     """Strongly typed event collection replacing List[Dict[str, Any]]."""
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid"
-    )
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     events: List[ModelEventData] = Field(
-        default_factory=list,
-        description="List of system events with structured data"
+        default_factory=list, description="List of system events with structured data"
     )
 
     def add_event(
@@ -372,7 +339,7 @@ class ModelEventCollection(BaseModel):
         source: str,
         message: str,
         severity: str = "info",
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
     ) -> None:
         """Add a new event to the collection."""
         event = ModelEventData(
@@ -381,7 +348,7 @@ class ModelEventCollection(BaseModel):
             source=source,
             message=message,
             severity=severity,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
         self.events.append(event)
 
@@ -401,20 +368,19 @@ class ModelResultItem(BaseModel):
     """Strongly typed result item for operation results."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
+        str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
     id: str = Field(description="Unique identifier for this result item")
-    status: str = Field(description="Status of this specific item (success, failure, pending)")
+    status: str = Field(
+        description="Status of this specific item (success, failure, pending)"
+    )
     message: str = Field(description="Human-readable message about this item")
     data: Optional[ModelStructuredData] = Field(
-        default=None,
-        description="Structured data associated with this item"
+        default=None, description="Structured data associated with this item"
     )
 
-    @field_validator('status')
+    @field_validator("status")
     @classmethod
     def validate_status(cls, v):
         """Validate status values."""
@@ -427,14 +393,11 @@ class ModelResultItem(BaseModel):
 class ModelResultCollection(BaseModel):
     """Strongly typed result collection replacing List[Dict[str, Any]]."""
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid"
-    )
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     results: List[ModelResultItem] = Field(
         default_factory=list,
-        description="List of operation results with structured data"
+        description="List of operation results with structured data",
     )
 
     def add_result(
@@ -442,15 +405,10 @@ class ModelResultCollection(BaseModel):
         id: str,
         status: str,
         message: str,
-        data: Optional[ModelStructuredData] = None
+        data: Optional[ModelStructuredData] = None,
     ) -> None:
         """Add a new result to the collection."""
-        result = ModelResultItem(
-            id=id,
-            status=status,
-            message=message,
-            data=data
-        )
+        result = ModelResultItem(id=id, status=status, message=message, data=data)
         self.results.append(result)
 
     def get_successful_results(self) -> List[ModelResultItem]:
@@ -475,7 +433,9 @@ def convert_list_to_string_list(data: List[str]) -> ModelStringList:
     return ModelStringList(values=data)
 
 
-def convert_list_of_dicts_to_structured_data(data: List[dict[str, Any]]) -> ModelResultCollection:
+def convert_list_of_dicts_to_structured_data(
+    data: List[dict[str, Any]]
+) -> ModelResultCollection:
     """Convert a list of dictionaries to structured result collection."""
     collection = ModelResultCollection()
 
@@ -489,7 +449,7 @@ def convert_list_of_dicts_to_structured_data(data: List[dict[str, Any]]) -> Mode
             id=str(i),
             status="success",
             message=f"Converted item {i}",
-            data=structured_data
+            data=structured_data,
         )
 
     return collection

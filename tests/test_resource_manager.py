@@ -4,20 +4,21 @@ Tests for resource manager utilities following ONEX standards.
 
 from __future__ import annotations
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
+import pytest
+
 from omnimemory.utils.resource_manager import (
-    ResourceManager,
-    ResourceType,
-    ResourceStatus,
-    ResourceHandle,
-    ResourcePool,
     ResourceAllocationError,
+    ResourceHandle,
+    ResourceManager,
+    ResourcePool,
+    ResourceStatus,
     ResourceTimeoutError,
+    ResourceType,
 )
 
 
@@ -34,11 +35,7 @@ class TestResourceManager:
         """Test registering resource pools."""
         rm = ResourceManager()
 
-        pool_config = {
-            "min_size": 2,
-            "max_size": 10,
-            "timeout": 30.0
-        }
+        pool_config = {"min_size": 2, "max_size": 10, "timeout": 30.0}
 
         rm.register_pool(ResourceType.DATABASE, pool_config)
         assert ResourceType.DATABASE in rm.resource_pools
@@ -52,11 +49,7 @@ class TestResourceManager:
         mock_resource = Mock()
         mock_factory = Mock(return_value=mock_resource)
 
-        pool_config = {
-            "min_size": 1,
-            "max_size": 5,
-            "factory": mock_factory
-        }
+        pool_config = {"min_size": 1, "max_size": 5, "factory": mock_factory}
 
         rm.register_pool(ResourceType.MEMORY, pool_config)
 
@@ -79,11 +72,7 @@ class TestResourceManager:
         mock_resource = Mock()
         mock_factory = Mock(return_value=mock_resource)
 
-        pool_config = {
-            "min_size": 1,
-            "max_size": 3,
-            "factory": mock_factory
-        }
+        pool_config = {"min_size": 1, "max_size": 3, "factory": mock_factory}
 
         rm.register_pool(ResourceType.CACHE, pool_config)
 
@@ -106,7 +95,7 @@ class TestResourceManager:
             "min_size": 0,
             "max_size": 2,
             "factory": mock_factory,
-            "timeout": 0.1
+            "timeout": 0.1,
         }
 
         rm.register_pool(ResourceType.NETWORK, pool_config)
@@ -147,7 +136,7 @@ class TestResourceManager:
             "min_size": 0,
             "max_size": 5,
             "factory": mock_factory,
-            "health_check_interval": 0.1
+            "health_check_interval": 0.1,
         }
 
         rm.register_pool(ResourceType.DATABASE, pool_config)
@@ -197,6 +186,7 @@ class TestResourceManager:
 
         # Resource factory that fails sometimes
         call_count = 0
+
         def failing_factory():
             nonlocal call_count
             call_count += 1
@@ -204,11 +194,7 @@ class TestResourceManager:
                 raise ConnectionError("Factory failed")
             return Mock()
 
-        pool_config = {
-            "min_size": 0,
-            "max_size": 5,
-            "factory": failing_factory
-        }
+        pool_config = {"min_size": 0, "max_size": 5, "factory": failing_factory}
 
         rm.register_pool(ResourceType.DATABASE, pool_config)
 
@@ -243,7 +229,7 @@ class TestResourceManager:
             "max_size": 8,
             "factory": mock_factory,
             "scale_threshold": 0.8,  # Scale when 80% utilized
-            "scale_increment": 2
+            "scale_increment": 2,
         }
 
         rm.register_pool(ResourceType.MEMORY, pool_config)
@@ -277,7 +263,7 @@ class TestResourceManager:
             "min_size": 1,
             "max_size": 3,
             "factory": mock_factory,
-            "resource_ttl": 0.1  # Very short TTL for testing
+            "resource_ttl": 0.1,  # Very short TTL for testing
         }
 
         rm.register_pool(ResourceType.CACHE, pool_config)
@@ -305,11 +291,7 @@ class TestResourcePool:
 
     def test_resource_pool_creation(self):
         """Test resource pool can be created with valid configuration."""
-        config = {
-            "min_size": 2,
-            "max_size": 10,
-            "factory": lambda: Mock()
-        }
+        config = {"min_size": 2, "max_size": 10, "factory": lambda: Mock()}
 
         pool = ResourcePool(ResourceType.DATABASE, config)
         assert pool.resource_type == ResourceType.DATABASE
@@ -319,11 +301,7 @@ class TestResourcePool:
     @pytest.mark.asyncio
     async def test_resource_pool_initialization(self):
         """Test resource pool initializes with minimum resources."""
-        config = {
-            "min_size": 3,
-            "max_size": 10,
-            "factory": lambda: Mock()
-        }
+        config = {"min_size": 3, "max_size": 10, "factory": lambda: Mock()}
 
         pool = ResourcePool(ResourceType.MEMORY, config)
         await pool.initialize()
@@ -334,11 +312,7 @@ class TestResourcePool:
     @pytest.mark.asyncio
     async def test_resource_pool_acquire_release_cycle(self):
         """Test complete acquire/release cycle."""
-        config = {
-            "min_size": 2,
-            "max_size": 5,
-            "factory": lambda: Mock()
-        }
+        config = {"min_size": 2, "max_size": 5, "factory": lambda: Mock()}
 
         pool = ResourcePool(ResourceType.CACHE, config)
         await pool.initialize()
@@ -358,11 +332,7 @@ class TestResourcePool:
     @pytest.mark.asyncio
     async def test_resource_pool_concurrent_access(self):
         """Test resource pool handles concurrent access safely."""
-        config = {
-            "min_size": 1,
-            "max_size": 3,
-            "factory": lambda: Mock()
-        }
+        config = {"min_size": 1, "max_size": 3, "factory": lambda: Mock()}
 
         pool = ResourcePool(ResourceType.NETWORK, config)
         await pool.initialize()
@@ -393,9 +363,7 @@ class TestResourceHandle:
         """Test resource handle creation with valid parameters."""
         resource = Mock()
         handle = ResourceHandle(
-            resource_id=uuid4(),
-            resource=resource,
-            resource_type=ResourceType.DATABASE
+            resource_id=uuid4(), resource=resource, resource_type=ResourceType.DATABASE
         )
 
         assert handle.resource is resource
@@ -414,13 +382,13 @@ class TestResourceHandle:
         healthy_handle = ResourceHandle(
             resource_id=uuid4(),
             resource=healthy_resource,
-            resource_type=ResourceType.CACHE
+            resource_type=ResourceType.CACHE,
         )
 
         unhealthy_handle = ResourceHandle(
             resource_id=uuid4(),
             resource=unhealthy_resource,
-            resource_type=ResourceType.CACHE
+            resource_type=ResourceType.CACHE,
         )
 
         assert healthy_handle.is_healthy()
@@ -433,7 +401,7 @@ class TestResourceHandle:
             resource_id=uuid4(),
             resource=resource,
             resource_type=ResourceType.MEMORY,
-            ttl=0.1
+            ttl=0.1,
         )
 
         # Initially not expired
@@ -441,6 +409,7 @@ class TestResourceHandle:
 
         # Wait for expiration
         import time
+
         time.sleep(0.2)
 
         # Now should be expired
@@ -450,9 +419,7 @@ class TestResourceHandle:
         """Test resource handle context data management."""
         resource = Mock()
         handle = ResourceHandle(
-            resource_id=uuid4(),
-            resource=resource,
-            resource_type=ResourceType.DATABASE
+            resource_id=uuid4(), resource=resource, resource_type=ResourceType.DATABASE
         )
 
         # Add context data
@@ -479,6 +446,7 @@ class TestResourceManagerIntegration:
 
         # Simulate database connection factory
         connection_count = 0
+
         def create_db_connection():
             nonlocal connection_count
             connection_count += 1
@@ -494,7 +462,7 @@ class TestResourceManagerIntegration:
             "max_size": 8,
             "factory": create_db_connection,
             "health_check_interval": 0.5,
-            "resource_ttl": 10.0
+            "resource_ttl": 10.0,
         }
 
         rm.register_pool(ResourceType.DATABASE, db_config)
@@ -502,10 +470,13 @@ class TestResourceManagerIntegration:
         # Test multiple operations
         operations = []
         for i in range(10):
+
             async def database_operation(op_id: int):
                 async with rm.acquire_context(ResourceType.DATABASE) as handle:
                     # Simulate database work
-                    result = handle.resource.execute(f"SELECT * FROM table WHERE id={op_id}")
+                    result = handle.resource.execute(
+                        f"SELECT * FROM table WHERE id={op_id}"
+                    )
                     await asyncio.sleep(0.1)  # Simulate query time
                     return f"Operation {op_id}: {result}"
 

@@ -210,12 +210,12 @@ poetry run python scripts/validate_onex.py         # ONEX compliance check
 
 ```bash
 # Database connections
-DATABASE_URL="postgresql://user:pass@localhost:5432/omnimemory"
+DATABASE_URL="postgresql://user:pass@localhost:5432/omnimemory"  # pragma: allowlist secret
 SUPABASE_URL="https://your-project.supabase.co"
-SUPABASE_ANON_KEY="your-anon-key"
+SUPABASE_ANON_KEY="your-anon-key"  # pragma: allowlist secret
 
 # Vector database
-PINECONE_API_KEY="your-pinecone-key"
+PINECONE_API_KEY="your-pinecone-key"  # pragma: allowlist secret
 PINECONE_ENVIRONMENT="your-environment"
 
 # Cache and temporary storage

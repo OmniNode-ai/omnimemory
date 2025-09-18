@@ -91,7 +91,7 @@ class ModelUser(BaseModel):
             display_name="System User",
             roles=["system", "admin"],
             permissions=["system.all"],
-            attributes={"type": "system", "automated": "true"}
+            attributes={"type": "system", "automated": "true"},
         )
 
     @classmethod
@@ -105,5 +105,5 @@ class ModelUser(BaseModel):
             display_name="Anonymous User",
             roles=["anonymous"],
             permissions=["read"],
-            attributes={"type": "anonymous", "temporary": "true"}
+            attributes={"type": "anonymous", "temporary": "true"},
         )

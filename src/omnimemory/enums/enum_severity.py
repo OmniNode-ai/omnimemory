@@ -1,22 +1,11 @@
 """
 Severity level enumeration following ONEX standards.
 
-Uses the standard severity levels from omnibase_core.
-This file maintained for backward compatibility during migration.
+Standard severity levels imported from omnibase_core for unified logging.
 """
 
 # Import standard ONEX severity levels from omnibase_core
-try:
-    from omnibase_core.enums.enum_log_level import EnumLogLevel as EnumSeverity
-except ImportError:
-    # Fallback for development environments without omnibase_core
-    from enum import Enum
+from omnibase_core.enums.enum_log_level import EnumLogLevel as EnumSeverity
 
-    class EnumSeverity(str, Enum):
-        """Fallback severity levels (use omnibase_core.enums.EnumLogLevel in production)."""
-
-        CRITICAL = "critical"
-        ERROR = "error"
-        WARNING = "warning"
-        INFO = "info"
-        DEBUG = "debug"
+# Make available for import
+__all__ = ["EnumSeverity"]

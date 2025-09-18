@@ -9,33 +9,35 @@ This module provides models for tracking migration progress across the system:
 """
 
 from datetime import datetime, timedelta
-from functools import cached_property
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field
 
-from .model_typed_collections import ModelMetadata, ModelConfiguration
-from .model_progress_summary import ProgressSummaryResponse
+from omnimemory.enums import FileProcessingStatus, MigrationPriority, MigrationStatus
 
-from omnimemory.enums import MigrationStatus, MigrationPriority, FileProcessingStatus
 from ...utils.error_sanitizer import ErrorSanitizer, SanitizationLevel
+from .model_progress_summary import ProgressSummaryResponse
+from .model_typed_collections import ModelConfiguration, ModelMetadata
 
 # Initialize error sanitizer for secure logging
 _error_sanitizer = ErrorSanitizer(
-    default_level=SanitizationLevel.STANDARD,
-    enable_stack_trace_filter=True
+    default_level=SanitizationLevel.STANDARD, enable_stack_trace_filter=True
 )
+
 
 class BatchProcessingMetrics(BaseModel):
     """Metrics for batch processing operations."""
+
     batch_id: str = Field(description="Unique batch identifier")
     batch_size: int = Field(description="Number of items in batch")
     processed_count: int = Field(default=0, description="Number of items processed")
     failed_count: int = Field(default=0, description="Number of items failed")
     start_time: Optional[datetime] = Field(default=None, description="Batch start time")
     end_time: Optional[datetime] = Field(default=None, description="Batch end time")
-    error_messages: List[str] = Field(default_factory=list, description="Error messages")
+    error_messages: List[str] = Field(
+        default_factory=list, description="Error messages"
+    )
 
     @computed_field
     @property
@@ -53,17 +55,27 @@ class BatchProcessingMetrics(BaseModel):
             return self.end_time - self.start_time
         return None
 
+
 class FileProcessingInfo(BaseModel):
     """Information about individual file processing."""
+
     file_path: str = Field(description="Path to the file being processed")
     file_size: Optional[int] = Field(default=None, description="File size in bytes")
     status: FileProcessingStatus = Field(default=FileProcessingStatus.PENDING)
-    start_time: Optional[datetime] = Field(default=None, description="Processing start time")
-    end_time: Optional[datetime] = Field(default=None, description="Processing end time")
-    error_message: Optional[str] = Field(default=None, description="Error message if failed")
+    start_time: Optional[datetime] = Field(
+        default=None, description="Processing start time"
+    )
+    end_time: Optional[datetime] = Field(
+        default=None, description="Processing end time"
+    )
+    error_message: Optional[str] = Field(
+        default=None, description="Error message if failed"
+    )
     retry_count: int = Field(default=0, description="Number of retry attempts")
     batch_id: Optional[str] = Field(default=None, description="Associated batch ID")
-    metadata: ModelMetadata = Field(default_factory=ModelMetadata, description="Additional file metadata")
+    metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata, description="Additional file metadata"
+    )
 
     @computed_field
     @property
@@ -73,25 +85,43 @@ class FileProcessingInfo(BaseModel):
             return self.end_time - self.start_time
         return None
 
+
 class MigrationProgressMetrics(BaseModel):
     """Comprehensive metrics for migration progress tracking."""
+
     total_files: int = Field(description="Total number of files to process")
     processed_files: int = Field(default=0, description="Number of files processed")
     failed_files: int = Field(default=0, description="Number of files failed")
     skipped_files: int = Field(default=0, description="Number of files skipped")
 
-    total_size_bytes: Optional[int] = Field(default=None, description="Total size of all files")
+    total_size_bytes: Optional[int] = Field(
+        default=None, description="Total size of all files"
+    )
     processed_size_bytes: int = Field(default=0, description="Size of processed files")
 
-    start_time: datetime = Field(default_factory=datetime.now, description="Migration start time")
-    last_update_time: datetime = Field(default_factory=datetime.now, description="Last update time")
-    estimated_completion: Optional[datetime] = Field(default=None, description="Estimated completion time")
+    start_time: datetime = Field(
+        default_factory=datetime.now, description="Migration start time"
+    )
+    last_update_time: datetime = Field(
+        default_factory=datetime.now, description="Last update time"
+    )
+    estimated_completion: Optional[datetime] = Field(
+        default=None, description="Estimated completion time"
+    )
 
-    files_per_second: float = Field(default=0.0, description="Processing rate in files per second")
-    bytes_per_second: float = Field(default=0.0, description="Processing rate in bytes per second")
+    files_per_second: float = Field(
+        default=0.0, description="Processing rate in files per second"
+    )
+    bytes_per_second: float = Field(
+        default=0.0, description="Processing rate in bytes per second"
+    )
 
-    current_batch: Optional[str] = Field(default=None, description="Current batch being processed")
-    batch_metrics: List[BatchProcessingMetrics] = Field(default_factory=list, description="Batch processing metrics")
+    current_batch: Optional[str] = Field(
+        default=None, description="Current batch being processed"
+    )
+    batch_metrics: List[BatchProcessingMetrics] = Field(
+        default_factory=list, description="Batch processing metrics"
+    )
 
     # Performance optimization: Cache expensive calculations
     _cached_completion_percentage: Optional[float] = Field(
@@ -176,7 +206,9 @@ class MigrationProgressMetrics(BaseModel):
             return None
 
         remaining_seconds = self.remaining_files / self.files_per_second
-        self.estimated_completion = self.last_update_time + timedelta(seconds=remaining_seconds)
+        self.estimated_completion = self.last_update_time + timedelta(
+            seconds=remaining_seconds
+        )
         return self.estimated_completion
 
     def _is_cache_valid(self) -> bool:
@@ -193,6 +225,7 @@ class MigrationProgressMetrics(BaseModel):
         self._cached_success_rate = None
         self._cache_invalidated_at = datetime.now()
 
+
 class MigrationProgressTracker(BaseModel):
     """
     Comprehensive migration progress tracker for OmniMemory.
@@ -204,39 +237,56 @@ class MigrationProgressTracker(BaseModel):
     - Error tracking and recovery
     """
 
-    migration_id: UUID = Field(default_factory=uuid4, description="Unique migration identifier")
+    migration_id: UUID = Field(
+        default_factory=uuid4, description="Unique migration identifier"
+    )
     name: str = Field(description="Migration name or description")
-    status: MigrationStatus = Field(default=MigrationStatus.PENDING, description="Current migration status")
-    priority: MigrationPriority = Field(default=MigrationPriority.NORMAL, description="Migration priority")
+    status: MigrationStatus = Field(
+        default=MigrationStatus.PENDING, description="Current migration status"
+    )
+    priority: MigrationPriority = Field(
+        default=MigrationPriority.NORMAL, description="Migration priority"
+    )
 
     metrics: MigrationProgressMetrics = Field(description="Progress metrics")
-    files: List[FileProcessingInfo] = Field(default_factory=list, description="File processing information")
+    files: List[FileProcessingInfo] = Field(
+        default_factory=list, description="File processing information"
+    )
 
-    error_summary: Dict[str, int] = Field(default_factory=dict, description="Error count by type")
+    error_summary: Dict[str, int] = Field(
+        default_factory=dict, description="Error count by type"
+    )
     recovery_attempts: int = Field(default=0, description="Number of recovery attempts")
 
-    created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
-    updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="Creation timestamp"
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.now, description="Last update timestamp"
+    )
 
-    configuration: ModelConfiguration = Field(default_factory=ModelConfiguration, description="Migration configuration")
-    metadata: ModelMetadata = Field(default_factory=ModelMetadata, description="Additional metadata")
+    configuration: ModelConfiguration = Field(
+        default_factory=ModelConfiguration, description="Migration configuration"
+    )
+    metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata, description="Additional metadata"
+    )
 
-    def add_file(self, file_path: str, file_size: Optional[int] = None, **metadata) -> FileProcessingInfo:
+    def add_file(
+        self, file_path: str, file_size: Optional[int] = None, **metadata
+    ) -> FileProcessingInfo:
         """Add a file to be tracked for processing."""
         from .model_typed_collections import ModelKeyValuePair
-        
+
         # Convert dict metadata to ModelMetadata
         metadata_obj = ModelMetadata()
         if metadata:
             metadata_obj.pairs = [
-                ModelKeyValuePair(key=str(k), value=str(v)) 
-                for k, v in metadata.items()
+                ModelKeyValuePair(key=str(k), value=str(v)) for k, v in metadata.items()
             ]
-        
+
         file_info = FileProcessingInfo(
-            file_path=file_path,
-            file_size=file_size,
-            metadata=metadata_obj
+            file_path=file_path, file_size=file_size, metadata=metadata_obj
         )
         self.files.append(file_info)
         self.metrics.total_files = len(self.files)
@@ -249,7 +299,9 @@ class MigrationProgressTracker(BaseModel):
         self._update_timestamp()
         return file_info
 
-    def start_file_processing(self, file_path: str, batch_id: Optional[str] = None) -> bool:
+    def start_file_processing(
+        self, file_path: str, batch_id: Optional[str] = None
+    ) -> bool:
         """Mark a file as started processing."""
         file_info = self._find_file(file_path)
         if file_info:
@@ -260,7 +312,9 @@ class MigrationProgressTracker(BaseModel):
             return True
         return False
 
-    def complete_file_processing(self, file_path: str, success: bool = True, error_message: Optional[str] = None):
+    def complete_file_processing(
+        self, file_path: str, success: bool = True, error_message: Optional[str] = None
+    ):
         """Mark a file as completed processing."""
         file_info = self._find_file(file_path)
         if file_info:
@@ -279,7 +333,9 @@ class MigrationProgressTracker(BaseModel):
                 # Track error types
                 if error_message:
                     error_type = type(Exception(error_message)).__name__
-                    self.error_summary[error_type] = self.error_summary.get(error_type, 0) + 1
+                    self.error_summary[error_type] = (
+                        self.error_summary.get(error_type, 0) + 1
+                    )
 
             self._update_progress_metrics()
             self._update_timestamp()
@@ -296,9 +352,7 @@ class MigrationProgressTracker(BaseModel):
     def start_batch(self, batch_id: str, batch_size: int) -> BatchProcessingMetrics:
         """Start a new batch processing."""
         batch_metrics = BatchProcessingMetrics(
-            batch_id=batch_id,
-            batch_size=batch_size,
-            start_time=datetime.now()
+            batch_id=batch_id, batch_size=batch_size, start_time=datetime.now()
         )
         self.metrics.batch_metrics.append(batch_metrics)
         self.metrics.current_batch = batch_id
@@ -329,17 +383,27 @@ class MigrationProgressTracker(BaseModel):
             processed_items=self.metrics.processed_files,
             successful_items=self.metrics.processed_files - self.metrics.failed_files,
             failed_items=self.metrics.failed_files,
-            current_batch_id=getattr(self.metrics, 'current_batch', None),
-            active_workers=len([b for b in self.metrics.batch_metrics if b.end_time is None]),
-            recent_errors=[
-                _error_sanitizer.sanitize_error_message(str(e), level=SanitizationLevel.STRICT)
-                for e in self.error_summary[-5:]
-            ] if self.error_summary else [],
+            current_batch_id=getattr(self.metrics, "current_batch", None),
+            active_workers=len(
+                [b for b in self.metrics.batch_metrics if b.end_time is None]
+            ),
+            recent_errors=(
+                [
+                    _error_sanitizer.sanitize_error_message(
+                        str(e), level=SanitizationLevel.STRICT
+                    )
+                    for e in self.error_summary[-5:]
+                ]
+                if self.error_summary
+                else []
+            ),
             performance_metrics={
                 "files_per_second": self.metrics.files_per_second,
                 "bytes_per_second": self.metrics.bytes_per_second,
-                "average_processing_time": getattr(self.metrics, 'average_processing_time_ms', 0.0)
-            }
+                "average_processing_time": getattr(
+                    self.metrics, "average_processing_time_ms", 0.0
+                ),
+            },
         )
 
     def _find_file(self, file_path: str) -> Optional[FileProcessingInfo]:
@@ -348,7 +412,9 @@ class MigrationProgressTracker(BaseModel):
 
     def _find_batch(self, batch_id: str) -> Optional[BatchProcessingMetrics]:
         """Find batch metrics by ID."""
-        return next((b for b in self.metrics.batch_metrics if b.batch_id == batch_id), None)
+        return next(
+            (b for b in self.metrics.batch_metrics if b.batch_id == batch_id), None
+        )
 
     def _update_progress_metrics(self):
         """Update progress metrics and estimates with cache invalidation."""
@@ -367,8 +433,10 @@ class MigrationProgressTracker(BaseModel):
         """Get list of failed files that can be retried."""
         retryable_files = []
         for file_info in self.files:
-            if (file_info.status == FileProcessingStatus.FAILED and
-                file_info.retry_count < max_retries):
+            if (
+                file_info.status == FileProcessingStatus.FAILED
+                and file_info.retry_count < max_retries
+            ):
                 file_info.retry_count += 1
                 file_info.status = FileProcessingStatus.PENDING
                 retryable_files.append(file_info)

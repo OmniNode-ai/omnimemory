@@ -65,22 +65,22 @@ class ModelSemVer(BaseModel):
         """Compare versions for less than."""
         if not isinstance(other, ModelSemVer):
             return NotImplemented
-        
+
         # Compare major.minor.patch
         self_core = (self.major, self.minor, self.patch)
         other_core = (other.major, other.minor, other.patch)
-        
+
         if self_core != other_core:
             return self_core < other_core
-        
+
         # Handle pre-release comparison
         if self.pre_release is None and other.pre_release is None:
             return False
         if self.pre_release is None:
             return False  # 1.0.0 > 1.0.0-alpha
         if other.pre_release is None:
-            return True   # 1.0.0-alpha < 1.0.0
-        
+            return True  # 1.0.0-alpha < 1.0.0
+
         return self.pre_release < other.pre_release
 
     def __eq__(self, other: object) -> bool:
@@ -117,11 +117,11 @@ class ModelSemVer(BaseModel):
             r"(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
             r"(?:\+(?P<buildmetadata>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
         )
-        
+
         match = re.match(pattern, version_string.strip())
         if not match:
             raise ValueError(f"Invalid semantic version format: {version_string}")
-        
+
         return cls(
             major=int(match.group("major")),
             minor=int(match.group("minor")),

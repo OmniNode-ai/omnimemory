@@ -1,0 +1,54 @@
+repos:
+  # Code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  # Import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+
+  # Linting - temporarily disabled during integration
+  # - repo: https://github.com/pycqa/flake8
+  #   rev: 7.1.1
+  #   hooks:
+  #     - id: flake8
+  #       args: ["--max-line-length=88", "--extend-ignore=E203,W503"]
+
+  # Type checking - temporarily disabled during integration
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.14.0
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies: [pydantic>=2.0]
+
+  # Security scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--exclude-files', '.git/.*']
+
+  # ONEX Centralized Validation (via omnibase_core imports)
+  - repo: local
+    hooks:
+      # Protocol validation
+      - id: validate-protocols
+        name: "ONEX: Protocol Validation"
+        entry: poetry run python scripts/validate_protocols.py --mode audit
+        language: system
+        always_run: true
+        pass_filenames: false
+
+      # SPI duplication check
+      - id: check-spi-duplicates
+        name: "ONEX: SPI Duplication Check"
+        entry: poetry run python scripts/validate_protocols.py --mode spi-check
+        language: system
+        always_run: true
+        pass_filenames: false

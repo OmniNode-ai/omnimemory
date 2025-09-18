@@ -4,9 +4,8 @@ Priority model following ONEX foundation patterns.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
-
 from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
+from pydantic import BaseModel, Field
 
 
 class ModelPriority(BaseModel):
@@ -84,11 +83,7 @@ class ModelPriority(BaseModel):
     @classmethod
     def create_normal(cls, reason: str | None = None) -> "ModelPriority":
         """Create normal priority."""
-        return cls(
-            level=EnumPriorityLevel.NORMAL,
-            reason=reason,
-            category="standard"
-        )
+        return cls(level=EnumPriorityLevel.NORMAL, reason=reason, category="standard")
 
     @classmethod
     def create_high(cls, reason: str, created_by: str | None = None) -> "ModelPriority":
@@ -98,7 +93,7 @@ class ModelPriority(BaseModel):
             reason=reason,
             created_by=created_by,
             category="high_priority",
-            tags=["high", "attention_required"]
+            tags=["high", "attention_required"],
         )
 
     @classmethod
@@ -106,12 +101,13 @@ class ModelPriority(BaseModel):
         cls,
         reason: str,
         created_by: str | None = None,
-        expires_in_minutes: int | None = None
+        expires_in_minutes: int | None = None,
     ) -> "ModelPriority":
         """Create critical priority with optional expiration."""
         expires_at = None
         if expires_in_minutes:
             from datetime import timedelta
+
             expires_at = datetime.utcnow() + timedelta(minutes=expires_in_minutes)
 
         return cls(
@@ -120,7 +116,7 @@ class ModelPriority(BaseModel):
             created_by=created_by,
             expires_at=expires_at,
             category="critical",
-            tags=["critical", "urgent", "immediate_action"]
+            tags=["critical", "urgent", "immediate_action"],
         )
 
     @classmethod
@@ -129,7 +125,7 @@ class ModelPriority(BaseModel):
         base_level: EnumPriorityLevel,
         boost_factor: float,
         expires_in_minutes: int,
-        reason: str
+        reason: str,
     ) -> "ModelPriority":
         """Create temporarily boosted priority."""
         from datetime import timedelta
@@ -140,5 +136,5 @@ class ModelPriority(BaseModel):
             boost_factor=boost_factor,
             expires_at=datetime.utcnow() + timedelta(minutes=expires_in_minutes),
             category="temporary_boost",
-            tags=["boosted", "temporary"]
+            tags=["boosted", "temporary"],
         )
