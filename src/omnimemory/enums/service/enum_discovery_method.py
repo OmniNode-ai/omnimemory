@@ -17,7 +17,6 @@ class EnumDiscoveryMethod(str, Enum):
     EUREKA = "eureka"
     ETCD = "etcd"
     ZOOKEEPER = "zookeeper"
-    REDIS = "redis"
     MANUAL = "manual"
 
     def __str__(self) -> str:
@@ -38,7 +37,6 @@ class EnumDiscoveryMethod(str, Enum):
             self.EUREKA,
             self.ETCD,
             self.ZOOKEEPER,
-            self.REDIS,
         }
 
     @property

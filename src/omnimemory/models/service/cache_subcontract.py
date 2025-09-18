@@ -1,8 +1,8 @@
 """
 ModelCachingSubcontract implementation for OmniMemory ONEX architecture.
 
-This module provides standardized caching infrastructure that replaces external
-Redis dependencies with centralized omnibase_core patterns.
+This module provides standardized in-memory caching infrastructure following
+centralized omnibase_core patterns for high-performance memory management.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import asyncio
 import sys
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Dict, List, Optional, Union
 
 import structlog
 from pydantic import BaseModel, Field
@@ -38,7 +38,7 @@ class ModelCircuitBreakerState(BaseModel):
 class ModelCacheEntry(BaseModel):
     """Individual cache entry with metadata."""
 
-    value: Any = Field(description="Cached value")
+    value: Union[str, int, float, bool, Dict, List] = Field(description="Cached value")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = Field(default=None)
     access_count: int = Field(default=0)
@@ -68,7 +68,7 @@ class ModelCacheStats(BaseModel):
 
 class ModelCachingSubcontract:
     """
-    Centralized caching infrastructure replacing Redis dependencies.
+    Centralized in-memory caching infrastructure for ONEX architecture.
 
     Features:
     - In-memory caching with configurable TTL
@@ -424,7 +424,9 @@ class ModelCachingSubcontract:
                 retry_in_seconds=backoff_seconds,
             )
 
-    def _sanitize_value(self, value: Any) -> Any:
+    def _sanitize_value(
+        self, value: Union[str, int, float, bool, Dict, List]
+    ) -> Union[str, int, float, bool, Dict, List]:
         """Sanitize cache value for security."""
         if value is None:
             return value

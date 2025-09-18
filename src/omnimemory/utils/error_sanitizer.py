@@ -68,7 +68,6 @@ class ErrorSanitizer:
                 r"postgresql://[^@]+@[^/]+/[^\s]+",
                 r"mysql://[^@]+@[^/]+/[^\s]+",
                 r"mongodb://[^@]+@[^/]+/[^\s]+",
-                # Redis connection strings removed - using memory_cache infrastructure
             ],
             "ip_addresses": [
                 r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?\b",
