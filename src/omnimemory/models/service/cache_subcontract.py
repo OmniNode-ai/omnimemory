@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import time
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 
@@ -82,7 +83,9 @@ class ModelCachingSubcontract:
         """Initialize caching subcontract with configuration."""
         self.config = config
         self._cache: Dict[str, ModelCacheEntry] = {}
-        self._access_order: Dict[str, float] = {}  # key -> timestamp for LRU
+        self._access_order: OrderedDict[
+            str, float
+        ] = OrderedDict()  # key -> timestamp for LRU
         self._stats = ModelCacheStats(max_size_mb=config.max_size_mb)
         self._circuit_breaker = ModelCircuitBreakerState()
         self._lock = asyncio.Lock()
@@ -91,9 +94,11 @@ class ModelCachingSubcontract:
 
     async def _ensure_cleanup_task_started(self) -> None:
         """Safely start cleanup task if not already started."""
-        if not self._cleanup_task_started:
-            self._start_cleanup_task()
-            self._cleanup_task_started = True
+        # Use lock to prevent race condition in task initialization
+        async with self._lock:
+            if not self._cleanup_task_started:
+                self._start_cleanup_task()
+                self._cleanup_task_started = True
 
     async def get(self, key: str) -> Optional[Any]:
         """
@@ -125,7 +130,8 @@ class ModelCachingSubcontract:
             # Update access tracking
             entry.access_count += 1
             entry.last_accessed = datetime.utcnow()
-            self._access_order[key] = time.time()
+            # Move to end of OrderedDict for O(1) LRU tracking
+            self._access_order.move_to_end(key)
             self._stats.hits += 1
 
             logger.debug("cache_hit", key=key, access_count=entry.access_count)
@@ -218,6 +224,7 @@ class ModelCachingSubcontract:
                     self._stats.entry_count += 1
 
                 self._cache[key] = entry
+                # Add to end of OrderedDict for O(1) LRU tracking
                 self._access_order[key] = time.time()
                 self._stats.current_size_mb += size_mb
 
@@ -317,20 +324,17 @@ class ModelCachingSubcontract:
             self._stats.entry_count -= 1
 
     async def _evict_lru_entries(self) -> None:
-        """Evict least recently used entries to free space."""
+        """Evict least recently used entries to free space - O(1) performance."""
         if not self._access_order:
             return
-
-        # Sort by access time (oldest first)
-        sorted_keys = sorted(self._access_order.items(), key=lambda x: x[1])
 
         # Evict oldest entries until we're under the size limit
         target_size = self.config.max_size_mb * 0.8  # Leave 20% buffer
 
-        for key, _ in sorted_keys:
-            if self._stats.current_size_mb <= target_size:
-                break
-
+        # Pop from beginning of OrderedDict (oldest entries) for O(1) eviction
+        while self._stats.current_size_mb > target_size and self._access_order:
+            # Get the first (oldest) key from OrderedDict
+            key = next(iter(self._access_order))
             await self._remove_entry(key)
             self._stats.evictions += 1
             logger.debug("cache_evicted_lru", key=key)

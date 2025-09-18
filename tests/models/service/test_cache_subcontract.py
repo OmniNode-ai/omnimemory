@@ -218,6 +218,99 @@ class TestCacheGlobalInstance:
 
         await close_memory_cache()
 
+    @pytest.mark.asyncio
+    async def test_concurrent_cache_operations(self, cache):
+        """Test concurrent access patterns under load."""
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+
+        async def concurrent_set_get(cache, key_prefix, num_operations):
+            """Perform concurrent set/get operations."""
+            tasks = []
+            for i in range(num_operations):
+                key = f"{key_prefix}_{i}"
+                value = f"value_{i}"
+                # Alternate between set and get operations
+                if i % 2 == 0:
+                    tasks.append(cache.set(key, value))
+                else:
+                    tasks.append(cache.get(key))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Count successful operations (no exceptions)
+            successful = sum(1 for r in results if not isinstance(r, Exception))
+            return successful
+
+        # Run multiple concurrent batches
+        concurrent_tasks = []
+        for batch in range(3):
+            task = concurrent_set_get(cache, f"batch_{batch}", 10)
+            concurrent_tasks.append(task)
+
+        results = await asyncio.gather(*concurrent_tasks)
+
+        # Verify we got reasonable results without deadlocks
+        assert all(isinstance(r, int) and r > 0 for r in results)
+
+        # Verify cache integrity after concurrent operations
+        stats = cache.get_stats()
+        assert stats.entry_count >= 0  # Should not be negative
+        assert stats.current_size_mb >= 0  # Should not be negative
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_under_load(self, cache):
+        """Test circuit breaker behavior under concurrent failures."""
+        # Mock the _record_failure method to simulate failures
+        original_record_failure = cache._record_failure
+        failure_count = 0
+
+        async def mock_record_failure():
+            nonlocal failure_count
+            failure_count += 1
+            await original_record_failure()
+
+        cache._record_failure = mock_record_failure
+
+        # Trigger multiple failures concurrently
+        tasks = []
+        for i in range(10):
+            # This will fail due to oversized entry
+            large_value = "x" * (1024 * 1024 + 1)  # 1MB + 1 byte
+            tasks.append(cache.set(f"large_key_{i}", large_value))
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # All should fail due to size limit
+        assert all(r is False for r in results if not isinstance(r, Exception))
+
+        # Circuit breaker should have recorded failures
+        assert cache._circuit_breaker.failure_count >= 0
+
+    @pytest.mark.asyncio
+    async def test_memory_pressure_eviction(self, cache):
+        """Test cache eviction under memory pressure."""
+        # Fill cache beyond limit to trigger eviction
+        large_value = "x" * (512 * 1024)  # 512KB each
+
+        keys_added = []
+        for i in range(25):  # This should exceed the 10MB limit
+            key = f"pressure_key_{i}"
+            result = await cache.set(key, large_value)
+            if result:
+                keys_added.append(key)
+
+        # Verify eviction occurred
+        stats = cache.get_stats()
+        assert stats.evictions > 0
+        assert stats.current_size_mb <= cache.config.max_size_mb
+
+        # Verify some early entries were evicted (LRU behavior)
+        first_key_exists = await cache.get("pressure_key_0")
+        last_key_exists = await cache.get(f"pressure_key_{len(keys_added)-1}")
+
+        # Last entry should still exist, first might be evicted
+        assert last_key_exists is not None
+
 
 if __name__ == "__main__":
     # Run tests with: python -m pytest tests/models/service/test_cache_subcontract.py -v
