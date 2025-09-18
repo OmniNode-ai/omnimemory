@@ -5,7 +5,7 @@ Processing metrics model for operation timing and performance tracking.
 from datetime import datetime
 from typing import Any, Dict
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from ..foundation.model_typed_collections import ModelMetadata
 
@@ -15,35 +15,52 @@ class ModelProcessingMetrics(BaseModel):
 
     # Core timing metrics
     processing_time_ms: float = Field(
-        description="Total processing time in milliseconds"
+        ge=0.0,
+        description="Total processing time in milliseconds (for performance monitoring)",
     )
     start_time: datetime = Field(description="When processing started")
     end_time: datetime = Field(description="When processing completed")
 
     # Performance breakdowns
     validation_time_ms: float = Field(
-        default=0.0, description="Time spent on input validation in milliseconds"
+        default=0.0,
+        ge=0.0,
+        description="Time spent on input validation in milliseconds",
     )
     computation_time_ms: float = Field(
-        default=0.0, description="Time spent on core computation in milliseconds"
+        default=0.0,
+        ge=0.0,
+        description="Time spent on core computation in milliseconds",
     )
     storage_time_ms: float = Field(
-        default=0.0, description="Time spent on storage operations in milliseconds"
+        default=0.0,
+        ge=0.0,
+        description="Time spent on storage operations in milliseconds",
     )
     serialization_time_ms: float = Field(
-        default=0.0, description="Time spent on serialization in milliseconds"
+        default=0.0, ge=0.0, description="Time spent on serialization in milliseconds"
     )
 
     # Resource metrics
     memory_usage_bytes: int = Field(
-        default=0, description="Peak memory usage during processing in bytes"
+        default=0,
+        ge=0,
+        description="Peak memory usage during processing in bytes (for monitoring)",
     )
     cpu_usage_percent: float = Field(
-        default=0.0, description="CPU usage percentage during processing"
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="CPU usage percentage during processing (0-100%)",
     )
 
     # Quality metrics
-    retry_count: int = Field(default=0, description="Number of retries performed")
+    retry_count: int = Field(
+        default=0,
+        ge=0,
+        le=10,
+        description="Number of retries performed (0-10 max for performance)",
+    )
     cache_hit: bool = Field(
         default=False, description="Whether operation result was served from cache"
     )
@@ -120,3 +137,15 @@ class ModelProcessingMetrics(BaseModel):
             "serialization": serialization_pct,
             "other": other_pct,
         }
+
+    @field_validator("performance_metadata")
+    @classmethod
+    def validate_performance_metadata(cls, v: Any) -> Any:
+        """Validate performance metadata for security and size limits."""
+        if hasattr(v, "metadata") and isinstance(v.metadata, dict):
+            # Limit metadata size to prevent memory issues
+            if len(v.metadata) > 50:
+                # Keep only first 50 entries
+                limited_metadata = dict(list(v.metadata.items())[:50])
+                v.metadata = limited_metadata
+        return v

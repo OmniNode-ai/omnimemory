@@ -15,7 +15,7 @@ from omnibase_core.core.errors.core_errors import (
 from omnibase_core.enums.enum_log_level import (
     EnumLogLevel as CoreSeverity,  # type: ignore[import-untyped]
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Local omnimemory-specific error codes
 from ...enums.enum_error_code import EnumErrorCode
@@ -38,12 +38,14 @@ class ModelErrorDetails(BaseModel):
         description="Standardized error code (core or omnimemory-specific)",
     )
     error_type: str = Field(
-        description="Type or category of the error",
+        max_length=100,
+        description="Type or category of the error (VALIDATION, AUTHENTICATION, etc.)",
     )
 
     # Error information
     message: str = Field(
-        description="Human-readable error message",
+        max_length=500,
+        description="Human-readable error message (sanitized for security)",
     )
     detailed_message: str | None = Field(
         default=None,
@@ -55,7 +57,8 @@ class ModelErrorDetails(BaseModel):
 
     # Context information
     component: str = Field(
-        description="System component where the error occurred",
+        max_length=100,
+        description="System component where the error occurred (cache, database, etc.)",
     )
     operation: str = Field(
         description="Operation that was being performed",
@@ -96,7 +99,9 @@ class ModelErrorDetails(BaseModel):
     )
     retry_after_seconds: int | None = Field(
         default=None,
-        description="Suggested retry delay in seconds",
+        ge=0,
+        le=3600,
+        description="Suggested retry delay in seconds (0-3600 max)",
     )
     resolution_hint: str | None = Field(
         default=None,
@@ -140,7 +145,8 @@ class ModelErrorDetails(BaseModel):
     # Metrics and monitoring
     occurrence_count: int = Field(
         default=1,
-        description="Number of times this error has occurred",
+        ge=1,
+        description="Number of times this error has occurred (for monitoring)",
     )
     first_occurrence: datetime = Field(
         default_factory=datetime.utcnow,
@@ -158,5 +164,54 @@ class ModelErrorDetails(BaseModel):
     )
     metadata: dict[str, str] = Field(
         default_factory=dict,
-        description="Additional error metadata",
+        description="Additional error metadata (sanitized for security)",
     )
+
+    @field_validator("detailed_message", "inner_error", "resolution_hint")
+    @classmethod
+    def validate_sensitive_content(cls, v: str | None) -> str | None:
+        """Sanitize potentially sensitive content in error details."""
+        if v is None:
+            return v
+        # Check for sensitive patterns and sanitize
+        v_lower = v.lower()
+        sensitive_patterns = [
+            "password",
+            "secret",
+            "key",
+            "token",
+            "credential",
+            "api_key",
+            "auth",
+            "private_key",
+            "certificate",
+        ]
+        if any(pattern in v_lower for pattern in sensitive_patterns):
+            return "[REDACTED_SENSITIVE_CONTENT]"
+        # Limit length to prevent excessive logging
+        if len(v) > 2000:
+            return v[:2000] + "[TRUNCATED]"
+        return v
+
+    @field_validator("stack_trace")
+    @classmethod
+    def validate_stack_trace(cls, v: list[str]) -> list[str]:
+        """Validate and sanitize stack trace for security."""
+        if not v:
+            return v
+        # Limit stack trace depth and line length
+        sanitized = []
+        for i, line in enumerate(v[:50]):  # Max 50 stack frames
+            if len(line) > 500:
+                line = line[:500] + "[TRUNCATED]"
+            sanitized.append(line)
+        return sanitized
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[str]) -> list[str]:
+        """Validate error tags for security and performance."""
+        if not v:
+            return v
+        # Limit number and length of tags
+        return [tag[:50] for tag in v[:20] if tag.strip()]

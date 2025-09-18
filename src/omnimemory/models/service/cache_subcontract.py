@@ -8,6 +8,7 @@ Redis dependencies with centralized omnibase_core patterns.
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -15,10 +16,23 @@ from typing import Any, Dict, Optional
 import structlog
 from pydantic import BaseModel, Field
 
-from ..models.foundation.model_configuration import ModelCacheConfig
-from ..utils.error_sanitizer import SanitizationLevel, sanitize_error
+from ...utils.error_sanitizer import SanitizationLevel, sanitize_error
+from ..foundation.model_configuration import ModelCacheConfig
 
 logger = structlog.get_logger(__name__)
+
+
+class ModelCircuitBreakerState(BaseModel):
+    """Circuit breaker state tracking."""
+
+    is_open: bool = Field(default=False, description="Whether circuit is open")
+    failure_count: int = Field(default=0, description="Current failure count")
+    last_failure_time: Optional[datetime] = Field(
+        default=None, description="Time of last failure"
+    )
+    next_retry_time: Optional[datetime] = Field(
+        default=None, description="When to retry next"
+    )
 
 
 class ModelCacheEntry(BaseModel):
@@ -41,6 +55,9 @@ class ModelCacheStats(BaseModel):
     current_size_mb: float = Field(default=0.0)
     max_size_mb: float = Field(default=100.0)
     entry_count: int = Field(default=0)
+    circuit_breaker_trips: int = Field(
+        default=0, description="Number of circuit breaker trips"
+    )
 
     @property
     def hit_rate(self) -> float:
@@ -67,6 +84,7 @@ class ModelCachingSubcontract:
         self._cache: Dict[str, ModelCacheEntry] = {}
         self._access_order: Dict[str, float] = {}  # key -> timestamp for LRU
         self._stats = ModelCacheStats(max_size_mb=config.max_size_mb)
+        self._circuit_breaker = ModelCircuitBreakerState()
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task] = None
         self._start_cleanup_task()
@@ -109,7 +127,7 @@ class ModelCachingSubcontract:
         self, key: str, value: Any, ttl_seconds: Optional[int] = None
     ) -> bool:
         """
-        Store value in cache.
+        Store value in cache with security and performance validation.
 
         Args:
             key: Cache key
@@ -119,46 +137,103 @@ class ModelCachingSubcontract:
         Returns:
             True if successfully stored
         """
-        async with self._lock:
-            # Calculate expiration
-            expires_at = None
-            if ttl_seconds is not None:
-                expires_at = datetime.now() + timedelta(seconds=ttl_seconds)
-            elif self.config.ttl_seconds > 0:
-                expires_at = datetime.now() + timedelta(seconds=self.config.ttl_seconds)
+        try:
+            # Check circuit breaker
+            if self._is_circuit_breaker_open():
+                logger.warning("cache_set_rejected_circuit_breaker_open", key=key)
+                return False
 
-            # Estimate size (rough approximation)
-            size_bytes = len(str(value).encode("utf-8"))
+            async with self._lock:
+                # Security: Check entry count limit to prevent key flooding
+                if len(self._cache) >= self.config.max_entries:
+                    logger.warning(
+                        "cache_set_rejected_max_entries",
+                        key=key,
+                        current_entries=len(self._cache),
+                        max_entries=self.config.max_entries,
+                    )
+                    await self._evict_lru_entries()
+                    if len(self._cache) >= self.config.max_entries:
+                        return False
 
-            # Check size limits before adding
-            projected_size = self._stats.current_size_mb + (size_bytes / 1024 / 1024)
-            if projected_size > self.config.max_size_mb:
-                await self._evict_lru_entries()
+                # Security: Sanitize value if enabled
+                sanitized_value = (
+                    self._sanitize_value(value)
+                    if self.config.sanitize_values
+                    else value
+                )
 
-            # Create entry
-            entry = ModelCacheEntry(
-                value=value, expires_at=expires_at, size_bytes=size_bytes
-            )
+                # Performance: Better size calculation using sys.getsizeof
+                try:
+                    size_bytes = sys.getsizeof(sanitized_value)
+                except (TypeError, OSError):
+                    # Fallback to string encoding for complex objects
+                    size_bytes = len(str(sanitized_value).encode("utf-8"))
 
-            # Update existing or add new
-            if key in self._cache:
-                old_entry = self._cache[key]
-                self._stats.current_size_mb -= old_entry.size_bytes / 1024 / 1024
-            else:
-                self._stats.entry_count += 1
+                # Security: Check individual entry size limit
+                size_mb = size_bytes / 1024 / 1024
+                if size_mb > self.config.max_entry_size_mb:
+                    logger.warning(
+                        "cache_set_rejected_entry_too_large",
+                        key=key,
+                        size_mb=round(size_mb, 2),
+                        max_size_mb=self.config.max_entry_size_mb,
+                    )
+                    return False
 
-            self._cache[key] = entry
-            self._access_order[key] = time.time()
-            self._stats.current_size_mb += size_bytes / 1024 / 1024
+                # Calculate expiration
+                expires_at = None
+                if ttl_seconds is not None:
+                    expires_at = datetime.now() + timedelta(seconds=ttl_seconds)
+                elif self.config.ttl_seconds > 0:
+                    expires_at = datetime.now() + timedelta(
+                        seconds=self.config.ttl_seconds
+                    )
 
-            logger.debug(
-                "cache_set",
+                # Check total size limits before adding
+                projected_size = self._stats.current_size_mb + size_mb
+                if projected_size > self.config.max_size_mb:
+                    await self._evict_lru_entries()
+
+                # Create entry with sanitized value
+                entry = ModelCacheEntry(
+                    value=sanitized_value, expires_at=expires_at, size_bytes=size_bytes
+                )
+
+                # Update existing or add new
+                if key in self._cache:
+                    old_entry = self._cache[key]
+                    self._stats.current_size_mb -= old_entry.size_bytes / 1024 / 1024
+                else:
+                    self._stats.entry_count += 1
+
+                self._cache[key] = entry
+                self._access_order[key] = time.time()
+                self._stats.current_size_mb += size_mb
+
+                # Reset circuit breaker on success
+                await self._record_success()
+
+                logger.debug(
+                    "cache_set_success",
+                    key=key,
+                    size_bytes=size_bytes,
+                    expires_at=expires_at,
+                    total_entries=self._stats.entry_count,
+                    sanitized=self.config.sanitize_values,
+                )
+                return True
+
+        except Exception as e:
+            await self._record_failure()
+            logger.error(
+                "cache_set_error",
                 key=key,
-                size_bytes=size_bytes,
-                expires_at=expires_at,
-                total_entries=self._stats.entry_count,
+                error=sanitize_error(
+                    e, context="cache_set", level=SanitizationLevel.STANDARD
+                ),
             )
-            return True
+            return False
 
     async def delete(self, key: str) -> bool:
         """
@@ -286,6 +361,85 @@ class ModelCachingSubcontract:
                     )
 
         self._cleanup_task = asyncio.create_task(cleanup_loop())
+
+    def _is_circuit_breaker_open(self) -> bool:
+        """Check if circuit breaker is open."""
+        if not self.config.circuit_breaker_enabled:
+            return False
+
+        if not self._circuit_breaker.is_open:
+            return False
+
+        # Check if we should retry
+        if (
+            self._circuit_breaker.next_retry_time
+            and datetime.now() > self._circuit_breaker.next_retry_time
+        ):
+            self._circuit_breaker.is_open = False
+            logger.info("circuit_breaker_half_open")
+            return False
+
+        return True
+
+    async def _record_success(self) -> None:
+        """Record successful operation for circuit breaker."""
+        if self.config.circuit_breaker_enabled:
+            self._circuit_breaker.failure_count = 0
+            if self._circuit_breaker.is_open:
+                self._circuit_breaker.is_open = False
+                logger.info("circuit_breaker_closed_after_success")
+
+    async def _record_failure(self) -> None:
+        """Record failed operation for circuit breaker."""
+        if not self.config.circuit_breaker_enabled:
+            return
+
+        self._circuit_breaker.failure_count += 1
+        self._circuit_breaker.last_failure_time = datetime.now()
+
+        if (
+            self._circuit_breaker.failure_count
+            >= self.config.circuit_breaker_failure_threshold
+        ):
+            self._circuit_breaker.is_open = True
+            # Retry after exponential backoff (max 5 minutes)
+            backoff_seconds = min(300, 2**self._circuit_breaker.failure_count)
+            self._circuit_breaker.next_retry_time = datetime.now() + timedelta(
+                seconds=backoff_seconds
+            )
+            self._stats.circuit_breaker_trips += 1
+            logger.warning(
+                "circuit_breaker_opened",
+                failure_count=self._circuit_breaker.failure_count,
+                retry_in_seconds=backoff_seconds,
+            )
+
+    def _sanitize_value(self, value: Any) -> Any:
+        """Sanitize cache value for security."""
+        if value is None:
+            return value
+
+        # Convert sensitive types to safe representations
+        if isinstance(value, dict):
+            sanitized = {}
+            for k, v in value.items():
+                # Skip potentially sensitive keys
+                key_lower = str(k).lower()
+                if any(
+                    sensitive in key_lower
+                    for sensitive in ["password", "secret", "key", "token", "auth"]
+                ):
+                    sanitized[k] = "[REDACTED]"
+                else:
+                    sanitized[k] = self._sanitize_value(v)
+            return sanitized
+        elif isinstance(value, (list, tuple)):
+            return [self._sanitize_value(item) for item in value]
+        elif isinstance(value, str) and len(value) > 1000:
+            # Truncate very long strings to prevent memory issues
+            return value[:1000] + "[TRUNCATED]"
+        else:
+            return value
 
     async def close(self) -> None:
         """Cleanup resources."""
