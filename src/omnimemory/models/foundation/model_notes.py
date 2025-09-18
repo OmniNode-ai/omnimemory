@@ -182,7 +182,7 @@ class ModelNotesCollection(BaseModel):
 
     def get_note_count_by_severity(self) -> dict[EnumSeverity, int]:
         """Get count of notes by severity level."""
-        counts = {}
+        counts: dict[EnumSeverity, int] = {}
         for note in self.get_active_notes():
             counts[note.severity] = counts.get(note.severity, 0) + 1
         return counts

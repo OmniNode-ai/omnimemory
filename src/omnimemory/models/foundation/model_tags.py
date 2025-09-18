@@ -39,7 +39,7 @@ class ModelTag(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_tag_name(cls, v):
+    def validate_tag_name(cls, v: str) -> str:
         """Validate tag name format."""
         # Remove whitespace and convert to lowercase
         v = v.strip().lower()
@@ -74,7 +74,7 @@ class ModelTagCollection(BaseModel):
 
     @field_validator("tags")
     @classmethod
-    def validate_unique_tags(cls, v):
+    def validate_unique_tags(cls, v: list["ModelTag"]) -> list["ModelTag"]:
         """Ensure tag names are unique."""
         tag_names = [tag.name for tag in v]
         if len(tag_names) != len(set(tag_names)):

@@ -4,7 +4,9 @@ Priority model following ONEX foundation patterns.
 
 from datetime import datetime
 
-from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
+from omnibase_core.enums.enum_priority_level import (
+    EnumPriorityLevel,  # type: ignore[import-untyped]
+)
 from pydantic import BaseModel, Field
 
 
@@ -61,7 +63,7 @@ class ModelPriority(BaseModel):
         else:
             base_priority = self.level.get_numeric_value()
 
-        return base_priority * self.boost_factor
+        return float(base_priority) * self.boost_factor
 
     def is_high_priority(self) -> bool:
         """Check if this is high priority."""

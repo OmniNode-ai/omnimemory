@@ -2,8 +2,9 @@
 Semantic version model following ONEX standards.
 """
 
+from __future__ import annotations
+
 import re
-from typing import Self
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -61,7 +62,7 @@ class ModelSemVer(BaseModel):
             version += f"+{self.build_metadata}"
         return version
 
-    def __lt__(self, other: Self) -> bool:
+    def __lt__(self, other: ModelSemVer) -> bool:
         """Compare versions for less than."""
         if not isinstance(other, ModelSemVer):
             return NotImplemented
@@ -94,20 +95,20 @@ class ModelSemVer(BaseModel):
             and self.pre_release == other.pre_release
         )
 
-    def __le__(self, other: Self) -> bool:
+    def __le__(self, other: ModelSemVer) -> bool:
         """Compare versions for less than or equal."""
         return self == other or self < other
 
-    def __gt__(self, other: Self) -> bool:
+    def __gt__(self, other: ModelSemVer) -> bool:
         """Compare versions for greater than."""
         return not self <= other
 
-    def __ge__(self, other: Self) -> bool:
+    def __ge__(self, other: ModelSemVer) -> bool:
         """Compare versions for greater than or equal."""
         return not self < other
 
     @classmethod
-    def from_string(cls, version_string: str) -> Self:
+    def from_string(cls, version_string: str) -> ModelSemVer:
         """Create ModelSemVer from string representation."""
         # Regular expression to match semantic version
         pattern = (
@@ -130,7 +131,7 @@ class ModelSemVer(BaseModel):
             build_metadata=match.group("buildmetadata"),
         )
 
-    def increment_major(self) -> Self:
+    def increment_major(self) -> ModelSemVer:
         """Create new version with incremented major version."""
         return ModelSemVer(
             major=self.major + 1,
@@ -138,7 +139,7 @@ class ModelSemVer(BaseModel):
             patch=0,
         )
 
-    def increment_minor(self) -> Self:
+    def increment_minor(self) -> ModelSemVer:
         """Create new version with incremented minor version."""
         return ModelSemVer(
             major=self.major,
@@ -146,7 +147,7 @@ class ModelSemVer(BaseModel):
             patch=0,
         )
 
-    def increment_patch(self) -> Self:
+    def increment_patch(self) -> ModelSemVer:
         """Create new version with incremented patch version."""
         return ModelSemVer(
             major=self.major,
@@ -158,6 +159,6 @@ class ModelSemVer(BaseModel):
         """Check if this is a stable release version."""
         return self.pre_release is None
 
-    def is_compatible_with(self, other: Self) -> bool:
+    def is_compatible_with(self, other: ModelSemVer) -> bool:
         """Check if this version is compatible with another (same major version)."""
         return self.major == other.major and self >= other

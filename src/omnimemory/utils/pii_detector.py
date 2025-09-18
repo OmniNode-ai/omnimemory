@@ -347,7 +347,7 @@ class PIIDetector:
         # Sort by start position and confidence
         matches.sort(key=lambda x: (x.start_index, -x.confidence))
 
-        deduplicated = []
+        deduplicated: List[PIIMatch] = []
         for match in matches:
             # Check if this match overlaps with any existing match
             overlap = False

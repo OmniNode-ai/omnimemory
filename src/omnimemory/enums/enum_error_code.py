@@ -6,30 +6,7 @@ All general error codes are imported from omnibase_core.core.errors.core_errors
 when available.
 """
 
-try:
-    from omnibase_core.core.errors.core_errors import OnexErrorCode
-except ImportError:
-    # Fallback for development environments without omnibase_core
-    from enum import Enum
-
-    class OnexErrorCode(str, Enum):
-        """Base class for ONEX error codes (fallback implementation)."""
-
-        def get_component(self) -> str:
-            """Get the component identifier for this error code."""
-            raise NotImplementedError("Subclasses must implement get_component()")
-
-        def get_number(self) -> int:
-            """Get the numeric identifier for this error code."""
-            raise NotImplementedError("Subclasses must implement get_number()")
-
-        def get_description(self) -> str:
-            """Get a human-readable description for this error code."""
-            raise NotImplementedError("Subclasses must implement get_description()")
-
-        def get_exit_code(self) -> int:
-            """Get the appropriate CLI exit code for this error."""
-            return 1  # Default to error exit code
+from omnibase_core.core.errors.core_errors import OnexErrorCode
 
 
 class EnumErrorCode(OnexErrorCode):
