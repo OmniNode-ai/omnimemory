@@ -1,5 +1,5 @@
 """
-Service health model following ONEX standards.
+Memory service health model following ONEX standards.
 """
 
 from datetime import datetime
@@ -9,32 +9,32 @@ from pydantic import BaseModel, Field
 from ...enums import EnumHealthStatus
 
 
-class ModelServiceHealth(BaseModel):
-    """Service health information following ONEX standards."""
+class ModelMemoryServiceHealth(BaseModel):
+    """Memory service health information following ONEX standards."""
 
     # Service identification
     service_id: str = Field(
-        description="Unique identifier for the service",
+        description="Unique identifier for the memory service",
     )
     service_name: str = Field(
-        description="Human-readable name for the service",
+        description="Human-readable name for the memory service",
     )
 
     # Health status
     status: EnumHealthStatus = Field(
-        description="Current status of the service",
+        description="Current status of the memory service",
     )
     is_healthy: bool = Field(
-        description="Whether the service is considered healthy",
+        description="Whether the memory service is considered healthy",
     )
 
     # Uptime information
     uptime_seconds: int = Field(
-        description="Service uptime in seconds",
+        description="Memory service uptime in seconds",
     )
     last_restart_at: datetime | None = Field(
         default=None,
-        description="When the service was last restarted",
+        description="When the memory service was last restarted",
     )
 
     # Performance metrics
@@ -78,13 +78,28 @@ class ModelServiceHealth(BaseModel):
         description="Connection pool utilization percentage",
     )
 
+    # Memory-specific metrics
+    memory_cache_hit_rate: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Memory cache hit rate percentage",
+    )
+    memory_operations_per_second: float = Field(
+        description="Memory operations processed per second",
+    )
+    memory_storage_utilization: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Memory storage utilization percentage",
+    )
+
     # Dependency health
     dependencies_healthy: bool = Field(
-        description="Whether all dependencies are healthy",
+        description="Whether all memory service dependencies are healthy",
     )
     unhealthy_dependencies: list[str] = Field(
         default_factory=list,
-        description="List of unhealthy dependencies",
+        description="List of unhealthy memory service dependencies",
     )
 
     # Error information
@@ -106,10 +121,10 @@ class ModelServiceHealth(BaseModel):
         description="Duration of the health check in milliseconds",
     )
 
-    # Service-specific metrics
+    # Memory service-specific metrics
     custom_metrics: dict[str, float] = Field(
         default_factory=dict,
-        description="Service-specific health metrics",
+        description="Memory service-specific health metrics",
     )
 
     # Alerts and warnings

@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from ...enums import EnumMemoryStorageType
+from ...enums import EnumMemoryItemType, EnumMemoryStorageType
 
 
 class ModelMemoryItem(BaseModel):
@@ -19,8 +19,8 @@ class ModelMemoryItem(BaseModel):
     item_id: UUID = Field(
         description="Unique identifier for the memory item",
     )
-    item_type: str = Field(
-        description="Type or category of the memory item",
+    item_type: EnumMemoryItemType = Field(
+        description="Type or category of the memory item using standardized enum values",
     )
 
     # Content

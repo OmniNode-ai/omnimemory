@@ -6,6 +6,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
+from ...enums.foundation.enum_calculation_method import EnumCalculationMethod
+from ...enums.foundation.enum_measurement_basis import EnumMeasurementBasis
+from ...enums.foundation.enum_measurement_type import EnumMeasurementType
+from ...enums.foundation.enum_quality_grade import EnumQualityGrade
+
 
 class ModelSuccessRate(BaseModel):
     """Success rate metric following ONEX standards."""
@@ -29,8 +34,8 @@ class ModelSuccessRate(BaseModel):
     calculation_window_end: datetime = Field(
         description="End time of the calculation window",
     )
-    measurement_type: str = Field(
-        description="Type of operation measured (e.g., 'memory_storage', 'retrieval')",
+    measurement_type: EnumMeasurementType = Field(
+        description="Type of operation measured",
     )
 
     @field_validator("successful_operations")
@@ -66,9 +71,8 @@ class ModelConfidenceScore(BaseModel):
         le=1.0,
         description="Confidence score as a decimal between 0.0 and 1.0",
     )
-    measurement_basis: str = Field(
-        description="Basis for confidence measurement "
-        "(e.g., 'data_quality', 'algorithm_certainty')",
+    measurement_basis: EnumMeasurementBasis = Field(
+        description="Basis for confidence measurement",
     )
     contributing_factors: list[str] = Field(
         default_factory=list,
@@ -83,9 +87,8 @@ class ModelConfidenceScore(BaseModel):
         ge=0,
         description="Sample size used for confidence calculation",
     )
-    calculation_method: str = Field(
-        description="Method used to calculate confidence "
-        "(e.g., 'statistical', 'heuristic', 'ml_based')",
+    calculation_method: EnumCalculationMethod = Field(
+        description="Method used to calculate confidence",
     )
     measured_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -129,8 +132,8 @@ class ModelQualityMetrics(BaseModel):
         le=1.0,
         description="Combined reliability index based on success rate and confidence",
     )
-    quality_grade: str = Field(
-        description="Overall quality grade (A+, A, B+, B, C+, C, D, F)",
+    quality_grade: EnumQualityGrade = Field(
+        description="Overall quality grade",
     )
     improvement_suggestions: list[str] = Field(
         default_factory=list,
@@ -139,14 +142,16 @@ class ModelQualityMetrics(BaseModel):
 
     @field_validator("quality_grade")
     @classmethod
-    def validate_quality_grade(cls, v: str) -> str:
+    def validate_quality_grade(cls, v: EnumQualityGrade) -> EnumQualityGrade:
         """Validate quality grade format."""
-        valid_grades = {"A+", "A", "B+", "B", "C+", "C", "D", "F"}
-        if v not in valid_grades:
-            raise ValueError(f"Quality grade must be one of {valid_grades}")
+        # Enum validation is handled automatically by Pydantic
         return v
 
     @property
     def is_high_quality(self) -> bool:
         """Check if metrics indicate high quality."""
-        return self.quality_grade in {"A+", "A", "B+"} and self.reliability_index >= 0.8
+        return (
+            self.quality_grade
+            in {EnumQualityGrade.A_PLUS, EnumQualityGrade.A, EnumQualityGrade.B_PLUS}
+            and self.reliability_index >= 0.8
+        )

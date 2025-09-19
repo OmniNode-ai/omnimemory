@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -50,7 +51,7 @@ class AuditEvent(BaseModel):
     """Structured audit event model."""
 
     # Event identification
-    event_id: str = Field(description="Unique event identifier")
+    event_id: UUID = Field(description="Unique event identifier")
     timestamp: datetime = Field(description="Event timestamp in UTC")
     event_type: AuditEventType = Field(description="Type of event")
     severity: AuditSeverity = Field(description="Event severity level")
@@ -61,7 +62,7 @@ class AuditEvent(BaseModel):
     user_context: Optional[str] = Field(
         default=None, description="User context if available"
     )
-    session_id: Optional[str] = Field(default=None, description="Session identifier")
+    session_id: UUID | None = Field(default=None, description="Session identifier")
 
     # Event details
     message: str = Field(description="Human-readable event description")
@@ -247,7 +248,7 @@ class AuditLogger:
 
     def log_pii_detection(
         self,
-        pii_types: list,
+        pii_types: list[str],
         content_length: int,
         sanitized: bool = False,
         details: Optional[ModelAuditEventDetails] = None,
@@ -345,11 +346,11 @@ class AuditLogger:
 
         self.log_event(event)
 
-    def _generate_event_id(self) -> str:
+    def _generate_event_id(self) -> UUID:
         """Generate unique event ID."""
         import uuid
 
-        return str(uuid.uuid4())
+        return uuid.uuid4()
 
 
 # Global audit logger instance

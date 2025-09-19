@@ -1,5 +1,5 @@
 """
-Service configuration model following ONEX standards.
+Memory service configuration model following ONEX standards.
 """
 
 from pydantic import BaseModel, Field
@@ -7,40 +7,40 @@ from pydantic import BaseModel, Field
 from ...enums import EnumHealthStatus, EnumNodeType
 
 
-class ModelServiceConfig(BaseModel):
+class ModelMemoryServiceConfig(BaseModel):
     """Configuration for ONEX memory services following standards."""
 
     # Service identification
     service_id: str = Field(
-        description="Unique identifier for the service",
+        description="Unique identifier for the memory service",
     )
     service_name: str = Field(
-        description="Human-readable name for the service",
+        description="Human-readable name for the memory service",
     )
     service_type: str = Field(
-        description="Type of service (storage, retrieval, processing, etc.)",
+        description="Type of memory service (storage, retrieval, processing, etc.)",
     )
 
     # ONEX architecture information
     node_type: EnumNodeType = Field(
-        description="ONEX node type for this service",
+        description="ONEX node type for this memory service",
     )
     node_priority: int = Field(
         default=5,
         ge=1,
         le=10,
-        description="Priority of this service within its node type",
+        description="Priority of this memory service within its node type",
     )
 
     # Service configuration
     host: str = Field(
-        description="Host address for the service",
+        description="Host address for the memory service",
     )
     port: int = Field(
-        description="Port number for the service",
+        description="Port number for the memory service",
     )
     endpoint: str = Field(
-        description="Service endpoint path",
+        description="Memory service endpoint path",
     )
 
     # Resource configuration
@@ -113,14 +113,14 @@ class ModelServiceConfig(BaseModel):
         description="Whether to enable TLS encryption",
     )
 
-    # Service dependencies
+    # Memory service dependencies
     dependencies: list[str] = Field(
         default_factory=list,
-        description="List of service dependencies",
+        description="List of memory service dependencies",
     )
     optional_dependencies: list[str] = Field(
         default_factory=list,
-        description="List of optional service dependencies",
+        description="List of optional memory service dependencies",
     )
 
     # Environment configuration
@@ -136,11 +136,11 @@ class ModelServiceConfig(BaseModel):
     # Feature flags
     feature_flags: dict[str, bool] = Field(
         default_factory=dict,
-        description="Feature flags for the service",
+        description="Feature flags for the memory service",
     )
 
-    # Additional configuration
+    # Additional memory service configuration
     custom_config: dict[str, str] = Field(
         default_factory=dict,
-        description="Custom configuration parameters",
+        description="Custom memory service configuration parameters",
     )

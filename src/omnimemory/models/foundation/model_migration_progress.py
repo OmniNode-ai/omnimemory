@@ -15,7 +15,12 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
-from ...enums import FileProcessingStatus, MigrationPriority, MigrationStatus
+from ...enums import (
+    FileProcessingStatus,
+    MigrationPriority,
+    MigrationStatus,
+    PriorityLevel,
+)
 from ...utils.error_sanitizer import ErrorSanitizer, SanitizationLevel
 from .model_configuration import ModelConfiguration
 from .model_metadata import ModelMetadata
@@ -72,7 +77,7 @@ class ModelFileInfo(BaseModel):
 class ModelBatchProcessingMetrics(BaseModel):
     """Metrics for batch processing operations."""
 
-    batch_id: str = Field(description="Unique batch identifier")
+    batch_id: UUID = Field(description="Unique batch identifier")
     batch_size: int = Field(description="Number of items in batch")
     processed_count: int = Field(default=0, description="Number of items processed")
     failed_count: int = Field(default=0, description="Number of items failed")
@@ -114,7 +119,7 @@ class ModelFileProcessingInfo(BaseModel):
     retry_count: int = Field(
         default=0, ge=0, le=10, description="Number of retry attempts (0-10)"
     )
-    batch_id: Optional[str] = Field(default=None, description="Associated batch ID")
+    batch_id: UUID | None = Field(default=None, description="Associated batch ID")
     metadata: ModelMetadata = Field(
         default_factory=ModelMetadata, description="Additional processing metadata"
     )
@@ -157,7 +162,7 @@ class ModelMigrationProgressMetrics(BaseModel):
         default=0.0, description="Processing rate in bytes per second"
     )
 
-    current_batch: Optional[str] = Field(
+    current_batch: UUID | None = Field(
         default=None, description="Current batch being processed"
     )
     batch_metrics: List[ModelBatchProcessingMetrics] = Field(
@@ -347,12 +352,12 @@ class ModelMigrationProgressTracker(BaseModel):
         return file_processing_info
 
     def start_file_processing(
-        self, file_path: Union[str, Path], batch_id: Optional[str] = None
+        self, file_path: Union[str, Path], batch_id: UUID | None = None
     ) -> bool:
         """Mark a file as started processing."""
         file_info = self._find_file(file_path)
         if file_info:
-            file_info.status = FileProcessingStatus.PROCESSING
+            file_info.status = FileProcessingStatus.IN_PROGRESS
             file_info.start_time = datetime.now()
             file_info.batch_id = batch_id
             self._update_timestamp()
@@ -400,7 +405,7 @@ class ModelMigrationProgressTracker(BaseModel):
             self._update_timestamp()
 
     def start_batch(
-        self, batch_id: str, batch_size: int
+        self, batch_id: UUID, batch_size: int
     ) -> ModelBatchProcessingMetrics:
         """Start a new batch processing."""
         batch_metrics = ModelBatchProcessingMetrics(
@@ -411,7 +416,7 @@ class ModelMigrationProgressTracker(BaseModel):
         self._update_timestamp()
         return batch_metrics
 
-    def complete_batch(self, batch_id: str) -> None:
+    def complete_batch(self, batch_id: UUID) -> None:
         """Complete batch processing."""
         batch_metrics = self._find_batch(batch_id)
         if batch_metrics:
@@ -420,13 +425,25 @@ class ModelMigrationProgressTracker(BaseModel):
                 self.metrics.current_batch = None
             self._update_timestamp()
 
+    def _convert_priority(self, migration_priority: MigrationPriority) -> PriorityLevel:
+        """Convert MigrationPriority to PriorityLevel for progress summary."""
+        mapping = {
+            MigrationPriority.LOW: PriorityLevel.LOW,
+            MigrationPriority.NORMAL: PriorityLevel.MEDIUM,
+            MigrationPriority.MEDIUM: PriorityLevel.MEDIUM,
+            MigrationPriority.HIGH: PriorityLevel.HIGH,
+            MigrationPriority.CRITICAL: PriorityLevel.CRITICAL,
+            MigrationPriority.IMMEDIATE: PriorityLevel.CRITICAL,
+        }
+        return mapping.get(migration_priority, PriorityLevel.MEDIUM)
+
     def get_progress_summary(self) -> ModelProgressSummaryResponse:
         """Get a comprehensive progress summary."""
         return ModelProgressSummaryResponse(
             migration_id=str(self.migration_id),
             name=self.name,
             status=self.status,
-            priority=self.priority,
+            priority=self._convert_priority(self.priority),
             completion_percentage=(
                 (self.metrics.processed_files / self.metrics.total_files * 100.0)
                 if self.metrics.total_files > 0
@@ -477,7 +494,7 @@ class ModelMigrationProgressTracker(BaseModel):
         search_path = Path(file_path) if isinstance(file_path, str) else file_path
         return next((f for f in self.files if f.file_info.path == search_path), None)
 
-    def _find_batch(self, batch_id: str) -> Optional[ModelBatchProcessingMetrics]:
+    def _find_batch(self, batch_id: UUID) -> Optional[ModelBatchProcessingMetrics]:
         """Find batch metrics by ID."""
         return next(
             (b for b in self.metrics.batch_metrics if b.batch_id == batch_id), None

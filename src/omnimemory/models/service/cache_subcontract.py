@@ -1,5 +1,5 @@
 """
-ModelCachingSubcontract implementation for OmniMemory ONEX architecture.
+MemoryCacheImplementation for OmniMemory ONEX architecture.
 
 This module provides standardized in-memory caching infrastructure following
 centralized omnibase_core patterns for high-performance memory management.
@@ -19,188 +19,16 @@ from pydantic import BaseModel, Field, field_validator
 
 from ...utils.error_sanitizer import SanitizationLevel, sanitize_error
 from ..foundation.model_cache_config import ModelCacheConfig
+from .model_cache_entry import ModelCacheEntry
+from .model_cache_info import ModelCacheInfo
+from .model_cache_stats import ModelCacheStats
+from .model_cache_value import ModelCacheValue
+from .model_circuit_breaker_state import ModelCircuitBreakerState
 
 logger = structlog.get_logger(__name__)
 
 
-class ModelCacheValue(BaseModel):
-    """Strongly typed cache value with validation and serialization support."""
-
-    model_config = {"extra": "forbid", "validate_assignment": True}
-
-    # Value type and content
-    value_type: Literal[
-        "string", "integer", "float", "boolean", "dict", "list"
-    ] = Field(description="Type of the cached value for runtime validation")
-    string_value: Optional[str] = Field(default=None, description="String value")
-    integer_value: Optional[int] = Field(default=None, description="Integer value")
-    float_value: Optional[float] = Field(default=None, description="Float value")
-    boolean_value: Optional[bool] = Field(default=None, description="Boolean value")
-    dict_value: Optional[Dict[str, Any]] = Field(
-        default=None, description="Dictionary value"
-    )
-    list_value: Optional[List[Any]] = Field(default=None, description="List value")
-
-    # Metadata
-    is_sanitized: bool = Field(default=False, description="Whether value was sanitized")
-    original_type: str = Field(description="Original Python type name")
-
-    @field_validator("value_type")
-    @classmethod
-    def validate_value_type(cls, v: str) -> str:
-        """Validate value type is supported."""
-        valid_types = {"string", "integer", "float", "boolean", "dict", "list"}
-        if v not in valid_types:
-            raise ValueError(f"value_type must be one of: {valid_types}")
-        return v
-
-    @classmethod
-    def from_raw_value(
-        cls, value: Union[str, int, float, bool, Dict, List]
-    ) -> "ModelCacheValue":
-        """Create ModelCacheValue from raw Python value."""
-        if isinstance(value, str):
-            return cls(
-                value_type="string",
-                string_value=value,
-                original_type=type(value).__name__,
-            )
-        elif isinstance(value, int):
-            return cls(
-                value_type="integer",
-                integer_value=value,
-                original_type=type(value).__name__,
-            )
-        elif isinstance(value, float):
-            return cls(
-                value_type="float",
-                float_value=value,
-                original_type=type(value).__name__,
-            )
-        elif isinstance(value, bool):
-            return cls(
-                value_type="boolean",
-                boolean_value=value,
-                original_type=type(value).__name__,
-            )
-        elif isinstance(value, dict):
-            return cls(
-                value_type="dict", dict_value=value, original_type=type(value).__name__
-            )
-        elif isinstance(value, list):
-            return cls(
-                value_type="list", list_value=value, original_type=type(value).__name__
-            )
-        else:
-            raise ValueError(f"Unsupported cache value type: {type(value)}")
-
-    def to_raw_value(self) -> Union[str, int, float, bool, Dict, List]:
-        """Convert back to raw Python value."""
-        if self.value_type == "string":
-            if self.string_value is None:
-                raise ValueError("string_value is None but value_type is 'string'")
-            return self.string_value
-        elif self.value_type == "integer":
-            if self.integer_value is None:
-                raise ValueError("integer_value is None but value_type is 'integer'")
-            return self.integer_value
-        elif self.value_type == "float":
-            if self.float_value is None:
-                raise ValueError("float_value is None but value_type is 'float'")
-            return self.float_value
-        elif self.value_type == "boolean":
-            if self.boolean_value is None:
-                raise ValueError("boolean_value is None but value_type is 'boolean'")
-            return self.boolean_value
-        elif self.value_type == "dict":
-            if self.dict_value is None:
-                raise ValueError("dict_value is None but value_type is 'dict'")
-            return self.dict_value
-        elif self.value_type == "list":
-            if self.list_value is None:
-                raise ValueError("list_value is None but value_type is 'list'")
-            return self.list_value
-        else:
-            raise ValueError(f"Invalid value_type: {self.value_type}")
-
-    def validate_value_consistency(self) -> None:
-        """Validate that exactly one value field is set and matches value_type."""
-        value_fields = [
-            self.string_value,
-            self.integer_value,
-            self.float_value,
-            self.boolean_value,
-            self.dict_value,
-            self.list_value,
-        ]
-        non_none_count = sum(1 for v in value_fields if v is not None)
-
-        if non_none_count != 1:
-            raise ValueError(
-                f"Exactly one value field must be set, found {non_none_count}"
-            )
-
-
-class ModelCircuitBreakerState(BaseModel):
-    """Circuit breaker state tracking."""
-
-    is_open: bool = Field(default=False, description="Whether circuit is open")
-    failure_count: int = Field(default=0, description="Current failure count")
-    last_failure_time: Optional[datetime] = Field(
-        default=None, description="Time of last failure"
-    )
-    next_retry_time: Optional[datetime] = Field(
-        default=None, description="When to retry next"
-    )
-
-
-class ModelCacheEntry(BaseModel):
-    """Individual cache entry with metadata."""
-
-    value: ModelCacheValue = Field(description="Strongly typed cached value")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    expires_at: Optional[datetime] = Field(default=None)
-    access_count: int = Field(default=0)
-    last_accessed: datetime = Field(default_factory=datetime.utcnow)
-    size_bytes: int = Field(default=0, description="Approximate size in bytes")
-
-
-class ModelCacheStats(BaseModel):
-    """Cache performance statistics."""
-
-    hits: int = Field(default=0)
-    misses: int = Field(default=0)
-    evictions: int = Field(default=0)
-    current_size_mb: float = Field(default=0.0)
-    max_size_mb: float = Field(default=100.0)
-    entry_count: int = Field(default=0)
-    circuit_breaker_trips: int = Field(
-        default=0, description="Number of circuit breaker trips"
-    )
-
-    @property
-    def hit_rate(self) -> float:
-        """Calculate cache hit rate percentage."""
-        total = self.hits + self.misses
-        return (self.hits / total * 100.0) if total > 0 else 0.0
-
-
-class ModelCacheInfo(BaseModel):
-    """Strongly typed cache information for monitoring."""
-
-    enabled: bool = Field(description="Whether caching is enabled")
-    max_size_mb: float = Field(description="Maximum cache size in megabytes")
-    current_size_mb: float = Field(description="Current cache size in megabytes")
-    entry_count: int = Field(description="Number of entries in cache")
-    hit_rate_percent: float = Field(description="Cache hit rate percentage")
-    total_hits: int = Field(description="Total cache hits")
-    total_misses: int = Field(description="Total cache misses")
-    total_evictions: int = Field(description="Total cache evictions")
-    eviction_policy: str = Field(description="Eviction policy in use")
-    default_ttl_seconds: int = Field(description="Default TTL in seconds")
-
-
-class ModelCachingSubcontract:
+class MemoryCacheImplementation:
     """
     Centralized in-memory caching infrastructure for ONEX architecture.
 
@@ -662,13 +490,13 @@ class ModelCachingSubcontract:
 
 
 # Global cache instance (lazy initialization)
-_global_cache: Optional[ModelCachingSubcontract] = None
+_global_cache: Optional[MemoryCacheImplementation] = None
 _cache_lock = asyncio.Lock()
 
 
 async def get_memory_cache(
     config: Optional[ModelCacheConfig] = None,
-) -> ModelCachingSubcontract:
+) -> MemoryCacheImplementation:
     """
     Get or create global memory cache instance.
 
@@ -676,7 +504,7 @@ async def get_memory_cache(
         config: Cache configuration (uses defaults if None)
 
     Returns:
-        ModelCachingSubcontract instance
+        MemoryCacheImplementation instance
     """
     global _global_cache
 
@@ -684,7 +512,7 @@ async def get_memory_cache(
         if _global_cache is None:
             if config is None:
                 config = ModelCacheConfig()
-            _global_cache = ModelCachingSubcontract(config)
+            _global_cache = MemoryCacheImplementation(config)
 
         return _global_cache
 

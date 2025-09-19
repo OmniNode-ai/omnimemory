@@ -15,11 +15,15 @@ all enums at the package level following ONEX standards.
 # Import all enums from domains
 from .core import EnumNodeType, EnumOperationStatus
 from .foundation import (
+    EnumCalculationMethod,
     EnumDataType,
     EnumDecayFunction,
     EnumErrorCode,
     EnumHealthStatus,
+    EnumMeasurementBasis,
+    EnumMeasurementType,
     EnumPriorityLevel,
+    EnumQualityGrade,
     EnumSeverity,
     EnumTrustLevel,
     FileProcessingStatus,
@@ -29,7 +33,16 @@ from .foundation import (
     PriorityLevel,
 )
 from .intelligence import EnumIntelligenceOperationType
-from .memory import EnumMemoryOperationType, EnumMemoryStorageType
+from .memory import (
+    EnumCompressionLevel,
+    EnumEncodingFormat,
+    EnumMemoryItemType,
+    EnumMemoryOperationType,
+    EnumMemoryStorageType,
+    EnumMigrationStrategy,
+    EnumRetentionPolicy,
+    EnumStorageBackend,
+)
 from .service import (
     EnumCircuitBreakerState,
     EnumDiscoveryMethod,
@@ -44,12 +57,16 @@ __all__ = [
     "EnumOperationStatus",
     "EnumNodeType",
     # Foundation enums
+    "EnumCalculationMethod",
     "EnumDataType",
     "EnumErrorCode",
     "OmniMemoryErrorCode",
     "EnumHealthStatus",
+    "EnumMeasurementBasis",
+    "EnumMeasurementType",
     "EnumPriorityLevel",
     "PriorityLevel",
+    "EnumQualityGrade",
     "EnumSeverity",
     "EnumTrustLevel",
     "EnumDecayFunction",
@@ -57,8 +74,14 @@ __all__ = [
     "MigrationPriority",
     "FileProcessingStatus",
     # Memory enums
+    "EnumCompressionLevel",
+    "EnumEncodingFormat",
+    "EnumMemoryItemType",
     "EnumMemoryOperationType",
     "EnumMemoryStorageType",
+    "EnumMigrationStrategy",
+    "EnumRetentionPolicy",
+    "EnumStorageBackend",
     # Intelligence enums
     "EnumIntelligenceOperationType",
     # Service enums

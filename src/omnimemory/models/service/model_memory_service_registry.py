@@ -1,5 +1,5 @@
 """
-Service registry model following ONEX standards.
+Memory service registry model following ONEX standards.
 """
 
 from datetime import datetime
@@ -9,60 +9,60 @@ from pydantic import BaseModel, Field
 from ...enums import EnumHealthStatus, EnumNodeType
 
 
-class ModelServiceRegistry(BaseModel):
-    """Service registry entry following ONEX standards."""
+class ModelMemoryServiceRegistry(BaseModel):
+    """Memory service registry entry following ONEX standards."""
 
     # Service identification
     service_id: str = Field(
-        description="Unique identifier for the service",
+        description="Unique identifier for the memory service",
     )
     service_name: str = Field(
-        description="Human-readable name for the service",
+        description="Human-readable name for the memory service",
     )
     service_version: str = Field(
-        description="Version of the service",
+        description="Version of the memory service",
     )
 
     # Service location
     host: str = Field(
-        description="Host address for the service",
+        description="Host address for the memory service",
     )
     port: int = Field(
-        description="Port number for the service",
+        description="Port number for the memory service",
     )
     endpoint: str = Field(
-        description="Service endpoint path",
+        description="Memory service endpoint path",
     )
     protocol: str = Field(
         default="https",
-        description="Protocol used by the service",
+        description="Protocol used by the memory service",
     )
 
     # ONEX architecture information
     node_type: EnumNodeType = Field(
-        description="ONEX node type for this service",
+        description="ONEX node type for this memory service",
     )
     capabilities: list[str] = Field(
         default_factory=list,
-        description="Capabilities provided by this service",
+        description="Memory capabilities provided by this service",
     )
 
     # Service status
     status: EnumHealthStatus = Field(
-        description="Current status of the service",
+        description="Current status of the memory service",
     )
     is_available: bool = Field(
-        description="Whether the service is available for requests",
+        description="Whether the memory service is available for requests",
     )
 
     # Registration information
     registered_at: datetime = Field(
         default_factory=datetime.utcnow,
-        description="When the service was registered",
+        description="When the memory service was registered",
     )
     last_heartbeat: datetime = Field(
         default_factory=datetime.utcnow,
-        description="Last heartbeat from the service",
+        description="Last heartbeat from the memory service",
     )
     heartbeat_interval_ms: int = Field(
         default=30000,
@@ -72,11 +72,11 @@ class ModelServiceRegistry(BaseModel):
     # Service metadata
     tags: list[str] = Field(
         default_factory=list,
-        description="Tags for categorizing the service",
+        description="Tags for categorizing the memory service",
     )
     metadata: dict[str, str] = Field(
         default_factory=dict,
-        description="Additional metadata for the service",
+        description="Additional metadata for the memory service",
     )
 
     # Load balancing information
@@ -86,16 +86,16 @@ class ModelServiceRegistry(BaseModel):
     )
     max_load: int = Field(
         default=100,
-        description="Maximum load this service can handle",
+        description="Maximum load this memory service can handle",
     )
     current_load: int = Field(
         default=0,
-        description="Current load on the service",
+        description="Current load on the memory service",
     )
 
     # Health information
     health_check_url: str = Field(
-        description="URL for health checks",
+        description="URL for memory service health checks",
     )
     last_health_check: datetime | None = Field(
         default=None,
@@ -120,9 +120,22 @@ class ModelServiceRegistry(BaseModel):
         description="Failure threshold for circuit breaker",
     )
 
+    # Memory service-specific information
+    memory_type_supported: list[str] = Field(
+        default_factory=list,
+        description="Types of memory operations supported (temporal, persistent, vector)",
+    )
+    storage_backends: list[str] = Field(
+        default_factory=list,
+        description="Supported storage backends (memory_cache, postgresql, pinecone)",
+    )
+    max_memory_capacity_mb: int = Field(
+        description="Maximum memory capacity in megabytes",
+    )
+
     # Discovery information
     discovery_method: str = Field(
-        description="How the service was discovered",
+        description="How the memory service was discovered",
     )
     auto_deregister: bool = Field(
         default=True,
