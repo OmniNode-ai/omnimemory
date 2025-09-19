@@ -47,13 +47,13 @@ class ModelMemorySubcontract(BaseModel):
         description="Data encoding format for storage",
     )
     compression_level: EnumCompressionLevel = Field(
-        default=EnumCompressionLevel.BALANCED,
+        default=EnumCompressionLevel.MEDIUM,
         description="Compression level for storage optimization",
     )
 
     # Retention and lifecycle
     retention_policy: EnumRetentionPolicy = Field(
-        default=EnumRetentionPolicy.TIME_BASED,
+        default=EnumRetentionPolicy.TTL,
         description="Data retention policy to apply",
     )
     ttl_seconds: int | None = Field(

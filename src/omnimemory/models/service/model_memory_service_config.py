@@ -2,16 +2,18 @@
 Memory service configuration model following ONEX standards.
 """
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
-from ...enums import EnumHealthStatus, EnumNodeType
+from ...enums import EnumEnvironment, EnumHealthStatus, EnumNodeType
 
 
 class ModelMemoryServiceConfig(BaseModel):
     """Configuration for ONEX memory services following standards."""
 
     # Service identification
-    service_id: str = Field(
+    service_id: UUID = Field(
         description="Unique identifier for the memory service",
     )
     service_name: str = Field(
@@ -124,8 +126,8 @@ class ModelMemoryServiceConfig(BaseModel):
     )
 
     # Environment configuration
-    environment: str = Field(
-        default="production",
+    environment: EnumEnvironment = Field(
+        default=EnumEnvironment.PRODUCTION,
         description="Environment (development, staging, production)",
     )
     region: str = Field(

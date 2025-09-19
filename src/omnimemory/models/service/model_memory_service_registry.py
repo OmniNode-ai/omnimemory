@@ -3,17 +3,24 @@ Memory service registry model following ONEX standards.
 """
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ...enums import EnumHealthStatus, EnumNodeType
+from ...enums import (
+    EnumCircuitBreakerState,
+    EnumDiscoveryMethod,
+    EnumHealthStatus,
+    EnumNodeType,
+    EnumProtocol,
+)
 
 
 class ModelMemoryServiceRegistry(BaseModel):
     """Memory service registry entry following ONEX standards."""
 
     # Service identification
-    service_id: str = Field(
+    service_id: UUID = Field(
         description="Unique identifier for the memory service",
     )
     service_name: str = Field(
@@ -33,8 +40,8 @@ class ModelMemoryServiceRegistry(BaseModel):
     endpoint: str = Field(
         description="Memory service endpoint path",
     )
-    protocol: str = Field(
-        default="https",
+    protocol: EnumProtocol = Field(
+        default=EnumProtocol.HTTPS,
         description="Protocol used by the memory service",
     )
 
@@ -101,14 +108,14 @@ class ModelMemoryServiceRegistry(BaseModel):
         default=None,
         description="When the last health check was performed",
     )
-    health_status: str = Field(
-        default="unknown",
+    health_status: EnumHealthStatus = Field(
+        default=EnumHealthStatus.UNKNOWN,
         description="Result of the last health check",
     )
 
     # Circuit breaker information
-    circuit_breaker_state: str = Field(
-        default="closed",
+    circuit_breaker_state: EnumCircuitBreakerState = Field(
+        default=EnumCircuitBreakerState.CLOSED,
         description="State of the circuit breaker (closed, open, half-open)",
     )
     failure_count: int = Field(
@@ -134,7 +141,7 @@ class ModelMemoryServiceRegistry(BaseModel):
     )
 
     # Discovery information
-    discovery_method: str = Field(
+    discovery_method: EnumDiscoveryMethod = Field(
         description="How the memory service was discovered",
     )
     auto_deregister: bool = Field(

@@ -4,17 +4,24 @@ Memory service subcontract model following ONEX standards.
 
 from datetime import datetime
 from typing import Any, Dict, List
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ...enums import EnumHealthStatus, EnumNodeType
+from ...enums import (
+    EnumDiscoveryMethod,
+    EnumEnvironment,
+    EnumHealthStatus,
+    EnumNodeType,
+    EnumProtocol,
+)
 
 
 class ModelServiceSubcontract(BaseModel):
     """Service subcontract configuration for ONEX memory services."""
 
     # Service identification
-    service_id: str = Field(
+    service_id: UUID = Field(
         description="Unique identifier for the memory service",
     )
     service_name: str = Field(
@@ -45,8 +52,8 @@ class ModelServiceSubcontract(BaseModel):
     endpoint: str = Field(
         description="Memory service endpoint path",
     )
-    protocol: str = Field(
-        default="https",
+    protocol: EnumProtocol = Field(
+        default=EnumProtocol.HTTPS,
         description="Protocol used by the memory service",
     )
 
@@ -131,8 +138,8 @@ class ModelServiceSubcontract(BaseModel):
     )
 
     # Environment configuration
-    environment: str = Field(
-        default="production",
+    environment: EnumEnvironment = Field(
+        default=EnumEnvironment.PRODUCTION,
         description="Environment (development, staging, production)",
     )
     region: str = Field(
@@ -195,8 +202,8 @@ class ModelServiceSubcontract(BaseModel):
     )
 
     # Discovery and lifecycle
-    discovery_method: str = Field(
-        default="manual",
+    discovery_method: EnumDiscoveryMethod = Field(
+        default=EnumDiscoveryMethod.MANUAL,
         description="How the memory service was discovered",
     )
     auto_deregister: bool = Field(

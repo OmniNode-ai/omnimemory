@@ -3,17 +3,18 @@ Memory service health model following ONEX standards.
 """
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ...enums import EnumHealthStatus
+from ...enums import EnumHealthStatus, EnumTrendDirection
 
 
 class ModelMemoryServiceHealth(BaseModel):
     """Memory service health information following ONEX standards."""
 
     # Service identification
-    service_id: str = Field(
+    service_id: UUID = Field(
         description="Unique identifier for the memory service",
     )
     service_name: str = Field(
@@ -138,11 +139,11 @@ class ModelMemoryServiceHealth(BaseModel):
     )
 
     # Trend information
-    health_trend: str = Field(
-        default="stable",
+    health_trend: EnumTrendDirection = Field(
+        default=EnumTrendDirection.STABLE,
         description="Health trend (improving, stable, degrading)",
     )
-    performance_trend: str = Field(
-        default="stable",
+    performance_trend: EnumTrendDirection = Field(
+        default=EnumTrendDirection.STABLE,
         description="Performance trend (improving, stable, degrading)",
     )

@@ -44,11 +44,13 @@ from .memory import (
     EnumStorageBackend,
 )
 from .service import (
+    EnumCacheEvictionPolicy,
     EnumCircuitBreakerState,
     EnumDiscoveryMethod,
     EnumEnvironment,
     EnumProtocol,
     EnumServiceType,
+    EnumTrendDirection,
 )
 
 # Re-export all enums at package level
@@ -90,6 +92,8 @@ __all__ = [
     "EnumDiscoveryMethod",
     "EnumEnvironment",
     "EnumServiceType",
+    "EnumTrendDirection",
+    "EnumCacheEvictionPolicy",
 ]
 
 # Compatibility aliases for commonly used enums

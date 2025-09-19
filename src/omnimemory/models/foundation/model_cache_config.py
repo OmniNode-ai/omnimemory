@@ -6,6 +6,8 @@ Provides strongly typed cache configuration for ModelCachingSubcontract.
 
 from pydantic import BaseModel, Field
 
+from ...enums import EnumCacheEvictionPolicy
+
 
 class ModelCacheConfig(BaseModel):
     """Configuration for the ModelCachingSubcontract caching system."""
@@ -29,8 +31,8 @@ class ModelCacheConfig(BaseModel):
         le=86400,
         description="Default TTL for cache entries in seconds",
     )
-    eviction_policy: str = Field(
-        default="lru",
+    eviction_policy: EnumCacheEvictionPolicy = Field(
+        default=EnumCacheEvictionPolicy.LRU,
         description="Cache eviction policy (currently only 'lru' supported)",
     )
     sanitize_values: bool = Field(

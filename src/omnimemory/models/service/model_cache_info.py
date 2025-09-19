@@ -4,6 +4,8 @@ Cache information model for OmniMemory following ONEX standards.
 
 from pydantic import BaseModel, Field
 
+from ...enums import EnumCacheEvictionPolicy
+
 
 class ModelCacheInfo(BaseModel):
     """Strongly typed cache information for monitoring."""
@@ -16,5 +18,7 @@ class ModelCacheInfo(BaseModel):
     total_hits: int = Field(description="Total cache hits")
     total_misses: int = Field(description="Total cache misses")
     total_evictions: int = Field(description="Total cache evictions")
-    eviction_policy: str = Field(description="Eviction policy in use")
+    eviction_policy: EnumCacheEvictionPolicy = Field(
+        description="Eviction policy in use"
+    )
     default_ttl_seconds: int = Field(description="Default TTL in seconds")

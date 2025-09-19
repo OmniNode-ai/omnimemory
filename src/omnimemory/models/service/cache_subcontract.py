@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import structlog
 from pydantic import BaseModel, Field, field_validator
 
+from ...enums import EnumCacheEvictionPolicy
 from ...utils.error_sanitizer import SanitizationLevel, sanitize_error
 from ..foundation.model_cache_config import ModelCacheConfig
 from .model_cache_entry import ModelCacheEntry
