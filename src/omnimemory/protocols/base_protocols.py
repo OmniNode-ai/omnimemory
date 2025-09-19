@@ -18,8 +18,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Protocol
 from uuid import UUID
 
-from omnibase_core.core.monadic.model_node_result import NodeResult
-
 from ..models.foundation import (
     ModelConfiguration,
     ModelHealthResponse,
@@ -28,7 +26,6 @@ from ..models.foundation import (
     ModelOptionalStringList,
     ModelResultCollection,
     ModelStringList,
-    ModelSystemConfiguration,
 )
 from .data_models import (  # Requests and responses
     AgentCoordinationRequest,
@@ -107,6 +104,7 @@ from .data_models import (  # Requests and responses
     WorkflowStateRequest,
     WorkflowStateResponse,
 )
+from .node_result import NodeResult
 
 # === BASE PROTOCOLS ===
 
@@ -158,14 +156,14 @@ class ProtocolMemoryBase(Protocol):
     @abstractmethod
     async def configure(
         self,
-        config: ModelSystemConfiguration,
+        config: ModelConfiguration,
         correlation_id: Optional[UUID] = None,
     ) -> NodeResult[bool]:
         """
         Configure the memory component with new settings.
 
         Args:
-            config: ModelSystemConfiguration with database, cache, performance,
+            config: ModelConfiguration with database, cache, performance,
                    and observability settings
             correlation_id: Request correlation ID
 
