@@ -1,0 +1,21 @@
+diff --git a/src/omnimemory/enums/enum_node_type.py b/src/omnimemory/enums/enum_node_type.py
+new file mode 100644
+index 0000000..8c8ecec
+--- /dev/null
++++ b/src/omnimemory/enums/enum_node_type.py
+@@ -0,0 +1,14 @@
++"""
++Node type enumeration following ONEX standards.
++"""
++
++from enum import Enum
++
++
++class EnumNodeType(str, Enum):
++    """ONEX node types for the 4-node architecture."""
++    
++    EFFECT = "effect"
++    COMPUTE = "compute"
++    REDUCER = "reducer"
++    ORCHESTRATOR = "orchestrator"
+\ No newline at end of file

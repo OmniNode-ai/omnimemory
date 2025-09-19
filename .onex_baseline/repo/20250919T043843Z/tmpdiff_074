@@ -1,0 +1,344 @@
+diff --git a/src/omnimemory/utils/audit_logger.py b/src/omnimemory/utils/audit_logger.py
+new file mode 100644
+index 0000000..d9d9b9e
+--- /dev/null
++++ b/src/omnimemory/utils/audit_logger.py
+@@ -0,0 +1,337 @@
++"""
++Audit logging utility for sensitive operations tracking.
++
++Provides comprehensive audit logging for security-sensitive operations
++including memory access, configuration changes, and PII detection events.
++"""
++
++import json
++import logging
++import time
++from datetime import datetime, timezone
++from enum import Enum
++from pathlib import Path
++from typing import Any, Dict, Optional
++
++from pydantic import BaseModel, Field
++
++from ..models.foundation.model_audit_metadata import (
++    AuditEventDetails,
++    ResourceUsageMetadata,
++    SecurityAuditDetails,
++    PerformanceAuditDetails,
++)
++
++
++class AuditEventType(str, Enum):
++    """Types of auditable events."""
++
++    MEMORY_STORE = "memory_store"
++    MEMORY_RETRIEVE = "memory_retrieve"
++    MEMORY_DELETE = "memory_delete"
++    CONFIG_CHANGE = "config_change"
++    PII_DETECTED = "pii_detected"
++    PII_SANITIZED = "pii_sanitized"
++    AUTH_SUCCESS = "auth_success"
++    AUTH_FAILURE = "auth_failure"
++    ACCESS_DENIED = "access_denied"
++    SYSTEM_ERROR = "system_error"
++    SECURITY_VIOLATION = "security_violation"
++
++
++class AuditSeverity(str, Enum):
++    """Severity levels for audit events."""
++
++    LOW = "low"
++    MEDIUM = "medium"
++    HIGH = "high"
++    CRITICAL = "critical"
++
++
++class AuditEvent(BaseModel):
++    """Structured audit event model."""
++
++    # Event identification
++    event_id: str = Field(description="Unique event identifier")
++    timestamp: datetime = Field(description="Event timestamp in UTC")
++    event_type: AuditEventType = Field(description="Type of event")
++    severity: AuditSeverity = Field(description="Event severity level")
++
++    # Context information
++    operation: str = Field(description="Operation being performed")
++    component: str = Field(description="Component generating the event")
++    user_context: Optional[str] = Field(default=None, description="User context if available")
++    session_id: Optional[str] = Field(default=None, description="Session identifier")
++
++    # Event details
++    message: str = Field(description="Human-readable event description")
++    details: AuditEventDetails = Field(default_factory=AuditEventDetails, description="Additional event details")
++
++    # Security context
++    source_ip: Optional[str] = Field(default=None, description="Source IP address")
++    user_agent: Optional[str] = Field(default=None, description="User agent string")
++
++    # Performance data
++    duration_ms: Optional[float] = Field(default=None, description="Operation duration")
++    resource_usage: Optional[ResourceUsageMetadata] = Field(default=None, description="Resource usage metrics")
++
++    # Compliance tracking
++    data_classification: Optional[str] = Field(default=None, description="Data classification level")
++    pii_detected: bool = Field(default=False, description="Whether PII was detected")
++    sanitized: bool = Field(default=False, description="Whether data was sanitized")
++
++    class Config:
++        """Pydantic config for audit events."""
++        json_encoders = {
++            datetime: lambda v: v.isoformat()
++        }
++
++
++class AuditLogger:
++    """Advanced audit logger with structured logging and security features."""
++
++    def __init__(self,
++                 log_file: Optional[Path] = None,
++                 console_output: bool = True,
++                 json_format: bool = True):
++        """
++        Initialize audit logger.
++
++        Args:
++            log_file: Path to audit log file (None for memory-only)
++            console_output: Whether to output to console
++            json_format: Whether to use JSON format for logs
++        """
++        self.log_file = log_file
++        self.console_output = console_output
++        self.json_format = json_format
++
++        # Setup Python logger
++        self.logger = logging.getLogger("omnimemory.audit")
++        self.logger.setLevel(logging.INFO)
++
++        # Clear existing handlers
++        self.logger.handlers = []
++
++        # Add file handler if specified
++        if log_file:
++            log_file.parent.mkdir(parents=True, exist_ok=True)
++            file_handler = logging.FileHandler(log_file)
++            file_handler.setLevel(logging.INFO)
++            if json_format:
++                file_handler.setFormatter(self._json_formatter())
++            else:
++                file_handler.setFormatter(self._text_formatter())
++            self.logger.addHandler(file_handler)
++
++        # Add console handler if specified
++        if console_output:
++            console_handler = logging.StreamHandler()
++            console_handler.setLevel(logging.WARNING)  # Only show warnings and above on console
++            console_handler.setFormatter(self._text_formatter())
++            self.logger.addHandler(console_handler)
++
++    def _json_formatter(self) -> logging.Formatter:
++        """Create JSON log formatter."""
++        class JSONFormatter(logging.Formatter):
++            def format(self, record):
++                log_data = {
++                    'timestamp': datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
++                    'level': record.levelname,
++                    'logger': record.name,
++                    'message': record.getMessage()
++                }
++
++                # Add audit event data if present
++                if hasattr(record, 'audit_event'):
++                    log_data['audit_event'] = record.audit_event
++
++                return json.dumps(log_data)
++
++        return JSONFormatter()
++
++    def _text_formatter(self) -> logging.Formatter:
++        """Create human-readable log formatter."""
++        return logging.Formatter(
++            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
++        )
++
++    def log_event(self, event: AuditEvent) -> None:
++        """
++        Log an audit event.
++
++        Args:
++            event: The audit event to log
++        """
++        # Create log record with event data
++        log_level = self._severity_to_log_level(event.severity)
++
++        # Create log message
++        message = f"[{event.event_type.value}] {event.message}"
++
++        # Create log record
++        record = self.logger.makeRecord(
++            name=self.logger.name,
++            level=log_level,
++            fn="",
++            lno=0,
++            msg=message,
++            args=(),
++            exc_info=None
++        )
++
++        # Attach audit event data
++        record.audit_event = event.model_dump()
++
++        # Log the event
++        self.logger.handle(record)
++
++    def _severity_to_log_level(self, severity: AuditSeverity) -> int:
++        """Convert audit severity to Python log level."""
++        mapping = {
++            AuditSeverity.LOW: logging.INFO,
++            AuditSeverity.MEDIUM: logging.WARNING,
++            AuditSeverity.HIGH: logging.ERROR,
++            AuditSeverity.CRITICAL: logging.CRITICAL
++        }
++        return mapping.get(severity, logging.INFO)
++
++    def log_memory_operation(self,
++                           operation_type: str,
++                           memory_id: str,
++                           success: bool,
++                           duration_ms: Optional[float] = None,
++                           details: Optional[AuditEventDetails] = None,
++                           user_context: Optional[str] = None) -> None:
++        """Log a memory operation event."""
++        event_type_map = {
++            'store': AuditEventType.MEMORY_STORE,
++            'retrieve': AuditEventType.MEMORY_RETRIEVE,
++            'delete': AuditEventType.MEMORY_DELETE
++        }
++
++        event = AuditEvent(
++            event_id=self._generate_event_id(),
++            timestamp=datetime.now(timezone.utc),
++            event_type=event_type_map.get(operation_type, AuditEventType.MEMORY_STORE),
++            severity=AuditSeverity.LOW if success else AuditSeverity.HIGH,
++            operation=f"memory_{operation_type}",
++            component="memory_manager",
++            message=f"Memory {operation_type} {'succeeded' if success else 'failed'} for ID: {memory_id}",
++            details=details or {},
++            duration_ms=duration_ms,
++            user_context=user_context
++        )
++
++        self.log_event(event)
++
++    def log_pii_detection(self,
++                         pii_types: list,
++                         content_length: int,
++                         sanitized: bool = False,
++                         details: Optional[AuditEventDetails] = None) -> None:
++        """Log PII detection event."""
++        severity = AuditSeverity.HIGH if pii_types else AuditSeverity.LOW
++
++        event = AuditEvent(
++            event_id=self._generate_event_id(),
++            timestamp=datetime.now(timezone.utc),
++            event_type=AuditEventType.PII_DETECTED if pii_types else AuditEventType.PII_SANITIZED,
++            severity=severity,
++            operation="pii_scan",
++            component="pii_detector",
++            message=f"PII detection scan found {len(pii_types)} PII types in {content_length} chars",
++            details={
++                "pii_types_detected": pii_types,
++                "content_length": content_length,
++                "sanitized": sanitized,
++                **(details or {})
++            },
++            pii_detected=bool(pii_types),
++            sanitized=sanitized
++        )
++
++        self.log_event(event)
++
++    def log_security_violation(self,
++                              violation_type: str,
++                              description: str,
++                              source_ip: Optional[str] = None,
++                              user_context: Optional[str] = None,
++                              details: Optional[AuditEventDetails] = None) -> None:
++        """Log security violation event."""
++        event = AuditEvent(
++            event_id=self._generate_event_id(),
++            timestamp=datetime.now(timezone.utc),
++            event_type=AuditEventType.SECURITY_VIOLATION,
++            severity=AuditSeverity.CRITICAL,
++            operation="security_check",
++            component="security_monitor",
++            message=f"Security violation: {violation_type} - {description}",
++            details=details or {},
++            source_ip=source_ip,
++            user_context=user_context
++        )
++
++        self.log_event(event)
++
++    def log_config_change(self,
++                         config_key: str,
++                         old_value: Optional[str],
++                         new_value: str,
++                         user_context: Optional[str] = None,
++                         details: Optional[AuditEventDetails] = None) -> None:
++        """Log configuration change event."""
++        event = AuditEvent(
++            event_id=self._generate_event_id(),
++            timestamp=datetime.now(timezone.utc),
++            event_type=AuditEventType.CONFIG_CHANGE,
++            severity=AuditSeverity.MEDIUM,
++            operation="config_update",
++            component="config_manager",
++            message=f"Configuration changed: {config_key}",
++            details={
++                "config_key": config_key,
++                "old_value": "***REDACTED***" if old_value and "secret" in config_key.lower() else old_value,
++                "new_value": "***REDACTED***" if "secret" in config_key.lower() else new_value,
++                **(details or {})
++            },
++            user_context=user_context
++        )
++
++        self.log_event(event)
++
++    def _generate_event_id(self) -> str:
++        """Generate unique event ID."""
++        import uuid
++        return str(uuid.uuid4())
++
++
++# Global audit logger instance
++_audit_logger: Optional[AuditLogger] = None
++
++
++def get_audit_logger() -> AuditLogger:
++    """Get the global audit logger instance."""
++    global _audit_logger
++    if _audit_logger is None:
++        # Initialize with default settings
++        log_file = Path("logs/audit.log")
++        _audit_logger = AuditLogger(
++            log_file=log_file,
++            console_output=True,
++            json_format=True
++        )
++    return _audit_logger
++
++
++def configure_audit_logger(log_file: Optional[Path] = None,
++                          console_output: bool = True,
++                          json_format: bool = True) -> None:
++    """Configure the global audit logger."""
++    global _audit_logger
++    _audit_logger = AuditLogger(
++        log_file=log_file,
++        console_output=console_output,
++        json_format=json_format
++    )
+\ No newline at end of file

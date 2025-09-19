@@ -1,0 +1,539 @@
+diff --git a/tests/test_resource_manager.py b/tests/test_resource_manager.py
+new file mode 100644
+index 0000000..5c8ea13
+--- /dev/null
++++ b/tests/test_resource_manager.py
+@@ -0,0 +1,532 @@
++"""
++Tests for resource manager utilities following ONEX standards.
++"""
++
++from __future__ import annotations
++
++import pytest
++import asyncio
++from unittest.mock import Mock, AsyncMock, patch
++from datetime import datetime, timedelta
++from uuid import uuid4
++
++from omnimemory.utils.resource_manager import (
++    ResourceManager,
++    ResourceType,
++    ResourceStatus,
++    ResourceHandle,
++    ResourcePool,
++    ResourceAllocationError,
++    ResourceTimeoutError,
++)
++
++
++class TestResourceManager:
++    """Test resource manager functionality."""
++
++    def test_resource_manager_creation(self):
++        """Test resource manager can be created with valid parameters."""
++        rm = ResourceManager()
++        assert rm is not None
++        assert isinstance(rm.resource_pools, dict)
++
++    def test_register_resource_pool(self):
++        """Test registering resource pools."""
++        rm = ResourceManager()
++
++        pool_config = {
++            "min_size": 2,
++            "max_size": 10,
++            "timeout": 30.0
++        }
++
++        rm.register_pool(ResourceType.DATABASE, pool_config)
++        assert ResourceType.DATABASE in rm.resource_pools
++
++    @pytest.mark.asyncio
++    async def test_acquire_and_release_resource(self):
++        """Test resource acquisition and release."""
++        rm = ResourceManager()
++
++        # Mock resource factory
++        mock_resource = Mock()
++        mock_factory = Mock(return_value=mock_resource)
++
++        pool_config = {
++            "min_size": 1,
++            "max_size": 5,
++            "factory": mock_factory
++        }
++
++        rm.register_pool(ResourceType.MEMORY, pool_config)
++
++        # Acquire resource
++        handle = await rm.acquire(ResourceType.MEMORY)
++
++        assert isinstance(handle, ResourceHandle)
++        assert handle.resource is mock_resource
++        assert handle.status == ResourceStatus.ACTIVE
++
++        # Release resource
++        await rm.release(handle)
++        assert handle.status == ResourceStatus.RELEASED
++
++    @pytest.mark.asyncio
++    async def test_resource_context_manager(self):
++        """Test resource manager context manager."""
++        rm = ResourceManager()
++
++        mock_resource = Mock()
++        mock_factory = Mock(return_value=mock_resource)
++
++        pool_config = {
++            "min_size": 1,
++            "max_size": 3,
++            "factory": mock_factory
++        }
++
++        rm.register_pool(ResourceType.CACHE, pool_config)
++
++        # Use context manager
++        async with rm.acquire_context(ResourceType.CACHE) as handle:
++            assert handle.resource is mock_resource
++            assert handle.status == ResourceStatus.ACTIVE
++
++        # Resource should be automatically released
++        assert handle.status == ResourceStatus.RELEASED
++
++    @pytest.mark.asyncio
++    async def test_resource_pool_max_capacity(self):
++        """Test resource pool respects maximum capacity."""
++        rm = ResourceManager()
++
++        mock_factory = Mock(side_effect=lambda: Mock())
++
++        pool_config = {
++            "min_size": 0,
++            "max_size": 2,
++            "factory": mock_factory,
++            "timeout": 0.1
++        }
++
++        rm.register_pool(ResourceType.NETWORK, pool_config)
++
++        # Acquire maximum resources
++        handle1 = await rm.acquire(ResourceType.NETWORK)
++        handle2 = await rm.acquire(ResourceType.NETWORK)
++
++        # Third acquisition should timeout
++        with pytest.raises(ResourceTimeoutError):
++            await rm.acquire(ResourceType.NETWORK)
++
++        # Release one resource
++        await rm.release(handle1)
++
++        # Now third acquisition should work
++        handle3 = await rm.acquire(ResourceType.NETWORK)
++        assert handle3.status == ResourceStatus.ACTIVE
++
++        # Cleanup
++        await rm.release(handle2)
++        await rm.release(handle3)
++
++    @pytest.mark.asyncio
++    async def test_resource_health_monitoring(self):
++        """Test resource health monitoring."""
++        rm = ResourceManager()
++
++        healthy_resource = Mock()
++        healthy_resource.is_healthy = Mock(return_value=True)
++
++        unhealthy_resource = Mock()
++        unhealthy_resource.is_healthy = Mock(return_value=False)
++
++        mock_factory = Mock(side_effect=[healthy_resource, unhealthy_resource])
++
++        pool_config = {
++            "min_size": 0,
++            "max_size": 5,
++            "factory": mock_factory,
++            "health_check_interval": 0.1
++        }
++
++        rm.register_pool(ResourceType.DATABASE, pool_config)
++
++        # Acquire healthy resource
++        handle1 = await rm.acquire(ResourceType.DATABASE)
++        assert handle1.is_healthy()
++
++        # Acquire unhealthy resource
++        handle2 = await rm.acquire(ResourceType.DATABASE)
++        assert not handle2.is_healthy()
++
++        # Health monitoring should replace unhealthy resource
++        await asyncio.sleep(0.2)
++
++        # Check pool health
++        pool_health = rm.get_pool_health(ResourceType.DATABASE)
++        assert pool_health["active_resources"] >= 0
++        assert "health_check_failures" in pool_health
++
++        await rm.release(handle1)
++        await rm.release(handle2)
++
++    def test_resource_metrics_collection(self):
++        """Test resource usage metrics collection."""
++        rm = ResourceManager()
++
++        # Get initial metrics
++        metrics = rm.get_metrics()
++        assert "total_pools" in metrics
++        assert "total_resources" in metrics
++        assert "resource_types" in metrics
++
++        # Register a pool
++        pool_config = {"min_size": 2, "max_size": 10}
++        rm.register_pool(ResourceType.MEMORY, pool_config)
++
++        # Get updated metrics
++        updated_metrics = rm.get_metrics()
++        assert updated_metrics["total_pools"] == 1
++        assert ResourceType.MEMORY.value in updated_metrics["resource_types"]
++
++    @pytest.mark.asyncio
++    async def test_resource_cleanup_on_error(self):
++        """Test resource cleanup when errors occur."""
++        rm = ResourceManager()
++
++        # Resource factory that fails sometimes
++        call_count = 0
++        def failing_factory():
++            nonlocal call_count
++            call_count += 1
++            if call_count % 3 == 0:  # Every 3rd call fails
++                raise ConnectionError("Factory failed")
++            return Mock()
++
++        pool_config = {
++            "min_size": 0,
++            "max_size": 5,
++            "factory": failing_factory
++        }
++
++        rm.register_pool(ResourceType.DATABASE, pool_config)
++
++        # Try to acquire resources - some should fail
++        successful_handles = []
++        failed_attempts = 0
++
++        for i in range(10):
++            try:
++                handle = await rm.acquire(ResourceType.DATABASE)
++                successful_handles.append(handle)
++            except ResourceAllocationError:
++                failed_attempts += 1
++
++        # Should have some successes and failures
++        assert len(successful_handles) > 0
++        assert failed_attempts > 0
++
++        # Cleanup successful handles
++        for handle in successful_handles:
++            await rm.release(handle)
++
++    @pytest.mark.asyncio
++    async def test_resource_pool_scaling(self):
++        """Test resource pool automatic scaling."""
++        rm = ResourceManager()
++
++        mock_factory = Mock(side_effect=lambda: Mock())
++
++        pool_config = {
++            "min_size": 2,
++            "max_size": 8,
++            "factory": mock_factory,
++            "scale_threshold": 0.8,  # Scale when 80% utilized
++            "scale_increment": 2
++        }
++
++        rm.register_pool(ResourceType.MEMORY, pool_config)
++
++        # Initially should have min_size resources
++        pool_stats = rm.get_pool_stats(ResourceType.MEMORY)
++        assert pool_stats["current_size"] >= 2
++
++        # Acquire many resources to trigger scaling
++        handles = []
++        for i in range(6):
++            handle = await rm.acquire(ResourceType.MEMORY)
++            handles.append(handle)
++
++        # Pool should have scaled up
++        updated_stats = rm.get_pool_stats(ResourceType.MEMORY)
++        assert updated_stats["current_size"] > pool_stats["current_size"]
++
++        # Cleanup
++        for handle in handles:
++            await rm.release(handle)
++
++    @pytest.mark.asyncio
++    async def test_resource_expiration(self):
++        """Test resource expiration and renewal."""
++        rm = ResourceManager()
++
++        mock_factory = Mock(side_effect=lambda: Mock())
++
++        pool_config = {
++            "min_size": 1,
++            "max_size": 3,
++            "factory": mock_factory,
++            "resource_ttl": 0.1  # Very short TTL for testing
++        }
++
++        rm.register_pool(ResourceType.CACHE, pool_config)
++
++        # Acquire resource
++        handle = await rm.acquire(ResourceType.CACHE)
++        original_resource = handle.resource
++
++        # Wait for expiration
++        await asyncio.sleep(0.2)
++
++        # Force expiration check
++        await rm._check_resource_expiration(ResourceType.CACHE)
++
++        # Acquire another resource - should be new
++        new_handle = await rm.acquire(ResourceType.CACHE)
++        assert new_handle.resource is not original_resource
++
++        await rm.release(handle)
++        await rm.release(new_handle)
++
++
++class TestResourcePool:
++    """Test resource pool functionality."""
++
++    def test_resource_pool_creation(self):
++        """Test resource pool can be created with valid configuration."""
++        config = {
++            "min_size": 2,
++            "max_size": 10,
++            "factory": lambda: Mock()
++        }
++
++        pool = ResourcePool(ResourceType.DATABASE, config)
++        assert pool.resource_type == ResourceType.DATABASE
++        assert pool.min_size == 2
++        assert pool.max_size == 10
++
++    @pytest.mark.asyncio
++    async def test_resource_pool_initialization(self):
++        """Test resource pool initializes with minimum resources."""
++        config = {
++            "min_size": 3,
++            "max_size": 10,
++            "factory": lambda: Mock()
++        }
++
++        pool = ResourcePool(ResourceType.MEMORY, config)
++        await pool.initialize()
++
++        assert len(pool.available_resources) == 3
++        assert pool.current_size == 3
++
++    @pytest.mark.asyncio
++    async def test_resource_pool_acquire_release_cycle(self):
++        """Test complete acquire/release cycle."""
++        config = {
++            "min_size": 2,
++            "max_size": 5,
++            "factory": lambda: Mock()
++        }
++
++        pool = ResourcePool(ResourceType.CACHE, config)
++        await pool.initialize()
++
++        initial_available = len(pool.available_resources)
++
++        # Acquire resource
++        handle = await pool.acquire()
++        assert len(pool.available_resources) == initial_available - 1
++        assert handle.resource_id in pool.active_resources
++
++        # Release resource
++        await pool.release(handle)
++        assert len(pool.available_resources) == initial_available
++        assert handle.resource_id not in pool.active_resources
++
++    @pytest.mark.asyncio
++    async def test_resource_pool_concurrent_access(self):
++        """Test resource pool handles concurrent access safely."""
++        config = {
++            "min_size": 1,
++            "max_size": 3,
++            "factory": lambda: Mock()
++        }
++
++        pool = ResourcePool(ResourceType.NETWORK, config)
++        await pool.initialize()
++
++        # Create multiple concurrent acquisition tasks
++        async def acquire_and_release():
++            handle = await pool.acquire()
++            await asyncio.sleep(0.1)  # Hold resource briefly
++            await pool.release(handle)
++            return handle.resource_id
++
++        tasks = [acquire_and_release() for _ in range(5)]
++        resource_ids = await asyncio.gather(*tasks)
++
++        # All tasks should complete successfully
++        assert len(resource_ids) == 5
++        assert all(rid is not None for rid in resource_ids)
++
++        # Pool should be back to initial state
++        assert len(pool.active_resources) == 0
++        assert len(pool.available_resources) >= pool.min_size
++
++
++class TestResourceHandle:
++    """Test resource handle functionality."""
++
++    def test_resource_handle_creation(self):
++        """Test resource handle creation with valid parameters."""
++        resource = Mock()
++        handle = ResourceHandle(
++            resource_id=uuid4(),
++            resource=resource,
++            resource_type=ResourceType.DATABASE
++        )
++
++        assert handle.resource is resource
++        assert handle.resource_type == ResourceType.DATABASE
++        assert handle.status == ResourceStatus.ACTIVE
++        assert handle.created_at is not None
++
++    def test_resource_handle_health_check(self):
++        """Test resource handle health checking."""
++        healthy_resource = Mock()
++        healthy_resource.is_healthy = Mock(return_value=True)
++
++        unhealthy_resource = Mock()
++        unhealthy_resource.is_healthy = Mock(return_value=False)
++
++        healthy_handle = ResourceHandle(
++            resource_id=uuid4(),
++            resource=healthy_resource,
++            resource_type=ResourceType.CACHE
++        )
++
++        unhealthy_handle = ResourceHandle(
++            resource_id=uuid4(),
++            resource=unhealthy_resource,
++            resource_type=ResourceType.CACHE
++        )
++
++        assert healthy_handle.is_healthy()
++        assert not unhealthy_handle.is_healthy()
++
++    def test_resource_handle_expiration(self):
++        """Test resource handle expiration checking."""
++        resource = Mock()
++        handle = ResourceHandle(
++            resource_id=uuid4(),
++            resource=resource,
++            resource_type=ResourceType.MEMORY,
++            ttl=0.1
++        )
++
++        # Initially not expired
++        assert not handle.is_expired()
++
++        # Wait for expiration
++        import time
++        time.sleep(0.2)
++
++        # Now should be expired
++        assert handle.is_expired()
++
++    def test_resource_handle_context_data(self):
++        """Test resource handle context data management."""
++        resource = Mock()
++        handle = ResourceHandle(
++            resource_id=uuid4(),
++            resource=resource,
++            resource_type=ResourceType.DATABASE
++        )
++
++        # Add context data
++        handle.set_context("user_id", "user123")
++        handle.set_context("operation", "query")
++
++        assert handle.get_context("user_id") == "user123"
++        assert handle.get_context("operation") == "query"
++        assert handle.get_context("nonexistent") is None
++
++        # Clear context
++        handle.clear_context()
++        assert handle.get_context("user_id") is None
++
++
++@pytest.mark.integration
++class TestResourceManagerIntegration:
++    """Integration tests for resource manager."""
++
++    @pytest.mark.asyncio
++    async def test_complete_resource_lifecycle(self):
++        """Test complete resource lifecycle management."""
++        rm = ResourceManager()
++
++        # Simulate database connection factory
++        connection_count = 0
++        def create_db_connection():
++            nonlocal connection_count
++            connection_count += 1
++            conn = Mock()
++            conn.connection_id = connection_count
++            conn.is_healthy = Mock(return_value=True)
++            conn.execute = Mock(return_value="query_result")
++            return conn
++
++        # Configure database pool
++        db_config = {
++            "min_size": 2,
++            "max_size": 8,
++            "factory": create_db_connection,
++            "health_check_interval": 0.5,
++            "resource_ttl": 10.0
++        }
++
++        rm.register_pool(ResourceType.DATABASE, db_config)
++
++        # Test multiple operations
++        operations = []
++        for i in range(10):
++            async def database_operation(op_id: int):
++                async with rm.acquire_context(ResourceType.DATABASE) as handle:
++                    # Simulate database work
++                    result = handle.resource.execute(f"SELECT * FROM table WHERE id={op_id}")
++                    await asyncio.sleep(0.1)  # Simulate query time
++                    return f"Operation {op_id}: {result}"
++
++            operations.append(database_operation(i))
++
++        # Execute all operations concurrently
++        results = await asyncio.gather(*operations)
++
++        # Verify all operations completed
++        assert len(results) == 10
++        assert all("Operation" in result for result in results)
++
++        # Check resource pool health
++        health = rm.get_pool_health(ResourceType.DATABASE)
++        assert health["total_created"] >= 2  # At least min_size
++        assert health["active_resources"] == 0  # All released
++
++        # Get final metrics
++        metrics = rm.get_metrics()
++        assert metrics["total_pools"] == 1
++        assert metrics["total_operations"] >= 10
++
++        # Cleanup
++        await rm.shutdown()
+\ No newline at end of file

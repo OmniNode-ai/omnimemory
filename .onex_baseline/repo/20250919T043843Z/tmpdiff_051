@@ -1,0 +1,184 @@
+diff --git a/src/omnimemory/models/foundation/model_system_health.py b/src/omnimemory/models/foundation/model_system_health.py
+new file mode 100644
+index 0000000..e5996a4
+--- /dev/null
++++ b/src/omnimemory/models/foundation/model_system_health.py
+@@ -0,0 +1,177 @@
++"""
++System health model following ONEX standards.
++"""
++
++from datetime import datetime
++
++from pydantic import BaseModel, Field
++
++from omnibase_core.enums.node import EnumHealthStatus
++
++
++class ModelSystemHealth(BaseModel):
++    """System health information following ONEX standards."""
++
++    # System identification
++    system_id: str = Field(
++        description="Unique identifier for the system",
++    )
++    system_name: str = Field(
++        description="Human-readable name for the system",
++    )
++    system_version: str = Field(
++        description="Version of the system",
++    )
++
++    # Overall health status
++    overall_status: EnumHealthStatus = Field(
++        description="Overall system health status",
++    )
++    is_healthy: bool = Field(
++        description="Whether the system is considered healthy",
++    )
++    health_score: float = Field(
++        ge=0.0,
++        le=1.0,
++        description="Overall health score (0.0 = critical, 1.0 = perfect)",
++    )
++
++    # System uptime
++    uptime_seconds: int = Field(
++        description="System uptime in seconds",
++    )
++    last_restart_at: datetime | None = Field(
++        default=None,
++        description="When the system was last restarted",
++    )
++
++    # Resource utilization
++    cpu_usage_percent: float = Field(
++        ge=0.0,
++        le=100.0,
++        description="Current CPU usage percentage",
++    )
++    memory_usage_mb: float = Field(
++        description="Current memory usage in megabytes",
++    )
++    memory_usage_percent: float = Field(
++        ge=0.0,
++        le=100.0,
++        description="Memory usage as percentage of total",
++    )
++    disk_usage_percent: float = Field(
++        ge=0.0,
++        le=100.0,
++        description="Disk usage percentage",
++    )
++
++    # Performance metrics
++    average_response_time_ms: float = Field(
++        description="Average response time in milliseconds",
++    )
++    requests_per_second: float = Field(
++        description="Current requests per second",
++    )
++    error_rate: float = Field(
++        ge=0.0,
++        le=1.0,
++        description="Error rate as a percentage",
++    )
++
++    # Service health
++    total_services: int = Field(
++        description="Total number of services",
++    )
++    healthy_services: int = Field(
++        description="Number of healthy services",
++    )
++    degraded_services: int = Field(
++        description="Number of degraded services",
++    )
++    unhealthy_services: int = Field(
++        description="Number of unhealthy services",
++    )
++
++    # Database health
++    database_connections_active: int = Field(
++        description="Number of active database connections",
++    )
++    database_connections_max: int = Field(
++        description="Maximum database connections allowed",
++    )
++    database_response_time_ms: float = Field(
++        description="Average database response time in milliseconds",
++    )
++
++    # Cache health
++    cache_hit_rate: float = Field(
++        ge=0.0,
++        le=1.0,
++        description="Cache hit rate percentage",
++    )
++    cache_memory_usage_mb: float = Field(
++        description="Cache memory usage in megabytes",
++    )
++
++    # Network health
++    network_latency_ms: float = Field(
++        description="Average network latency in milliseconds",
++    )
++    network_throughput_mbps: float = Field(
++        description="Network throughput in megabits per second",
++    )
++
++    # Alerts and issues
++    active_alerts: list[str] = Field(
++        default_factory=list,
++        description="List of active alerts",
++    )
++    critical_issues: list[str] = Field(
++        default_factory=list,
++        description="List of critical issues",
++    )
++    warnings: list[str] = Field(
++        default_factory=list,
++        description="List of current warnings",
++    )
++
++    # Trends
++    health_trend: str = Field(
++        default="stable",
++        description="Health trend (improving, stable, degrading)",
++    )
++    performance_trend: str = Field(
++        default="stable",
++        description="Performance trend (improving, stable, degrading)",
++    )
++
++    # Check information
++    last_health_check: datetime = Field(
++        default_factory=datetime.utcnow,
++        description="When the health check was performed",
++    )
++    health_check_duration_ms: float = Field(
++        description="Duration of the health check in milliseconds",
++    )
++    next_health_check: datetime | None = Field(
++        default=None,
++        description="When the next health check is scheduled",
++    )
++
++    # System metadata
++    environment: str = Field(
++        description="Environment (development, staging, production)",
++    )
++    region: str = Field(
++        description="Deployment region",
++    )
++    cluster_id: str | None = Field(
++        default=None,
++        description="Cluster identifier if applicable",
++    )
++
++    # Custom health metrics
++    custom_metrics: dict[str, float] = Field(
++        default_factory=dict,
++        description="Custom health metrics specific to the system",
++    )
+\ No newline at end of file
