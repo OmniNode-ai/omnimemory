@@ -4,116 +4,71 @@ Memory operation parameters model following ONEX standards.
 
 from pydantic import BaseModel, Field
 
+from ...enums import (
+    EnumCompressionLevel,
+    EnumEncodingFormat,
+    EnumMemoryStorageType,
+    EnumMigrationStrategy,
+    EnumRetentionPolicy,
+    EnumStorageBackend,
+)
+
 
 class ModelMemoryParameters(BaseModel):
     """Structured parameters for memory operations following ONEX standards."""
 
-    # Memory operation parameters (string values for type safety)
-    memory_type: str | None = Field(
+    # Memory operation parameters (using proper enums and types)
+    memory_type: EnumMemoryStorageType | None = Field(
         default=None,
-        description="Type of memory operation (temporal, persistent, vector, etc.)",
+        description="Type of memory storage with strongly typed enum values",
     )
-    storage_backend: str | None = Field(
+    storage_backend: EnumStorageBackend | None = Field(
         default=None,
-        description="Storage backend to use (redis, postgresql, pinecone)",
+        description="Storage backend to use with strongly typed enum values",
     )
-    encoding_format: str | None = Field(
+    encoding_format: EnumEncodingFormat | None = Field(
         default=None,
-        description="Data encoding format (json, binary, compressed)",
+        description="Data encoding format with strongly typed enum values",
     )
-    retention_policy: str | None = Field(
+    retention_policy: EnumRetentionPolicy | None = Field(
         default=None,
-        description="Memory retention policy (permanent, ttl, lru)",
+        description="Memory retention policy with strongly typed enum values",
     )
-    compression_level: str | None = Field(
+    compression_level: EnumCompressionLevel | None = Field(
         default=None,
-        description="Compression level for storage (none, low, medium, high)",
+        description="Compression level for storage optimization with enum values",
     )
     encryption_key: str | None = Field(
         default=None,
         description="Encryption key identifier for secure storage",
     )
 
-    # Intelligence-specific parameters
+    # Intelligence-specific parameters (proper numeric types)
     embedding_model: str | None = Field(
         default=None,
         description="Embedding model to use for semantic processing",
     )
-    similarity_threshold: str | None = Field(
+    similarity_threshold: float | None = Field(
         default=None,
-        description="Similarity threshold for semantic matching (0.0-1.0 as string)",
+        ge=0.0,
+        le=1.0,
+        description="Similarity threshold for semantic matching (0.0-1.0)",
     )
-    max_results: str | None = Field(
+    max_results: int | None = Field(
         default=None,
-        description="Maximum number of results to return (as string for consistency)",
+        ge=1,
+        le=10000,
+        description="Maximum number of results to return",
     )
 
-    # Migration-specific parameters
-    batch_size: str | None = Field(
+    # Migration-specific parameters (proper types)
+    batch_size: int | None = Field(
         default=None,
-        description="Batch size for migration operations (as string)",
+        ge=1,
+        le=100000,
+        description="Batch size for migration operations",
     )
-    migration_strategy: str | None = Field(
+    migration_strategy: EnumMigrationStrategy | None = Field(
         default=None,
-        description="Migration strategy (incremental, bulk, intelligent)",
-    )
-
-
-class ModelMemoryOptions(BaseModel):
-    """Boolean options for memory operations following ONEX standards."""
-
-    # Validation options
-    validate_input: bool = Field(
-        default=True,
-        description="Whether to validate input data before processing",
-    )
-    require_confirmation: bool = Field(
-        default=False,
-        description="Whether the operation requires explicit confirmation",
-    )
-    skip_duplicates: bool = Field(
-        default=True,
-        description="Whether to skip duplicate memory entries",
-    )
-
-    # Processing options
-    async_processing: bool = Field(
-        default=True,
-        description="Whether to process the operation asynchronously",
-    )
-    enable_compression: bool = Field(
-        default=False,
-        description="Whether to enable data compression",
-    )
-    enable_encryption: bool = Field(
-        default=True,
-        description="Whether to enable data encryption",
-    )
-
-    # Intelligence options
-    enable_semantic_indexing: bool = Field(
-        default=True,
-        description="Whether to enable semantic indexing for the memory",
-    )
-    auto_generate_embeddings: bool = Field(
-        default=True,
-        description="Whether to automatically generate embeddings",
-    )
-    enable_pattern_recognition: bool = Field(
-        default=False,
-        description="Whether to enable pattern recognition processing",
-    )
-
-    # Migration options
-    preserve_timestamps: bool = Field(
-        default=True,
-        description="Whether to preserve original timestamps during migration",
-    )
-    rollback_on_failure: bool = Field(
-        default=True,
-        description="Whether to rollback changes if operation fails",
-    )
-    create_backup: bool = Field(
-        default=False,
-        description="Whether to create backup before destructive operations",
+        description="Migration strategy with strongly typed enum values",
     )

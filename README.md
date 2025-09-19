@@ -76,7 +76,7 @@ result = memory_manager.retrieve("context", similarity_threshold=0.8)
 omnimemory/
 ├── src/omnimemory/           # Core application code
 │   ├── core/                 # Core memory interfaces and abstractions
-│   ├── storage/             # Storage backends (PostgreSQL, Redis, Vector DBs)
+│   ├── storage/             # Storage backends (PostgreSQL, ModelCachingSubcontract, Vector DBs)
 │   ├── engines/             # Memory processing and retrieval engines
 │   ├── consolidation/       # Memory consolidation and optimization
 │   ├── security/           # Encryption and access control
@@ -91,7 +91,7 @@ omnimemory/
 ```
 Storage Backends:
 ├── PostgreSQL (Persistent Memory & Metadata)
-├── Redis (Ephemeral Memory & Caching)
+├── ModelCachingSubcontract (Standardized Memory Caching)
 ├── Pinecone (Vector Memory & Semantic Search)
 └── SQLAlchemy (ORM & Database Management)
 
@@ -122,7 +122,7 @@ python scripts/validate_memory_systems.py --environment production
 ### Service Ports
 - **8000**: OmniMemory API
 - **5432**: PostgreSQL (Memory Storage)
-- **6379**: Redis (Cache & Sessions)
+- **Memory Cache**: ModelCachingSubcontract (In-process caching)
 - **5000**: Memory Management Dashboard
 
 ## 🧪 Testing & Quality

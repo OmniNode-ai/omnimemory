@@ -7,7 +7,7 @@ Advanced unified memory and intelligence system designed to migrate and moderniz
 - **Python 3.12+** with Poetry dependency management
 - **FastAPI + Uvicorn** for production API layer
 - **Pydantic 2.10+** for data validation and ONEX compliance
-- **Storage**: PostgreSQL/Supabase, Redis caching, Pinecone vector DB
+- **Storage**: PostgreSQL/Supabase, ModelCachingSubcontract, Pinecone vector DB
 - **ONEX Dependencies**: omnibase_spi, omnibase_core (git-based)
 - **Async/await** architecture throughout
 

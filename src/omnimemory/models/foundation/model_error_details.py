@@ -5,27 +5,60 @@ Uses the standard ONEX error patterns from omnibase_core when available.
 """
 
 from datetime import datetime
-from uuid import UUID
-
-from pydantic import BaseModel, Field
 
 # Import standard ONEX error types from omnibase_core
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Union
+from uuid import UUID
+
+
+# Define fallback classes first
+class _FallbackErrorCode(str, Enum):
+    """Base class for ONEX error codes (fallback implementation)."""
+
+    pass
+
+
+class _FallbackSeverity(str, Enum):
+    """Base class for severity levels (fallback implementation)."""
+
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+# Import or use fallbacks
 try:
-    from omnibase_core.core.errors.core_errors import OnexErrorCode as CoreErrorCode
-    from omnibase_core.enums.enum_log_level import EnumLogLevel as CoreSeverity
-    # Local omnimemory-specific error codes
-    from ...enums.enum_error_code import OmniMemoryErrorCode
-    # Union type for error codes
-    ErrorCodeType = CoreErrorCode | OmniMemoryErrorCode | str
-    SeverityType = CoreSeverity
+    from omnibase_core.core.errors.core_errors import (
+        OnexErrorCode as CoreErrorCode,  # type: ignore[import-untyped]
+    )
+    from omnibase_core.enums.enum_log_level import (
+        EnumLogLevel as CoreSeverity,  # type: ignore[import-untyped]
+    )
 except ImportError:
-    # Fallback for development environments
-    from ...enums.enum_error_code import OmniMemoryErrorCode as ErrorCodeType
-    from ...enums.enum_severity import EnumSeverity as SeverityType
+    # Use fallback implementations when omnibase_core is not available
+    CoreErrorCode = _FallbackErrorCode  # type: ignore[misc,assignment]
+    CoreSeverity = _FallbackSeverity  # type: ignore[misc,assignment]
+
+
+from pydantic import BaseModel, Field, field_validator
+
+# Local omnimemory-specific error codes
+from ...enums import EnumErrorCode
+from ...enums.foundation.enum_component import EnumComponent
+from ...enums.foundation.enum_error_type import EnumErrorType
+from ...enums.foundation.enum_operation_context import EnumOperationContext
+
+# Type aliases for error codes and severity
+ErrorCodeType = Union[CoreErrorCode, EnumErrorCode, str]
+SeverityType = Union[CoreSeverity, str]  # Type alias instead of variable
 
 
 class ModelErrorDetails(BaseModel):
-    """Error details model following ONEX standards with omnibase_core integration."""
+    """
+    Error details model following ONEX standards with omnibase_core integration.
+    """
 
     # Error identification
     error_id: UUID = Field(
@@ -34,28 +67,29 @@ class ModelErrorDetails(BaseModel):
     error_code: ErrorCodeType = Field(
         description="Standardized error code (core or omnimemory-specific)",
     )
-    error_type: str = Field(
-        description="Type or category of the error",
+    error_type: EnumErrorType = Field(
+        description="Type or category of the error using standardized error types",
     )
 
     # Error information
     message: str = Field(
-        description="Human-readable error message",
+        max_length=500,
+        description="Human-readable error message (sanitized for security)",
     )
     detailed_message: str | None = Field(
         default=None,
         description="Detailed technical error message",
     )
     severity: SeverityType = Field(
-        description="Severity level of the error (using core severity levels)",
+        description="Severity level of the error (using core severity)",
     )
 
     # Context information
-    component: str = Field(
-        description="System component where the error occurred",
+    component: EnumComponent = Field(
+        description="System component where the error occurred using standardized component types",
     )
-    operation: str = Field(
-        description="Operation that was being performed",
+    operation: EnumOperationContext = Field(
+        description="Operation that was being performed using standardized operation contexts",
     )
     context: dict[str, str] = Field(
         default_factory=dict,
@@ -71,7 +105,7 @@ class ModelErrorDetails(BaseModel):
         default=None,
         description="ID of parent error if this is a cascading error",
     )
-    trace_id: str | None = Field(
+    trace_id: UUID | None = Field(
         default=None,
         description="Distributed tracing identifier",
     )
@@ -93,7 +127,9 @@ class ModelErrorDetails(BaseModel):
     )
     retry_after_seconds: int | None = Field(
         default=None,
-        description="Suggested retry delay in seconds",
+        ge=0,
+        le=3600,
+        description="Suggested retry delay in seconds (0-3600 max)",
     )
     resolution_hint: str | None = Field(
         default=None,
@@ -137,7 +173,8 @@ class ModelErrorDetails(BaseModel):
     # Metrics and monitoring
     occurrence_count: int = Field(
         default=1,
-        description="Number of times this error has occurred",
+        ge=1,
+        description="Number of times this error has occurred (for monitoring)",
     )
     first_occurrence: datetime = Field(
         default_factory=datetime.utcnow,
@@ -155,5 +192,54 @@ class ModelErrorDetails(BaseModel):
     )
     metadata: dict[str, str] = Field(
         default_factory=dict,
-        description="Additional error metadata",
+        description="Additional error metadata (sanitized for security)",
     )
+
+    @field_validator("detailed_message", "inner_error", "resolution_hint")
+    @classmethod
+    def validate_sensitive_content(cls, v: str | None) -> str | None:
+        """Sanitize potentially sensitive content in error details."""
+        if v is None:
+            return v
+        # Check for sensitive patterns and sanitize
+        v_lower = v.lower()
+        sensitive_patterns = [
+            "password",
+            "secret",
+            "key",
+            "token",
+            "credential",
+            "api_key",
+            "auth",
+            "private_key",
+            "certificate",
+        ]
+        if any(pattern in v_lower for pattern in sensitive_patterns):
+            return "[REDACTED_SENSITIVE_CONTENT]"
+        # Limit length to prevent excessive logging
+        if len(v) > 2000:
+            return v[:2000] + "[TRUNCATED]"
+        return v
+
+    @field_validator("stack_trace")
+    @classmethod
+    def validate_stack_trace(cls, v: list[str]) -> list[str]:
+        """Validate and sanitize stack trace for security."""
+        if not v:
+            return v
+        # Limit stack trace depth and line length
+        sanitized = []
+        for i, line in enumerate(v[:50]):  # Max 50 stack frames
+            if len(line) > 500:
+                line = line[:500] + "[TRUNCATED]"
+            sanitized.append(line)
+        return sanitized
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[str]) -> list[str]:
+        """Validate error tags for security and performance."""
+        if not v:
+            return v
+        # Limit number and length of tags
+        return [tag[:50] for tag in v[:20] if tag.strip()]

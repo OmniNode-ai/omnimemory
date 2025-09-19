@@ -4,16 +4,18 @@ Memory storage configuration model following ONEX standards.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
-from ...enums.enum_memory_storage_type import EnumMemoryStorageType
+from ...enums import EnumMemoryStorageType
 
 
 class ModelMemoryStorageConfig(BaseModel):
     """Configuration for memory storage systems following ONEX standards."""
 
     # Storage identification
-    storage_id: str = Field(
+    storage_id: UUID = Field(
         description="Unique identifier for the storage system",
     )
     storage_name: str = Field(
@@ -95,32 +97,32 @@ class ModelMemoryStorageConfig(BaseModel):
         description="Whether automatic backups are enabled",
     )
 
-    @field_validator('max_connections')
+    @field_validator("max_connections")
     @classmethod
     def validate_max_connections(cls, v: int) -> int:
         """Validate max_connections is within reasonable bounds."""
         if v < 1:
-            raise ValueError('max_connections must be at least 1')
+            raise ValueError("max_connections must be at least 1")
         if v > 1000:
-            raise ValueError('max_connections cannot exceed 1000')
+            raise ValueError("max_connections cannot exceed 1000")
         return v
 
-    @field_validator('connection_timeout_ms', 'idle_timeout_ms')
+    @field_validator("connection_timeout_ms", "idle_timeout_ms")
     @classmethod
     def validate_timeout_values(cls, v: int) -> int:
         """Validate timeout values are positive and reasonable."""
         if v < 100:
-            raise ValueError('Timeout values must be at least 100ms')
+            raise ValueError("Timeout values must be at least 100ms")
         if v > 300000:  # 5 minutes
-            raise ValueError('Timeout values cannot exceed 300,000ms (5 minutes)')
+            raise ValueError("Timeout values cannot exceed 300,000ms (5 minutes)")
         return v
 
-    @field_validator('batch_size')
+    @field_validator("batch_size")
     @classmethod
     def validate_batch_size(cls, v: int) -> int:
         """Validate batch size is within reasonable bounds."""
         if v < 1:
-            raise ValueError('batch_size must be at least 1')
+            raise ValueError("batch_size must be at least 1")
         if v > 10000:
-            raise ValueError('batch_size cannot exceed 10,000')
+            raise ValueError("batch_size cannot exceed 10,000")
         return v

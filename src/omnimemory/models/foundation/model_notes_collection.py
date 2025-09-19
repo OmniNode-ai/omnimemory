@@ -1,0 +1,139 @@
+"""
+Notes collection model following ONEX standards.
+"""
+
+from datetime import datetime
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
+
+from ...enums import EnumSeverity
+from .model_note import ModelNote
+
+
+class ModelNotesCollection(BaseModel):
+    """Collection of notes following ONEX standards."""
+
+    collection_id: UUID = Field(
+        default_factory=uuid4,
+        description="Unique identifier for this notes collection",
+    )
+    notes: list[ModelNote] = Field(
+        default_factory=list,
+        description="List of notes in this collection",
+    )
+    collection_type: str = Field(
+        description="Type of notes collection (e.g., 'memory_operation', 'debug_session', 'user_feedback')",
+    )
+    title: str | None = Field(
+        default=None,
+        description="Title or summary of the notes collection",
+    )
+    description: str | None = Field(
+        default=None,
+        description="Description of the notes collection",
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="When the collection was created",
+    )
+    updated_at: datetime | None = Field(
+        default=None,
+        description="When the collection was last updated",
+    )
+    owner: str | None = Field(
+        default=None,
+        description="Owner of the notes collection",
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Tags for categorizing the collection",
+    )
+    metadata: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional metadata for the collection",
+    )
+
+    def add_note(
+        self,
+        content: str,
+        category: str,
+        severity: EnumSeverity = EnumSeverity.INFO,
+        author: str | None = None,
+        tags: list[str] | None = None,
+        correlation_id: UUID | None = None,
+        metadata: dict[str, str] | None = None,
+        is_system_generated: bool = False,
+    ) -> ModelNote:
+        """Add a new note to the collection."""
+        note = ModelNote(
+            content=content,
+            category=category,
+            severity=severity,
+            author=author,
+            tags=tags or [],
+            correlation_id=correlation_id,
+            metadata=metadata or {},
+            is_system_generated=is_system_generated,
+        )
+        self.notes.append(note)
+        self.updated_at = datetime.utcnow()
+        return note
+
+    def get_notes_by_category(self, category: str) -> list[ModelNote]:
+        """Get all notes in a specific category."""
+        return [note for note in self.notes if note.category == category]
+
+    def get_notes_by_severity(self, severity: EnumSeverity) -> list[ModelNote]:
+        """Get all notes with a specific severity."""
+        return [note for note in self.notes if note.severity == severity]
+
+    def get_notes_by_tag(self, tag: str) -> list[ModelNote]:
+        """Get all notes with a specific tag."""
+        return [note for note in self.notes if tag in note.tags]
+
+    def get_active_notes(self) -> list[ModelNote]:
+        """Get all non-archived notes."""
+        return [note for note in self.notes if not note.is_archived]
+
+    def archive_notes_by_category(self, category: str) -> int:
+        """Archive all notes in a specific category."""
+        count = 0
+        for note in self.notes:
+            if note.category == category and not note.is_archived:
+                note.archive()
+                count += 1
+        if count > 0:
+            self.updated_at = datetime.utcnow()
+        return count
+
+    def get_note_count_by_severity(self) -> dict[EnumSeverity, int]:
+        """Get count of notes by severity level."""
+        counts: dict[EnumSeverity, int] = {}
+        for note in self.get_active_notes():
+            counts[note.severity] = counts.get(note.severity, 0) + 1
+        return counts
+
+    @property
+    def total_notes(self) -> int:
+        """Get total number of notes."""
+        return len(self.notes)
+
+    @property
+    def active_notes_count(self) -> int:
+        """Get count of active (non-archived) notes."""
+        return len(self.get_active_notes())
+
+    @property
+    def has_critical_notes(self) -> bool:
+        """Check if collection has any critical notes."""
+        return any(
+            note.severity == EnumSeverity.CRITICAL for note in self.get_active_notes()
+        )
+
+    @property
+    def has_error_notes(self) -> bool:
+        """Check if collection has any error notes."""
+        return any(
+            note.severity == EnumSeverity.ERROR for note in self.get_active_notes()
+        )

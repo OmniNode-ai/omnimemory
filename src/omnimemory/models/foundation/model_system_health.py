@@ -3,17 +3,30 @@ System health model following ONEX standards.
 """
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from omnibase_core.enums.node import EnumHealthStatus
+try:
+    from omnibase_core.enums.node import EnumHealthStatus
+except ImportError:
+    # Fallback for development environments without omnibase_core
+    from enum import Enum
+
+    class EnumHealthStatus(str, Enum):  # type: ignore[no-redef]
+        """Health status enumeration (fallback implementation)."""
+
+        HEALTHY = "healthy"
+        DEGRADED = "degraded"
+        UNHEALTHY = "unhealthy"
+        UNKNOWN = "unknown"
 
 
 class ModelSystemHealth(BaseModel):
     """System health information following ONEX standards."""
 
     # System identification
-    system_id: str = Field(
+    system_id: UUID = Field(
         description="Unique identifier for the system",
     )
     system_name: str = Field(

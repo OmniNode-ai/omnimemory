@@ -1,121 +1,51 @@
 """
-Configuration model following ONEX standards.
+Configuration model for ONEX Foundation Architecture.
+
+Provides strongly typed configuration replacing Dict[str, Any].
 """
 
-from pydantic import BaseModel, Field
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .model_configuration_option import ModelConfigurationOption
 
 
-class ModelDatabaseConfig(BaseModel):
-    """Database configuration settings."""
+class ModelConfiguration(BaseModel):
+    """Strongly typed configuration replacing Dict[str, Any]."""
 
-    host: str = Field(
-        description="Database host address"
-    )
-    port: int = Field(
-        description="Database port number"
-    )
-    database_name: str = Field(
-        description="Database name"
-    )
-    username: str = Field(
-        description="Database username"
-    )
-    max_connections: int = Field(
-        default=10,
-        description="Maximum number of connections"
-    )
-    connection_timeout_seconds: int = Field(
-        default=30,
-        description="Connection timeout in seconds"
-    )
-    enable_ssl: bool = Field(
-        default=True,
-        description="Whether to enable SSL connections"
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
+
+    options: List[ModelConfigurationOption] = Field(
+        default_factory=list, description="List of configuration options with metadata"
     )
 
+    def get_option(self, key: str) -> Optional[str]:
+        """Get configuration option value by key."""
+        for option in self.options:
+            if option.key == key:
+                return option.value
+        return None
 
-class ModelCacheConfig(BaseModel):
-    """Cache configuration settings."""
+    def set_option(
+        self,
+        key: str,
+        value: str,
+        description: Optional[str] = None,
+        is_sensitive: bool = False,
+    ) -> None:
+        """Set configuration option with metadata."""
+        # Update existing or add new
+        for option in self.options:
+            if option.key == key:
+                option.value = value
+                if description is not None:
+                    option.description = description
+                option.is_sensitive = is_sensitive
+                return
 
-    enabled: bool = Field(
-        default=True,
-        description="Whether caching is enabled"
-    )
-    max_size_mb: int = Field(
-        default=100,
-        description="Maximum cache size in megabytes"
-    )
-    ttl_seconds: int = Field(
-        default=3600,
-        description="Time to live for cached items in seconds"
-    )
-    eviction_policy: str = Field(
-        default="LRU",
-        description="Cache eviction policy (LRU, FIFO, etc.)"
-    )
-
-
-class ModelPerformanceConfig(BaseModel):
-    """Performance configuration settings."""
-
-    max_concurrent_operations: int = Field(
-        default=100,
-        description="Maximum concurrent operations"
-    )
-    operation_timeout_seconds: int = Field(
-        default=30,
-        description="Operation timeout in seconds"
-    )
-    rate_limit_per_minute: int = Field(
-        default=1000,
-        description="Rate limit per minute"
-    )
-    batch_size: int = Field(
-        default=50,
-        description="Default batch size for bulk operations"
-    )
-
-
-class ModelObservabilityConfig(BaseModel):
-    """Observability configuration settings."""
-
-    metrics_enabled: bool = Field(
-        default=True,
-        description="Whether metrics collection is enabled"
-    )
-    tracing_enabled: bool = Field(
-        default=True,
-        description="Whether distributed tracing is enabled"
-    )
-    logging_level: str = Field(
-        default="INFO",
-        description="Logging level (DEBUG, INFO, WARN, ERROR)"
-    )
-    metrics_export_interval_seconds: int = Field(
-        default=60,
-        description="Metrics export interval in seconds"
-    )
-
-
-class ModelSystemConfiguration(BaseModel):
-    """Complete system configuration following ONEX standards."""
-
-    database: ModelDatabaseConfig = Field(
-        description="Database configuration"
-    )
-    cache: ModelCacheConfig = Field(
-        description="Cache configuration"
-    )
-    performance: ModelPerformanceConfig = Field(
-        description="Performance configuration"
-    )
-    observability: ModelObservabilityConfig = Field(
-        description="Observability configuration"
-    )
-    environment: str = Field(
-        description="Deployment environment (development, staging, production)"
-    )
-    debug_mode: bool = Field(
-        default=False,
-        description="Whether debug mode is enabled"
-    )
+        self.options.append(
+            ModelConfigurationOption(
+                key=key, value=value, description=description, is_sensitive=is_sensitive
+            )
+        )
