@@ -250,3 +250,8 @@ cache/
 
 # Claude Code configuration (contains sensitive MCP permissions)
 .claude/settings.local.json
+
+# ONEX Reviewer output directories
+.onex_baseline/
+.onex_nightly/
+.onex_nightly_prev
