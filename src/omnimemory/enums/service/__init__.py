@@ -16,6 +16,7 @@ from .enum_environment import EnumEnvironment
 
 # Import service-specific enums
 from .enum_protocol import EnumProtocol
+from .enum_region import EnumRegion
 from .enum_service_type import EnumServiceType
 from .enum_trend_direction import EnumTrendDirection
 
@@ -28,6 +29,7 @@ __all__ = [
     "EnumCircuitBreakerState",
     "EnumDiscoveryMethod",
     "EnumEnvironment",
+    "EnumRegion",
     "EnumServiceType",
     "EnumTrendDirection",
     "EnumCacheEvictionPolicy",

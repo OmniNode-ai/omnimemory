@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 from ...enums import EnumMemoryOperationType
 from ..foundation.model_memory_data import ModelMemoryRequestData
 from .model_memory_context import ModelMemoryContext
-from .model_memory_parameters import ModelMemoryOptions, ModelMemoryParameters
+from .model_memory_options import ModelMemoryOptions
+from .model_memory_parameters import ModelMemoryParameters
 
 
 class ModelMemoryRequest(BaseModel):

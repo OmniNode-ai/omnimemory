@@ -3,7 +3,7 @@ Memory operations subcontract model following ONEX standards.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Dict, List, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -16,6 +16,7 @@ from ...enums.memory import (
     EnumRetentionPolicy,
     EnumStorageBackend,
 )
+from ...types import ConfigDict
 
 
 class ModelMemorySubcontract(BaseModel):
@@ -199,7 +200,7 @@ class ModelMemorySubcontract(BaseModel):
     )
 
     # Context and metadata
-    operation_context: Dict[str, Any] = Field(
+    operation_context: ConfigDict = Field(
         default_factory=dict,
         description="Additional context for the memory operation",
     )

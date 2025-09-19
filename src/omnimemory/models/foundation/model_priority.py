@@ -58,19 +58,19 @@ class ModelPriority(BaseModel):
         """Get effective priority value considering boost and expiration."""
         if self.is_expired():
             # If expired, fallback to normal priority
-            base_priority = EnumPriorityLevel.NORMAL.get_numeric_value()
+            base_priority = float(EnumPriorityLevel.MEDIUM)  # Use MEDIUM as "normal"
         else:
-            base_priority = self.level.get_numeric_value()
+            base_priority = float(self.level)
 
         return base_priority * self.boost_factor
 
     def is_high_priority(self) -> bool:
         """Check if this is high priority."""
-        return self.level.is_high_priority() and not self.is_expired()
+        return self.level >= EnumPriorityLevel.HIGH and not self.is_expired()
 
     def requires_immediate_action(self) -> bool:
         """Check if this requires immediate action."""
-        return self.level.requires_immediate_action() and not self.is_expired()
+        return self.level >= EnumPriorityLevel.CRITICAL and not self.is_expired()
 
     def add_tag(self, tag: str) -> None:
         """Add a tag to this priority."""
@@ -84,7 +84,7 @@ class ModelPriority(BaseModel):
     @classmethod
     def create_normal(cls, reason: str | None = None) -> "ModelPriority":
         """Create normal priority."""
-        return cls(level=EnumPriorityLevel.NORMAL, reason=reason, category="standard")
+        return cls(level=EnumPriorityLevel.MEDIUM, reason=reason, category="standard")
 
     @classmethod
     def create_high(cls, reason: str, created_by: str | None = None) -> "ModelPriority":

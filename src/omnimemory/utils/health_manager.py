@@ -15,7 +15,7 @@ import os
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Literal, Optional, cast
 
 import psutil  # type: ignore[import-untyped]
 import structlog
@@ -185,7 +185,12 @@ class HealthCheckResult(BaseModel):
         """Convert to ModelDependencyStatus for API response."""
         return ModelDependencyStatus(
             name=self.config.name,
-            status=self.status.value if self.status.value != "unknown" else "unhealthy",
+            status=cast(
+                Literal["healthy", "degraded", "unhealthy"],
+                "unhealthy"
+                if self.status.value not in ["healthy", "degraded", "unhealthy"]
+                else self.status.value,
+            ),
             latency_ms=self.latency_ms,
             last_check=self.timestamp,
             error_message=self.error_message,
@@ -278,11 +283,16 @@ class HealthCheckManager:
                     # Use circuit breaker if configured
                     if name in self._circuit_breakers:
                         circuit_breaker = self._circuit_breakers[name]
-                        result = await circuit_breaker.call(check_func)
+                        result = cast(
+                            HealthCheckResult, await circuit_breaker.call(check_func)
+                        )
                     else:
                         # Apply timeout directly
-                        result = await asyncio.wait_for(
-                            check_func(), timeout=config.timeout
+                        result = cast(
+                            HealthCheckResult,
+                            await asyncio.wait_for(
+                                check_func(), timeout=config.timeout
+                            ),
                         )
 
                     # Ensure result has correct latency
@@ -394,7 +404,7 @@ class HealthCheckManager:
                             error_type=type(result).__name__,
                         )
                     else:
-                        health_results.append(result)
+                        health_results.append(cast(HealthCheckResult, result))
 
                 logger.info(
                     "health_check_all_completed",
@@ -540,10 +550,11 @@ class HealthCheckManager:
             ]
 
             response = ModelHealthResponse(
-                status=(
-                    overall_status.value
-                    if overall_status.value != "unknown"
-                    else "unhealthy"
+                status=cast(
+                    Literal["healthy", "degraded", "unhealthy"],
+                    "unhealthy"
+                    if overall_status.value not in ["healthy", "degraded", "unhealthy"]
+                    else overall_status.value,
                 ),
                 latency_ms=total_latency_ms,
                 timestamp=datetime.now(),

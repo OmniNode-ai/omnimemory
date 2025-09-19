@@ -30,7 +30,10 @@ __email__ = "contact@omninode.ai"
 from .models import core, foundation, intelligence, memory, service
 
 # Import infrastructure components
-from .models.service.cache_subcontract import ModelCachingSubcontract, get_memory_cache
+from .models.service.cache_subcontract import (
+    MemoryCacheImplementation,
+    get_memory_cache,
+)
 
 # Import protocol definitions
 from .protocols import (  # Base protocols; Effect node protocols (memory storage, retrieval, persistence); Compute node protocols (intelligence processing, semantic analysis); Reducer node protocols (consolidation, aggregation, optimization); Orchestrator node protocols (workflow, agent, memory coordination); Data models; Enums; Error handling

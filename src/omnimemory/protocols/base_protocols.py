@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import datetime
-from typing import Optional, Protocol
+from typing import Dict, List, Optional, Protocol
 from uuid import UUID
 
 from omnibase_core.core.monadic.model_node_result import NodeResult

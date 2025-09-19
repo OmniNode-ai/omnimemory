@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ...enums import EnumEnvironment, EnumHealthStatus, EnumNodeType
+from ...enums.service import EnumRegion, EnumServiceType
 
 
 class ModelMemoryServiceConfig(BaseModel):
@@ -19,8 +20,8 @@ class ModelMemoryServiceConfig(BaseModel):
     service_name: str = Field(
         description="Human-readable name for the memory service",
     )
-    service_type: str = Field(
-        description="Type of memory service (storage, retrieval, processing, etc.)",
+    service_type: EnumServiceType = Field(
+        description="Type of memory service using ONEX 4-node architecture",
     )
 
     # ONEX architecture information
@@ -130,9 +131,9 @@ class ModelMemoryServiceConfig(BaseModel):
         default=EnumEnvironment.PRODUCTION,
         description="Environment (development, staging, production)",
     )
-    region: str = Field(
-        default="us-west-2",
-        description="Deployment region",
+    region: EnumRegion = Field(
+        default=EnumRegion.US_WEST_2,
+        description="Deployment region using ONEX enum types",
     )
 
     # Feature flags

@@ -14,6 +14,7 @@ from ...enums import (
     EnumNodeType,
     EnumProtocol,
 )
+from ...enums.memory import EnumMemoryStorageType, EnumStorageBackend
 
 
 class ModelMemoryServiceRegistry(BaseModel):
@@ -128,13 +129,13 @@ class ModelMemoryServiceRegistry(BaseModel):
     )
 
     # Memory service-specific information
-    memory_type_supported: list[str] = Field(
+    memory_type_supported: list[EnumMemoryStorageType] = Field(
         default_factory=list,
-        description="Types of memory operations supported (temporal, persistent, vector)",
+        description="Types of memory operations supported using ONEX enum types",
     )
-    storage_backends: list[str] = Field(
+    storage_backends: list[EnumStorageBackend] = Field(
         default_factory=list,
-        description="Supported storage backends (memory_cache, postgresql, pinecone)",
+        description="Supported storage backends using ONEX enum types",
     )
     max_memory_capacity_mb: int = Field(
         description="Maximum memory capacity in megabytes",

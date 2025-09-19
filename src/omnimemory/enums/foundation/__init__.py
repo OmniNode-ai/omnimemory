@@ -18,6 +18,7 @@ from .enum_migration_status import (
 )
 from .enum_priority_level import EnumPriorityLevel, PriorityLevel
 from .enum_quality_grade import EnumQualityGrade
+from .enum_resource_type import EnumResourceType
 from .enum_severity import EnumSeverity
 from .enum_trust_level import EnumDecayFunction, EnumTrustLevel
 
@@ -38,4 +39,5 @@ __all__ = [
     "MigrationStatus",
     "MigrationPriority",
     "FileProcessingStatus",
+    "EnumResourceType",
 ]

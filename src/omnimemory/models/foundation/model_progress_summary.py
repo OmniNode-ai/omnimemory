@@ -7,6 +7,7 @@ in progress reporting, ensuring type safety and validation.
 
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ from ...enums import MigrationStatus, PriorityLevel
 class ModelProgressSummaryResponse(BaseModel):
     """Strongly typed progress summary response."""
 
-    migration_id: str = Field(description="Unique identifier for the migration")
+    migration_id: UUID = Field(description="Unique identifier for the migration")
 
     name: str = Field(description="Human-readable name of the migration")
 
@@ -44,7 +45,7 @@ class ModelProgressSummaryResponse(BaseModel):
 
     failed_items: int = Field(description="Number of failed items")
 
-    current_batch_id: Optional[str] = Field(
+    current_batch_id: Optional[UUID] = Field(
         default=None, description="Current batch being processed"
     )
 

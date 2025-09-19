@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, Optional
 
 import structlog
 from pydantic import BaseModel, Field
@@ -167,7 +167,7 @@ class ObservabilityManager:
     - Enhanced logging with context
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._active_traces: Dict[str, PerformanceMetrics] = {}
         self._logger = structlog.get_logger(__name__)
 
@@ -179,7 +179,7 @@ class ObservabilityManager:
         user_id: Optional[str] = None,
         operation: Optional[str] = None,
         trace_level: TraceLevel = TraceLevel.INFO,
-        **metadata,
+        **metadata: Any,
     ) -> AsyncGenerator[CorrelationContext, None]:
         """
         Async context manager for correlation tracking.
@@ -209,7 +209,7 @@ class ObservabilityManager:
             operation=operation,
             parent_correlation_id=correlation_id_var.get(),
             trace_level=trace_level,
-            metadata=sanitized_metadata,
+            metadata=ModelMetadata(**sanitized_metadata),
         )
 
         # Set context variables
@@ -258,7 +258,7 @@ class ObservabilityManager:
         operation_name: str,
         operation_type: OperationType,
         trace_performance: bool = True,
-        **additional_context,
+        **additional_context: Any,
     ) -> AsyncGenerator[str, None]:
         """
         Async context manager for operation tracing.
@@ -361,7 +361,9 @@ class ObservabilityManager:
         """Get current performance metrics for active traces."""
         return self._active_traces.copy()
 
-    def log_with_context(self, level: str, message: str, **additional_fields):
+    def log_with_context(
+        self, level: str, message: str, **additional_fields: Any
+    ) -> None:
         """Log a message with current correlation context."""
         context = self.get_current_context()
 
@@ -380,8 +382,8 @@ async def correlation_context(
     request_id: Optional[str] = None,
     user_id: Optional[str] = None,
     operation: Optional[str] = None,
-    **metadata,
-):
+    **metadata: Any,
+) -> AsyncGenerator[CorrelationContext, None]:
     """Convenience function for correlation context management."""
     async with observability_manager.correlation_context(
         correlation_id=correlation_id,
@@ -395,8 +397,8 @@ async def correlation_context(
 
 @asynccontextmanager
 async def trace_operation(
-    operation_name: str, operation_type: OperationType | str, **context
-):
+    operation_name: str, operation_type: OperationType | str, **context: Any
+) -> AsyncGenerator[None, None]:
     """Convenience function for operation tracing."""
     if isinstance(operation_type, str):
         # Try to convert string to OperationType
@@ -422,15 +424,15 @@ def get_request_id() -> Optional[str]:
     return request_id_var.get()
 
 
-def log_with_correlation(level: str, message: str, **fields):
+def log_with_correlation(level: str, message: str, **fields: Any) -> None:
     """Log a message with correlation context."""
     observability_manager.log_with_context(level, message, **fields)
 
 
-def inject_correlation_context(func):
+def inject_correlation_context(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to inject correlation context into function logs."""
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         context = observability_manager.get_current_context()
         logger.info(
             f"function_called_{func.__name__}",
@@ -454,10 +456,10 @@ def inject_correlation_context(func):
     return wrapper
 
 
-async def inject_correlation_context_async(func):
+def inject_correlation_context_async(func: Callable[..., Any]) -> Callable[..., Any]:
     """Async decorator to inject correlation context into function logs."""
 
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         context = observability_manager.get_current_context()
         logger.info(
             f"async_function_called_{func.__name__}",

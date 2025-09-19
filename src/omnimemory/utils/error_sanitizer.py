@@ -9,7 +9,7 @@ __all__ = ["SanitizationLevel", "ErrorSanitizer"]
 
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 class SanitizationLevel(Enum):
@@ -171,8 +171,8 @@ class ErrorSanitizer:
             return "Exception: Operation failed - details suppressed for audit"
 
     def sanitize_dict(
-        self, data: Dict, keys_to_sanitize: Optional[Set[str]] = None
-    ) -> Dict:
+        self, data: Dict[str, Any], keys_to_sanitize: Optional[Set[str]] = None
+    ) -> Dict[str, Any]:
         """
         Sanitize sensitive keys in dictionary data.
 
@@ -197,7 +197,7 @@ class ErrorSanitizer:
                 "session_id",
             }
 
-        sanitized = {}
+        sanitized: Dict[str, Any] = {}
         for key, value in data.items():
             if any(sensitive in key.lower() for sensitive in keys_to_sanitize):
                 sanitized[key] = "[REDACTED]"
@@ -270,10 +270,10 @@ def sanitize_error(
 
 
 def sanitize_dict(
-    data: Dict,
+    data: Dict[str, Any],
     keys_to_sanitize: Optional[Set[str]] = None,
     level: SanitizationLevel = SanitizationLevel.STANDARD,
-) -> Dict:
+) -> Dict[str, Any]:
     """
     Convenient function for dictionary sanitization.
 

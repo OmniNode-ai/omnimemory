@@ -5,7 +5,13 @@ This module provides foundation models for base implementations,
 error handling, migration progress tracking, and system-level operations.
 """
 
-from ...enums import EnumErrorCode, EnumSeverity
+from ...enums import (
+    EnumErrorCode,
+    EnumSeverity,
+    FileProcessingStatus,
+    MigrationPriority,
+    MigrationStatus,
+)
 from .model_audit_metadata import (
     ModelAuditEventDetails,
     ModelPerformanceAuditDetails,
@@ -52,9 +58,6 @@ from .model_metrics_response import (
     ModelResourceMetricsDetailed,
 )
 from .model_migration_progress import (
-    FileProcessingStatus,
-    MigrationPriority,
-    MigrationStatus,
     ModelBatchProcessingMetrics,
     ModelFileProcessingInfo,
     ModelMigrationProgressMetrics,

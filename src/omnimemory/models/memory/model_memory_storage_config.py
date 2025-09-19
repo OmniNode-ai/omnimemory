@@ -4,6 +4,8 @@ Memory storage configuration model following ONEX standards.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from ...enums import EnumMemoryStorageType
@@ -13,7 +15,7 @@ class ModelMemoryStorageConfig(BaseModel):
     """Configuration for memory storage systems following ONEX standards."""
 
     # Storage identification
-    storage_id: str = Field(
+    storage_id: UUID = Field(
         description="Unique identifier for the storage system",
     )
     storage_name: str = Field(

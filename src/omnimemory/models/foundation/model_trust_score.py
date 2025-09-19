@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from ...enums import EnumDecayFunction, EnumTrustLevel
 
@@ -97,7 +97,9 @@ class ModelTrustScore(BaseModel):
 
     @field_validator("trust_level")
     @classmethod
-    def validate_trust_level_matches_score(cls, v, info):
+    def validate_trust_level_matches_score(
+        cls, v: EnumTrustLevel, info: ValidationInfo
+    ) -> EnumTrustLevel:
         """Ensure trust level matches base score."""
         if "current_score" in info.data:
             score = info.data["current_score"]
@@ -131,6 +133,8 @@ class ModelTrustScore(BaseModel):
 
         # Check cache validity if not forcing recalculation
         if not force_recalculate and self._is_cache_valid(as_of):
+            # cached_score is guaranteed to be non-None when cache is valid
+            assert self.cached_score is not None
             return self.cached_score
 
         if self.decay_function == EnumDecayFunction.NONE:

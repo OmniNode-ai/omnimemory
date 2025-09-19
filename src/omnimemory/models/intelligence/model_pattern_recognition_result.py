@@ -15,7 +15,7 @@ class ModelPatternRecognitionResult(BaseModel):
     result_id: UUID = Field(
         description="Unique identifier for the pattern recognition result",
     )
-    pattern_id: str = Field(
+    pattern_id: UUID = Field(
         description="Identifier for the recognized pattern",
     )
 

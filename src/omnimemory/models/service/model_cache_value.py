@@ -2,9 +2,11 @@
 Cache value model for OmniMemory following ONEX standards.
 """
 
-from typing import Any, Dict, List, Literal, Union
+from typing import Dict, List, Literal, Union
 
 from pydantic import BaseModel, Field, field_validator
+
+from ...types import MemoryValue, PrimitiveValue
 
 
 class ModelCacheValue(BaseModel):
@@ -20,10 +22,12 @@ class ModelCacheValue(BaseModel):
     integer_value: int | None = Field(default=None, description="Integer value")
     float_value: float | None = Field(default=None, description="Float value")
     boolean_value: bool | None = Field(default=None, description="Boolean value")
-    dict_value: Dict[str, Any] | None = Field(
+    dict_value: Dict[str, PrimitiveValue] | None = Field(
         default=None, description="Dictionary value"
     )
-    list_value: List[Any] | None = Field(default=None, description="List value")
+    list_value: List[PrimitiveValue] | None = Field(
+        default=None, description="List value"
+    )
 
     # Metadata
     is_sanitized: bool = Field(default=False, description="Whether value was sanitized")
@@ -39,9 +43,7 @@ class ModelCacheValue(BaseModel):
         return v
 
     @classmethod
-    def from_raw_value(
-        cls, value: Union[str, int, float, bool, Dict, List]
-    ) -> "ModelCacheValue":
+    def from_raw_value(cls, value: MemoryValue) -> "ModelCacheValue":
         """Create ModelCacheValue from raw Python value."""
         if isinstance(value, str):
             return cls(
@@ -78,7 +80,7 @@ class ModelCacheValue(BaseModel):
         else:
             raise ValueError(f"Unsupported cache value type: {type(value)}")
 
-    def to_raw_value(self) -> Union[str, int, float, bool, Dict, List]:
+    def to_raw_value(self) -> MemoryValue:
         """Convert back to raw Python value."""
         if self.value_type == "string":
             if self.string_value is None:

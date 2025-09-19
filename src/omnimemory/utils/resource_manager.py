@@ -14,13 +14,13 @@ import asyncio
 import contextlib
 import random
 import time
-from enum import Enum
-from typing import Any, AsyncGenerator, Callable, Dict, Optional, TypeVar
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, AsyncGenerator, Callable, Dict, Optional, TypeVar
 
-from pydantic import BaseModel, Field
 import structlog
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger(__name__)
 
@@ -49,25 +49,39 @@ def _sanitize_error(error: Exception) -> str:
         return f"{error_type}: Operation failed"
 
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class CircuitState(Enum):
     """Circuit breaker states following resilience patterns."""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Circuit is open, failing fast
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Circuit is open, failing fast
     HALF_OPEN = "half_open"  # Testing if service has recovered
+
 
 class CircuitBreakerConfig(BaseModel):
     """Configuration for circuit breaker behavior."""
-    failure_threshold: int = Field(default=5, description="Number of failures before opening circuit")
-    recovery_timeout: int = Field(default=60, description="Seconds to wait before trying half-open")
-    recovery_timeout_jitter: float = Field(default=0.1, description="Jitter factor (0.0-1.0) to prevent thundering herd")
-    success_threshold: int = Field(default=3, description="Successful calls needed to close circuit")
+
+    failure_threshold: int = Field(
+        default=5, description="Number of failures before opening circuit"
+    )
+    recovery_timeout: int = Field(
+        default=60, description="Seconds to wait before trying half-open"
+    )
+    recovery_timeout_jitter: float = Field(
+        default=0.1, description="Jitter factor (0.0-1.0) to prevent thundering herd"
+    )
+    success_threshold: int = Field(
+        default=3, description="Successful calls needed to close circuit"
+    )
     timeout: float = Field(default=30.0, description="Default timeout for operations")
+
 
 @dataclass
 class CircuitBreakerStats:
     """Statistics tracking for circuit breaker behavior."""
+
     failure_count: int = 0
     success_count: int = 0
     last_failure_time: Optional[datetime] = None
@@ -78,21 +92,26 @@ class CircuitBreakerStats:
 
 class CircuitBreakerStatsResponse(BaseModel):
     """Typed response model for circuit breaker statistics."""
+
     state: str = Field(description="Current circuit breaker state")
     failure_count: int = Field(description="Number of failures recorded")
     success_count: int = Field(description="Number of successful calls")
     total_calls: int = Field(description="Total number of calls attempted")
     total_timeouts: int = Field(description="Total number of timeout failures")
-    last_failure_time: Optional[str] = Field(description="ISO timestamp of last failure")
+    last_failure_time: Optional[str] = Field(
+        description="ISO timestamp of last failure"
+    )
     state_changed_at: str = Field(description="ISO timestamp when state last changed")
+
 
 class CircuitBreakerError(Exception):
     """Exception raised when circuit breaker is open."""
 
-    def __init__(self, service_name: str, state: CircuitState):
+    def __init__(self, service_name: str, state: CircuitState) -> None:
         self.service_name = service_name
         self.state = state
         super().__init__(f"Circuit breaker for {service_name} is {state.value}")
+
 
 class AsyncCircuitBreaker:
     """
@@ -102,14 +121,16 @@ class AsyncCircuitBreaker:
     gracefully and provide fast failure when services are known to be down.
     """
 
-    def __init__(self, name: str, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(
+        self, name: str, config: Optional[CircuitBreakerConfig] = None
+    ) -> None:
         self.name = name
         self.config = config or CircuitBreakerConfig()
         self.state = CircuitState.CLOSED
         self.stats = CircuitBreakerStats()
         self._lock = asyncio.Lock()
 
-    async def call(self, func: Callable[..., Any], *args, **kwargs) -> Any:
+    async def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Execute a function call through the circuit breaker."""
         async with self._lock:
             if self.state == CircuitState.OPEN:
@@ -121,8 +142,7 @@ class AsyncCircuitBreaker:
         try:
             # Apply timeout to the operation
             result = await asyncio.wait_for(
-                func(*args, **kwargs),
-                timeout=self.config.timeout
+                func(*args, **kwargs), timeout=self.config.timeout
             )
             await self._on_success()
             return result
@@ -149,7 +169,7 @@ class AsyncCircuitBreaker:
         time_since_failure = datetime.now() - self.stats.last_failure_time
         return time_since_failure.total_seconds() >= effective_timeout
 
-    async def _transition_to_half_open(self):
+    async def _transition_to_half_open(self) -> None:
         """Transition circuit breaker to half-open state."""
         self.state = CircuitState.HALF_OPEN
         self.stats.state_changed_at = datetime.now()
@@ -159,10 +179,10 @@ class AsyncCircuitBreaker:
             "circuit_breaker_state_change",
             name=self.name,
             new_state="half_open",
-            reason="recovery_timeout_reached"
+            reason="recovery_timeout_reached",
         )
 
-    async def _on_success(self):
+    async def _on_success(self) -> None:
         """Handle successful operation result."""
         async with self._lock:
             self.stats.total_calls += 1
@@ -174,20 +194,22 @@ class AsyncCircuitBreaker:
             elif self.state == CircuitState.CLOSED:
                 self.stats.failure_count = 0  # Reset failure count on success
 
-    async def _on_failure(self, error: Exception):
+    async def _on_failure(self, error: Exception) -> None:
         """Handle failed operation result."""
         async with self._lock:
             self.stats.total_calls += 1
             self.stats.failure_count += 1
             self.stats.last_failure_time = datetime.now()
 
-            if (self.state == CircuitState.CLOSED and
-                self.stats.failure_count >= self.config.failure_threshold):
+            if (
+                self.state == CircuitState.CLOSED
+                and self.stats.failure_count >= self.config.failure_threshold
+            ):
                 await self._transition_to_open()
             elif self.state == CircuitState.HALF_OPEN:
                 await self._transition_to_open()
 
-    async def _transition_to_closed(self):
+    async def _transition_to_closed(self) -> None:
         """Transition circuit breaker to closed state."""
         self.state = CircuitState.CLOSED
         self.stats.state_changed_at = datetime.now()
@@ -197,10 +219,10 @@ class AsyncCircuitBreaker:
             "circuit_breaker_state_change",
             name=self.name,
             new_state="closed",
-            reason="success_threshold_reached"
+            reason="success_threshold_reached",
         )
 
-    async def _transition_to_open(self):
+    async def _transition_to_open(self) -> None:
         """Transition circuit breaker to open state."""
         self.state = CircuitState.OPEN
         self.stats.state_changed_at = datetime.now()
@@ -210,8 +232,9 @@ class AsyncCircuitBreaker:
             name=self.name,
             new_state="open",
             reason="failure_threshold_reached",
-            failure_count=self.stats.failure_count
+            failure_count=self.stats.failure_count,
         )
+
 
 class AsyncResourceManager:
     """
@@ -224,12 +247,14 @@ class AsyncResourceManager:
     - Resource cleanup
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._circuit_breakers: Dict[str, AsyncCircuitBreaker] = {}
         self._semaphores: Dict[str, asyncio.Semaphore] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
 
-    def get_circuit_breaker(self, name: str, config: Optional[CircuitBreakerConfig] = None) -> AsyncCircuitBreaker:
+    def get_circuit_breaker(
+        self, name: str, config: Optional[CircuitBreakerConfig] = None
+    ) -> AsyncCircuitBreaker:
         """Get or create a circuit breaker for a service."""
         if name not in self._circuit_breakers:
             self._circuit_breakers[name] = AsyncCircuitBreaker(name, config)
@@ -255,8 +280,8 @@ class AsyncResourceManager:
         release_func: Optional[Callable[[Any], None]] = None,
         circuit_breaker_config: Optional[CircuitBreakerConfig] = None,
         semaphore_limit: Optional[int] = None,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any,
     ) -> AsyncGenerator[Any, None]:
         """
         Async context manager for comprehensive resource management.
@@ -269,8 +294,14 @@ class AsyncResourceManager:
             semaphore_limit: Semaphore limit for rate limiting
             *args, **kwargs: Arguments passed to acquire_func
         """
-        circuit_breaker = self.get_circuit_breaker(resource_name, circuit_breaker_config)
-        semaphore = self.get_semaphore(resource_name, semaphore_limit) if semaphore_limit else None
+        circuit_breaker = self.get_circuit_breaker(
+            resource_name, circuit_breaker_config
+        )
+        semaphore = (
+            self.get_semaphore(resource_name, semaphore_limit)
+            if semaphore_limit
+            else None
+        )
 
         resource = None
         try:
@@ -284,7 +315,7 @@ class AsyncResourceManager:
             logger.debug(
                 "resource_acquired",
                 resource_name=resource_name,
-                circuit_state=circuit_breaker.state.value
+                circuit_state=circuit_breaker.state.value,
             )
 
             yield resource
@@ -294,7 +325,7 @@ class AsyncResourceManager:
                 "resource_management_error",
                 resource_name=resource_name,
                 error=_sanitize_error(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             raise
         finally:
@@ -306,15 +337,12 @@ class AsyncResourceManager:
                     else:
                         release_func(resource)
 
-                    logger.debug(
-                        "resource_released",
-                        resource_name=resource_name
-                    )
+                    logger.debug("resource_released", resource_name=resource_name)
                 except Exception as e:
                     logger.error(
                         "resource_cleanup_error",
                         resource_name=resource_name,
-                        error=_sanitize_error(e)
+                        error=_sanitize_error(e),
                     )
 
             # Release semaphore if acquired
@@ -331,35 +359,41 @@ class AsyncResourceManager:
                 success_count=cb.stats.success_count,
                 total_calls=cb.stats.total_calls,
                 total_timeouts=cb.stats.total_timeouts,
-                last_failure_time=cb.stats.last_failure_time.isoformat() if cb.stats.last_failure_time else None,
-                state_changed_at=cb.stats.state_changed_at.isoformat()
+                last_failure_time=cb.stats.last_failure_time.isoformat()
+                if cb.stats.last_failure_time
+                else None,
+                state_changed_at=cb.stats.state_changed_at.isoformat(),
             )
         return stats
 
+
 # Global resource manager instance
 resource_manager = AsyncResourceManager()
+
 
 # Convenience functions for common patterns
 async def with_circuit_breaker(
     service_name: str,
     func: Callable[..., Any],
     config: Optional[CircuitBreakerConfig] = None,
-    *args,
-    **kwargs
+    *args: Any,
+    **kwargs: Any,
 ) -> Any:
     """Execute a function with circuit breaker protection."""
     circuit_breaker = resource_manager.get_circuit_breaker(service_name, config)
     return await circuit_breaker.call(func, *args, **kwargs)
 
+
 @contextlib.asynccontextmanager
-async def with_semaphore(name: str, limit: int):
+async def with_semaphore(name: str, limit: int) -> AsyncGenerator[None, None]:
     """Context manager for semaphore-based rate limiting."""
     semaphore = resource_manager.get_semaphore(name, limit)
     async with semaphore:
         yield
 
+
 @contextlib.asynccontextmanager
-async def with_timeout(timeout: float):
+async def with_timeout(timeout: float) -> AsyncGenerator[None, None]:
     """Context manager for timeout operations."""
     try:
         async with asyncio.timeout(timeout):

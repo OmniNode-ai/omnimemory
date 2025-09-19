@@ -166,11 +166,11 @@ def calculate_delay(attempt: int, config: RetryConfig) -> int:
 
 
 async def retry_with_backoff(
-    operation: Callable[..., Any],
+    operation: Callable[..., T],
     config: RetryConfig,
     correlation_id: Optional[UUID] = None,
-    *args,
-    **kwargs,
+    *args: Any,
+    **kwargs: Any,
 ) -> T:
     """
     Execute an operation with retry and exponential backoff.
@@ -295,18 +295,18 @@ def retry_decorator(
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
-        async def async_wrapper(*args, **kwargs) -> T:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
             correlation_id = kwargs.pop("correlation_id", None)
             return await retry_with_backoff(
                 func, config, correlation_id, *args, **kwargs
             )
 
         @functools.wraps(func)
-        def sync_wrapper(*args, **kwargs) -> T:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             # For sync functions, run in event loop
             correlation_id = kwargs.pop("correlation_id", None)
 
-            async def async_operation():
+            async def async_operation() -> T:
                 return await retry_with_backoff(
                     func, config, correlation_id, *args, **kwargs
                 )
@@ -353,8 +353,8 @@ class RetryManager:
         operation_name: str,
         config: Optional[RetryConfig] = None,
         correlation_id: Optional[UUID] = None,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> T:
         """
         Execute an operation with retry and track statistics.
@@ -374,7 +374,7 @@ class RetryManager:
         start_time = datetime.utcnow()
 
         try:
-            result = await retry_with_backoff(
+            result: T = await retry_with_backoff(
                 operation, retry_config, correlation_id, *args, **kwargs
             )
 

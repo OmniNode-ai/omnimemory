@@ -12,12 +12,13 @@ import sys
 import time
 from collections import OrderedDict
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import structlog
 from pydantic import BaseModel, Field, field_validator
 
 from ...enums import EnumCacheEvictionPolicy
+from ...types import MemoryValue, NestedMemoryValue, PrimitiveValue
 from ...utils.error_sanitizer import SanitizationLevel, sanitize_error
 from ..foundation.model_cache_config import ModelCacheConfig
 from .model_cache_entry import ModelCacheEntry
@@ -62,7 +63,7 @@ class MemoryCacheImplementation:
                 self._start_cleanup_task()
                 self._cleanup_task_started = True
 
-    async def get(self, key: str) -> Optional[Union[str, int, float, bool, Dict, List]]:
+    async def get(self, key: str) -> Optional[MemoryValue]:
         """
         Retrieve value from cache.
 
@@ -117,7 +118,7 @@ class MemoryCacheImplementation:
     async def set(
         self,
         key: str,
-        value: Union[str, int, float, bool, Dict, List],
+        value: MemoryValue,
         ttl_seconds: Optional[int] = None,
     ) -> bool:
         """
@@ -450,16 +451,14 @@ class MemoryCacheImplementation:
                 retry_in_seconds=backoff_seconds,
             )
 
-    def _sanitize_value(
-        self, value: Union[str, int, float, bool, Dict, List]
-    ) -> Union[str, int, float, bool, Dict, List]:
+    def _sanitize_value(self, value: MemoryValue) -> MemoryValue:
         """Sanitize cache value for security."""
         if value is None:
             return value
 
         # Convert sensitive types to safe representations
         if isinstance(value, dict):
-            sanitized: Dict[Any, Any] = {}
+            sanitized: Dict[str, PrimitiveValue] = {}
             for k, v in value.items():
                 # Skip potentially sensitive keys
                 key_lower = str(k).lower()
@@ -469,10 +468,18 @@ class MemoryCacheImplementation:
                 ):
                     sanitized[k] = "[REDACTED]"
                 else:
-                    sanitized[k] = self._sanitize_value(v)
+                    if isinstance(v, (dict, list)):
+                        sanitized[k] = "[REDACTED_COMPLEX]"
+                    else:
+                        sanitized[k] = v
             return sanitized
         elif isinstance(value, (list, tuple)):
-            return [self._sanitize_value(item) for item in value]
+            return [
+                item
+                if isinstance(item, (str, int, float, bool))
+                else "[REDACTED_COMPLEX]"
+                for item in value
+            ]
         elif isinstance(value, str) and len(value) > 1000:
             # Truncate very long strings to prevent memory issues
             return value[:1000] + "[TRUNCATED]"

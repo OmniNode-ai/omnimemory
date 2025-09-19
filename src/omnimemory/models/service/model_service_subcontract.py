@@ -3,7 +3,7 @@ Memory service subcontract model following ONEX standards.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Dict, List, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -15,6 +15,9 @@ from ...enums import (
     EnumNodeType,
     EnumProtocol,
 )
+from ...enums.memory import EnumMemoryStorageType, EnumStorageBackend
+from ...enums.service import EnumRegion, EnumServiceType
+from ...types import ConfigDict
 
 
 class ModelServiceSubcontract(BaseModel):
@@ -27,8 +30,8 @@ class ModelServiceSubcontract(BaseModel):
     service_name: str = Field(
         description="Human-readable name for the memory service",
     )
-    service_type: str = Field(
-        description="Type of memory service (storage, retrieval, processing, etc.)",
+    service_type: EnumServiceType = Field(
+        description="Type of memory service using ONEX 4-node architecture",
     )
 
     # ONEX architecture information
@@ -142,9 +145,9 @@ class ModelServiceSubcontract(BaseModel):
         default=EnumEnvironment.PRODUCTION,
         description="Environment (development, staging, production)",
     )
-    region: str = Field(
-        default="us-west-2",
-        description="Deployment region",
+    region: EnumRegion = Field(
+        default=EnumRegion.US_WEST_2,
+        description="Deployment region using ONEX enum types",
     )
 
     # Feature flags
@@ -188,13 +191,13 @@ class ModelServiceSubcontract(BaseModel):
     )
 
     # Memory service-specific configuration
-    memory_type_supported: List[str] = Field(
+    memory_type_supported: List[EnumMemoryStorageType] = Field(
         default_factory=list,
-        description="Types of memory operations supported (temporal, persistent, vector)",
+        description="Types of memory operations supported using ONEX enum types",
     )
-    storage_backends: List[str] = Field(
+    storage_backends: List[EnumStorageBackend] = Field(
         default_factory=list,
-        description="Supported storage backends (memory_cache, postgresql, pinecone)",
+        description="Supported storage backends using ONEX enum types",
     )
     max_memory_capacity_mb: int | None = Field(
         default=None,
@@ -216,7 +219,7 @@ class ModelServiceSubcontract(BaseModel):
     )
 
     # Additional configuration
-    custom_config: Dict[str, Any] = Field(
+    custom_config: ConfigDict = Field(
         default_factory=dict,
         description="Custom memory service configuration parameters",
     )
