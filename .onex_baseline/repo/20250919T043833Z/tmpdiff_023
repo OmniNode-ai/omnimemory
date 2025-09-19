@@ -1,0 +1,24 @@
+diff --git a/src/omnimemory/enums/enum_priority_level.py b/src/omnimemory/enums/enum_priority_level.py
+new file mode 100644
+index 0000000..e5699df
+--- /dev/null
++++ b/src/omnimemory/enums/enum_priority_level.py
+@@ -0,0 +1,17 @@
++"""
++Priority level enumerations for ONEX compliance.
++
++This module contains priority level enum types following ONEX standards.
++"""
++
++from enum import Enum
++
++
++class EnumPriorityLevel(str, Enum):
++    """Priority levels for ONEX operations."""
++
++    CRITICAL = "critical"
++    HIGH = "high"
++    NORMAL = "normal"
++    LOW = "low"
++    BACKGROUND = "background"
+\ No newline at end of file

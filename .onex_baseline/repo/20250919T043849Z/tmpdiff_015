@@ -1,0 +1,32 @@
+diff --git a/src/omnimemory/enums/enum_data_type.py b/src/omnimemory/enums/enum_data_type.py
+new file mode 100644
+index 0000000..e59ba42
+--- /dev/null
++++ b/src/omnimemory/enums/enum_data_type.py
+@@ -0,0 +1,25 @@
++"""
++Data type enumeration following ONEX standards.
++"""
++
++from enum import Enum
++
++
++class EnumDataType(str, Enum):
++    """Data types for memory data values."""
++    
++    STRING = "string"
++    INTEGER = "integer"
++    FLOAT = "float"
++    BOOLEAN = "boolean"
++    BYTES = "bytes"
++    JSON = "json"
++    XML = "xml"
++    CSV = "csv"
++    BINARY = "binary"
++    IMAGE = "image"
++    AUDIO = "audio"
++    VIDEO = "video"
++    DOCUMENT = "document"
++    ARCHIVE = "archive"
++    OTHER = "other"
+\ No newline at end of file

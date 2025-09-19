@@ -1,0 +1,8 @@
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..5777f87
+--- /dev/null
++++ b/tests/__init__.py
+@@ -0,0 +1 @@
++"""OmniMemory test package."""
+\ No newline at end of file
