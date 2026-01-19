@@ -3,7 +3,6 @@ Processing metrics model for operation timing and performance tracking.
 """
 
 from datetime import datetime
-from typing import Dict
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -79,7 +78,7 @@ class ModelProcessingMetrics(BaseModel):
 
     @computed_field
     @property
-    def breakdown_percentages(self) -> Dict[str, float]:
+    def breakdown_percentages(self) -> dict[str, float]:
         """
         Calculate percentage breakdown of processing time.
 

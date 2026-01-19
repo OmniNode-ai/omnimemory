@@ -111,19 +111,14 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import (
-    AsyncGenerator,
-    Callable,
-    Dict,
-    List,
     Literal,
-    Optional,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -185,9 +180,9 @@ class LabelValidationError(Exception):
 
 
 def validate_metric_labels(
-    labels: Dict[str, str],
+    labels: dict[str, str],
     required_labels: set[str],
-    allowed_labels: Optional[set[str]] = None,
+    allowed_labels: set[str] | None = None,
     metric_name: str = "unknown",
     strict: bool = True,
 ) -> None:
@@ -256,25 +251,24 @@ def validate_metric_labels(
                 expected_labels=allowed_labels,
                 provided_labels=provided,
             )
-        else:
-            # Non-strict mode: log warnings but don't raise
-            _label_logger = structlog.get_logger("omnimemory.label_validation")
-            if missing:
-                _label_logger.error(
-                    "label_validation_missing_required",
-                    metric_name=metric_name,
-                    missing_labels=sorted(missing),
-                    provided_labels=sorted(provided),
-                    required_labels=sorted(required_labels),
-                )
-            if extra:
-                _label_logger.warning(
-                    "label_validation_unexpected_extra",
-                    metric_name=metric_name,
-                    extra_labels=sorted(extra),
-                    provided_labels=sorted(provided),
-                    allowed_labels=sorted(allowed_labels),
-                )
+        # Non-strict mode: log warnings but don't raise
+        _label_logger = structlog.get_logger("omnimemory.label_validation")
+        if missing:
+            _label_logger.error(
+                "label_validation_missing_required",
+                metric_name=metric_name,
+                missing_labels=sorted(missing),
+                provided_labels=sorted(provided),
+                required_labels=sorted(required_labels),
+            )
+        if extra:
+            _label_logger.warning(
+                "label_validation_unexpected_extra",
+                metric_name=metric_name,
+                extra_labels=sorted(extra),
+                provided_labels=sorted(provided),
+                allowed_labels=sorted(allowed_labels),
+            )
 
 
 # === STRUCTURED LOG SCHEMA VALIDATION ===
@@ -359,12 +353,12 @@ class StructuredLogEntry(BaseModel):
     )
 
     # Optional fields (only on failure)
-    error_type: Optional[str] = Field(
+    error_type: str | None = Field(
         default=None,
         max_length=256,
         description="Exception class name (only on failure)",
     )
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         default=None,
         max_length=1000,
         description="Sanitized error message (only on failure, PII-safe)",
@@ -377,9 +371,9 @@ class StructuredLogEntry(BaseModel):
 
 
 def validate_log_entry(
-    log_data: Dict[str, object],
+    log_data: dict[str, object],
     raise_on_error: bool = True,
-) -> Optional[StructuredLogEntry]:
+) -> StructuredLogEntry | None:
     """Validate a log entry against the structured log schema.
 
     This function validates that a log entry dictionary conforms to the
@@ -432,8 +426,8 @@ def create_validated_log_entry(
     handler: str,
     status: Literal["success", "failure"],
     latency_ms: float,
-    error_type: Optional[str] = None,
-    error_message: Optional[str] = None,
+    error_type: str | None = None,
+    error_message: str | None = None,
 ) -> StructuredLogEntry:
     """Create a validated log entry with automatic timestamp generation.
 
@@ -467,7 +461,7 @@ def create_validated_log_entry(
         )
     """
     # Generate ISO8601 timestamp in UTC with millisecond precision
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     return StructuredLogEntry(
         correlation_id=correlation_id,
@@ -533,9 +527,7 @@ def sanitize_metadata_value(value: object) -> MetadataValue:
     elif isinstance(value, bool):
         # Check bool before int since bool is a subclass of int
         return value
-    elif isinstance(value, int):
-        return value
-    elif isinstance(value, float):
+    elif isinstance(value, int) or isinstance(value, float):
         return value
     elif value is None:
         return None
@@ -562,12 +554,10 @@ def _sanitize_error(error: Exception) -> str:
 
 
 # Context variables for correlation tracking
-correlation_id_var: ContextVar[Optional[str]] = ContextVar(
-    "correlation_id", default=None
-)
-request_id_var: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
-user_id_var: ContextVar[Optional[str]] = ContextVar("user_id", default=None)
-operation_var: ContextVar[Optional[str]] = ContextVar("operation", default=None)
+correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+user_id_var: ContextVar[str | None] = ContextVar("user_id", default=None)
+operation_var: ContextVar[str | None] = ContextVar("operation", default=None)
 
 logger = structlog.get_logger(__name__)
 
@@ -577,7 +567,7 @@ logger = structlog.get_logger(__name__)
 
 
 # Default histogram buckets for latency measurements (in milliseconds)
-DEFAULT_LATENCY_BUCKETS: Tuple[float, ...] = (
+DEFAULT_LATENCY_BUCKETS: tuple[float, ...] = (
     1.0,
     5.0,
     10.0,
@@ -655,7 +645,7 @@ class Counter:
     def __init__(
         self,
         name: str,
-        label_names: List[str],
+        label_names: list[str],
         max_entries: int = DEFAULT_MAX_METRIC_ENTRIES,
         strict_labels: bool = False,
     ) -> None:
@@ -676,10 +666,10 @@ class Counter:
         self.strict_labels = strict_labels
         self._label_names_set = frozenset(label_names)
         # Use OrderedDict for LRU eviction (oldest entries evicted first)
-        self._values: "OrderedDict[Tuple[str, ...], CounterValue]" = OrderedDict()
+        self._values: OrderedDict[tuple[str, ...], CounterValue] = OrderedDict()
         self._lock = threading.Lock()
 
-    def _validate_labels(self, labels: Dict[str, str]) -> None:
+    def _validate_labels(self, labels: dict[str, str]) -> None:
         """Validate labels against expected label names.
 
         Args:
@@ -749,26 +739,26 @@ class Counter:
             self._values.move_to_end(key)
             return self._values[key].get()
 
-    def get_all(self) -> Dict[Tuple[str, ...], int]:
+    def get_all(self) -> dict[tuple[str, ...], int]:
         """Get all counter values with their labels."""
         with self._lock:
             return {k: v.get() for k, v in self._values.items()}
 
-    def _labels_to_key(self, labels: Dict[str, str]) -> Tuple[str, ...]:
+    def _labels_to_key(self, labels: dict[str, str]) -> tuple[str, ...]:
         """Convert labels dict to hashable key tuple."""
         return tuple(labels.get(name, "") for name in self.label_names)
 
-    def labels_from_key(self, key: Tuple[str, ...]) -> Dict[str, str]:
+    def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key))
+        return dict(zip(self.label_names, key, strict=False))
 
 
 @dataclass
 class HistogramValue:
     """Thread-safe histogram value with buckets."""
 
-    buckets: Tuple[float, ...]
-    bucket_counts: List[int] = field(default_factory=list)
+    buckets: tuple[float, ...]
+    bucket_counts: list[int] = field(default_factory=list)
     sum_value: float = 0.0
     count: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
@@ -789,7 +779,7 @@ class HistogramValue:
             # Always increment +Inf bucket
             self.bucket_counts[-1] += 1
 
-    def get_snapshot(self) -> Dict[str, Union[float, int, List[int]]]:
+    def get_snapshot(self) -> dict[str, float | int | list[int]]:
         """Get a snapshot of histogram values."""
         with self._lock:
             return {
@@ -834,8 +824,8 @@ class Histogram:
     def __init__(
         self,
         name: str,
-        label_names: List[str],
-        buckets: Tuple[float, ...] = DEFAULT_LATENCY_BUCKETS,
+        label_names: list[str],
+        buckets: tuple[float, ...] = DEFAULT_LATENCY_BUCKETS,
         max_entries: int = DEFAULT_MAX_METRIC_ENTRIES,
         strict_labels: bool = False,
     ) -> None:
@@ -880,10 +870,10 @@ class Histogram:
         self.strict_labels = strict_labels
         self._label_names_set = frozenset(label_names)
         # Use OrderedDict for LRU eviction (oldest entries evicted first)
-        self._values: "OrderedDict[Tuple[str, ...], HistogramValue]" = OrderedDict()
+        self._values: OrderedDict[tuple[str, ...], HistogramValue] = OrderedDict()
         self._lock = threading.Lock()
 
-    def _validate_labels(self, labels: Dict[str, str]) -> None:
+    def _validate_labels(self, labels: dict[str, str]) -> None:
         """Validate labels against expected label names.
 
         Args:
@@ -943,7 +933,7 @@ class Histogram:
         # Safe to call outside lock - value_holder is our reference
         value_holder.observe(value)
 
-    def get(self, **labels: str) -> Dict[str, Union[float, int, List[int]]]:
+    def get(self, **labels: str) -> dict[str, float | int | list[int]]:
         """Get histogram snapshot for given labels."""
         key = self._labels_to_key(labels)
         with self._lock:
@@ -953,18 +943,18 @@ class Histogram:
             self._values.move_to_end(key)
             return self._values[key].get_snapshot()
 
-    def get_all(self) -> Dict[Tuple[str, ...], Dict[str, Union[float, int, List[int]]]]:
+    def get_all(self) -> dict[tuple[str, ...], dict[str, float | int | list[int]]]:
         """Get all histogram values with their labels."""
         with self._lock:
             return {k: v.get_snapshot() for k, v in self._values.items()}
 
-    def _labels_to_key(self, labels: Dict[str, str]) -> Tuple[str, ...]:
+    def _labels_to_key(self, labels: dict[str, str]) -> tuple[str, ...]:
         """Convert labels dict to hashable key tuple."""
         return tuple(labels.get(name, "") for name in self.label_names)
 
-    def labels_from_key(self, key: Tuple[str, ...]) -> Dict[str, str]:
+    def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key))
+        return dict(zip(self.label_names, key, strict=False))
 
 
 @dataclass
@@ -1021,7 +1011,7 @@ class Gauge:
     def __init__(
         self,
         name: str,
-        label_names: List[str],
+        label_names: list[str],
         max_entries: int = DEFAULT_MAX_METRIC_ENTRIES,
         strict_labels: bool = False,
     ) -> None:
@@ -1042,10 +1032,10 @@ class Gauge:
         self.strict_labels = strict_labels
         self._label_names_set = frozenset(label_names)
         # Use OrderedDict for LRU eviction (oldest entries evicted first)
-        self._values: "OrderedDict[Tuple[str, ...], GaugeValue]" = OrderedDict()
+        self._values: OrderedDict[tuple[str, ...], GaugeValue] = OrderedDict()
         self._lock = threading.Lock()
 
-    def _validate_labels(self, labels: Dict[str, str]) -> None:
+    def _validate_labels(self, labels: dict[str, str]) -> None:
         """Validate labels against expected label names.
 
         Args:
@@ -1115,18 +1105,18 @@ class Gauge:
             self._values.move_to_end(key)
             return self._values[key].get()
 
-    def get_all(self) -> Dict[Tuple[str, ...], float]:
+    def get_all(self) -> dict[tuple[str, ...], float]:
         """Get all gauge values with their labels."""
         with self._lock:
             return {k: v.get() for k, v in self._values.items()}
 
-    def _labels_to_key(self, labels: Dict[str, str]) -> Tuple[str, ...]:
+    def _labels_to_key(self, labels: dict[str, str]) -> tuple[str, ...]:
         """Convert labels dict to hashable key tuple."""
         return tuple(labels.get(name, "") for name in self.label_names)
 
-    def labels_from_key(self, key: Tuple[str, ...]) -> Dict[str, str]:
+    def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key))
+        return dict(zip(self.label_names, key, strict=False))
 
 
 class MetricsRegistry:
@@ -1153,14 +1143,14 @@ class MetricsRegistry:
         registry.memory_storage_latency_ms.observe(45.2, operation="store")
     """
 
-    _instance: Optional["MetricsRegistry"] = None
+    _instance: MetricsRegistry | None = None
     _class_lock = (
         threading.Lock()
     )  # Class-level lock for singleton creation/destruction
     _instance_lock: threading.RLock  # Instance-level lock for multi-metric operations
     _initialized: bool  # Flag to track initialization state
 
-    def __new__(cls) -> "MetricsRegistry":
+    def __new__(cls) -> MetricsRegistry:
         """Singleton pattern for metrics registry with double-checked locking.
 
         Thread-safety is achieved by:
@@ -1198,7 +1188,6 @@ class MetricsRegistry:
     def __init__(self) -> None:
         """No-op init - all initialization done in __new__ under lock."""
         # Initialization is done in __new__ to ensure thread safety
-        pass
 
     def _do_initialize(self) -> None:
         """Perform actual initialization (called under class lock from __new__).
@@ -1233,7 +1222,7 @@ class MetricsRegistry:
         # Mark as initialized AFTER all metrics are created
         self._initialized = True
 
-    def get_all_metrics(self) -> Dict[str, Dict[str, object]]:
+    def get_all_metrics(self) -> dict[str, dict[str, object]]:
         """Get snapshot of all metrics for reporting.
 
         Thread-safety: This method acquires the instance lock to ensure a
@@ -1392,23 +1381,23 @@ class PerformanceMetrics:
     """Performance metrics for operations."""
 
     start_time: float
-    end_time: Optional[float] = None
-    duration: Optional[float] = None
-    memory_usage_start: Optional[float] = None
-    memory_usage_end: Optional[float] = None
-    memory_delta: Optional[float] = None
-    success: Optional[bool] = None
-    error_type: Optional[str] = None
+    end_time: float | None = None
+    duration: float | None = None
+    memory_usage_start: float | None = None
+    memory_usage_end: float | None = None
+    memory_delta: float | None = None
+    success: bool | None = None
+    error_type: str | None = None
 
 
 class CorrelationContext(BaseModel):
     """Context information for correlation tracking."""
 
     correlation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    request_id: Optional[str] = Field(default=None)
-    user_id: Optional[str] = Field(default=None)
-    operation: Optional[str] = Field(default=None)
-    parent_correlation_id: Optional[str] = Field(default=None)
+    request_id: str | None = Field(default=None)
+    user_id: str | None = Field(default=None)
+    operation: str | None = Field(default=None)
+    parent_correlation_id: str | None = Field(default=None)
     trace_level: TraceLevel = Field(default=TraceLevel.INFO)
     metadata: ModelMetadata = Field(default_factory=ModelMetadata)
     created_at: datetime = Field(default_factory=datetime.now)
@@ -1448,17 +1437,17 @@ class ObservabilityManager:
         """
         self.max_active_traces = max_active_traces
         # Use OrderedDict for bounded storage with LRU eviction
-        self._active_traces: "OrderedDict[str, PerformanceMetrics]" = OrderedDict()
+        self._active_traces: OrderedDict[str, PerformanceMetrics] = OrderedDict()
         self._traces_lock = threading.Lock()
         self._logger = structlog.get_logger(__name__)
 
     @asynccontextmanager
     async def correlation_context(
         self,
-        correlation_id: Optional[str] = None,
-        request_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        operation: Optional[str] = None,
+        correlation_id: str | None = None,
+        request_id: str | None = None,
+        user_id: str | None = None,
+        operation: str | None = None,
         trace_level: TraceLevel = TraceLevel.INFO,
         **metadata,
     ) -> AsyncGenerator[CorrelationContext, None]:
@@ -1554,7 +1543,7 @@ class ObservabilityManager:
         correlation_id = correlation_id_var.get()
 
         # Initialize performance metrics if requested
-        start_memory: Optional[float] = None
+        start_memory: float | None = None
         if trace_performance:
             # Only track memory if psutil is available
             if _PSUTIL_AVAILABLE and psutil is not None:
@@ -1703,7 +1692,7 @@ class ObservabilityManager:
                         if trace_id in self._active_traces:
                             del self._active_traces[trace_id]
 
-    def get_current_context(self) -> Dict[str, Optional[str]]:
+    def get_current_context(self) -> dict[str, str | None]:
         """Get current correlation context."""
         return {
             "correlation_id": correlation_id_var.get(),
@@ -1712,7 +1701,7 @@ class ObservabilityManager:
             "operation": operation_var.get(),
         }
 
-    def get_performance_metrics(self) -> Dict[str, PerformanceMetrics]:
+    def get_performance_metrics(self) -> dict[str, PerformanceMetrics]:
         """Get current performance metrics for active traces (thread-safe)."""
         with self._traces_lock:
             return dict(self._active_traces)
@@ -1732,10 +1721,10 @@ observability_manager = ObservabilityManager()
 # Convenience functions for common patterns
 @asynccontextmanager
 async def correlation_context(
-    correlation_id: Optional[str] = None,
-    request_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    operation: Optional[str] = None,
+    correlation_id: str | None = None,
+    request_id: str | None = None,
+    user_id: str | None = None,
+    operation: str | None = None,
     **metadata,
 ):
     """Convenience function for correlation context management."""
@@ -1768,12 +1757,12 @@ async def trace_operation(
         yield trace_id
 
 
-def get_correlation_id() -> Optional[str]:
+def get_correlation_id() -> str | None:
     """Get current correlation ID from context."""
     return correlation_id_var.get()
 
 
-def get_request_id() -> Optional[str]:
+def get_request_id() -> str | None:
     """Get current request ID from context."""
     return request_id_var.get()
 
@@ -1858,14 +1847,14 @@ class HandlerMetrics:
     handler: str
     status: Literal["success", "failure"]
     latency_ms: float
-    error_type: Optional[str] = None
-    error_message: Optional[str] = None
+    error_type: str | None = None
+    error_message: str | None = None
 
 
 def _get_safe_content_metadata(
-    content: Optional[str],
+    content: str | None,
     field_name: str = "content",
-) -> Dict[str, Union[str, int, bool]]:
+) -> dict[str, str | int | bool]:
     """Extract safe metadata from content without logging PII.
 
     Instead of logging raw content, we log:
@@ -1942,7 +1931,7 @@ class HandlerObservabilityWrapper:
     def __init__(
         self,
         handler_name: str,
-        registry: Optional[MetricsRegistry] = None,
+        registry: MetricsRegistry | None = None,
         validate_log_schema: bool = False,
     ) -> None:
         """Initialize the wrapper.
@@ -1995,8 +1984,8 @@ class HandlerObservabilityWrapper:
     async def observe_operation(
         self,
         operation: str,
-        correlation_id: Optional[str] = None,
-    ) -> AsyncGenerator[Dict[str, str], None]:
+        correlation_id: str | None = None,
+    ) -> AsyncGenerator[dict[str, str], None]:
         """Context manager for observing handler operations.
 
         Implements the core observability pattern:
@@ -2035,8 +2024,8 @@ class HandlerObservabilityWrapper:
         # Start timing
         start_time = time.perf_counter()
         status: Literal["success", "failure"] = "success"
-        error_type: Optional[str] = None
-        error_message: Optional[str] = None
+        error_type: str | None = None
+        error_message: str | None = None
 
         try:
             yield ctx
@@ -2160,13 +2149,11 @@ class HandlerObservabilityWrapper:
         # Generate ISO8601 timestamp in UTC with millisecond precision
         # Format: YYYY-MM-DDTHH:MM:SS.sssZ (e.g., "2025-01-19T12:34:56.789Z")
         # Using timezone-aware datetime.now(timezone.utc) instead of deprecated utcnow()
-        timestamp = (
-            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        )
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
         # Build log data with ALL required fields (schema compliance)
         # Note: All required fields must be non-None strings/floats
-        log_data: Dict[str, Union[str, float]] = {
+        log_data: dict[str, str | float] = {
             "correlation_id": metrics.correlation_id,  # Required: str
             "operation": metrics.operation,  # Required: str
             "handler": metrics.handler,  # Required: str
@@ -2212,7 +2199,7 @@ class HandlerObservabilityWrapper:
         """Explicitly mark handler as unhealthy."""
         self.registry.handler_health_status.set(0.0, handler=self.handler_name)
 
-    def get_handler_stats(self) -> Dict[str, object]:
+    def get_handler_stats(self) -> dict[str, object]:
         """Get statistics for this handler.
 
         Returns:

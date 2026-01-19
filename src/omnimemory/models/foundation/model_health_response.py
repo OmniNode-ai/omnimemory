@@ -4,8 +4,8 @@ Health response model following ONEX standards.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -50,7 +50,7 @@ class ModelHealthResponse(BaseModel):
     )
     latency_ms: float = Field(description="Health check response time in milliseconds")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the health check was performed",
     )
     resource_usage: ModelResourceMetrics = Field(
@@ -74,7 +74,7 @@ class ModelCircuitBreakerStats(BaseModel):
     success_count: int = Field(ge=0, description="Total number of successful calls")
     total_calls: int = Field(ge=0, description="Total number of calls made")
     total_timeouts: int = Field(ge=0, description="Total number of timeout failures")
-    last_failure_time: Optional[datetime] = Field(
+    last_failure_time: datetime | None = Field(
         default=None, description="Timestamp of the last failure"
     )
     state_changed_at: datetime = Field(
@@ -89,7 +89,7 @@ class ModelCircuitBreakerStatsCollection(BaseModel):
         description="Circuit breaker statistics keyed by dependency name"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the statistics were collected",
     )
 
@@ -108,18 +108,18 @@ class ModelRateLimitedHealthCheckResponse(BaseModel):
         default_factory=dict,
         description="Additional details including retry_after and current_window_requests",
     )
-    health_check: Optional[ModelHealthResponse] = Field(
+    health_check: ModelHealthResponse | None = Field(
         default=None, description="Health check result if within rate limit"
     )
     rate_limited: bool = Field(
         default=True, description="Whether the request was rate limited"
     )
-    rate_limit_reset_time: Optional[datetime] = Field(
+    rate_limit_reset_time: datetime | None = Field(
         default=None, description="When the rate limit will reset"
     )
-    remaining_requests: Optional[int] = Field(
+    remaining_requests: int | None = Field(
         default=None, description="Number of requests remaining in the current window"
     )
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         default=None, description="Error message if rate limited"
     )

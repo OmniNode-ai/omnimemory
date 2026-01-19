@@ -13,8 +13,7 @@ All models follow ONEX standards with:
 
 from __future__ import annotations
 
-from typing import Iterator, List, Optional, Union
-from uuid import UUID
+from collections.abc import Iterator
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -28,14 +27,14 @@ class ModelStringList(BaseModel):
         str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
-    values: List[str] = Field(
+    values: list[str] = Field(
         default_factory=list,
         description="List of string values with validation and deduplication",
     )
 
     @field_validator("values")
     @classmethod
-    def validate_strings(cls, v: List[str]) -> List[str]:
+    def validate_strings(cls, v: list[str]) -> list[str]:
         """Validate and deduplicate string values."""
         if not isinstance(v, list):
             raise ValueError("values must be a list")
@@ -43,7 +42,7 @@ class ModelStringList(BaseModel):
         # Remove empty strings and duplicates while preserving order
         # Use O(1) set operations for efficient deduplication
         seen: set[str] = set()
-        result: List[str] = []
+        result: list[str] = []
         for item in v:
             if item:
                 stripped_item = item.strip()
@@ -57,7 +56,7 @@ class ModelStringList(BaseModel):
         """Support 'in' operator for checking membership."""
         return item in self.values
 
-    def __iter__(self) -> "Iterator[str]":
+    def __iter__(self) -> Iterator[str]:
         """Support iteration over values."""
         return iter(self.values)
 
@@ -77,13 +76,13 @@ class ModelOptionalStringList(BaseModel):
         str_strip_whitespace=True, validate_assignment=True, extra="forbid"
     )
 
-    values: Optional[List[str]] = Field(
+    values: list[str] | None = Field(
         default=None, description="Optional list of string values, None if not set"
     )
 
     @field_validator("values")
     @classmethod
-    def validate_optional_strings(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_optional_strings(cls, v: list[str] | None) -> list[str] | None:
         """Validate optional string values."""
         if v is None:
             return None
@@ -94,7 +93,7 @@ class ModelOptionalStringList(BaseModel):
         # Remove empty strings and duplicates while preserving order
         # Use O(1) set operations for efficient deduplication
         seen: set[str] = set()
-        result: List[str] = []
+        result: list[str] = []
         for item in v:
             if item:
                 stripped_item = item.strip()
@@ -142,7 +141,7 @@ class ModelOptionalStringList(BaseModel):
         """Check if the list is empty or None."""
         return self.values is None or len(self.values) == 0
 
-    def or_default(self, default: List[str]) -> List[str]:
+    def or_default(self, default: list[str]) -> list[str]:
         """Return values or a default if None.
 
         Args:
@@ -183,11 +182,11 @@ class ModelMetadata(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
-    pairs: List[ModelKeyValuePair] = Field(
+    pairs: list[ModelKeyValuePair] = Field(
         default_factory=list, description="List of key-value pairs for metadata storage"
     )
 
-    def get_value(self, key: str) -> Optional[str]:
+    def get_value(self, key: str) -> str | None:
         """Get metadata value by key."""
         for pair in self.pairs:
             if pair.key == key:
@@ -250,7 +249,7 @@ class ModelStructuredData(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
-    fields: List[ModelStructuredField] = Field(
+    fields: list[ModelStructuredField] = Field(
         default_factory=list,
         description="List of structured fields with type information",
     )
@@ -258,7 +257,7 @@ class ModelStructuredData(BaseModel):
         default="1.0", description="Schema version for compatibility tracking"
     )
 
-    def get_field_value(self, name: str) -> Optional[str]:
+    def get_field_value(self, name: str) -> str | None:
         """Get field value by name."""
         for field in self.fields:
             if field.name == name:
@@ -293,7 +292,7 @@ class ModelConfigurationOption(BaseModel):
 
     key: str = Field(description="Configuration option key")
     value: str = Field(description="Configuration option value")
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None, description="Option description for documentation"
     )
     is_sensitive: bool = Field(
@@ -314,11 +313,11 @@ class ModelConfiguration(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
-    options: List[ModelConfigurationOption] = Field(
+    options: list[ModelConfigurationOption] = Field(
         default_factory=list, description="List of configuration options with metadata"
     )
 
-    def get_option(self, key: str) -> Optional[str]:
+    def get_option(self, key: str) -> str | None:
         """Get configuration option value by key."""
         for option in self.options:
             if option.key == key:
@@ -329,7 +328,7 @@ class ModelConfiguration(BaseModel):
         self,
         key: str,
         value: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         is_sensitive: bool = False,
     ) -> None:
         """Set configuration option with metadata."""
@@ -369,7 +368,7 @@ class ModelEventData(BaseModel):
         description="Event severity level (debug, info, warning, error, critical)",
     )
     message: str = Field(description="Human-readable event message")
-    correlation_id: Optional[str] = Field(
+    correlation_id: str | None = Field(
         default=None, description="Correlation ID for tracking related events"
     )
 
@@ -396,7 +395,7 @@ class ModelEventCollection(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
-    events: List[ModelEventData] = Field(
+    events: list[ModelEventData] = Field(
         default_factory=list, description="List of system events with structured data"
     )
 
@@ -407,7 +406,7 @@ class ModelEventCollection(BaseModel):
         source: str,
         message: str,
         severity: str = "info",
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> None:
         """Add a new event to the collection."""
         event = ModelEventData(
@@ -420,11 +419,11 @@ class ModelEventCollection(BaseModel):
         )
         self.events.append(event)
 
-    def get_events_by_type(self, event_type: str) -> List[ModelEventData]:
+    def get_events_by_type(self, event_type: str) -> list[ModelEventData]:
         """Get all events of a specific type."""
         return [event for event in self.events if event.event_type == event_type]
 
-    def get_events_by_severity(self, severity: str) -> List[ModelEventData]:
+    def get_events_by_severity(self, severity: str) -> list[ModelEventData]:
         """Get all events of a specific severity."""
         return [event for event in self.events if event.severity == severity.lower()]
 
@@ -444,7 +443,7 @@ class ModelResultItem(BaseModel):
         description="Status of this specific item (success, failure, pending)"
     )
     message: str = Field(description="Human-readable message about this item")
-    data: Optional[ModelStructuredData] = Field(
+    data: ModelStructuredData | None = Field(
         default=None, description="Structured data associated with this item"
     )
 
@@ -463,7 +462,7 @@ class ModelResultCollection(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
-    results: List[ModelResultItem] = Field(
+    results: list[ModelResultItem] = Field(
         default_factory=list,
         description="List of operation results with structured data",
     )
@@ -473,17 +472,17 @@ class ModelResultCollection(BaseModel):
         id: str,
         status: str,
         message: str,
-        data: Optional[ModelStructuredData] = None,
+        data: ModelStructuredData | None = None,
     ) -> None:
         """Add a new result to the collection."""
         result = ModelResultItem(id=id, status=status, message=message, data=data)
         self.results.append(result)
 
-    def get_successful_results(self) -> List[ModelResultItem]:
+    def get_successful_results(self) -> list[ModelResultItem]:
         """Get all successful results."""
         return [result for result in self.results if result.status == "success"]
 
-    def get_failed_results(self) -> List[ModelResultItem]:
+    def get_failed_results(self) -> list[ModelResultItem]:
         """Get all failed results."""
         return [result for result in self.results if result.status == "failure"]
 
@@ -496,13 +495,13 @@ def convert_dict_to_metadata(data: dict[str, object]) -> ModelMetadata:
     return ModelMetadata.from_dict(data)
 
 
-def convert_list_to_string_list(data: List[str]) -> ModelStringList:
+def convert_list_to_string_list(data: list[str]) -> ModelStringList:
     """Convert a list of strings to ModelStringList."""
     return ModelStringList(values=data)
 
 
 def convert_list_of_dicts_to_structured_data(
-    data: List[dict[str, object]]
+    data: list[dict[str, object]],
 ) -> ModelResultCollection:
     """Convert a list of dictionaries to structured result collection."""
     collection = ModelResultCollection()

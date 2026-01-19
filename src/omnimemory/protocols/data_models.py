@@ -10,23 +10,19 @@ comprehensive validation, serialization, and observability features.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..models.foundation import (
     ModelConfiguration,
-    ModelEventCollection,
     ModelMetadata,
     ModelOptionalStringList,
     ModelResultCollection,
     ModelStringList,
     ModelStructuredData,
-    convert_dict_to_metadata,
-    convert_list_to_string_list,
 )
 
 # === ENUMS ===
@@ -111,7 +107,7 @@ class UserContext(BaseMemoryModel):
 
     user_id: UUID = Field(description="Unique user identifier")
     agent_id: UUID = Field(description="Agent performing the operation")
-    session_id: Optional[UUID] = Field(None, description="Session identifier")
+    session_id: UUID | None = Field(None, description="Session identifier")
     permissions: ModelStringList = Field(
         default_factory=ModelStringList,
         description="User permissions for memory operations",
@@ -139,10 +135,10 @@ class StoragePreferences(BaseMemoryModel):
     encryption_required: bool = Field(
         True, description="Whether encryption is required"
     )
-    geographic_preference: Optional[str] = Field(
+    geographic_preference: str | None = Field(
         None, description="Geographic storage preference"
     )
-    retention_policy: Optional[str] = Field(
+    retention_policy: str | None = Field(
         None, description="Data retention policy identifier"
     )
 
@@ -150,28 +146,28 @@ class StoragePreferences(BaseMemoryModel):
 class SearchFilters(BaseMemoryModel):
     """Filters for memory search operations."""
 
-    content_types: Optional[List[ContentType]] = Field(
+    content_types: list[ContentType] | None = Field(
         None, description="Filter by content types"
     )
-    priority_levels: Optional[List[MemoryPriority]] = Field(
+    priority_levels: list[MemoryPriority] | None = Field(
         None, description="Filter by priority levels"
     )
-    access_levels: Optional[List[AccessLevel]] = Field(
+    access_levels: list[AccessLevel] | None = Field(
         None, description="Filter by access levels"
     )
-    tags: Optional[ModelOptionalStringList] = Field(
+    tags: ModelOptionalStringList | None = Field(
         None, description="Filter by tags (AND logic)"
     )
-    source_agents: Optional[ModelOptionalStringList] = Field(
+    source_agents: ModelOptionalStringList | None = Field(
         None, description="Filter by source agents"
     )
-    date_range_start: Optional[datetime] = Field(
+    date_range_start: datetime | None = Field(
         None, description="Filter by creation date (start)"
     )
-    date_range_end: Optional[datetime] = Field(
+    date_range_end: datetime | None = Field(
         None, description="Filter by creation date (end)"
     )
-    has_embeddings: Optional[bool] = Field(
+    has_embeddings: bool | None = Field(
         None, description="Filter by embedding availability"
     )
 
@@ -186,7 +182,7 @@ class SearchResult(BaseMemoryModel):
     relevance_score: float = Field(
         ge=0.0, le=1.0, description="Relevance score (0.0 to 1.0)"
     )
-    memory_record: Optional["MemoryRecord"] = Field(
+    memory_record: MemoryRecord | None = Field(
         None, description="Full memory record (if requested)"
     )
     highlight_snippets: ModelStringList = Field(
@@ -208,10 +204,10 @@ class BaseMemoryRequest(BaseMemoryModel):
         default_factory=uuid4, description="Correlation ID for request tracking"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Request timestamp",
     )
-    user_context: Optional[UserContext] = Field(
+    user_context: UserContext | None = Field(
         None, description="User context and permissions"
     )
     timeout_ms: int = Field(
@@ -228,7 +224,7 @@ class BaseMemoryResponse(BaseMemoryModel):
     correlation_id: UUID = Field(description="Correlation ID matching request")
     status: OperationStatus = Field(description="Operation execution status")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Response timestamp",
     )
     execution_time_ms: int = Field(ge=0, description="Execution time in milliseconds")
@@ -268,19 +264,20 @@ class MemoryRecord(BaseMemoryModel):
         default_factory=uuid4, description="Unique memory identifier"
     )
     content: str = Field(
-        description="Memory content", max_length=1048576  # 1MB max content
+        description="Memory content",
+        max_length=1048576,  # 1MB max content
     )
     content_type: ContentType = Field(description="Type of memory content")
-    content_hash: Optional[str] = Field(
+    content_hash: str | None = Field(
         None, description="SHA-256 hash of content for integrity"
     )
-    embedding: Optional[List[float]] = Field(
+    embedding: list[float] | None = Field(
         None,
         description="Vector embedding for semantic search",
         min_length=768,
         max_length=4096,
     )
-    embedding_model: Optional[str] = Field(
+    embedding_model: str | None = Field(
         None, description="Model used to generate embedding"
     )
     tags: ModelStringList = Field(
@@ -290,29 +287,27 @@ class MemoryRecord(BaseMemoryModel):
         MemoryPriority.NORMAL, description="Memory priority level"
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Creation timestamp",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Last update timestamp",
     )
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         None, description="Expiration timestamp (for temporal memory)"
     )
     provenance: ModelStringList = Field(
         default_factory=ModelStringList, description="Memory provenance chain"
     )
     source_agent: str = Field(description="Agent that created this memory")
-    related_memories: List[UUID] = Field(
+    related_memories: list[UUID] = Field(
         default_factory=list, description="Related memory identifiers"
     )
     access_level: AccessLevel = Field(
         AccessLevel.INTERNAL, description="Memory access control level"
     )
-    storage_location: Optional[str] = Field(
-        None, description="Physical storage location"
-    )
+    storage_location: str | None = Field(None, description="Physical storage location")
     index_status: IndexingStatus = Field(
         IndexingStatus.PENDING, description="Indexing status for search"
     )
@@ -322,7 +317,7 @@ class MemoryRecord(BaseMemoryModel):
     usage_count: int = Field(
         0, ge=0, description="Number of times this memory has been accessed"
     )
-    last_accessed: Optional[datetime] = Field(None, description="Last access timestamp")
+    last_accessed: datetime | None = Field(None, description="Last access timestamp")
 
     @field_validator("tags", "provenance", mode="before")
     @classmethod
@@ -340,13 +335,13 @@ class MemoryStoreRequest(BaseMemoryRequest):
     """Request to store memory."""
 
     memory: MemoryRecord = Field(description="Memory record to store")
-    storage_preferences: Optional[StoragePreferences] = Field(
+    storage_preferences: StoragePreferences | None = Field(
         None, description="Storage location and durability preferences"
     )
     generate_embedding: bool = Field(
         True, description="Whether to generate vector embedding"
     )
-    embedding_model: Optional[str] = Field(
+    embedding_model: str | None = Field(
         None, description="Specific embedding model to use"
     )
     index_immediately: bool = Field(
@@ -383,8 +378,8 @@ class MemoryRetrieveRequest(BaseMemoryRequest):
 class MemoryRetrieveResponse(BaseMemoryResponse):
     """Response from memory retrieve operation."""
 
-    memory: Optional[MemoryRecord] = Field(description="Retrieved memory record")
-    related_memories: List[MemoryRecord] = Field(
+    memory: MemoryRecord | None = Field(description="Retrieved memory record")
+    related_memories: list[MemoryRecord] = Field(
         default_factory=list, description="Related memory records (if requested)"
     )
     cache_hit: bool = Field(description="Whether result came from cache")
@@ -397,7 +392,7 @@ class MemoryDeleteRequest(BaseMemoryRequest):
     soft_delete: bool = Field(
         True, description="Whether to perform soft delete (preserving audit trail)"
     )
-    reason: Optional[str] = Field(None, description="Reason for deletion")
+    reason: str | None = Field(None, description="Reason for deletion")
 
 
 class MemoryDeleteResponse(BaseMemoryResponse):
@@ -405,7 +400,7 @@ class MemoryDeleteResponse(BaseMemoryResponse):
 
     memory_id: UUID = Field(description="Deleted memory identifier")
     soft_deleted: bool = Field(description="Whether soft delete was performed")
-    backup_location: Optional[str] = Field(
+    backup_location: str | None = Field(
         None, description="Location of backup (if created)"
     )
 
@@ -421,9 +416,7 @@ class SemanticSearchRequest(BaseMemoryRequest):
     similarity_threshold: float = Field(
         0.7, ge=0.0, le=1.0, description="Minimum similarity score"
     )
-    filters: Optional[SearchFilters] = Field(
-        None, description="Additional search filters"
-    )
+    filters: SearchFilters | None = Field(None, description="Additional search filters")
     include_embeddings: bool = Field(
         False, description="Include embeddings in response"
     )
@@ -431,7 +424,7 @@ class SemanticSearchRequest(BaseMemoryRequest):
     highlight_matches: bool = Field(
         True, description="Highlight search terms in content"
     )
-    embedding_model: Optional[str] = Field(
+    embedding_model: str | None = Field(
         None, description="Specific embedding model for query"
     )
 
@@ -439,11 +432,11 @@ class SemanticSearchRequest(BaseMemoryRequest):
 class SemanticSearchResponse(BaseMemoryResponse):
     """Response from semantic search."""
 
-    results: List[SearchResult] = Field(description="Search results with scores")
+    results: list[SearchResult] = Field(description="Search results with scores")
     total_matches: int = Field(ge=0, description="Total number of matches found")
     search_time_ms: int = Field(ge=0, description="Search execution time")
     index_version: str = Field(description="Search index version used")
-    query_embedding: Optional[List[float]] = Field(
+    query_embedding: list[float] | None = Field(
         None, description="Query embedding used for search"
     )
 
@@ -451,17 +444,13 @@ class SemanticSearchResponse(BaseMemoryResponse):
 class TemporalSearchRequest(BaseMemoryRequest):
     """Request for time-based memory retrieval."""
 
-    time_range_start: Optional[datetime] = Field(
-        None, description="Start of time range"
-    )
-    time_range_end: Optional[datetime] = Field(None, description="End of time range")
+    time_range_start: datetime | None = Field(None, description="Start of time range")
+    time_range_end: datetime | None = Field(None, description="End of time range")
     temporal_decay_factor: float = Field(
         1.0, ge=0.0, le=1.0, description="Temporal decay factor for scoring"
     )
     limit: int = Field(10, ge=1, le=1000, description="Maximum number of results")
-    filters: Optional[SearchFilters] = Field(
-        None, description="Additional search filters"
-    )
+    filters: SearchFilters | None = Field(None, description="Additional search filters")
     sort_by: str = Field(
         "relevance", description="Sort order (relevance/created_at/updated_at)"
     )
@@ -470,11 +459,11 @@ class TemporalSearchRequest(BaseMemoryRequest):
 class TemporalSearchResponse(BaseMemoryResponse):
     """Response from temporal search."""
 
-    results: List[SearchResult] = Field(description="Time-filtered search results")
+    results: list[SearchResult] = Field(description="Time-filtered search results")
     total_matches: int = Field(
         ge=0, description="Total number of matches in time range"
     )
-    time_range_coverage: Dict[str, int] = Field(
+    time_range_coverage: dict[str, int] = Field(
         default_factory=dict, description="Distribution of matches across time periods"
     )
 
@@ -489,15 +478,13 @@ class ContextualSearchRequest(BaseMemoryRequest):
         0.5, ge=0.0, le=1.0, description="Weight of context vs content similarity"
     )
     limit: int = Field(10, ge=1, le=1000, description="Maximum number of results")
-    filters: Optional[SearchFilters] = Field(
-        None, description="Additional search filters"
-    )
+    filters: SearchFilters | None = Field(None, description="Additional search filters")
 
 
 class ContextualSearchResponse(BaseMemoryResponse):
     """Response from contextual search."""
 
-    results: List[SearchResult] = Field(description="Context-matched results")
+    results: list[SearchResult] = Field(description="Context-matched results")
     context_analysis: ModelMetadata = Field(
         default_factory=ModelMetadata, description="Analysis of context matching"
     )
@@ -585,7 +572,7 @@ class PatternAnalysisResponse(BaseMemoryResponse):
     patterns: ModelResultCollection = Field(
         default_factory=ModelResultCollection, description="Discovered patterns"
     )
-    confidence_scores: List[float] = Field(description="Pattern confidence scores")
+    confidence_scores: list[float] = Field(description="Pattern confidence scores")
 
 
 class InsightExtractionRequest(BaseMemoryRequest):
@@ -604,7 +591,7 @@ class InsightExtractionResponse(BaseMemoryResponse):
     insights: ModelResultCollection = Field(
         default_factory=ModelResultCollection, description="Extracted insights"
     )
-    insight_scores: List[float] = Field(description="Insight relevance scores")
+    insight_scores: list[float] = Field(description="Insight relevance scores")
 
 
 # Semantic Analysis Models
@@ -630,13 +617,13 @@ class EmbeddingRequest(BaseMemoryRequest):
     """Request for vector embedding generation."""
 
     text: str = Field(description="Text to embed")
-    model: Optional[str] = Field(None, description="Embedding model to use")
+    model: str | None = Field(None, description="Embedding model to use")
 
 
 class EmbeddingResponse(BaseMemoryResponse):
     """Response from embedding generation."""
 
-    embedding: List[float] = Field(description="Generated vector embedding")
+    embedding: list[float] = Field(description="Generated vector embedding")
     model_used: str = Field(description="Embedding model used")
     dimensions: int = Field(description="Embedding dimensions")
 
@@ -676,7 +663,7 @@ class PatternRecognitionResponse(BaseMemoryResponse):
     recognized_patterns: ModelResultCollection = Field(
         default_factory=ModelResultCollection, description="Recognized patterns"
     )
-    pattern_confidence: List[float] = Field(description="Pattern confidence scores")
+    pattern_confidence: list[float] = Field(description="Pattern confidence scores")
 
 
 class PatternLearningRequest(BaseMemoryRequest):
@@ -714,7 +701,7 @@ class PatternPredictionResponse(BaseMemoryResponse):
     predictions: ModelResultCollection = Field(
         default_factory=ModelResultCollection, description="Pattern predictions"
     )
-    confidence_intervals: List[Dict[str, float]] = Field(
+    confidence_intervals: list[dict[str, float]] = Field(
         description="Prediction confidence"
     )
 
@@ -723,7 +710,7 @@ class PatternPredictionResponse(BaseMemoryResponse):
 class ConsolidationRequest(BaseMemoryRequest):
     """Request for memory consolidation."""
 
-    memory_ids: List[UUID] = Field(description="Memories to consolidate")
+    memory_ids: list[UUID] = Field(description="Memories to consolidate")
     consolidation_strategy: str = Field(description="Consolidation strategy")
 
 
@@ -731,7 +718,7 @@ class ConsolidationResponse(BaseMemoryResponse):
     """Response from memory consolidation."""
 
     consolidated_memory_id: UUID = Field(description="ID of consolidated memory")
-    source_memory_ids: List[UUID] = Field(description="IDs of source memories")
+    source_memory_ids: list[UUID] = Field(description="IDs of source memories")
 
 
 class DeduplicationRequest(BaseMemoryRequest):
@@ -749,7 +736,7 @@ class DeduplicationResponse(BaseMemoryResponse):
     """Response from memory deduplication."""
 
     duplicates_removed: int = Field(description="Number of duplicates removed")
-    duplicate_groups: List[List[UUID]] = Field(
+    duplicate_groups: list[list[UUID]] = Field(
         description="Groups of duplicate memories"
     )
 
@@ -757,7 +744,7 @@ class DeduplicationResponse(BaseMemoryResponse):
 class ContextMergeRequest(BaseMemoryRequest):
     """Request for memory context merging."""
 
-    context_ids: List[UUID] = Field(description="Context IDs to merge")
+    context_ids: list[UUID] = Field(description="Context IDs to merge")
     merge_strategy: str = Field(description="Context merge strategy")
 
 
@@ -765,7 +752,7 @@ class ContextMergeResponse(BaseMemoryResponse):
     """Response from context merging."""
 
     merged_context_id: UUID = Field(description="ID of merged context")
-    source_context_ids: List[UUID] = Field(description="IDs of source contexts")
+    source_context_ids: list[UUID] = Field(description="IDs of source contexts")
 
 
 # Memory Aggregation Models
@@ -792,7 +779,7 @@ class AggregationResponse(BaseMemoryResponse):
 class SummarizationRequest(BaseMemoryRequest):
     """Request for memory summarization."""
 
-    memory_cluster: List[UUID] = Field(description="Memory cluster to summarize")
+    memory_cluster: list[UUID] = Field(description="Memory cluster to summarize")
     summarization_level: str = Field("standard", description="Level of summarization")
 
 
@@ -811,7 +798,7 @@ class StatisticsRequest(BaseMemoryRequest):
     statistics_type: ModelStringList = Field(
         default_factory=ModelStringList, description="Types of statistics to generate"
     )
-    time_window: Optional[Dict[str, datetime]] = Field(
+    time_window: dict[str, datetime] | None = Field(
         None, description="Time window for stats"
     )
 
@@ -822,7 +809,7 @@ class StatisticsResponse(BaseMemoryResponse):
     statistics: ModelConfiguration = Field(
         default_factory=ModelConfiguration, description="Generated statistics"
     )
-    charts_data: Optional[ModelMetadata] = Field(
+    charts_data: ModelMetadata | None = Field(
         None, description="Data for visualization"
     )
 
@@ -845,7 +832,7 @@ class LayoutOptimizationResponse(BaseMemoryResponse):
     optimization_results: ModelConfiguration = Field(
         default_factory=ModelConfiguration, description="Optimization results"
     )
-    performance_improvement: Dict[str, float] = Field(description="Performance gains")
+    performance_improvement: dict[str, float] = Field(description="Performance gains")
 
 
 class CompressionRequest(BaseMemoryRequest):
@@ -877,7 +864,7 @@ class RetrievalOptimizationResponse(BaseMemoryResponse):
     optimization_applied: ModelStringList = Field(
         default_factory=ModelStringList, description="Optimizations applied"
     )
-    expected_improvement: Dict[str, float] = Field(
+    expected_improvement: dict[str, float] = Field(
         description="Expected performance gains"
     )
 
@@ -926,7 +913,7 @@ class WorkflowStateRequest(BaseMemoryRequest):
 
     workflow_id: UUID = Field(description="Workflow ID to manage")
     state_operation: str = Field(description="State operation (get/set/reset)")
-    state_data: Optional[ModelMetadata] = Field(None, description="State data")
+    state_data: ModelMetadata | None = Field(None, description="State data")
 
 
 class WorkflowStateResponse(BaseMemoryResponse):
@@ -944,7 +931,7 @@ class WorkflowStateResponse(BaseMemoryResponse):
 class AgentCoordinationRequest(BaseMemoryRequest):
     """Request for agent coordination."""
 
-    agent_ids: List[UUID] = Field(description="Agents to coordinate")
+    agent_ids: list[UUID] = Field(description="Agents to coordinate")
     coordination_task: ModelConfiguration = Field(
         default_factory=ModelConfiguration, description="Coordination task definition"
     )
@@ -968,7 +955,7 @@ class BroadcastRequest(BaseMemoryRequest):
     update_data: ModelConfiguration = Field(
         default_factory=ModelConfiguration, description="Update data to broadcast"
     )
-    target_agents: Optional[List[UUID]] = Field(
+    target_agents: list[UUID] | None = Field(
         None, description="Target agents (None = all)"
     )
 
@@ -977,8 +964,8 @@ class BroadcastResponse(BaseMemoryResponse):
     """Response from update broadcast."""
 
     broadcast_id: UUID = Field(description="Broadcast operation ID")
-    agents_notified: List[UUID] = Field(description="Agents successfully notified")
-    failed_notifications: List[UUID] = Field(
+    agents_notified: list[UUID] = Field(description="Agents successfully notified")
+    failed_notifications: list[UUID] = Field(
         description="Agents that failed to receive update"
     )
 
@@ -986,7 +973,7 @@ class BroadcastResponse(BaseMemoryResponse):
 class StateSynchronizationRequest(BaseMemoryRequest):
     """Request for agent state synchronization."""
 
-    agent_ids: List[UUID] = Field(description="Agents to synchronize")
+    agent_ids: list[UUID] = Field(description="Agents to synchronize")
     synchronization_scope: ModelConfiguration = Field(
         default_factory=ModelConfiguration, description="Scope of synchronization"
     )
@@ -1021,7 +1008,7 @@ class LifecycleOrchestrationResponse(BaseMemoryResponse):
     orchestration_plan: ModelConfiguration = Field(
         default_factory=ModelConfiguration, description="Lifecycle orchestration plan"
     )
-    affected_memories: List[UUID] = Field(
+    affected_memories: list[UUID] = Field(
         description="Memories affected by orchestration"
     )
 

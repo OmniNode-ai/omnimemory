@@ -13,7 +13,8 @@ Technical Debt Notes:
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Dict, Optional, Type, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -31,14 +32,14 @@ class ModelOnexContainer:
 
     def __init__(self) -> None:
         """Initialize the container with empty registries."""
-        self._singletons: Dict[Type[Any], Any] = {}
-        self._singleton_factories: Dict[Type[Any], Callable[..., Any]] = {}
-        self._transient_factories: Dict[Type[Any], Callable[..., Any]] = {}
+        self._singletons: dict[type[Any], Any] = {}
+        self._singleton_factories: dict[type[Any], Callable[..., Any]] = {}
+        self._transient_factories: dict[type[Any], Callable[..., Any]] = {}
 
     def register_singleton(
         self,
-        interface: Type[T],
-        implementation: Type[T] | Callable[..., T],
+        interface: type[T],
+        implementation: type[T] | Callable[..., T],
     ) -> None:
         """
         Register a singleton service.
@@ -58,8 +59,8 @@ class ModelOnexContainer:
 
     def register_transient(
         self,
-        interface: Type[T],
-        implementation: Type[T] | Callable[..., T],
+        interface: type[T],
+        implementation: type[T] | Callable[..., T],
     ) -> None:
         """
         Register a transient service.
@@ -109,7 +110,7 @@ class ModelOnexContainer:
         # Default: call without arguments
         return factory()
 
-    def resolve(self, interface: Type[T]) -> T:
+    def resolve(self, interface: type[T]) -> T:
         """
         Resolve a registered service.
 
@@ -143,7 +144,7 @@ class ModelOnexContainer:
 
         raise KeyError(f"No registration found for {interface}")
 
-    def is_registered(self, interface: Type[Any]) -> bool:
+    def is_registered(self, interface: type[Any]) -> bool:
         """
         Check if an interface is registered.
 

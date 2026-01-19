@@ -1,3 +1,4 @@
+---
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 OmniNode Team
 
@@ -7,7 +8,8 @@
 # === REQUIRED ROOT FIELDS ===
 name: "memory_storage_effect"
 version: {major: 0, minor: 1, patch: 0}
-description: "Memory storage effect node for CRUD operations to storage backends. Handles persistent storage operations across PostgreSQL, Redis, and Pinecone."
+description: "Memory storage effect node for CRUD operations to storage backends. Handles persistent storage
+  operations across PostgreSQL, Redis, and Pinecone."
 node_type: "EFFECT"
 input_model: "MemoryStoreRequest"
 output_model: "MemoryStoreResponse"

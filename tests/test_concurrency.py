@@ -5,8 +5,7 @@ Tests for concurrency utilities following ONEX standards.
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, Mock, patch
-from uuid import uuid4
+from unittest.mock import Mock
 
 import pytest
 

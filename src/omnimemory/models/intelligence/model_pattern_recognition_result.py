@@ -2,7 +2,7 @@
 Pattern recognition result model following ONEX standards.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -99,7 +99,7 @@ class ModelPatternRecognitionResult(BaseModel):
 
     # Temporal information
     recognized_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the pattern was recognized",
     )
 

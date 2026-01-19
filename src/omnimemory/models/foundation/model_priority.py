@@ -2,7 +2,7 @@
 Priority model following ONEX foundation patterns.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
 from pydantic import BaseModel, Field
@@ -29,7 +29,7 @@ class ModelPriority(BaseModel):
         description="Priority boost factor for fine-tuning (1.0 = normal)",
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When this priority was set",
     )
     created_by: str | None = Field(
@@ -51,7 +51,7 @@ class ModelPriority(BaseModel):
         """Check if priority has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def get_effective_priority(self) -> float:
         """Get effective priority value considering boost and expiration."""
@@ -108,9 +108,7 @@ class ModelPriority(BaseModel):
         if expires_in_minutes:
             from datetime import timedelta
 
-            expires_at = datetime.now(timezone.utc) + timedelta(
-                minutes=expires_in_minutes
-            )
+            expires_at = datetime.now(UTC) + timedelta(minutes=expires_in_minutes)
 
         return cls(
             level=EnumPriorityLevel.CRITICAL,
@@ -136,8 +134,7 @@ class ModelPriority(BaseModel):
             level=base_level,
             reason=reason,
             boost_factor=boost_factor,
-            expires_at=datetime.now(timezone.utc)
-            + timedelta(minutes=expires_in_minutes),
+            expires_at=datetime.now(UTC) + timedelta(minutes=expires_in_minutes),
             category="temporary_boost",
             tags=["boosted", "temporary"],
         )

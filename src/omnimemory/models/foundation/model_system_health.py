@@ -2,7 +2,7 @@
 System health model following ONEX standards.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from omnibase_core.enums import EnumHealthStatus
 from pydantic import BaseModel, Field
@@ -146,7 +146,7 @@ class ModelSystemHealth(BaseModel):
 
     # Check information
     last_health_check: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the health check was performed",
     )
     health_check_duration_ms: float = Field(

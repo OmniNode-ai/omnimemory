@@ -32,6 +32,7 @@ Tests that depend on files that may not exist during scaffold phase use
 This allows the test suite to pass while providing visibility into
 what implementations are pending.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -5,8 +5,7 @@ Tests for resource manager utilities following ONEX standards.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest

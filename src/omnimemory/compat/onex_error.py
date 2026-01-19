@@ -15,7 +15,7 @@ These are documented exceptions to the zero-Any policy for compat modules.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 class OnexError(Exception):
@@ -28,12 +28,12 @@ class OnexError(Exception):
     def __init__(
         self,
         message: str,
-        code: Optional[str] = None,
-        context: Optional[dict[str, Any]] = None,
-        cause: Optional[Exception] = None,
-        error_code: Optional[str] = None,
-        correlation_id: Optional[Any] = None,
-        details: Optional[dict[str, Any]] = None,
+        code: str | None = None,
+        context: dict[str, Any] | None = None,
+        cause: Exception | None = None,
+        error_code: str | None = None,
+        correlation_id: Any | None = None,
+        details: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         """
@@ -84,5 +84,3 @@ class OnexError(Exception):
 
 class BaseOnexError(OnexError):
     """Alias for OnexError for backward compatibility."""
-
-    pass

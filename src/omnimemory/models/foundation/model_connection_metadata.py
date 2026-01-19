@@ -6,7 +6,6 @@ in connection pooling, ensuring type safety and validation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +19,7 @@ class ConnectionMetadata(BaseModel):
         default_factory=datetime.now, description="When this connection was created"
     )
 
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None, description="When this connection was last used"
     )
 
@@ -28,15 +27,13 @@ class ConnectionMetadata(BaseModel):
         default=0, description="Number of times this connection has been used"
     )
 
-    connection_string: Optional[str] = Field(
+    connection_string: str | None = Field(
         default=None, description="Connection string (sanitized)"
     )
 
-    database_name: Optional[str] = Field(
-        default=None, description="Name of the database"
-    )
+    database_name: str | None = Field(default=None, description="Name of the database")
 
-    server_version: Optional[str] = Field(
+    server_version: str | None = Field(
         default=None, description="Server version information"
     )
 
@@ -44,7 +41,7 @@ class ConnectionMetadata(BaseModel):
         default=True, description="Whether the connection is healthy"
     )
 
-    last_health_check: Optional[datetime] = Field(
+    last_health_check: datetime | None = Field(
         default=None, description="When the connection was last health checked"
     )
 
@@ -52,7 +49,7 @@ class ConnectionMetadata(BaseModel):
         default=0, description="Number of errors encountered with this connection"
     )
 
-    last_error: Optional[str] = Field(
+    last_error: str | None = Field(
         default=None, description="Last error message (sanitized)"
     )
 
@@ -76,11 +73,11 @@ class ConnectionPoolStats(BaseModel):
         default=0, description="Number of times the pool was exhausted"
     )
 
-    average_wait_time_ms: Optional[float] = Field(
+    average_wait_time_ms: float | None = Field(
         default=None, description="Average wait time for connection acquisition"
     )
 
-    longest_wait_time_ms: Optional[float] = Field(
+    longest_wait_time_ms: float | None = Field(
         default=None, description="Longest wait time for connection acquisition"
     )
 
@@ -116,11 +113,11 @@ class SemaphoreMetrics(BaseModel):
         default=0, description="Total number of semaphore releases"
     )
 
-    average_hold_time_ms: Optional[float] = Field(
+    average_hold_time_ms: float | None = Field(
         default=None, description="Average time semaphore is held"
     )
 
-    max_hold_time_ms: Optional[float] = Field(
+    max_hold_time_ms: float | None = Field(
         default=None, description="Maximum time semaphore was held"
     )
 

@@ -8,11 +8,6 @@ patterns, protocols, and error handling.
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime
-from typing import Dict
-from uuid import UUID, uuid4
-
 import pytest
 
 from omnimemory import (  # Protocols; Data models; Error handling
@@ -24,7 +19,6 @@ from omnimemory import (  # Protocols; Data models; Error handling
     MemoryStoreResponse,
     OmniMemoryError,
     OmniMemoryErrorCode,
-    ProtocolMemoryBase,
     ProtocolMemoryStorage,
     SystemError,
     ValidationError,
@@ -49,17 +43,16 @@ class MockMemoryStorageNode:
         """Mock cache hit rate."""
         return 0.85
 
-    async def _get_storage_utilization(self) -> Dict[str, float]:
+    async def _get_storage_utilization(self) -> dict[str, float]:
         """Mock storage utilization."""
         return {"disk": 0.60, "memory": 0.45}
 
-    async def _validate_configuration(self, config: Dict[str, str]) -> bool:
+    async def _validate_configuration(self, config: dict[str, str]) -> bool:
         """Mock configuration validation."""
         return "invalid_key" not in config
 
-    async def _apply_configuration(self, config: Dict[str, str]) -> None:
+    async def _apply_configuration(self, config: dict[str, str]) -> None:
         """Mock configuration application."""
-        pass
 
     async def store_memory(
         self,
@@ -92,7 +85,7 @@ class MockMemoryStorageNode:
         except Exception as e:
             return NodeResult.failure(
                 error=SystemError(
-                    message=f"Mock storage failed: {str(e)}",
+                    message=f"Mock storage failed: {e!s}",
                     system_component="mock_storage",
                 ),
                 provenance=["mock_storage.store_memory.failed"],
@@ -260,7 +253,7 @@ class TestFoundationArchitecture:
         if not contract_path.exists():
             pytest.skip(f"contract.yaml not found at {contract_path}")
 
-        with open(contract_path, "r") as f:
+        with open(contract_path) as f:
             contract_data = yaml.safe_load(f)
 
         # Verify contract structure

@@ -7,19 +7,15 @@ including memory access, configuration changes, and PII detection events.
 
 import json
 import logging
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
 from ..models.foundation.model_audit_metadata import (
     AuditEventDetails,
-    PerformanceAuditDetails,
     ResourceUsageMetadata,
-    SecurityAuditDetails,
 )
 
 
@@ -60,10 +56,10 @@ class AuditEvent(BaseModel):
     # Context information
     operation: str = Field(description="Operation being performed")
     component: str = Field(description="Component generating the event")
-    user_context: Optional[str] = Field(
+    user_context: str | None = Field(
         default=None, description="User context if available"
     )
-    session_id: Optional[str] = Field(default=None, description="Session identifier")
+    session_id: str | None = Field(default=None, description="Session identifier")
 
     # Event details
     message: str = Field(description="Human-readable event description")
@@ -72,17 +68,17 @@ class AuditEvent(BaseModel):
     )
 
     # Security context
-    source_ip: Optional[str] = Field(default=None, description="Source IP address")
-    user_agent: Optional[str] = Field(default=None, description="User agent string")
+    source_ip: str | None = Field(default=None, description="Source IP address")
+    user_agent: str | None = Field(default=None, description="User agent string")
 
     # Performance data
-    duration_ms: Optional[float] = Field(default=None, description="Operation duration")
-    resource_usage: Optional[ResourceUsageMetadata] = Field(
+    duration_ms: float | None = Field(default=None, description="Operation duration")
+    resource_usage: ResourceUsageMetadata | None = Field(
         default=None, description="Resource usage metrics"
     )
 
     # Compliance tracking
-    data_classification: Optional[str] = Field(
+    data_classification: str | None = Field(
         default=None, description="Data classification level"
     )
     pii_detected: bool = Field(default=False, description="Whether PII was detected")
@@ -99,7 +95,7 @@ class AuditLogger:
 
     def __init__(
         self,
-        log_file: Optional[Path] = None,
+        log_file: Path | None = None,
         console_output: bool = True,
         json_format: bool = True,
     ):
@@ -149,7 +145,7 @@ class AuditLogger:
             def format(self, record):
                 log_data = {
                     "timestamp": datetime.fromtimestamp(
-                        record.created, tz=timezone.utc
+                        record.created, tz=UTC
                     ).isoformat(),
                     "level": record.levelname,
                     "logger": record.name,
@@ -213,9 +209,9 @@ class AuditLogger:
         operation_type: str,
         memory_id: str,
         success: bool,
-        duration_ms: Optional[float] = None,
-        details: Optional[AuditEventDetails] = None,
-        user_context: Optional[str] = None,
+        duration_ms: float | None = None,
+        details: AuditEventDetails | None = None,
+        user_context: str | None = None,
     ) -> None:
         """Log a memory operation event."""
         event_type_map = {
@@ -226,7 +222,7 @@ class AuditLogger:
 
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             event_type=event_type_map.get(operation_type, AuditEventType.MEMORY_STORE),
             severity=AuditSeverity.LOW if success else AuditSeverity.HIGH,
             operation=f"memory_{operation_type}",
@@ -244,14 +240,14 @@ class AuditLogger:
         pii_types: list,
         content_length: int,
         sanitized: bool = False,
-        details: Optional[AuditEventDetails] = None,
+        details: AuditEventDetails | None = None,
     ) -> None:
         """Log PII detection event."""
         severity = AuditSeverity.HIGH if pii_types else AuditSeverity.LOW
 
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             event_type=(
                 AuditEventType.PII_DETECTED
                 if pii_types
@@ -277,14 +273,14 @@ class AuditLogger:
         self,
         violation_type: str,
         description: str,
-        source_ip: Optional[str] = None,
-        user_context: Optional[str] = None,
-        details: Optional[AuditEventDetails] = None,
+        source_ip: str | None = None,
+        user_context: str | None = None,
+        details: AuditEventDetails | None = None,
     ) -> None:
         """Log security violation event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             event_type=AuditEventType.SECURITY_VIOLATION,
             severity=AuditSeverity.CRITICAL,
             operation="security_check",
@@ -300,15 +296,15 @@ class AuditLogger:
     def log_config_change(
         self,
         config_key: str,
-        old_value: Optional[str],
+        old_value: str | None,
         new_value: str,
-        user_context: Optional[str] = None,
-        details: Optional[AuditEventDetails] = None,
+        user_context: str | None = None,
+        details: AuditEventDetails | None = None,
     ) -> None:
         """Log configuration change event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             event_type=AuditEventType.CONFIG_CHANGE,
             severity=AuditSeverity.MEDIUM,
             operation="config_update",
@@ -339,7 +335,7 @@ class AuditLogger:
 
 
 # Global audit logger instance
-_audit_logger: Optional[AuditLogger] = None
+_audit_logger: AuditLogger | None = None
 
 
 def get_audit_logger() -> AuditLogger:
@@ -355,7 +351,7 @@ def get_audit_logger() -> AuditLogger:
 
 
 def configure_audit_logger(
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     console_output: bool = True,
     json_format: bool = True,
 ) -> None:

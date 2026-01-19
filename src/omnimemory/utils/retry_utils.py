@@ -8,12 +8,12 @@ failures in OmniMemory operations with configurable backoff strategies.
 from __future__ import annotations
 
 __all__ = [
-    "RetryConfig",
     "RetryAttempt",
+    "RetryConfig",
     "RetryResult",
     "RetryStats",
-    "is_retryable_exception",
     "execute_with_retry",
+    "is_retryable_exception",
     "retry_decorator",
 ]
 
@@ -21,8 +21,9 @@ import asyncio
 import functools
 import logging
 import random
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -61,7 +62,7 @@ class RetryConfig(BaseModel):
     jitter: bool = Field(
         default=True, description="Whether to add random jitter to delays"
     )
-    retryable_exceptions: List[str] = Field(
+    retryable_exceptions: list[str] = Field(
         default_factory=lambda: [
             "ConnectionError",
             "TimeoutError",
@@ -77,14 +78,14 @@ class RetryAttemptInfo(BaseModel):
 
     attempt_number: int = Field(description="Current attempt number (1-indexed)")
     delay_ms: int = Field(description="Delay before this attempt in milliseconds")
-    exception: Optional[str] = Field(
+    exception: str | None = Field(
         default=None, description="Exception that triggered the retry"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the attempt was made",
     )
-    correlation_id: Optional[UUID] = Field(
+    correlation_id: UUID | None = Field(
         default=None, description="Request correlation ID"
     )
 
@@ -105,13 +106,13 @@ class RetryStatistics(BaseModel):
     average_attempts: float = Field(
         default=0.0, description="Average number of attempts per operation"
     )
-    common_exceptions: Dict[str, int] = Field(
+    common_exceptions: dict[str, int] = Field(
         default_factory=dict, description="Count of common exceptions encountered"
     )
 
 
 def is_retryable_exception(
-    exception: Exception, retryable_exceptions: List[str]
+    exception: Exception, retryable_exceptions: list[str]
 ) -> bool:
     """
     Check if an exception should trigger a retry.
@@ -169,7 +170,7 @@ def calculate_delay(attempt: int, config: RetryConfig) -> int:
 async def retry_with_backoff(
     operation: Callable[..., Any],
     config: RetryConfig,
-    correlation_id: Optional[UUID] = None,
+    correlation_id: UUID | None = None,
     *args,
     **kwargs,
 ) -> T:
@@ -190,7 +191,7 @@ async def retry_with_backoff(
         The last exception if all retry attempts fail
     """
     last_exception = None
-    attempts: List[RetryAttemptInfo] = []
+    attempts: list[RetryAttemptInfo] = []
 
     for attempt in range(1, config.max_attempts + 1):
         try:
@@ -241,34 +242,32 @@ async def retry_with_backoff(
                     f"(correlation_id: {correlation_id})"
                 )
                 continue
-            else:
-                # Final failure or non-retryable exception
-                # Use stricter sanitization for final failures
-                sanitized_error = _error_sanitizer.sanitize_error_message(
-                    str(e), level=SanitizationLevel.STRICT
-                )
-                logger.error(
-                    f"Operation failed permanently after {attempt} attempts "
-                    f"with {type(e).__name__}: {sanitized_error} "
-                    f"(correlation_id: {correlation_id})"
-                )
-                break
+            # Final failure or non-retryable exception
+            # Use stricter sanitization for final failures
+            sanitized_error = _error_sanitizer.sanitize_error_message(
+                str(e), level=SanitizationLevel.STRICT
+            )
+            logger.error(
+                f"Operation failed permanently after {attempt} attempts "
+                f"with {type(e).__name__}: {sanitized_error} "
+                f"(correlation_id: {correlation_id})"
+            )
+            break
 
     # All attempts failed
     if last_exception:
         raise last_exception
-    else:
-        raise RuntimeError("Operation failed without exception")
+    raise RuntimeError("Operation failed without exception")
 
 
 def retry_decorator(
-    config: Optional[RetryConfig] = None,
+    config: RetryConfig | None = None,
     max_attempts: int = 3,
     base_delay_ms: int = 1000,
     max_delay_ms: int = 30000,
     exponential_multiplier: float = 2.0,
     jitter: bool = True,
-    retryable_exceptions: Optional[List[str]] = None,
+    retryable_exceptions: list[str] | None = None,
 ) -> Callable:
     """
     Decorator for adding retry behavior to functions.
@@ -338,7 +337,7 @@ class RetryManager:
     Manager for retry operations with statistics tracking.
     """
 
-    def __init__(self, default_config: Optional[RetryConfig] = None):
+    def __init__(self, default_config: RetryConfig | None = None):
         """
         Initialize retry manager.
 
@@ -347,14 +346,14 @@ class RetryManager:
         """
         self.default_config = default_config or RetryConfig()
         self.statistics = RetryStatistics()
-        self._operation_attempts: Dict[str, int] = {}
+        self._operation_attempts: dict[str, int] = {}
 
     async def execute_with_retry(
         self,
         operation: Callable[..., T],
         operation_name: str,
-        config: Optional[RetryConfig] = None,
-        correlation_id: Optional[UUID] = None,
+        config: RetryConfig | None = None,
+        correlation_id: UUID | None = None,
         *args,
         **kwargs,
     ) -> T:

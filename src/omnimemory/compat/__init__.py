@@ -16,14 +16,14 @@ Removal Criteria:
 - Remove the local stubs
 """
 
-from .model_onex_container import ModelOnexContainer, ModelONEXContainer
+from .model_onex_container import ModelONEXContainer, ModelOnexContainer
 from .node_result import NodeResult
 from .onex_error import BaseOnexError, OnexError
 
 __all__ = [
+    "BaseOnexError",
+    "ModelONEXContainer",  # Alias for upstream compatibility
+    "ModelOnexContainer",
     "NodeResult",
     "OnexError",
-    "BaseOnexError",
-    "ModelOnexContainer",
-    "ModelONEXContainer",  # Alias for upstream compatibility
 ]

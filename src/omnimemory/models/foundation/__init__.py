@@ -6,9 +6,6 @@ error handling, migration progress tracking, and system-level operations.
 """
 
 from ...enums.enum_error_code import OmniMemoryErrorCode
-
-# Backward compatibility alias
-EnumErrorCode = OmniMemoryErrorCode
 from ...enums.enum_severity import EnumSeverity
 from .model_audit_metadata import (
     AuditEventDetails,
@@ -95,7 +92,7 @@ from .model_typed_collections import (
 )
 
 __all__ = [
-    "EnumErrorCode",
+    "OmniMemoryErrorCode",
     "EnumSeverity",
     "ModelErrorDetails",
     "ModelSystemHealth",

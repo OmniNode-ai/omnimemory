@@ -18,10 +18,10 @@ from . import container, core, foundation, intelligence, memory, service
 
 # Re-export domains for direct access
 __all__ = [
-    "core",
-    "memory",
-    "intelligence",
-    "service",
     "container",
+    "core",
     "foundation",
+    "intelligence",
+    "memory",
+    "service",
 ]

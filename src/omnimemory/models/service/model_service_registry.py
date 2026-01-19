@@ -2,7 +2,7 @@
 Service registry model following ONEX standards.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from omnibase_core.enums import EnumHealthStatus, EnumNodeType
 from pydantic import BaseModel, Field
@@ -56,11 +56,11 @@ class ModelServiceRegistry(BaseModel):
 
     # Registration information
     registered_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the service was registered",
     )
     last_heartbeat: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Last heartbeat from the service",
     )
     heartbeat_interval_ms: int = Field(

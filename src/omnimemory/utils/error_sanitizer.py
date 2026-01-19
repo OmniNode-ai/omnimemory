@@ -6,15 +6,15 @@ disclosure while maintaining useful debugging information for developers.
 """
 
 __all__ = [
-    "SanitizationLevel",
     "ErrorSanitizer",
-    "sanitize_error",
+    "SanitizationLevel",
     "sanitize_dict",
+    "sanitize_error",
 ]
 
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Pattern, Set
+from re import Pattern
 
 
 class SanitizationLevel(Enum):
@@ -31,7 +31,7 @@ class SanitizationLevel(Enum):
 # This avoids repeated regex compilation on each sanitization call.
 
 # Credential patterns - detect passwords, API keys, tokens, etc.
-_CREDENTIAL_PATTERNS: List[Pattern[str]] = [
+_CREDENTIAL_PATTERNS: list[Pattern[str]] = [
     re.compile(r'\bpassword\s*[=:]\s*[\'"]?([^\s\'"]+)', re.IGNORECASE),
     re.compile(r'\bapi[_-]?key\s*[=:]\s*[\'"]?([^\s\'"]+)', re.IGNORECASE),
     re.compile(r'\bsecret\s*[=:]\s*[\'"]?([^\s\'"]+)', re.IGNORECASE),
@@ -42,7 +42,7 @@ _CREDENTIAL_PATTERNS: List[Pattern[str]] = [
 ]
 
 # Connection string patterns - detect database/service URLs
-_CONNECTION_STRING_PATTERNS: List[Pattern[str]] = [
+_CONNECTION_STRING_PATTERNS: list[Pattern[str]] = [
     re.compile(r"postgresql://[^@]+@[^/]+/[^\s]+", re.IGNORECASE),
     re.compile(r"mysql://[^@]+@[^/]+/[^\s]+", re.IGNORECASE),
     re.compile(r"mongodb://[^@]+@[^/]+/[^\s]+", re.IGNORECASE),
@@ -50,19 +50,19 @@ _CONNECTION_STRING_PATTERNS: List[Pattern[str]] = [
 ]
 
 # IP address patterns - detect IPv4 and IPv6 addresses
-_IP_ADDRESS_PATTERNS: List[Pattern[str]] = [
+_IP_ADDRESS_PATTERNS: list[Pattern[str]] = [
     re.compile(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?\b"),
     re.compile(r"\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b"),
 ]
 
 # File path patterns - detect system paths
-_FILE_PATH_PATTERNS: List[Pattern[str]] = [
+_FILE_PATH_PATTERNS: list[Pattern[str]] = [
     re.compile(r"/[a-zA-Z0-9/_-]+(?:\.[a-zA-Z0-9]+)?"),
     re.compile(r"[A-Za-z]:\\\\[a-zA-Z0-9\\\\._-]+"),
 ]
 
 # Personal information patterns - detect PII
-_PERSONAL_INFO_PATTERNS: List[Pattern[str]] = [
+_PERSONAL_INFO_PATTERNS: list[Pattern[str]] = [
     re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),  # email
     re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN
     re.compile(r"\b\d{16}\b"),  # Credit card
@@ -73,7 +73,7 @@ _STRICT_NUMBER_PATTERN: Pattern[str] = re.compile(r"\d+")
 _STRICT_IDENTIFIER_PATTERN: Pattern[str] = re.compile(r"\b[a-zA-Z0-9]{8,}\b")
 
 # Pattern category mapping for easy iteration (uses pre-compiled patterns)
-_SENSITIVE_PATTERNS: Dict[str, List[Pattern[str]]] = {
+_SENSITIVE_PATTERNS: dict[str, list[Pattern[str]]] = {
     "credentials": _CREDENTIAL_PATTERNS,
     "connection_strings": _CONNECTION_STRING_PATTERNS,
     "ip_addresses": _IP_ADDRESS_PATTERNS,
@@ -112,7 +112,7 @@ class ErrorSanitizer:
             "ValidationError",
         }
 
-    def sanitize_error(self, error: Exception, context: Optional[str] = None) -> str:
+    def sanitize_error(self, error: Exception, context: str | None = None) -> str:
         """
         Sanitize error message based on security level and context.
 
@@ -147,7 +147,7 @@ class ErrorSanitizer:
         return f"{error_type}: {sanitized}"
 
     def _standard_sanitize(
-        self, message: str, error_type: str, context: Optional[str] = None
+        self, message: str, error_type: str, context: str | None = None
     ) -> str:
         """Standard sanitization - balance security and debugging."""
         sanitized = message
@@ -194,8 +194,8 @@ class ErrorSanitizer:
             return "Exception: Operation failed - details suppressed for audit"
 
     def sanitize_dict(
-        self, data: Dict, keys_to_sanitize: Optional[Set[str]] = None
-    ) -> Dict:
+        self, data: dict, keys_to_sanitize: set[str] | None = None
+    ) -> dict:
         """
         Sanitize sensitive keys in dictionary data.
 
@@ -268,7 +268,7 @@ default_sanitizer = ErrorSanitizer(SanitizationLevel.STANDARD)
 
 def sanitize_error(
     error: Exception,
-    context: Optional[str] = None,
+    context: str | None = None,
     level: SanitizationLevel = SanitizationLevel.STANDARD,
 ) -> str:
     """
@@ -291,10 +291,10 @@ def sanitize_error(
 
 
 def sanitize_dict(
-    data: Dict,
-    keys_to_sanitize: Optional[Set[str]] = None,
+    data: dict,
+    keys_to_sanitize: set[str] | None = None,
     level: SanitizationLevel = SanitizationLevel.STANDARD,
-) -> Dict:
+) -> dict:
     """
     Convenient function for dictionary sanitization.
 

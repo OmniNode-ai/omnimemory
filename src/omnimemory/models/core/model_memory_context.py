@@ -2,7 +2,7 @@
 Memory context model following ONEX standards.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -39,7 +39,7 @@ class ModelMemoryContext(BaseModel):
 
     # Operation metadata
     operation_timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the operation was initiated",
     )
     timeout_ms: int = Field(

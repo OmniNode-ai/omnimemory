@@ -2,7 +2,7 @@
 Intelligence analysis model following ONEX standards.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -83,7 +83,7 @@ class ModelIntelligenceAnalysis(BaseModel):
 
     # Temporal information
     analyzed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the analysis was performed",
     )
     expires_at: datetime | None = Field(
