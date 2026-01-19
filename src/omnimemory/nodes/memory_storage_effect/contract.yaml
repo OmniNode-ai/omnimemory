@@ -7,12 +7,13 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "memory_storage_effect"
-version: {major: 0, minor: 1, patch: 0}
-description: "Memory storage effect node for CRUD operations to storage backends. Handles persistent storage
-  operations across PostgreSQL, Redis, and Pinecone."
+node_version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 1, minor: 0, patch: 0}
+description: "Memory storage effect node for CRUD operations. P1A: FileSystem backend for snapshot persistence.
+  Phase 2: PostgreSQL, Redis, and Pinecone backends."
 node_type: "EFFECT"
-input_model: "MemoryStoreRequest"
-output_model: "MemoryStoreResponse"
+input_model: "ModelMemoryStorageRequest"
+output_model: "ModelMemoryStorageResponse"
 
 # === IO OPERATIONS (Required for EFFECT nodes) ===
 io_operations:
@@ -50,13 +51,13 @@ service_configuration:
 # === INPUT/OUTPUT STATE ===
 input_state:
   object_type: "object"
-  required: ["operation_type", "data"]
-  optional: ["metadata", "correlation_id"]
+  required: ["operation"]
+  optional: ["snapshot_id", "snapshot", "metadata", "tags"]
 
 output_state:
   object_type: "object"
-  required: ["success", "result"]
-  optional: ["error_message", "metadata"]
+  required: ["status"]
+  optional: ["snapshot", "snapshot_ids", "error_message"]
 
 # === ACTIONS ===
 actions:
@@ -91,16 +92,29 @@ actions:
     outputs: ["status"]
 
 # === DEPENDENCIES ===
+# P1A: FileSystem backend is primary, other backends deferred to Phase 2
 dependencies:
+  # P1A Primary Backend
+  - name: filesystem
+    dependency_type: service
+    description: FileSystem storage for snapshot persistence (P1A primary)
+    required: true
+
+  # Phase 2 Backends (deferred)
   - name: postgresql
     dependency_type: service
-    description: PostgreSQL database for persistent memory storage
+    description: PostgreSQL database for persistent memory storage (Phase 2)
+    required: false
   - name: redis
     dependency_type: service
-    description: Redis cache for high-speed temporal memory
+    description: Redis cache for high-speed temporal memory (Phase 2)
+    required: false
   - name: pinecone
     dependency_type: service
-    description: Pinecone vector database for semantic memory
+    description: Pinecone vector database for semantic memory (Phase 2)
+    required: false
+
+  # Protocol Dependencies
   - name: ProtocolMemoryStorage
     dependency_type: protocol
     description: Core storage operations protocol
@@ -127,9 +141,30 @@ event_type:
 # === INFRASTRUCTURE ===
 infrastructure:
   storage_backends:
-    - postgresql
-    - redis
-    - pinecone
+    - filesystem  # P1A primary
+    # Phase 2 backends (deferred):
+    # - postgresql
+    # - redis
+    # - pinecone
+
+# === ENUM DEFINITIONS ===
+# These enums MUST match exactly with the Pydantic Literal types in the models
+enums:
+  operation:
+    description: "Storage operation to perform"
+    values:
+      - store  # Create a new snapshot in storage
+      - retrieve  # Fetch an existing snapshot by ID
+      - delete  # Remove a snapshot from storage
+      - update  # Modify an existing snapshot
+      - list  # Query snapshots with optional filtering
+  status:
+    description: "Operation result status"
+    values:
+      - success
+      - error
+      - not_found
+      - permission_denied
 
 # === VALIDATION RULES ===
 validation_rules:
@@ -138,9 +173,12 @@ validation_rules:
   output_validation_enabled: true
   performance_validation_enabled: true
   constraint_definitions:
-    operation_type: "string type with values [store, retrieve, update, delete, list]"
-    data: "dict type required for memory operations"
-    memory_id: "string type for memory record identifier"
+    operation: "Literal['store', 'retrieve', 'delete', 'update', 'list'] - must match enums.operation.values"
+    status: "Literal['success', 'error', 'not_found', 'permission_denied'] - must match enums.status.values"
+    snapshot_id: "string type for snapshot identifier (UUID)"
+    snapshot: "ModelMemorySnapshot for storage operations"
+    metadata: "dict type for additional operation metadata"
+    tags: "list of strings for filtering operations"
 
 # === TAGS ===
 tags:
@@ -148,6 +186,9 @@ tags:
   - storage
   - effect
   - crud
-  - postgresql
-  - redis
-  - pinecone
+  - filesystem
+  - snapshot
+  # Phase 2 tags (deferred):
+  # - postgresql
+  # - redis
+  # - pinecone

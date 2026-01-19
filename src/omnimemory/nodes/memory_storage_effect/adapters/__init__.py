@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+"""Memory Storage Effect Handlers.
+
+This module provides handler adapters for memory storage CRUD operations.
+The primary handler is the FileSystem adapter which wraps `HandlerFileSystem`
+from omnibase_infra to store memory snapshots as JSON files.
+
+Available Handlers:
+    - HandlerFileSystemAdapter: Stores snapshots as JSON files on disk
+
+Example:
+    >>> from omnimemory.nodes.memory_storage_effect.handlers import (
+    ...     HandlerFileSystemAdapter,
+    ...     HandlerFileSystemAdapterConfig,
+    ... )
+    >>> from pathlib import Path
+    >>>
+    >>> config = HandlerFileSystemAdapterConfig(base_path=Path("/data/memory"))
+    >>> adapter = HandlerFileSystemAdapter(config)
+    >>> await adapter.initialize()
+
+.. versionadded:: 0.1.0
+    Initial implementation for OMN-1384.
+"""
+
+from .adapter_filesystem import (
+    HandlerFileSystemAdapter,
+    HandlerFileSystemAdapterConfig,
+)
+
+__all__ = [
+    "HandlerFileSystemAdapter",
+    "HandlerFileSystemAdapterConfig",
+]

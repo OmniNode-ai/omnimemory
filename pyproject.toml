@@ -19,7 +19,7 @@ httpx = "^0.28.0"
 pydantic = "^2.10.0"
 
 # FastAPI web framework for production API
-fastapi = "^0.115.0"
+fastapi = "^0.120.1"
 uvicorn = {extras = ["standard"], version = "^0.32.0"}
 
 # Memory and storage components
@@ -63,11 +63,9 @@ aiohttp = "^3.12.15"
 
 [tool.poetry.group.dev.dependencies]
 # Handler reuse infrastructure from omnibase_infra
-# Provides: HandlerDb, HandlerQdrant, HandlerFileSystem, HandlerGraph, HandlerHttp, etc.
+# Provides: HandlerDb, HandlerFileSystem, HandlerHttpRest, HandlerConsul, HandlerVault, etc.
 # See docs/handler_reuse_matrix.md for complete handler mapping
-# NOTE: Uncomment when omnibase-infra is published to PyPI:
-# omnibase-infra = "^0.1.0"
-# structlog version constraint (^23.3.0) is compatible with omnibase-infra (^23.2.0)
+omnibase-infra = "^0.2.1"
 
 # Testing framework
 pytest = "^8.3.4"
