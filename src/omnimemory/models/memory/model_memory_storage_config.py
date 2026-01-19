@@ -4,13 +4,15 @@ Memory storage configuration model following ONEX standards.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from ...enums.enum_memory_storage_type import EnumMemoryStorageType
 
 
 class ModelMemoryStorageConfig(BaseModel):
     """Configuration for memory storage systems following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Storage identification
     storage_id: str = Field(

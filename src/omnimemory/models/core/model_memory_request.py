@@ -4,7 +4,7 @@ Memory request model following ONEX standards.
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
 from ..foundation.model_contract_version import DEFAULT_CONTRACT_VERSION
@@ -15,6 +15,8 @@ from .model_memory_parameters import ModelMemoryOptions, ModelMemoryParameters
 
 class ModelMemoryRequest(BaseModel):
     """Base memory request model following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Contract version for schema tracking
     contract_version: str = Field(

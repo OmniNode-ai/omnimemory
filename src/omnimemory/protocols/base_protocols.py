@@ -312,7 +312,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
         limit: int = 100,
         offset: int = 0,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[List[MemoryRecord]]:
+    ) -> NodeResult[list[MemoryRecord]]:
         """
         List memory records with optional filtering and pagination.
 
@@ -391,7 +391,7 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
         relationship_types: ModelOptionalStringList | None = None,
         max_depth: int = 2,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[List[MemoryRecord]]:
+    ) -> NodeResult[list[MemoryRecord]]:
         """
         Get memories related to a specific memory record.
 
@@ -466,7 +466,7 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
     @abstractmethod
     async def verify_integrity(
         self,
-        memory_ids: List[UUID] | None = None,
+        memory_ids: list[UUID] | None = None,
         correlation_id: UUID | None = None,
     ) -> NodeResult[ModelMetadata]:
         """
@@ -778,7 +778,7 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
     @abstractmethod
     async def detect_conflicts(
         self,
-        memories: List[MemoryRecord],
+        memories: list[MemoryRecord],
         correlation_id: UUID | None = None,
     ) -> NodeResult[ModelResultCollection]:
         """

@@ -22,7 +22,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     from ..compat.onex_error import OnexError as BaseOnexError
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation import ModelMetadata
 
@@ -108,6 +108,14 @@ class OmniMemoryErrorCode(str, Enum):
 
 class ErrorCategoryInfo(BaseModel):
     """Information about an error category."""
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        validate_default=True,
+        extra="forbid",
+        frozen=True,  # Category info is immutable
+    )
 
     prefix: str = Field(description="Error code prefix")
     description: str = Field(description="Category description")
@@ -308,7 +316,7 @@ class ValidationError(OmniMemoryError):
             error_code = OmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
         # Build context with validation details
-        context = kwargs.get("context", {})
+        context = kwargs.get("context") or {}
         if field_name:
             context["field_name"] = field_name
         if field_value is not None:
@@ -354,7 +362,7 @@ class StorageError(OmniMemoryError):
             error_code = OmniMemoryErrorCode.TRANSACTION_FAILED
 
         # Build context with storage details
-        context = kwargs.get("context", {})
+        context = kwargs.get("context") or {}
         if storage_system:
             context["storage_system"] = storage_system
         if operation:
@@ -401,7 +409,7 @@ class RetrievalError(OmniMemoryError):
             error_code = OmniMemoryErrorCode.FILTER_INVALID
 
         # Build context with retrieval details
-        context = kwargs.get("context", {})
+        context = kwargs.get("context") or {}
         if memory_id:
             context["memory_id"] = str(memory_id)
         if query:
@@ -445,7 +453,7 @@ class ProcessingError(OmniMemoryError):
             error_code = OmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
         # Build context with processing details
-        context = kwargs.get("context", {})
+        context = kwargs.get("context") or {}
         if processing_stage:
             context["processing_stage"] = processing_stage
         if model_name:
@@ -489,7 +497,7 @@ class CoordinationError(OmniMemoryError):
             error_code = OmniMemoryErrorCode.ORCHESTRATION_FAILED
 
         # Build context with coordination details
-        context = kwargs.get("context", {})
+        context = kwargs.get("context") or {}
         if workflow_id:
             context["workflow_id"] = str(workflow_id)
         if agent_ids:
@@ -532,7 +540,7 @@ class SystemError(OmniMemoryError):
             error_code = OmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
         # Build context with system details
-        context = kwargs.get("context", {})
+        context = kwargs.get("context") or {}
         if system_component:
             context["system_component"] = system_component
 

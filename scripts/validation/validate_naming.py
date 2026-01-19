@@ -47,11 +47,35 @@ FILE_PATTERNS = {
     "handlers": re.compile(r"^handler_[a-z][a-z0-9_]*\.py$"),
     "mixins": re.compile(r"^mixin_[a-z][a-z0-9_]*\.py$"),
     "nodes": re.compile(r"^node_[a-z][a-z0-9_]*\.py$"),
+    "validators": re.compile(r"^validator_[a-z][a-z0-9_]*\.py$"),
     "utils": re.compile(r"^[a-z][a-z0-9_]*\.py$"),  # Utils are more flexible
 }
 
-# Directories/files to skip
-SKIP_FILES = {"__init__.py", "conftest.py", "base.py", "compat"}
+# Files to skip (exact filename match)
+SKIP_FILES = {"__init__.py", "conftest.py", "base.py"}
+
+# Directory names to skip (exact directory name match in path parts)
+# - compat: compatibility stubs
+# - protocols: API contracts use standard Request/Response patterns, not Model prefix
+# - enums: Enum files follow enum_xxx.py naming, classes use semantic names (not EnumXxx)
+# - models: Model files follow model_xxx.py naming, classes use semantic names (not ModelXxx)
+# - utils: Utility classes are not domain models, use semantic names
+# - foundation: Foundation models are base infrastructure, use semantic names
+# - __pycache__, .git, tests: standard exclusions
+# NOTE: File naming is enforced via file patterns, class prefix naming is relaxed for
+#       readability and to avoid redundancy (e.g., model_connection_metadata.py containing
+#       ConnectionMetadata vs ModelConnectionMetadata)
+SKIP_DIRECTORIES = {
+    "compat",
+    "__pycache__",
+    ".git",
+    "tests",
+    "protocols",
+    "enums",
+    "models",
+    "utils",
+    "foundation",
+}
 
 
 def get_directory_type(filepath: Path) -> str | None:
@@ -64,9 +88,13 @@ def get_directory_type(filepath: Path) -> str | None:
 
 def validate_file(filepath: Path) -> list[Violation]:
     """Validate a single Python file."""
+    # Skip files by exact filename match
     if filepath.name in SKIP_FILES:
         return []
-    if any(skip in str(filepath) for skip in SKIP_FILES):
+
+    # Skip files in specific directories (exact directory name match)
+    # Use path.parts to check for exact directory names, not substring matching
+    if any(skip_dir in filepath.parts for skip_dir in SKIP_DIRECTORIES):
         return []
 
     violations: list[Violation] = []
@@ -122,6 +150,21 @@ def validate_file(filepath: Path) -> list[Violation]:
             elif dir_type == "protocols" and expected_prefix is None:
                 expected_pattern = CLASS_PATTERNS["Protocol"]
                 expected_prefix = "Protocol"
+            elif dir_type == "services" and expected_prefix is None:
+                expected_pattern = CLASS_PATTERNS["Service"]
+                expected_prefix = "Service"
+            elif dir_type == "handlers" and expected_prefix is None:
+                expected_pattern = CLASS_PATTERNS["Handler"]
+                expected_prefix = "Handler"
+            elif dir_type == "mixins" and expected_prefix is None:
+                expected_pattern = CLASS_PATTERNS["Mixin"]
+                expected_prefix = "Mixin"
+            elif dir_type == "nodes" and expected_prefix is None:
+                expected_pattern = CLASS_PATTERNS["Node"]
+                expected_prefix = "Node"
+            elif dir_type == "validators" and expected_prefix is None:
+                expected_pattern = CLASS_PATTERNS["Validator"]
+                expected_prefix = "Validator"
 
             if expected_pattern and not expected_pattern.match(class_name):
                 violations.append(

@@ -5,7 +5,7 @@ This module provides a reusable contract version field that can be added
 to models requiring schema version tracking for ONEX compliance.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .model_semver import ModelSemVer
 
@@ -31,6 +31,8 @@ class ModelContractVersion(BaseModel):
         request = MyRequest(data="test")
         print(request.contract_version)  # "1.0.0"
     """
+
+    model_config = ConfigDict(frozen=False)
 
     contract_version: str = Field(
         default=DEFAULT_CONTRACT_VERSION,

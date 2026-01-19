@@ -583,7 +583,8 @@ class ResourcePool:
             ResourceTimeoutError: If acquisition times out
             ResourceAllocationError: If resource creation fails
         """
-        timeout = timeout or self._timeout
+        # Resolve effective timeout upfront for type safety in arithmetic operations
+        effective_timeout: float = timeout if timeout is not None else self._timeout
         start_time = time.time()
 
         while True:
@@ -627,13 +628,13 @@ class ResourcePool:
 
             # Check timeout
             elapsed = time.time() - start_time
-            if elapsed >= timeout:
+            if elapsed >= effective_timeout:
                 raise ResourceTimeoutError(
                     f"Timeout acquiring {self.resource_type.value} resource"
                 )
             try:
                 await asyncio.wait_for(
-                    self._available_event.wait(), timeout=timeout - elapsed
+                    self._available_event.wait(), timeout=effective_timeout - elapsed
                 )
             except TimeoutError as e:
                 raise ResourceTimeoutError(

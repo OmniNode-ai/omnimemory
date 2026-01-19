@@ -5,13 +5,15 @@ Intelligence analysis model following ONEX standards.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_intelligence_operation_type import EnumIntelligenceOperationType
 
 
 class ModelIntelligenceAnalysis(BaseModel):
     """Intelligence analysis result following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Analysis identification
     analysis_id: UUID = Field(

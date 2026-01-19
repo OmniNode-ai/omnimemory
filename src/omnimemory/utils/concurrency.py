@@ -456,8 +456,11 @@ class AsyncConnectionPool:
         self._validate_connection = validate_connection or (lambda conn: True)
         self._close_connection = close_connection or (lambda conn: None)
 
-        self._available: asyncio.Queue = asyncio.Queue(maxsize=config.max_connections)
-        self._active: dict[str, ConnectionMetadata] = {}
+        self._available: asyncio.Queue[Any] = asyncio.Queue(
+            maxsize=config.max_connections
+        )
+        # Maps connection_id -> actual connection object (Any type for generic pool)
+        self._active: dict[str, Any] = {}
         self._metrics = PoolMetrics()
         self._status = PoolStatus.HEALTHY
         self._lock = asyncio.Lock()

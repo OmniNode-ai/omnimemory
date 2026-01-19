@@ -7,11 +7,13 @@ in connection pooling, ensuring type safety and validation.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConnectionMetadata(BaseModel):
     """Strongly typed metadata for connection objects."""
+
+    model_config = ConfigDict(frozen=False)
 
     connection_id: str = Field(description="Unique identifier for this connection")
 
@@ -57,6 +59,8 @@ class ConnectionMetadata(BaseModel):
 class ConnectionPoolStats(BaseModel):
     """Strongly typed connection pool statistics."""
 
+    model_config = ConfigDict(frozen=False)
+
     pool_name: str = Field(description="Name of the connection pool")
 
     total_connections: int = Field(description="Total number of connections in pool")
@@ -96,6 +100,8 @@ class ConnectionPoolStats(BaseModel):
 
 class SemaphoreMetrics(BaseModel):
     """Strongly typed semaphore performance metrics."""
+
+    model_config = ConfigDict(frozen=False)
 
     name: str = Field(description="Name of the semaphore")
 

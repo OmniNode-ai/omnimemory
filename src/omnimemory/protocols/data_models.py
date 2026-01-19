@@ -274,8 +274,8 @@ class MemoryRecord(BaseMemoryModel):
     embedding: list[float] | None = Field(
         None,
         description="Vector embedding for semantic search",
-        min_length=768,
-        max_length=4096,
+        min_length=1,
+        max_length=8192,
     )
     embedding_model: str | None = Field(
         None, description="Model used to generate embedding"

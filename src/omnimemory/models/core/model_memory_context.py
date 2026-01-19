@@ -5,7 +5,7 @@ Memory context model following ONEX standards.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_node_type import EnumNodeType
 from ..foundation.model_priority import ModelPriority
@@ -16,6 +16,8 @@ from ..foundation.model_user import ModelUser
 
 class ModelMemoryContext(BaseModel):
     """Context information for memory operations following ONEX standards with typed models."""
+
+    model_config = ConfigDict(frozen=False)
 
     correlation_id: UUID = Field(
         description="Unique correlation identifier for tracing operations across nodes",

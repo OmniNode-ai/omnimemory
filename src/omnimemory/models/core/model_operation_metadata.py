@@ -4,13 +4,15 @@ Operation metadata model for tracking operation-specific information.
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..foundation.model_typed_collections import ModelConfiguration, ModelMetadata
 
 
 class ModelOperationMetadata(BaseModel):
     """Operation metadata for tracking operation-specific information."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Operation identification
     operation_type: str = Field(

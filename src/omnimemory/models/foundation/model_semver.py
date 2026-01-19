@@ -5,11 +5,13 @@ Semantic version model following ONEX standards.
 import re
 from typing import Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelSemVer(BaseModel):
     """Semantic version model following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     major: int = Field(
         ge=0,

@@ -6,13 +6,15 @@ import math
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 from omnimemory.enums import EnumDecayFunction, EnumTrustLevel
 
 
 class ModelTrustScore(BaseModel):
     """Trust score with time-based decay and validation."""
+
+    model_config = ConfigDict(frozen=False)
 
     base_score: float = Field(
         ge=0.0,
@@ -80,6 +82,20 @@ class ModelTrustScore(BaseModel):
     _cached_score: float | None = PrivateAttr(default=None)
     _cache_timestamp: datetime | None = PrivateAttr(default=None)
     _cache_ttl_seconds: int = PrivateAttr(default=300)
+
+    @field_validator(
+        "initial_timestamp", "last_updated", "last_verified", mode="before"
+    )
+    @classmethod
+    def validate_timezone_aware(cls, v: datetime | None) -> datetime | None:
+        """Ensure datetime values are timezone-aware to prevent comparison errors."""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                # Convert naive datetime to UTC
+                return v.replace(tzinfo=UTC)
+        return v
 
     @field_validator("trust_level")
     @classmethod

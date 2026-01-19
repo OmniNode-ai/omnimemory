@@ -4,11 +4,13 @@ Success metrics models following ONEX standards.
 
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelSuccessRate(BaseModel):
     """Success rate metric following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     rate: float = Field(
         ge=0.0,
@@ -60,6 +62,8 @@ class ModelSuccessRate(BaseModel):
 
 class ModelConfidenceScore(BaseModel):
     """Confidence score metric following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     score: float = Field(
         ge=0.0,
@@ -115,6 +119,8 @@ class ModelConfidenceScore(BaseModel):
 
 class ModelQualityMetrics(BaseModel):
     """Combined quality metrics following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     success_rate: ModelSuccessRate = Field(
         description="Success rate metrics",

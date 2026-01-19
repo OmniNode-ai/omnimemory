@@ -4,7 +4,7 @@ Memory metadata model following ONEX standards.
 
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
 from ..foundation.model_error_details import ModelErrorDetails
@@ -15,6 +15,8 @@ from ..foundation.model_success_metrics import ModelConfidenceScore, ModelSucces
 
 class ModelMemoryMetadata(BaseModel):
     """Metadata for memory operations following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Operation identification
     operation_type: EnumMemoryOperationType = Field(

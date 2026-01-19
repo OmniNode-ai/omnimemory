@@ -54,17 +54,48 @@ SECRET_PATTERNS = [
 ]
 
 # Lines to skip (false positives)
+# Each pattern must have a clear, documented reason for exclusion.
+# Be conservative: prefer false positives over missing real secrets.
 SKIP_PATTERNS = [
-    re.compile(r"os\.environ"),  # Environment variable access
-    re.compile(r"os\.getenv"),  # Environment variable access
-    re.compile(r"\.get\s*\("),  # Dict/config gets
-    re.compile(r"Field\s*\("),  # Pydantic Field definitions
-    re.compile(r"#.*example"),  # Example comments
-    re.compile(r'["\']your[_-]'),  # Placeholder values
-    re.compile(r'["\']<'),  # Placeholder values like <your-key>
-    re.compile(r"test_"),  # Test files/functions
-    re.compile(r"mock"),  # Mock values
+    # REASON: Environment variable lookups retrieve values at runtime, not hardcoded
+    (re.compile(r"os\.environ\["), "Environment variable dict access"),
+    (re.compile(r"os\.environ\.get\("), "Environment variable get() access"),
+    (re.compile(r"os\.getenv\("), "Environment variable getenv() access"),
+    # REASON: Pydantic Field() with default_factory or env= is config, not secrets
+    (re.compile(r"Field\s*\([^)]*default_factory"), "Pydantic Field with factory"),
+    (re.compile(r"Field\s*\([^)]*env\s*="), "Pydantic Field with env parameter"),
+    # REASON: Placeholder values that are not real secrets
+    (re.compile(r'["\']your[-_]'), "Placeholder starting with 'your-' or 'your_'"),
+    (re.compile(r'["\']<[a-zA-Z]'), "Placeholder like <your-key>"),
+    (re.compile(r'["\']xxx'), "Placeholder with xxx"),
+    (re.compile(r'["\']CHANGEME'), "Placeholder CHANGEME"),
+    (re.compile(r'["\']REPLACE'), "Placeholder REPLACE"),
+    # REASON: Comments that explicitly mark lines as examples
+    (re.compile(r"#\s*example", re.IGNORECASE), "Explicit example comment"),
+    (re.compile(r"#\s*placeholder", re.IGNORECASE), "Explicit placeholder comment"),
+    (re.compile(r"#\s*fake", re.IGNORECASE), "Explicit fake comment"),
+    # REASON: Mock/test values should only skip in test files - handled below
 ]
+
+# Additional patterns that only skip in test files
+TEST_ONLY_SKIP_PATTERNS = [
+    (re.compile(r"mock", re.IGNORECASE), "Mock value in test file"),
+    (re.compile(r"fake", re.IGNORECASE), "Fake value in test file"),
+]
+
+
+def is_test_file(filepath: Path) -> bool:
+    """Check if a file is a test file based on path or name."""
+    name = filepath.name
+    path_str = str(filepath)
+    return (
+        name.startswith("test_")
+        or name.endswith("_test.py")
+        or "/tests/" in path_str
+        or "\\tests\\" in path_str
+        or "/test/" in path_str
+        or "\\test\\" in path_str
+    )
 
 
 def validate_file(filepath: Path) -> list[Violation]:
@@ -75,17 +106,22 @@ def validate_file(filepath: Path) -> list[Violation]:
         return []
 
     violations: list[Violation] = []
+    is_test = is_test_file(filepath)
 
     for line_num, line in enumerate(content.splitlines(), start=1):
-        # Skip if line matches skip patterns
-        if any(skip.search(line) for skip in SKIP_PATTERNS):
+        # Skip if line matches general skip patterns (tuple format: pattern, reason)
+        if any(pattern.search(line) for pattern, _reason in SKIP_PATTERNS):
+            continue
+
+        # Skip test-only patterns if in test file
+        if is_test and any(
+            pattern.search(line) for pattern, _reason in TEST_ONLY_SKIP_PATTERNS
+        ):
             continue
 
         for pattern, message in SECRET_PATTERNS:
             if pattern.search(line):
-                violations.append(
-                    Violation(str(filepath), line_num, message)
-                )
+                violations.append(Violation(str(filepath), line_num, message))
                 break  # Only one violation per line
 
     return violations

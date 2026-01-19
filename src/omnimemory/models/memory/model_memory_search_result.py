@@ -4,13 +4,15 @@ Memory search result model following ONEX standards.
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .model_memory_item import ModelMemoryItem
 
 
 class ModelMemorySearchResult(BaseModel):
     """Search result model for memory queries following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Result identification
     result_id: UUID = Field(

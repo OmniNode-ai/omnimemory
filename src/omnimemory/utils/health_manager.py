@@ -28,7 +28,7 @@ except ImportError:
     psutil = None  # type: ignore[assignment]
 
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation.model_health_metadata import (
     HealthCheckMetadata,
@@ -146,6 +146,7 @@ from ..models.foundation.model_health_response import (
     ModelHealthResponse,
     ModelResourceMetrics,
 )
+from .concurrency import CircuitBreaker
 from .observability import OperationType, correlation_context, trace_operation
 from .resource_manager import AsyncCircuitBreaker, CircuitBreakerConfig
 
@@ -818,6 +819,8 @@ class HealthCheckDetails(BaseModel):
 class ResourceHealthCheck(BaseModel):
     """Result of a resource health check."""
 
+    model_config = ConfigDict(use_enum_values=False)
+
     status: HealthStatus = Field(description="Health status of the resource")
     response_time: float = Field(default=0.0, description="Response time in seconds")
     details: HealthCheckDetails = Field(
@@ -827,14 +830,11 @@ class ResourceHealthCheck(BaseModel):
         default=None, description="Correlation ID for tracking"
     )
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = False
-
 
 class SystemHealth(BaseModel):
     """Overall system health status."""
+
+    model_config = ConfigDict(use_enum_values=False)
 
     overall_status: HealthStatus = Field(description="Overall system health status")
     resource_statuses: dict[str, ResourceHealthCheck] = Field(
@@ -844,11 +844,6 @@ class SystemHealth(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp of health check",
     )
-
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = False
 
 
 class HealthManager:
@@ -1129,7 +1124,11 @@ class HealthManager:
         stats = {}
         for name, cb in self.circuit_breakers.items():
             state = getattr(cb, "state", None)
-            state_value = state.value if hasattr(state, "value") else str(state)
+            # Explicit None check for type safety - state could be None from getattr
+            if state is not None and hasattr(state, "value"):
+                state_value = state.value
+            else:
+                state_value = str(state) if state is not None else "unknown"
 
             stats[name] = ModelCircuitBreakerStats(
                 state=state_value,

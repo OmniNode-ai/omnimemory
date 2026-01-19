@@ -5,11 +5,13 @@ Tags model following ONEX standards.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelTag(BaseModel):
     """Individual tag model with metadata."""
+
+    model_config = ConfigDict(frozen=False)
 
     name: str = Field(
         description="Tag name",
@@ -56,6 +58,8 @@ class ModelTag(BaseModel):
 
 class ModelTagCollection(BaseModel):
     """Collection of tags with validation and management."""
+
+    model_config = ConfigDict(frozen=False)
 
     tags: list[ModelTag] = Field(
         default_factory=list,

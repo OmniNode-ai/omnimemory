@@ -5,11 +5,13 @@ Service registry model following ONEX standards.
 from datetime import UTC, datetime
 
 from omnibase_core.enums import EnumHealthStatus, EnumNodeType
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelServiceRegistry(BaseModel):
     """Service registry entry following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Service identification
     service_id: str = Field(

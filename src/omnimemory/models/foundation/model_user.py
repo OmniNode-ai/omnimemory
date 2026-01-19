@@ -5,11 +5,13 @@ User model following ONEX foundation patterns.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelUser(BaseModel):
     """User model with comprehensive identity and authorization information."""
+
+    model_config = ConfigDict(frozen=False)
 
     user_id: UUID = Field(
         description="Unique user identifier",

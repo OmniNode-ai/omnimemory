@@ -47,6 +47,7 @@ class EnumCasingVisitor(ast.NodeVisitor):
 
         if is_enum:
             for item in node.body:
+                # Handle regular assignment: MEMBER = "value"
                 if isinstance(item, ast.Assign):
                     for target in item.targets:
                         if isinstance(target, ast.Name):
@@ -63,6 +64,22 @@ class EnumCasingVisitor(ast.NodeVisitor):
                                         "should be UPPER_SNAKE_CASE",
                                     )
                                 )
+                # Handle annotated assignment: MEMBER: str = "value"
+                elif isinstance(item, ast.AnnAssign):
+                    if isinstance(item.target, ast.Name):
+                        name = item.target.id
+                        # Skip dunder and private attrs
+                        if name.startswith("_"):
+                            continue
+                        if not UPPER_SNAKE_CASE.match(name):
+                            self.violations.append(
+                                Violation(
+                                    self.filepath,
+                                    item.lineno,
+                                    f"Enum member '{name}' in {node.name} "
+                                    "should be UPPER_SNAKE_CASE",
+                                )
+                            )
 
         self.generic_visit(node)
 

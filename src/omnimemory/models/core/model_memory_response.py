@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_operation_status import EnumOperationStatus
 from ..foundation.model_contract_version import DEFAULT_CONTRACT_VERSION
@@ -22,6 +22,8 @@ from .model_provenance import ModelProvenanceChain
 
 class ModelMemoryResponse(BaseModel):
     """Base memory response model following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Contract version for schema tracking
     contract_version: str = Field(

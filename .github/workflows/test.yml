@@ -22,15 +22,20 @@ jobs:
   # JOB ORDERING RATIONALE (Fail-Fast Optimization)
   # =============================================================================
   #
-  # Phase 1 - Quick Validation (parallel, ~2-3 min):
+  # Phase 1 - Quick Validation (parallel, ~2-5 min):
   #   - lint: Code quality (ruff format, ruff check, mypy strict)
   #   - pyright: Type checking (complementary to mypy)
+  #   - onex-validation: ONEX pattern validation (pydantic, naming, enums, etc.)
   #
   # Phase 2 - Full Test Suite (after Phase 1 completes):
-  #   - test: Run all tests
+  #   - test: Run all tests (depends on lint, pyright, onex-validation)
   #
   # Phase 3 - Aggregation:
   #   - test-summary: Aggregates all job results
+  #
+  # CONFIGURATION SYNC NOTE:
+  # These validations are synchronized with .pre-commit-config.yaml
+  # Pre-commit runs subset at commit time, full validation at pre-push
   # =============================================================================
 
   # Phase 1 - Code Quality
@@ -75,12 +80,15 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
+      # SYNC: Pre-commit hook 'ruff-format' (auto-fixes, CI checks)
       - name: Check ruff formatting
         run: poetry run ruff format --check src/ tests/
 
+      # SYNC: Pre-commit hook 'ruff-fix' (auto-fixes, CI checks)
       - name: Check ruff linting (includes import sorting)
         run: poetry run ruff check src/ tests/
 
+      # SYNC: Pre-commit hook 'mypy-type-check' at pre-push stage
       - name: Run mypy type checking (strict)
         run: poetry run mypy src/omnimemory
 
@@ -126,6 +134,8 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
+      # SYNC: Pre-commit hook 'pyright-type-check' at pre-push stage
+      # Uses pyrightconfig.json for project-level settings
       - name: Run pyright type checking
         run: poetry run pyright src/omnimemory
 
@@ -171,21 +181,27 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
+      # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
         run: poetry run python scripts/validation/validate_pydantic_patterns.py src/
 
+      # SYNC: Pre-commit hook 'validate-single-class-per-file' at pre-commit stage
       - name: Validate single class per file
         run: poetry run python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
 
+      # SYNC: Pre-commit hook 'validate-enum-casing' at pre-commit stage
       - name: Validate enum casing
         run: poetry run python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
 
+      # SYNC: Pre-commit hook 'validate-no-backward-compatibility' at pre-commit stage
       - name: Validate no backward compatibility
         run: poetry run python scripts/validation/validate_no_backward_compatibility.py -d src/
 
+      # SYNC: Pre-commit hook 'validate-secrets' at pre-commit stage
       - name: Validate secrets
         run: poetry run python scripts/validation/validate_secrets.py src/
 
+      # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-push stage
       - name: Validate naming conventions
         run: poetry run python scripts/validation/validate_naming.py src/
 

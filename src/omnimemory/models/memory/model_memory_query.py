@@ -4,13 +4,15 @@ Memory query model following ONEX standards.
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_memory_storage_type import EnumMemoryStorageType
 
 
 class ModelMemoryQuery(BaseModel):
     """Query model for memory search and retrieval following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Query identification
     query_id: UUID = Field(

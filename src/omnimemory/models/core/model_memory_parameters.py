@@ -2,11 +2,13 @@
 Memory operation parameters model following ONEX standards.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelMemoryParameters(BaseModel):
     """Structured parameters for memory operations following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Memory operation parameters (string values for type safety)
     memory_type: str | None = Field(
@@ -61,6 +63,8 @@ class ModelMemoryParameters(BaseModel):
 
 class ModelMemoryOptions(BaseModel):
     """Boolean options for memory operations following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Validation options
     validate_input: bool = Field(

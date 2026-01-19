@@ -5,13 +5,15 @@ Notes model following ONEX standards.
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_severity import EnumSeverity
 
 
 class ModelNote(BaseModel):
     """Individual note entry following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     note_id: UUID = Field(
         default_factory=uuid4,
@@ -86,6 +88,8 @@ class ModelNote(BaseModel):
 
 class ModelNotesCollection(BaseModel):
     """Collection of notes following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     collection_id: UUID = Field(
         default_factory=uuid4,

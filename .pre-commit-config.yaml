@@ -13,8 +13,8 @@
 #   - Fast pattern validations
 #
 # PRE-PUSH (quick validation before sharing):
-#   - mypy type checking (changed files only)
-#   - pyright type checking (changed files only)
+#   - mypy type checking (full src/omnimemory - synced with CI)
+#   - pyright type checking (full src/omnimemory - synced with CI)
 #   - Naming convention validation
 #
 # USAGE:
@@ -74,22 +74,25 @@ repos:
 
       - id: mypy-type-check
         name: mypy (type checking - strict)
-        entry: bash -c 'poetry run mypy "$@" --show-error-codes --no-error-summary' --
+        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml lint job
+        # CI runs: poetry run mypy src/omnimemory
+        entry: poetry run mypy src/omnimemory
         language: system
         types: [python]
         files: ^src/omnimemory/.*\.py$
-        exclude: ^tests/.*\.py$
-        pass_filenames: true  # Only check changed files, not entire codebase
+        pass_filenames: false  # Run on entire directory to match CI behavior
         stages: [pre-push]
 
       - id: pyright-type-check
         name: pyright (type checking - basic)
-        entry: poetry run pyright
+        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml pyright job
+        # CI runs: poetry run pyright src/omnimemory
+        # Uses pyrightconfig.json for project-level settings
+        entry: poetry run pyright src/omnimemory
         language: system
         types: [python]
         files: ^src/omnimemory/.*\.py$
-        exclude: ^tests/.*\.py$
-        pass_filenames: true  # Only check changed files, CI does full scan
+        pass_filenames: false  # Run on entire directory to match CI behavior
         stages: [pre-push]
 
       # Cleanup: Clear tmp/ directory before commits

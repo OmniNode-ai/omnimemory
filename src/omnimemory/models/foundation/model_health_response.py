@@ -7,11 +7,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelDependencyStatus(BaseModel):
     """Status of a system dependency."""
+
+    model_config = ConfigDict(frozen=False)
 
     name: str = Field(description="Name of the dependency")
     status: Literal["healthy", "degraded", "unhealthy"] = Field(
@@ -26,6 +28,8 @@ class ModelDependencyStatus(BaseModel):
 
 class ModelResourceMetrics(BaseModel):
     """System resource utilization metrics."""
+
+    model_config = ConfigDict(frozen=False)
 
     cpu_usage_percent: float = Field(
         ge=0.0, le=100.0, description="CPU usage percentage"
@@ -44,6 +48,8 @@ class ModelResourceMetrics(BaseModel):
 
 class ModelHealthResponse(BaseModel):
     """Health check response following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     status: Literal["healthy", "degraded", "unhealthy"] = Field(
         description="Overall system health status"
@@ -67,6 +73,8 @@ class ModelHealthResponse(BaseModel):
 class ModelCircuitBreakerStats(BaseModel):
     """Circuit breaker statistics for a single dependency."""
 
+    model_config = ConfigDict(frozen=False)
+
     state: Literal["closed", "open", "half_open"] = Field(
         description="Current circuit breaker state"
     )
@@ -85,6 +93,8 @@ class ModelCircuitBreakerStats(BaseModel):
 class ModelCircuitBreakerStatsCollection(BaseModel):
     """Collection of circuit breaker statistics for all dependencies."""
 
+    model_config = ConfigDict(frozen=False)
+
     circuit_breakers: dict[str, ModelCircuitBreakerStats] = Field(
         description="Circuit breaker statistics keyed by dependency name"
     )
@@ -96,6 +106,8 @@ class ModelCircuitBreakerStatsCollection(BaseModel):
 
 class ModelRateLimitedHealthCheckResponse(BaseModel):
     """Rate-limited health check response."""
+
+    model_config = ConfigDict(frozen=False)
 
     status: str = Field(
         default="rate_limited", description="Status of the rate-limited response"

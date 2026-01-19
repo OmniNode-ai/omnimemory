@@ -5,11 +5,13 @@ Service health model following ONEX standards.
 from datetime import UTC, datetime
 
 from omnibase_core.enums import EnumHealthStatus
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelServiceHealth(BaseModel):
     """Service health information following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Service identification
     service_id: str = Field(

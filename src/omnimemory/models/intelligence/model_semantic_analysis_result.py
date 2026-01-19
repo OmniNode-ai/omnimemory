@@ -5,11 +5,13 @@ Semantic analysis result model following ONEX standards.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelSemanticAnalysisResult(BaseModel):
     """Semantic analysis result following ONEX standards."""
+
+    model_config = ConfigDict(frozen=False)
 
     # Result identification
     result_id: UUID = Field(

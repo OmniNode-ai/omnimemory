@@ -7,11 +7,13 @@ in health management, ensuring type safety and validation.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthCheckMetadata(BaseModel):
     """Strongly typed metadata for health check operations."""
+
+    model_config = ConfigDict(frozen=False)
 
     connection_url: str | None = Field(
         default=None, description="Connection URL for dependency checks"
@@ -45,6 +47,8 @@ class HealthCheckMetadata(BaseModel):
 class AggregateHealthMetadata(BaseModel):
     """Strongly typed metadata for aggregate health status."""
 
+    model_config = ConfigDict(frozen=False)
+
     total_dependencies: int = Field(description="Total number of dependencies checked")
 
     healthy_dependencies: int = Field(description="Number of healthy dependencies")
@@ -74,6 +78,8 @@ class AggregateHealthMetadata(BaseModel):
 
 class ConfigurationChangeMetadata(BaseModel):
     """Strongly typed metadata for configuration changes."""
+
+    model_config = ConfigDict(frozen=False)
 
     changed_keys: list[str] = Field(
         description="List of configuration keys that were modified"

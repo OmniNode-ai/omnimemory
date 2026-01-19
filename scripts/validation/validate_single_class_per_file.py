@@ -43,34 +43,52 @@ EXEMPT_DIRECTORIES = {
 }
 
 
-def count_classes(filepath: Path) -> tuple[int, list[str]]:
-    """Count top-level class definitions in a file."""
+def is_enum_class(node: ast.ClassDef) -> bool:
+    """Check if a class definition is an Enum subclass."""
+    enum_bases = {"Enum", "StrEnum", "IntEnum", "IntFlag", "Flag", "auto"}
+    for base in node.bases:
+        if isinstance(base, ast.Name) and base.id in enum_bases:
+            return True
+        if isinstance(base, ast.Attribute) and base.attr in enum_bases:
+            return True
+    return False
+
+
+def count_classes(filepath: Path) -> tuple[int, list[str], int, list[str]]:
+    """Count top-level class definitions in a file.
+
+    Returns:
+        Tuple of (non_enum_count, non_enum_names, enum_count, enum_names)
+    """
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))
     except SyntaxError:
-        return 0, []
+        return 0, [], 0, []
     except Exception:
-        return 0, []
+        return 0, [], 0, []
 
-    class_names: list[str] = []
-    for node in ast.walk(tree):
+    non_enum_names: list[str] = []
+    enum_names: list[str] = []
+
+    # Only check top-level classes
+    for node in tree.body:
         if isinstance(node, ast.ClassDef):
-            # Only count top-level classes
-            parent = getattr(node, "parent", None)
-            if parent is None or isinstance(parent, ast.Module):
-                class_names.append(node.name)
+            if is_enum_class(node):
+                enum_names.append(node.name)
+            else:
+                non_enum_names.append(node.name)
 
-    # Manually check for top-level only
-    class_names = [
-        node.name for node in tree.body if isinstance(node, ast.ClassDef)
-    ]
-
-    return len(class_names), class_names
+    return len(non_enum_names), non_enum_names, len(enum_names), enum_names
 
 
 def validate_file(filepath: Path) -> list[Violation]:
-    """Validate a single Python file."""
+    """Validate a single Python file.
+
+    Rules:
+    - Only one non-enum class per file (enforced)
+    - Multiple enums in one file are allowed
+    """
     if filepath.name in EXEMPTIONS:
         return []
 
@@ -79,15 +97,18 @@ def validate_file(filepath: Path) -> list[Violation]:
         if part in EXEMPT_DIRECTORIES:
             return []
 
-    num_classes, class_names = count_classes(filepath)
+    non_enum_count, non_enum_names, enum_count, enum_names = count_classes(filepath)
 
-    if num_classes > 1:
+    # Only enforce single-class rule for non-enum classes
+    # Multiple enums in one file are explicitly allowed
+    if non_enum_count > 1:
         return [
             Violation(
                 str(filepath),
                 1,
-                f"Multiple classes in file ({num_classes}): {', '.join(class_names)}. "
-                "ONEX requires one model/enum per file.",
+                f"Multiple non-enum classes in file ({non_enum_count}): "
+                f"{', '.join(non_enum_names)}. ONEX requires one model per file. "
+                f"(Note: {enum_count} enum(s) also present, which are allowed)",
             )
         ]
 

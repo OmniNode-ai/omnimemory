@@ -52,11 +52,15 @@ class PydanticPatternVisitor(ast.NodeVisitor):
             self.in_class = node.name
             self.is_pydantic_model = True
 
-            # Check for empty ConfigDict
+            # Track if model_config is defined
+            has_model_config = False
+
+            # Check for model_config patterns
             for item in node.body:
                 if isinstance(item, ast.Assign):
                     for target in item.targets:
                         if isinstance(target, ast.Name) and target.id == "model_config":
+                            has_model_config = True
                             if isinstance(item.value, ast.Call):
                                 # Check if ConfigDict() with no args
                                 if (
@@ -73,6 +77,44 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                                             "add explicit configuration or remove",
                                         )
                                     )
+                            elif isinstance(item.value, ast.Dict):
+                                # Check for bare dict: model_config = {}
+                                if not item.value.keys:
+                                    self.violations.append(
+                                        Violation(
+                                            self.filepath,
+                                            item.lineno,
+                                            f"Empty dict for model_config in {node.name} - "
+                                            "use ConfigDict() with explicit settings or remove",
+                                        )
+                                    )
+                                else:
+                                    self.violations.append(
+                                        Violation(
+                                            self.filepath,
+                                            item.lineno,
+                                            f"Bare dict for model_config in {node.name} - "
+                                            "use ConfigDict() instead of plain dict",
+                                        )
+                                    )
+
+            # Check for missing model_config (only if model has fields)
+            has_fields = any(
+                isinstance(item, ast.AnnAssign)
+                and isinstance(item.target, ast.Name)
+                and not item.target.id.startswith("_")
+                for item in node.body
+            )
+
+            if not has_model_config and has_fields:
+                self.violations.append(
+                    Violation(
+                        self.filepath,
+                        node.lineno,
+                        f"Missing model_config in {node.name} - "
+                        "add model_config = ConfigDict(...) with explicit settings",
+                    )
+                )
 
             self.generic_visit(node)
             self.in_class = old_class
@@ -81,8 +123,20 @@ class PydanticPatternVisitor(ast.NodeVisitor):
             self.generic_visit(node)
 
 
+# Directories to skip from strict model_config validation
+# - utils: Utility classes use inline models for convenience, not domain models
+# - protocols: API contracts already have their own patterns
+# - compat: Compatibility stubs
+# - tests: Test fixtures and mocks
+SKIP_DIRECTORIES = {"utils", "protocols", "compat", "tests", "__pycache__", ".git"}
+
+
 def validate_file(filepath: Path) -> list[Violation]:
     """Validate a single Python file."""
+    # Skip files in specific directories
+    if any(skip_dir in filepath.parts for skip_dir in SKIP_DIRECTORIES):
+        return []
+
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))

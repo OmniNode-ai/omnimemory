@@ -7,13 +7,15 @@ in progress reporting, ensuring type safety and validation.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums import EnumPriorityLevel, MigrationStatus
 
 
 class ProgressSummaryResponse(BaseModel):
     """Strongly typed progress summary response."""
+
+    model_config = ConfigDict(frozen=False)
 
     migration_id: str = Field(description="Unique identifier for the migration")
 
