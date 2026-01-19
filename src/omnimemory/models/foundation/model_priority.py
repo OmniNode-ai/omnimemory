@@ -4,8 +4,8 @@ Priority model following ONEX foundation patterns.
 
 from datetime import UTC, datetime
 
-from omnibase_core.enums.enum_priority_level import (
-    EnumPriorityLevel,  # type: ignore[import-untyped]
+from omnibase_core.enums.enum_priority_level import (  # type: ignore[import-untyped]
+    EnumPriorityLevel,
 )
 from pydantic import BaseModel, ConfigDict, Field
 
