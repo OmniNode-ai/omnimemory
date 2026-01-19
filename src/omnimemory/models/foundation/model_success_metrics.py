@@ -37,9 +37,9 @@ class ModelSuccessRate(BaseModel):
 
     @field_validator("successful_operations")
     @classmethod
-    def validate_successful_operations(cls, v: int, info) -> int:
+    def validate_successful_operations(cls, v: int, info: object) -> int:
         """Validate successful operations doesn't exceed total."""
-        if hasattr(info, "data") and "total_operations" in info.data:
+        if hasattr(info, "data") and "total_operations" in getattr(info, "data", {}):
             total = info.data["total_operations"]
             if v > total:
                 raise ValueError("Successful operations cannot exceed total operations")

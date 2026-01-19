@@ -20,7 +20,9 @@ from uuid import UUID
 
 # Use local compatibility stub until omnibase_core provides NodeResult
 try:
-    from omnibase_core.core.monadic.model_node_result import NodeResult
+    from omnibase_core.core.monadic.model_node_result import (  # type: ignore[import-untyped]
+        NodeResult,
+    )
 except (ImportError, ModuleNotFoundError):
     from ..compat.node_result import NodeResult
 

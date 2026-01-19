@@ -4,26 +4,16 @@ Error details model following ONEX standards.
 Uses the standard ONEX error patterns from omnibase_core when available.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Import standard ONEX error types from omnibase_core
-try:
-    from omnibase_core.core.errors.core_errors import OnexErrorCode as CoreErrorCode
-    from omnibase_core.enums.enum_log_level import EnumLogLevel as CoreSeverity
-
-    # Local omnimemory-specific error codes
-    from ...enums.enum_error_code import OmniMemoryErrorCode
-
-    # Union type for error codes
-    ErrorCodeType = CoreErrorCode | OmniMemoryErrorCode | str
-    SeverityType = CoreSeverity
-except ImportError:
-    # Fallback for development environments
-    from ...enums.enum_error_code import OmniMemoryErrorCode as ErrorCodeType
-    from ...enums.enum_severity import EnumSeverity as SeverityType
+# Import local omnimemory enums (always available)
+from ...enums.enum_error_code import OmniMemoryErrorCode
+from ...enums.enum_severity import EnumSeverity
 
 
 class ModelErrorDetails(BaseModel):
@@ -35,7 +25,7 @@ class ModelErrorDetails(BaseModel):
     error_id: UUID = Field(
         description="Unique identifier for this error instance",
     )
-    error_code: ErrorCodeType = Field(
+    error_code: OmniMemoryErrorCode | str = Field(
         description="Standardized error code (core or omnimemory-specific)",
     )
     error_type: str = Field(
@@ -50,7 +40,7 @@ class ModelErrorDetails(BaseModel):
         default=None,
         description="Detailed technical error message",
     )
-    severity: SeverityType = Field(
+    severity: EnumSeverity = Field(
         description="Severity level of the error (using core severity levels)",
     )
 

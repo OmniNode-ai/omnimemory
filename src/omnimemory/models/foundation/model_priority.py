@@ -4,7 +4,9 @@ Priority model following ONEX foundation patterns.
 
 from datetime import UTC, datetime
 
-from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
+from omnibase_core.enums.enum_priority_level import (
+    EnumPriorityLevel,  # type: ignore[import-untyped]
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -59,9 +61,9 @@ class ModelPriority(BaseModel):
         """Get effective priority value considering boost and expiration."""
         if self.is_expired():
             # If expired, fallback to normal priority
-            base_priority = EnumPriorityLevel.NORMAL.get_numeric_value()
+            base_priority: float = float(EnumPriorityLevel.NORMAL.get_numeric_value())
         else:
-            base_priority = self.level.get_numeric_value()
+            base_priority = float(self.level.get_numeric_value())
 
         return base_priority * self.boost_factor
 

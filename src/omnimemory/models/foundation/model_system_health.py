@@ -4,7 +4,7 @@ System health model following ONEX standards.
 
 from datetime import UTC, datetime
 
-from omnibase_core.enums import EnumHealthStatus
+from omnibase_core.enums import EnumHealthStatus  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field
 
 

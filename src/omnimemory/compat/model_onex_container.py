@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -128,19 +128,19 @@ class ModelOnexContainer:
         """
         # Check if we have a cached singleton
         if interface in self._singletons:
-            return self._singletons[interface]
+            return cast(T, self._singletons[interface])
 
         # Check if we have a singleton factory
         if interface in self._singleton_factories:
             factory = self._singleton_factories[interface]
             instance = self._create_instance(factory)
             self._singletons[interface] = instance
-            return instance
+            return cast(T, instance)
 
         # Check if we have a transient factory
         if interface in self._transient_factories:
             factory = self._transient_factories[interface]
-            return self._create_instance(factory)
+            return cast(T, self._create_instance(factory))
 
         raise KeyError(f"No registration found for {interface}")
 

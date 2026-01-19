@@ -6,6 +6,11 @@ error handling, migration progress tracking, and system-level operations.
 """
 
 from ...enums.enum_error_code import OmniMemoryErrorCode
+from ...enums.enum_migration_status import (
+    FileProcessingStatus,
+    MigrationPriority,
+    MigrationStatus,
+)
 from ...enums.enum_severity import EnumSeverity
 from .model_audit_metadata import (
     AuditEventDetails,
@@ -58,11 +63,8 @@ from .model_metrics_response import (
 from .model_migration_progress import (
     BatchProcessingMetrics,
     FileProcessingInfo,
-    FileProcessingStatus,
-    MigrationPriority,
     MigrationProgressMetrics,
     MigrationProgressTracker,
-    MigrationStatus,
 )
 from .model_notes import ModelNote, ModelNotesCollection
 from .model_progress_summary import ProgressSummaryResponse

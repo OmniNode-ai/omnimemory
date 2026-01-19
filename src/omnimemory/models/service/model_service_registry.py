@@ -4,7 +4,10 @@ Service registry model following ONEX standards.
 
 from datetime import UTC, datetime
 
-from omnibase_core.enums import EnumHealthStatus, EnumNodeType
+from omnibase_core.enums import (  # type: ignore[import-untyped]
+    EnumHealthStatus,
+    EnumNodeType,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 

@@ -13,7 +13,9 @@ class AuditEventDetails(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    operation_type: str = Field(description="Type of operation being audited")
+    operation_type: str = Field(
+        default="unknown", description="Type of operation being audited"
+    )
 
     resource_id: str | None = Field(
         default=None, description="Identifier of the resource being accessed"

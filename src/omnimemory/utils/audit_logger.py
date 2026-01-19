@@ -64,7 +64,8 @@ class AuditEvent(BaseModel):
     # Event details
     message: str = Field(description="Human-readable event description")
     details: AuditEventDetails = Field(
-        default_factory=AuditEventDetails, description="Additional event details"
+        default_factory=lambda: AuditEventDetails(),
+        description="Additional event details",
     )
 
     # Security context
@@ -142,8 +143,8 @@ class AuditLogger:
         """Create JSON log formatter."""
 
         class JSONFormatter(logging.Formatter):
-            def format(self, record):
-                log_data = {
+            def format(self, record: logging.LogRecord) -> str:
+                log_data: dict[str, object] = {
                     "timestamp": datetime.fromtimestamp(
                         record.created, tz=UTC
                     ).isoformat(),
@@ -237,7 +238,7 @@ class AuditLogger:
 
     def log_pii_detection(
         self,
-        pii_types: list,
+        pii_types: list[str],
         content_length: int,
         sanitized: bool = False,
         details: AuditEventDetails | None = None,
@@ -261,7 +262,7 @@ class AuditLogger:
                 "pii_types_detected": pii_types,
                 "content_length": content_length,
                 "sanitized": sanitized,
-                **(details or {}),
+                **(details.model_dump() if details else {}),
             },
             pii_detected=bool(pii_types),
             sanitized=sanitized,
@@ -320,7 +321,7 @@ class AuditLogger:
                 "new_value": (
                     "***REDACTED***" if "secret" in config_key.lower() else new_value
                 ),
-                **(details or {}),
+                **(details.model_dump() if details else {}),
             },
             user_context=user_context,
         )

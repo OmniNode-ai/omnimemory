@@ -56,7 +56,7 @@ class ModelStringList(BaseModel):
         """Support 'in' operator for checking membership."""
         return item in self.values
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
         """Support iteration over values."""
         return iter(self.values)
 
@@ -112,7 +112,7 @@ class ModelOptionalStringList(BaseModel):
             return False
         return item in self.values
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
         """Support iteration over values.
 
         Returns empty iterator if values is None.

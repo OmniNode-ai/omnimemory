@@ -55,7 +55,7 @@ class ModelProcessingMetrics(BaseModel):
         description="Additional performance-related metadata",
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def efficiency_score(self) -> float:
         """
@@ -78,7 +78,7 @@ class ModelProcessingMetrics(BaseModel):
         # Cap at 1.0
         return min(1.0, efficiency)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def breakdown_percentages(self) -> dict[str, float]:
         """

@@ -6,7 +6,14 @@ import math
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    ValidationInfo,
+    field_validator,
+)
 
 from omnimemory.enums import EnumDecayFunction, EnumTrustLevel
 
@@ -99,9 +106,11 @@ class ModelTrustScore(BaseModel):
 
     @field_validator("trust_level")
     @classmethod
-    def validate_trust_level_matches_score(cls, v, info):
+    def validate_trust_level_matches_score(
+        cls, v: EnumTrustLevel, info: ValidationInfo
+    ) -> EnumTrustLevel:
         """Ensure trust level matches base score."""
-        if "current_score" in info.data:
+        if info.data and "current_score" in info.data:
             score = info.data["current_score"]
             expected_level = cls._score_to_level(score)
             if v != expected_level:
@@ -132,7 +141,11 @@ class ModelTrustScore(BaseModel):
             as_of = datetime.now(UTC)
 
         # Check cache validity if not forcing recalculation
-        if not force_recalculate and self._is_cache_valid(as_of):
+        if (
+            not force_recalculate
+            and self._is_cache_valid(as_of)
+            and self._cached_score is not None
+        ):
             return self._cached_score
 
         if self.decay_function == EnumDecayFunction.NONE:

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -139,7 +139,8 @@ class NodeResult(Generic[T]):
             )
 
         try:
-            new_value = func(self.value)
+            # Safe to cast: is_success=True implies value is not None
+            new_value = func(cast(T, self.value))
             return NodeResult[U].success(
                 new_value,
                 provenance=self.provenance,
@@ -178,7 +179,8 @@ class NodeResult(Generic[T]):
             )
 
         try:
-            inner_result = func(self.value)
+            # Safe to cast: is_success=True implies value is not None
+            inner_result = func(cast(T, self.value))
             # Combine provenance chains (outer first, then inner)
             combined_provenance = self.provenance + inner_result.provenance
             # Multiply trust scores for cumulative trust degradation
@@ -187,8 +189,9 @@ class NodeResult(Generic[T]):
             combined_metadata = {**self.metadata, **inner_result.metadata}
 
             if inner_result.is_success:
+                # Safe to cast: is_success=True implies value is not None
                 return NodeResult[U].success(
-                    inner_result.value,
+                    cast(U, inner_result.value),
                     provenance=combined_provenance,
                     trust_score=combined_trust,
                     metadata=combined_metadata,
@@ -223,7 +226,8 @@ class NodeResult(Generic[T]):
             if self.error:
                 raise self.error
             raise ValueError(self.error_message or "Unknown error")
-        return self.value
+        # Safe to cast: is_success=True implies value is not None
+        return cast(T, self.value)
 
     def unwrap_or(self, default: T) -> T:
         """
@@ -237,7 +241,8 @@ class NodeResult(Generic[T]):
         """
         if not self.is_success:
             return default
-        return self.value
+        # Safe to cast: is_success=True implies value is not None
+        return cast(T, self.value)
 
     def __bool__(self) -> bool:
         """Return True if this is a success result."""

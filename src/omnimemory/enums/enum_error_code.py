@@ -5,13 +5,19 @@ This module ONLY contains error codes specific to OmniMemory operations.
 All general error codes are imported from omnibase_core.core.errors.core_errors when available.
 """
 
+from __future__ import annotations
+
 try:
-    from omnibase_core.core.errors.core_errors import OnexErrorCode
+    from omnibase_core.core.errors.core_errors import (  # type: ignore[import-untyped]
+        OnexErrorCode,
+    )
+
+    _BASE_CLASS = OnexErrorCode
 except ImportError:
     # Fallback for development environments without omnibase_core
     from enum import Enum
 
-    class OnexErrorCode(str, Enum):
+    class OnexErrorCode(str, Enum):  # type: ignore[no-redef]
         """Base class for ONEX error codes (fallback implementation)."""
 
         def get_component(self) -> str:
@@ -30,8 +36,10 @@ except ImportError:
             """Get the appropriate CLI exit code for this error."""
             return 1  # Default to error exit code
 
+    _BASE_CLASS = OnexErrorCode
 
-class OmniMemoryErrorCode(OnexErrorCode):
+
+class OmniMemoryErrorCode(_BASE_CLASS):  # type: ignore[valid-type,misc]
     """Memory-specific error codes for the ONEX memory system."""
 
     # Memory operation errors (specific to omnimemory only)

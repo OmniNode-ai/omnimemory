@@ -16,16 +16,16 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Union
+from typing import Union, cast
 
 # Optional psutil import for resource metrics - gracefully degrade if unavailable
 _PSUTIL_AVAILABLE = False
 try:
-    import psutil
+    import psutil  # type: ignore[import-untyped]
 
     _PSUTIL_AVAILABLE = True
 except ImportError:
-    psutil = None  # type: ignore[assignment]
+    psutil = None
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
@@ -114,9 +114,10 @@ def _get_package_version() -> str:
     except ImportError:
         # Fallback for older Python versions
         try:
-            import pkg_resources
+            import pkg_resources  # type: ignore[import-not-found]
 
-            return pkg_resources.get_distribution("omnimemory").version
+            pkg_version: str = pkg_resources.get_distribution("omnimemory").version
+            return pkg_version
         except Exception:
             return "0.1.0"  # Fallback version
     except Exception:
@@ -221,7 +222,7 @@ class HealthCheckManager:
     - Failure isolation to prevent cascade failures
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._health_checks: dict[str, Callable[[], Awaitable[HealthCheckResult]]] = {}
         self._configs: dict[str, HealthCheckConfig] = {}
         self._circuit_breakers: dict[str, AsyncCircuitBreaker] = {}
@@ -236,7 +237,7 @@ class HealthCheckManager:
         self,
         config: HealthCheckConfig,
         check_func: Callable[[], Awaitable[HealthCheckResult]],
-    ):
+    ) -> None:
         """
         Register a health check function with configuration.
 
@@ -296,7 +297,9 @@ class HealthCheckManager:
                     # Use circuit breaker if configured
                     if name in self._circuit_breakers:
                         circuit_breaker = self._circuit_breakers[name]
-                        result = await circuit_breaker.call(check_func)
+                        result = cast(
+                            HealthCheckResult, await circuit_breaker.call(check_func)
+                        )
                     else:
                         # Apply timeout directly
                         result = await asyncio.wait_for(
@@ -412,7 +415,8 @@ class HealthCheckManager:
                             error_type=type(result).__name__,
                         )
                     else:
-                        health_results.append(result)
+                        # Result is HealthCheckResult when not an exception
+                        health_results.append(cast(HealthCheckResult, result))
 
                 logger.info(
                     "health_check_all_completed",
@@ -659,7 +663,7 @@ class HealthCheckManager:
             )
 
         # Perform health check
-        health_check_result = await self.comprehensive_health_check()
+        health_check_result = await self.get_comprehensive_health()
         return ModelRateLimitedHealthCheckResponse(
             health_check=health_check_result,
             rate_limited=False,
@@ -717,7 +721,7 @@ async def create_redis_health_check(
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 
         try:
-            client = redis.from_url(redis_url)
+            client = redis.from_url(redis_url)  # type: ignore[no-untyped-call]
             await client.ping()
             await client.close()
 

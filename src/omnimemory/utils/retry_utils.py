@@ -171,9 +171,9 @@ async def retry_with_backoff(
     operation: Callable[..., Any],
     config: RetryConfig,
     correlation_id: UUID | None = None,
-    *args,
-    **kwargs,
-) -> T:
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
     """
     Execute an operation with retry and exponential backoff.
 
@@ -236,7 +236,7 @@ async def retry_with_backoff(
                 e, config.retryable_exceptions
             ):
                 # Sanitize error message to prevent information disclosure
-                sanitized_error = _error_sanitizer.sanitize_error_message(str(e))
+                sanitized_error = _error_sanitizer.sanitize_error(e)
                 logger.warning(
                     f"Attempt {attempt}/{config.max_attempts} failed with {type(e).__name__}: {sanitized_error} "
                     f"(correlation_id: {correlation_id})"
@@ -244,9 +244,7 @@ async def retry_with_backoff(
                 continue
             # Final failure or non-retryable exception
             # Use stricter sanitization for final failures
-            sanitized_error = _error_sanitizer.sanitize_error_message(
-                str(e), level=SanitizationLevel.STRICT
-            )
+            sanitized_error = _error_sanitizer.sanitize_error(e)
             logger.error(
                 f"Operation failed permanently after {attempt} attempts "
                 f"with {type(e).__name__}: {sanitized_error} "
@@ -268,7 +266,7 @@ def retry_decorator(
     exponential_multiplier: float = 2.0,
     jitter: bool = True,
     retryable_exceptions: list[str] | None = None,
-) -> Callable:
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Decorator for adding retry behavior to functions.
 
@@ -284,8 +282,9 @@ def retry_decorator(
     Returns:
         Decorated function with retry behavior
     """
+    effective_config: RetryConfig
     if config is None:
-        config = RetryConfig(
+        effective_config = RetryConfig(
             max_attempts=max_attempts,
             base_delay_ms=base_delay_ms,
             max_delay_ms=max_delay_ms,
@@ -293,23 +292,25 @@ def retry_decorator(
             jitter=jitter,
             retryable_exceptions=retryable_exceptions or [],
         )
+    else:
+        effective_config = config
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
-        async def async_wrapper(*args, **kwargs) -> T:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             correlation_id = kwargs.pop("correlation_id", None)
             return await retry_with_backoff(
-                func, config, correlation_id, *args, **kwargs
+                func, effective_config, correlation_id, *args, **kwargs
             )
 
         @functools.wraps(func)
-        def sync_wrapper(*args, **kwargs) -> T:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             # For sync functions, run in event loop
             correlation_id = kwargs.pop("correlation_id", None)
 
-            async def async_operation():
+            async def async_operation() -> Any:
                 return await retry_with_backoff(
-                    func, config, correlation_id, *args, **kwargs
+                    func, effective_config, correlation_id, *args, **kwargs
                 )
 
             try:
@@ -325,7 +326,7 @@ def retry_decorator(
                 return asyncio.run(async_operation())
 
         if asyncio.iscoroutinefunction(func):
-            return async_wrapper
+            return async_wrapper  # type: ignore[return-value]
         else:
             return sync_wrapper
 
@@ -354,8 +355,8 @@ class RetryManager:
         operation_name: str,
         config: RetryConfig | None = None,
         correlation_id: UUID | None = None,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> T:
         """
         Execute an operation with retry and track statistics.
@@ -374,7 +375,7 @@ class RetryManager:
         retry_config = config or self.default_config
 
         try:
-            result = await retry_with_backoff(
+            result: T = await retry_with_backoff(
                 operation, retry_config, correlation_id, *args, **kwargs
             )
 

@@ -102,13 +102,14 @@ class ModelMemoryContext(BaseModel):
         self.trust_score.refresh_current_score()
         return self.trust_score.current_score
 
-    def add_context_tag(self, tag_name: str, category: str | None = None) -> bool:
+    def add_context_tag(self, tag_name: str, category: str | None = None) -> None:
         """Add a tag to the context."""
-        return self.tags.add_tag(tag_name, category=category)
+        self.tags.add_tag(tag_name, category=category)
 
     def has_context_tag(self, tag_name: str) -> bool:
         """Check if context has a specific tag."""
-        return self.tags.has_tag(tag_name)
+        normalized_name = tag_name.strip().lower().replace(" ", "_").replace("-", "_")
+        return normalized_name in self.tags.get_tag_names()
 
     def get_tag_names(self) -> list[str]:
         """Get list of all tag names."""

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -247,7 +248,7 @@ class BaseMemoryResponse(BaseMemoryModel):
 
     @field_validator("provenance", "warnings", mode="before")
     @classmethod
-    def convert_list_to_model_string_list(cls, v):
+    def convert_list_to_model_string_list(cls, v: Any) -> ModelStringList | Any:
         """Convert plain lists to ModelStringList for easier API usage."""
         if isinstance(v, list):
             return ModelStringList(values=v)
@@ -321,7 +322,7 @@ class MemoryRecord(BaseMemoryModel):
 
     @field_validator("tags", "provenance", mode="before")
     @classmethod
-    def convert_list_to_model_string_list(cls, v):
+    def convert_list_to_model_string_list(cls, v: Any) -> ModelStringList | Any:
         """Convert plain lists to ModelStringList for easier API usage."""
         if isinstance(v, list):
             return ModelStringList(values=v)
