@@ -2,7 +2,7 @@
 Notes model following ONEX standards.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -39,7 +39,7 @@ class ModelNote(BaseModel):
         description="Tags for categorizing the note",
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the note was created",
     )
     updated_at: datetime | None = Field(
@@ -66,24 +66,24 @@ class ModelNote(BaseModel):
     def archive(self) -> None:
         """Archive this note."""
         self.is_archived = True
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
 
     def update_content(self, new_content: str) -> None:
         """Update note content."""
         self.content = new_content
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
 
     def add_tag(self, tag: str) -> None:
         """Add a tag to this note."""
         if tag not in self.tags:
             self.tags.append(tag)
-            self.updated_at = datetime.now(UTC)
+            self.updated_at = datetime.now(timezone.utc)
 
     def remove_tag(self, tag: str) -> None:
         """Remove a tag from this note."""
         if tag in self.tags:
             self.tags.remove(tag)
-            self.updated_at = datetime.now(UTC)
+            self.updated_at = datetime.now(timezone.utc)
 
 
 class ModelNotesCollection(BaseModel):
@@ -111,7 +111,7 @@ class ModelNotesCollection(BaseModel):
         description="Description of the notes collection",
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the collection was created",
     )
     updated_at: datetime | None = Field(
@@ -154,7 +154,7 @@ class ModelNotesCollection(BaseModel):
             is_system_generated=is_system_generated,
         )
         self.notes.append(note)
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
         return note
 
     def get_notes_by_category(self, category: str) -> list[ModelNote]:
@@ -181,7 +181,7 @@ class ModelNotesCollection(BaseModel):
                 note.archive()
                 count += 1
         if count > 0:
-            self.updated_at = datetime.now(UTC)
+            self.updated_at = datetime.now(timezone.utc)
         return count
 
     def get_note_count_by_severity(self) -> dict[EnumSeverity, int]:

@@ -2,7 +2,7 @@
 Tags model following ONEX standards.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -24,7 +24,7 @@ class ModelTag(BaseModel):
         max_length=50,
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the tag was created",
     )
     created_by: UUID | None = Field(
@@ -71,7 +71,7 @@ class ModelTagCollection(BaseModel):
         description="Whether tags were auto-generated",
     )
     last_updated: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the tag collection was last updated",
     )
 
@@ -106,7 +106,7 @@ class ModelTagCollection(BaseModel):
             created_by=created_by,
         )
         self.tags.append(new_tag)
-        self.last_updated = datetime.now(UTC)
+        self.last_updated = datetime.now(timezone.utc)
 
     def remove_tag(self, name: str) -> bool:
         """Remove a tag by name."""
@@ -114,7 +114,7 @@ class ModelTagCollection(BaseModel):
         for i, tag in enumerate(self.tags):
             if tag.name == normalized_name:
                 self.tags.pop(i)
-                self.last_updated = datetime.now(UTC)
+                self.last_updated = datetime.now(timezone.utc)
                 return True
         return False
 

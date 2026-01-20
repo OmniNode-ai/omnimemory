@@ -3,7 +3,7 @@ Trust score model with time decay following ONEX standards.
 """
 
 import math
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import (
@@ -13,6 +13,7 @@ from pydantic import (
     PrivateAttr,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 from omnimemory.enums import EnumDecayFunction, EnumTrustLevel
@@ -40,7 +41,7 @@ def ensure_timezone_aware(
         raise TypeError(f"{field_name} must be a datetime, got {type(dt).__name__}")
     if dt.tzinfo is None:
         # Naive datetime - assume it represents UTC time and attach timezone
-        return dt.replace(tzinfo=UTC)
+        return dt.replace(tzinfo=timezone.utc)
     return dt
 
 
@@ -83,11 +84,11 @@ class ModelTrustScore(BaseModel):
 
     # Temporal information
     initial_timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the trust score was initially established",
     )
     last_updated: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the trust score was last updated",
     )
     last_verified: datetime | None = Field(
@@ -116,13 +117,25 @@ class ModelTrustScore(BaseModel):
     _cache_timestamp: datetime | None = PrivateAttr(default=None)
     _cache_ttl_seconds: int = PrivateAttr(default=300)
 
-    @field_validator(
-        "initial_timestamp", "last_updated", "last_verified", mode="before"
-    )
-    @classmethod
-    def validate_timezone_aware(cls, v: datetime | None) -> datetime | None:
-        """Ensure datetime values are timezone-aware to prevent comparison errors."""
-        return ensure_timezone_aware(v, "datetime field")
+    @model_validator(mode="after")
+    def validate_timezone_aware(self) -> "ModelTrustScore":
+        """Ensure all datetime values are timezone-aware to prevent comparison errors.
+
+        Uses model_validator(mode='after') to run after all fields are parsed,
+        ensuring datetime fields are already coerced from strings/other formats.
+        """
+        # Guard against naive datetimes and convert to UTC
+        result = ensure_timezone_aware(self.initial_timestamp, "initial_timestamp")
+        if result is not None:
+            self.initial_timestamp = result
+
+        result = ensure_timezone_aware(self.last_updated, "last_updated")
+        if result is not None:
+            self.last_updated = result
+
+        self.last_verified = ensure_timezone_aware(self.last_verified, "last_verified")
+
+        return self
 
     @field_validator("trust_level")
     @classmethod
@@ -158,7 +171,7 @@ class ModelTrustScore(BaseModel):
     ) -> float:
         """Calculate current trust score with time decay and caching for performance."""
         if as_of is None:
-            validated_as_of = datetime.now(UTC)
+            validated_as_of = datetime.now(timezone.utc)
         else:
             # Ensure provided datetime is timezone-aware to prevent TypeError
             result = ensure_timezone_aware(as_of, "as_of")
@@ -239,10 +252,10 @@ class ModelTrustScore(BaseModel):
         self.base_score = new_base_score
         self.current_score = self.calculate_current_score()
         self.trust_level = self._score_to_level(self.current_score)
-        self.last_updated = datetime.now(UTC)
+        self.last_updated = datetime.now(timezone.utc)
 
         if verified:
-            self.last_verified = datetime.now(UTC)
+            self.last_verified = datetime.now(timezone.utc)
             self.verification_count += 1
 
     def record_violation(self, penalty: float = 0.1) -> None:
@@ -252,7 +265,7 @@ class ModelTrustScore(BaseModel):
         self.base_score = max(0.0, self.base_score - penalty_factor)
         self.current_score = self.calculate_current_score()
         self.trust_level = self._score_to_level(self.current_score)
-        self.last_updated = datetime.now(UTC)
+        self.last_updated = datetime.now(timezone.utc)
 
     def refresh_current_score(self) -> None:
         """Refresh the current score based on time decay."""

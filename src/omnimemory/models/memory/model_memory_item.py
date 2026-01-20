@@ -4,7 +4,7 @@ Memory item model following ONEX standards.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -68,7 +68,7 @@ class ModelMemoryItem(BaseModel):
 
     # Temporal information
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the memory item was created",
     )
     updated_at: datetime | None = Field(

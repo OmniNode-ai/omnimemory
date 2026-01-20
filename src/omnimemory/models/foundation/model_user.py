@@ -2,7 +2,7 @@
 User model following ONEX foundation patterns.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,7 +42,7 @@ class ModelUser(BaseModel):
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the user was created",
     )
     last_active: datetime | None = Field(
@@ -80,7 +80,7 @@ class ModelUser(BaseModel):
 
     def update_last_active(self) -> None:
         """Update last active timestamp to now."""
-        self.last_active = datetime.now(UTC)
+        self.last_active = datetime.now(timezone.utc)
 
     @classmethod
     def create_system_user(cls) -> "ModelUser":

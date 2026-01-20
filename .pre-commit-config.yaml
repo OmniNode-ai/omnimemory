@@ -179,6 +179,10 @@ repos:
         stages: [pre-commit]
 
       # Naming Convention Validation (pre-push - slower scan)
+      # STAGE ALIGNMENT NOTE: pre-push (local) vs Phase 1 (CI) is INTENTIONAL
+      # - Local: Runs at pre-push to avoid slowing down regular commits
+      # - CI: Runs in Phase 1 (parallel with lint/pyright) for early failure detection
+      # See .github/workflows/test.yml for CI counterpart
       - id: validate-naming-conventions
         name: ONEX Naming Convention Validation
         entry: poetry run python scripts/validation/validate_naming.py

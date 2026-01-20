@@ -115,7 +115,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Literal,
@@ -461,7 +461,7 @@ def create_validated_log_entry(
         )
     """
     # Generate ISO8601 timestamp in UTC with millisecond precision
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     return StructuredLogEntry(
         correlation_id=correlation_id,
@@ -2163,7 +2163,9 @@ class HandlerObservabilityWrapper:
         # Generate ISO8601 timestamp in UTC with millisecond precision
         # Format: YYYY-MM-DDTHH:MM:SS.sssZ (e.g., "2025-01-19T12:34:56.789Z")
         # Using timezone-aware datetime.now(timezone.utc) instead of deprecated utcnow()
-        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        timestamp = (
+            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        )
 
         # Build log data with ALL required fields (schema compliance)
         # Note: All required fields must be non-None strings/floats

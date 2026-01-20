@@ -32,6 +32,9 @@ class Violation(NamedTuple):
 
 # Patterns that suggest hardcoded secrets
 SECRET_PATTERNS = [
+    # -------------------------------------------------------------------------
+    # CATEGORY: Direct assignment patterns (var = "secret")
+    # -------------------------------------------------------------------------
     (
         re.compile(r'(?i)(api[_-]?key|apikey)\s*=\s*["\'][^"\']{10,}["\']'),
         "Potential hardcoded API key",
@@ -58,6 +61,29 @@ SECRET_PATTERNS = [
         re.compile(r'(?i)private[_-]?key\s*=\s*["\'][^"\']{20,}["\']'),
         "Potential hardcoded private key",
     ),
+    # -------------------------------------------------------------------------
+    # CATEGORY: Hardcoded secrets in os.getenv/os.environ.get defaults
+    # These catch: os.getenv("API_KEY", "hardcoded-secret")
+    # Note: The skip patterns only match SAFE uses (no literal default)
+    # -------------------------------------------------------------------------
+    (
+        # Catches: os.getenv("API_KEY", "sk-1234567890") or similar
+        # Matches any os.getenv/os.environ.get with a string literal default 10+ chars
+        re.compile(
+            r'(?i)(?:os\.getenv|os\.environ\.get)\s*\(\s*["\'][^"\']*'
+            r'(?:API[_-]?KEY|SECRET[_-]?KEY|PASSWORD|TOKEN|CREDENTIAL|PRIVATE[_-]?KEY)'
+            r'[^"\']*["\']\s*,\s*["\'][^"\']{10,}["\']'
+        ),
+        "Potential hardcoded secret in env var default",
+    ),
+    (
+        # Catches any getenv with a suspicious-looking default (sk-, secret-, etc.)
+        re.compile(
+            r'(?i)(?:os\.getenv|os\.environ\.get)\s*\(\s*["\'][^"\']*["\']\s*,\s*'
+            r'["\'](?:sk-|secret-|password-|key-|token-|api-)[^"\']{8,}["\']'
+        ),
+        "Potential hardcoded secret prefix in env var default",
+    ),
 ]
 
 # Lines to skip (false positives)
@@ -75,21 +101,48 @@ SECRET_PATTERNS = [
 # 4. Document the exact scenario each pattern catches
 SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # -------------------------------------------------------------------------
-    # CATEGORY: Runtime environment variable access
+    # CATEGORY: Runtime environment variable access (NO default value)
     # SAFE BECAUSE: Values come from environment at runtime, not hardcoded
-    # PATTERN PRECISION: Requires exact os.environ/os.getenv call syntax
+    # PATTERN PRECISION: Only matches calls WITHOUT a default string literal
+    #
+    # SECURITY NOTE: We specifically DO NOT skip lines with hardcoded defaults!
+    # These patterns use negative lookahead to ensure no string literal follows
+    # the env var name as a default argument.
+    #
+    # SAFE examples (matched by these patterns):
+    #   api_key = os.getenv("API_KEY")
+    #   api_key = os.getenv("API_KEY", None)
+    #   api_key = os.getenv("API_KEY", default_var)
+    #   api_key = os.environ["API_KEY"]
+    #   api_key = os.environ.get("API_KEY", get_default())
+    #
+    # UNSAFE examples (NOT matched, will be flagged):
+    #   api_key = os.getenv("API_KEY", "sk-hardcoded123")
+    #   api_key = os.environ.get("API_KEY", "secret-fallback")
     # -------------------------------------------------------------------------
     (
+        # os.environ[] dict access - no default possible, always safe
         re.compile(r"\bos\.environ\s*\["),
         "os.environ[] dict access - value from runtime environment",
     ),
     (
-        re.compile(r"\bos\.environ\.get\s*\("),
-        "os.environ.get() call - value from runtime environment",
+        # os.environ.get() WITHOUT a string literal default
+        # Matches: os.environ.get("VAR"), os.environ.get("VAR", None), os.environ.get("VAR", var)
+        # Does NOT match: os.environ.get("VAR", "literal-default")
+        re.compile(r"\bos\.environ\.get\s*\(\s*[\"'][^\"']*[\"']\s*(?:,\s*(?:None|[a-zA-Z_][a-zA-Z0-9_]*(?:\([^)]*\))?))?\s*\)"),
+        "os.environ.get() call without string literal default",
     ),
     (
-        re.compile(r"\bos\.getenv\s*\("),
-        "os.getenv() call - value from runtime environment",
+        # os.getenv() WITHOUT a string literal default
+        # Matches: os.getenv("VAR"), os.getenv("VAR", None), os.getenv("VAR", var)
+        # Does NOT match: os.getenv("VAR", "literal-default")
+        re.compile(r"\bos\.getenv\s*\(\s*[\"'][^\"']*[\"']\s*(?:,\s*(?:None|[a-zA-Z_][a-zA-Z0-9_]*(?:\([^)]*\))?))?\s*\)"),
+        "os.getenv() call without string literal default",
+    ),
+    (
+        # os.environ.get() or os.getenv() with EMPTY string default - safe
+        re.compile(r"\b(?:os\.environ\.get|os\.getenv)\s*\(\s*[\"'][^\"']*[\"']\s*,\s*(?:\"\"|'')\s*\)"),
+        "os.getenv/environ.get() with empty string default",
     ),
     # -------------------------------------------------------------------------
     # CATEGORY: Pydantic configuration patterns

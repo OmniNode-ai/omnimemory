@@ -14,7 +14,7 @@ import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import cast
 
@@ -196,7 +196,7 @@ class HealthCheckResult(BaseModel):
     config: HealthCheckConfig = Field(description="Health check configuration")
     status: HealthStatus = Field(description="Health status")
     latency_ms: float = Field(description="Check latency in milliseconds")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error_message: str | None = Field(default=None)
     metadata: HealthCheckMetadata = Field(default_factory=HealthCheckMetadata)
 
@@ -607,7 +607,7 @@ class HealthCheckManager:
             response = ModelHealthResponse(
                 status=overall_status.value,
                 latency_ms=total_latency_ms,
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(timezone.utc),
                 resource_usage=resource_metrics,
                 dependencies=dependencies,
                 uptime_seconds=uptime_seconds,
@@ -845,7 +845,7 @@ class SystemHealth(BaseModel):
         default_factory=dict, description="Health status of individual resources"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp of health check",
     )
 

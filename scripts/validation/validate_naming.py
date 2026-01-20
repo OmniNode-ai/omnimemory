@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
+import warnings
 from pathlib import Path
 from typing import NamedTuple
 
@@ -40,16 +41,21 @@ CLASS_PATTERNS = {
 
 # Base class names that indicate expected naming prefix
 # Maps base class name -> expected prefix
+# Note: This mapping is used by detect_expected_prefix_from_bases() to determine
+# the required naming convention for a class based on its inheritance hierarchy.
 BASE_CLASS_TO_PREFIX = {
-    # Model base classes (Pydantic)
+    # Model base classes (Pydantic and similar)
     "BaseModel": "Model",
-    # Enum base classes
+    "BaseSettings": "Model",  # Pydantic settings are also models
+    "RootModel": "Model",  # Pydantic RootModel
+    # Enum base classes (stdlib and extensions)
     "Enum": "Enum",
     "StrEnum": "Enum",
     "IntEnum": "Enum",
     "Flag": "Enum",
     "IntFlag": "Enum",
-    # Protocol base classes
+    "auto": None,  # Explicitly ignore auto() - not a base class
+    # Protocol base classes (typing)
     "Protocol": "Protocol",
     # Node base classes (ONEX 4-node architecture)
     "BaseNode": "Node",
@@ -63,21 +69,36 @@ BASE_CLASS_TO_PREFIX = {
     "ComputeNode": "Node",
     "ReducerNode": "Node",
     "OrchestratorNode": "Node",
+    # Additional node patterns
+    "AbstractNode": "Node",
+    "NodeInterface": "Node",
     # Service base classes (ONEX service layer)
     "BaseService": "Service",
     "ServiceBase": "Service",
     "AbstractService": "Service",
+    "ServiceInterface": "Service",
+    "Service": "Service",  # Direct Service inheritance
     # Handler base classes (ONEX handler layer)
     "BaseHandler": "Handler",
     "HandlerBase": "Handler",
     "AbstractHandler": "Handler",
+    "HandlerInterface": "Handler",
+    "Handler": "Handler",  # Direct Handler inheritance
+    "RequestHandler": "Handler",
+    "EventHandler": "Handler",
+    "MessageHandler": "Handler",
     # Mixin base classes
     "BaseMixin": "Mixin",
     "MixinBase": "Mixin",
+    "Mixin": "Mixin",  # Direct Mixin inheritance
     # Validator base classes
     "BaseValidator": "Validator",
     "ValidatorBase": "Validator",
     "AbstractValidator": "Validator",
+    "ValidatorInterface": "Validator",
+    "Validator": "Validator",  # Direct Validator inheritance
+    # Pydantic field validators (these should be ignored, not classes)
+    # "field_validator": None,  # Not a base class
 }
 
 # File naming patterns - applied when file is in a typed directory
@@ -179,29 +200,48 @@ def get_ancestor_typed_directory(filepath: Path) -> str | None:
 def should_skip_file(filepath: Path) -> bool:
     """Determine if a file should be skipped entirely.
 
-    Uses precise matching:
-    - Exact filename match for SKIP_FILES
-    - Immediate parent directory match for SKIP_DIRECTORIES
-    - Regex patterns for SKIP_PATHS_PATTERNS
+    Uses precise Path-based matching (not substring matching):
+
+    1. Exact filename match against SKIP_FILES set
+       - Matches: "__init__.py", "conftest.py", "base.py"
+       - Does NOT match filenames containing these as substrings
+
+    2. Directory component match against SKIP_DIRECTORIES set
+       - Each path component is checked as a complete directory name
+       - Matches: "src/tests/test_foo.py" (contains "tests" component)
+       - Does NOT match: "src/attestations/foo.py" (no "tests" component)
+
+    3. Regex patterns for specific path patterns (SKIP_PATHS_PATTERNS)
+       - Used for precise path pattern matching when needed
+
+    Note: This function uses Path.parts which splits on path separators,
+    ensuring we match complete directory names, not substrings.
+    For example, "tests" will NOT match in "src/my_tests_helper/foo.py"
+    because "my_tests_helper" is a single path component that doesn't
+    equal "tests".
+
+    Args:
+        filepath: Path to the file to check
+
+    Returns:
+        True if the file should be skipped, False otherwise
     """
-    # Skip by exact filename
+    # Skip by exact filename (set membership, not substring)
     if filepath.name in SKIP_FILES:
         return True
 
-    # Skip by immediate parent directory (not arbitrary ancestor)
-    # This is more precise than checking if any path part matches
-    parent_dir = filepath.parent.name
-    if parent_dir in SKIP_DIRECTORIES:
-        return True
-
-    # Also check for nested skip directories (e.g., tests/unit/)
-    # But only match the directory itself, not files that happen to have similar names
-    for part in filepath.parts[:-1]:  # Exclude the filename
+    # Check each directory component against SKIP_DIRECTORIES
+    # Path.parts splits on separators: ('src', 'tests', 'unit', 'test_foo.py')
+    # We check each component (except filename) for exact match
+    # This is NOT substring matching - 'tests' won't match 'my_tests_dir'
+    path_parts = filepath.parts[:-1]  # Exclude the filename
+    for part in path_parts:
         if part in SKIP_DIRECTORIES:
             return True
 
     # Check against explicit path patterns (regex)
-    filepath_str = str(filepath).replace("\\", "/")  # Normalize for cross-platform
+    # Convert to forward slashes for cross-platform consistency
+    filepath_str = str(filepath).replace("\\", "/")
     for pattern in SKIP_PATHS_PATTERNS:
         if pattern.search(filepath_str):
             return True
@@ -217,13 +257,43 @@ def is_relaxed_naming_directory(filepath: Path) -> bool:
     return filepath.parent.name in RELAXED_CLASS_PREFIX_DIRECTORIES
 
 
+def _extract_base_class_name(base: ast.expr) -> str | None:
+    """Extract the class name from various AST expression types.
+
+    Handles:
+    - ast.Name: simple name like `BaseModel`
+    - ast.Attribute: qualified name like `pydantic.BaseModel` or `a.b.c.BaseModel`
+    - ast.Subscript: generic types like `Generic[T]` or `List[str]`
+    - ast.Call: constructor calls like `SomeBase()` or `TypedDict("Name", ...)`
+
+    Args:
+        base: AST expression representing a base class
+
+    Returns:
+        The extracted class name, or None if unable to extract
+    """
+    if isinstance(base, ast.Name):
+        return base.id
+    elif isinstance(base, ast.Attribute):
+        # For chained attributes like a.b.c.BaseModel, extract the final attr
+        return base.attr
+    elif isinstance(base, ast.Subscript):
+        # Handle Generic[T], Optional[X], etc.
+        return _extract_base_class_name(base.value)
+    elif isinstance(base, ast.Call):
+        # Handle SomeBase(), TypedDict("Name", ...), etc.
+        return _extract_base_class_name(base.func)
+    return None
+
+
 def detect_expected_prefix_from_bases(
     bases: list[ast.expr],
 ) -> tuple[str | None, re.Pattern[str] | None]:
     """Detect expected naming prefix from base classes.
 
     Examines the class's base classes and returns the expected prefix
-    based on known base class names.
+    based on known base class names. Checks ALL base classes to handle
+    multiple inheritance correctly.
 
     Args:
         bases: List of AST base class expressions
@@ -232,20 +302,13 @@ def detect_expected_prefix_from_bases(
         Tuple of (expected_prefix, pattern) or (None, None) if not determined
     """
     for base in bases:
-        base_name = None
-        if isinstance(base, ast.Name):
-            base_name = base.id
-        elif isinstance(base, ast.Attribute):
-            base_name = base.attr
-        elif isinstance(base, ast.Subscript):
-            # Handle generic types like Generic[T]
-            if isinstance(base.value, ast.Name):
-                base_name = base.value.id
-            elif isinstance(base.value, ast.Attribute):
-                base_name = base.value.attr
+        base_name = _extract_base_class_name(base)
 
         if base_name and base_name in BASE_CLASS_TO_PREFIX:
             prefix = BASE_CLASS_TO_PREFIX[base_name]
+            # Handle explicitly ignored base classes (value is None)
+            if prefix is None:
+                continue
             return prefix, CLASS_PATTERNS[prefix]
 
     return None, None
@@ -287,8 +350,43 @@ def validate_file(filepath: Path) -> list[Violation]:
     # Validate class naming
     try:
         content = filepath.read_text(encoding="utf-8")
+    except PermissionError:
+        warnings.warn(
+            f"Permission denied reading file: {filepath}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return violations
+    except FileNotFoundError:
+        warnings.warn(
+            f"File not found (possibly deleted during scan): {filepath}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return violations
+    except OSError as e:
+        warnings.warn(
+            f"OS error reading file {filepath}: {e}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return violations
+    except UnicodeDecodeError as e:
+        warnings.warn(
+            f"Unicode decode error in file {filepath}: {e}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return violations
+
+    try:
         tree = ast.parse(content, filename=str(filepath))
-    except (SyntaxError, UnicodeDecodeError):
+    except SyntaxError as e:
+        warnings.warn(
+            f"Syntax error parsing file {filepath}: {e}",
+            UserWarning,
+            stacklevel=2,
+        )
         return violations
 
     for node in tree.body:

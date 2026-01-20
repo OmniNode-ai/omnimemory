@@ -22,7 +22,7 @@ import functools
 import logging
 import random
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, TypeVar
 from uuid import UUID
 
@@ -82,7 +82,7 @@ class RetryAttemptInfo(BaseModel):
         default=None, description="Exception that triggered the retry"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the attempt was made",
     )
     correlation_id: UUID | None = Field(

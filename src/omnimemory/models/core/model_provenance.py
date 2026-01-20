@@ -2,7 +2,7 @@
 Provenance tracking model following ONEX standards.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,7 +41,7 @@ class ModelProvenanceEntry(BaseModel):
 
     # Temporal information
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When this provenance entry was created",
     )
 
@@ -91,7 +91,7 @@ class ModelProvenanceChain(BaseModel):
         description="Total number of operations in this chain",
     )
     chain_started_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When this provenance chain was started",
     )
     chain_updated_at: datetime | None = Field(
@@ -113,7 +113,7 @@ class ModelProvenanceChain(BaseModel):
         """Add a new provenance entry to the chain."""
         self.entries.append(entry)
         self.total_operations = len(self.entries)
-        self.chain_updated_at = datetime.now(UTC)
+        self.chain_updated_at = datetime.now(timezone.utc)
 
     def get_latest_entry(self) -> ModelProvenanceEntry | None:
         """Get the most recent provenance entry."""

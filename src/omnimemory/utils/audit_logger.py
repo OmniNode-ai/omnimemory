@@ -7,7 +7,7 @@ including memory access, configuration changes, and PII detection events.
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -146,7 +146,7 @@ class AuditLogger:
             def format(self, record: logging.LogRecord) -> str:
                 log_data: dict[str, object] = {
                     "timestamp": datetime.fromtimestamp(
-                        record.created, tz=UTC
+                        record.created, tz=timezone.utc
                     ).isoformat(),
                     "level": record.levelname,
                     "logger": record.name,
@@ -223,7 +223,7 @@ class AuditLogger:
 
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             event_type=event_type_map.get(operation_type, AuditEventType.MEMORY_STORE),
             severity=AuditSeverity.LOW if success else AuditSeverity.HIGH,
             operation=f"memory_{operation_type}",
@@ -248,7 +248,7 @@ class AuditLogger:
 
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             event_type=(
                 AuditEventType.PII_DETECTED
                 if pii_types
@@ -281,7 +281,7 @@ class AuditLogger:
         """Log security violation event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             event_type=AuditEventType.SECURITY_VIOLATION,
             severity=AuditSeverity.CRITICAL,
             operation="security_check",
@@ -305,7 +305,7 @@ class AuditLogger:
         """Log configuration change event."""
         event = AuditEvent(
             event_id=self._generate_event_id(),
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             event_type=AuditEventType.CONFIG_CHANGE,
             severity=AuditSeverity.MEDIUM,
             operation="config_update",

@@ -17,9 +17,13 @@ Usage:
 from __future__ import annotations
 
 import ast
+import logging
 import sys
 from pathlib import Path
 from typing import NamedTuple
+
+# Configure logging - default to WARNING so scripts are quiet unless debugging
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 
 class Violation(NamedTuple):
@@ -323,9 +327,11 @@ def validate_file(filepath: Path) -> list[Violation]:
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))
-    except SyntaxError:
-        return []  # Skip files with syntax errors
-    except Exception:
+    except SyntaxError as e:
+        logging.debug("Skipping file with syntax error: %s (%s)", filepath, e)
+        return []
+    except Exception as e:
+        logging.debug("Skipping unprocessable file: %s (%s)", filepath, e)
         return []
 
     # First pass: collect ConfigDict import aliases

@@ -4,7 +4,7 @@ Health response model following ONEX standards.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -56,7 +56,7 @@ class ModelHealthResponse(BaseModel):
     )
     latency_ms: float = Field(description="Health check response time in milliseconds")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the health check was performed",
     )
     resource_usage: ModelResourceMetrics = Field(
@@ -99,7 +99,7 @@ class ModelCircuitBreakerStatsCollection(BaseModel):
         description="Circuit breaker statistics keyed by dependency name"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the statistics were collected",
     )
 

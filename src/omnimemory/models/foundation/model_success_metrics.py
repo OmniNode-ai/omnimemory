@@ -2,7 +2,7 @@
 Success metrics models following ONEX standards.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -90,7 +90,7 @@ class ModelConfidenceScore(BaseModel):
         description="Method used to calculate confidence (e.g., 'statistical', 'heuristic', 'ml_based')",
     )
     measured_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the confidence score was calculated",
     )
 

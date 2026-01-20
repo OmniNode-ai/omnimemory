@@ -2,7 +2,7 @@
 Metrics response model following ONEX standards.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -71,7 +71,7 @@ class ModelMetricsResponse(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When metrics were collected",
     )
     collection_duration_ms: float = Field(

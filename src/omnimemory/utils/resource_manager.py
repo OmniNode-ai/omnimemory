@@ -26,7 +26,7 @@ import random
 import time
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, TypeVar
 
@@ -92,7 +92,9 @@ class CircuitBreakerStats:
     failure_count: int = 0
     success_count: int = 0
     last_failure_time: datetime | None = None
-    state_changed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    state_changed_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     total_calls: int = 0
     total_timeouts: int = 0
 
@@ -169,13 +171,13 @@ class AsyncCircuitBreaker:
         jitter = random.uniform(-jitter_range, jitter_range)
         effective_timeout = base_timeout + jitter
 
-        time_since_failure = datetime.now(UTC) - self.stats.last_failure_time
+        time_since_failure = datetime.now(timezone.utc) - self.stats.last_failure_time
         return time_since_failure.total_seconds() >= effective_timeout
 
     async def _transition_to_half_open(self) -> None:
         """Transition circuit breaker to half-open state."""
         self.state = CircuitState.HALF_OPEN
-        self.stats.state_changed_at = datetime.now(UTC)
+        self.stats.state_changed_at = datetime.now(timezone.utc)
         self.stats.success_count = 0
 
         logger.info(
@@ -202,7 +204,7 @@ class AsyncCircuitBreaker:
         async with self._lock:
             self.stats.total_calls += 1
             self.stats.failure_count += 1
-            self.stats.last_failure_time = datetime.now(UTC)
+            self.stats.last_failure_time = datetime.now(timezone.utc)
 
             if (
                 self.state == CircuitState.CLOSED
@@ -213,7 +215,7 @@ class AsyncCircuitBreaker:
     async def _transition_to_closed(self) -> None:
         """Transition circuit breaker to closed state."""
         self.state = CircuitState.CLOSED
-        self.stats.state_changed_at = datetime.now(UTC)
+        self.stats.state_changed_at = datetime.now(timezone.utc)
         self.stats.failure_count = 0
 
         logger.info(
@@ -226,7 +228,7 @@ class AsyncCircuitBreaker:
     async def _transition_to_open(self) -> None:
         """Transition circuit breaker to open state."""
         self.state = CircuitState.OPEN
-        self.stats.state_changed_at = datetime.now(UTC)
+        self.stats.state_changed_at = datetime.now(timezone.utc)
 
         logger.warning(
             "circuit_breaker_state_change",
@@ -450,7 +452,7 @@ class ResourceHandle:
     resource: Any
     resource_type: ResourceType
     status: ResourceStatus = ResourceStatus.ACTIVE
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     ttl: float | None = None
     _context: dict[str, Any] = field(default_factory=dict)
 
@@ -480,7 +482,7 @@ class ResourceHandle:
         if self.ttl is None:
             return False
 
-        elapsed = (datetime.now(UTC) - self.created_at).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - self.created_at).total_seconds()
         return elapsed >= self.ttl
 
     def set_context(self, key: str, value: Any) -> None:

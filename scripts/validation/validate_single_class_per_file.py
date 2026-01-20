@@ -12,9 +12,13 @@ Usage:
 from __future__ import annotations
 
 import ast
+import logging
 import sys
 from pathlib import Path
 from typing import NamedTuple
+
+# Configure logging - default to WARNING so scripts are quiet unless debugging
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 
 class Violation(NamedTuple):
@@ -67,9 +71,11 @@ def count_classes(filepath: Path) -> tuple[int, list[str], int, list[str]]:
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))
-    except SyntaxError:
+    except SyntaxError as e:
+        logging.debug("Skipping file with syntax error: %s (%s)", filepath, e)
         return 0, [], 0, []
-    except Exception:
+    except Exception as e:
+        logging.debug("Skipping unprocessable file: %s (%s)", filepath, e)
         return 0, [], 0, []
 
     non_enum_names: list[str] = []

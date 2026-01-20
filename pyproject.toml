@@ -99,10 +99,9 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-exclude = [
+extend-exclude = [
     "**/archived/**",
     "**/archive/**",
-    "**/__pycache__/**",
     "**/site-packages/**",
 ]
 
@@ -166,13 +165,10 @@ ignore = [
     "T201",      # Print statements (technical debt)
     "FBT003",    # Boolean positional value in call (technical debt)
     "N802",      # Invalid function name (technical debt)
-    "S603",      # Subprocess without shell (technical debt)
-    "S607",      # Start process with partial path (technical debt)
     "ARG001",    # Unused function argument (technical debt)
     "PLR0917",   # Too many positional args (technical debt)
     "S311",      # Random not for crypto (technical debt)
     "RET504",    # Unnecessary assignment (technical debt)
-    "S602",      # subprocess call with shell=True (validation scripts)
     "INP001",    # Missing __init__.py (scripts don't need it)
     "TRY002",    # Raise vanilla class (technical debt)
     "PGH003",    # type: ignore without code (technical debt)
@@ -191,6 +187,7 @@ ignore = [
     "N999",      # Invalid module name (technical debt)
     "F821",      # Undefined name (protocols use forward refs)
     "PLR0206",   # Cannot have defined parameters for properties (design choice)
+    "UP017",     # Use datetime.UTC (prefer timezone.utc for Python 3.10 compatibility)
     "A002",      # Function argument shadowing builtin (design choice)
     "B024",      # Abstract class without abstract methods (design choice)
     "SLF001",    # Private member accessed (test code needs this)
@@ -214,6 +211,17 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["omnimemory"]
+
+[tool.ruff.lint.per-file-ignores]
+# Subprocess security rules scoped to validation scripts only
+"scripts/validation/*" = [
+    "S602",  # subprocess call with shell=True
+    "S603",  # subprocess without shell
+    "S604",  # function call with shell=True
+    "S605",  # start process with shell
+    "S606",  # start process without shell
+    "S607",  # start process with partial path
+]
 
 [tool.mypy]
 # Strict mode enables: warn_return_any, warn_unused_configs, disallow_untyped_defs,

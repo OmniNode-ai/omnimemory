@@ -10,7 +10,7 @@ comprehensive validation, serialization, and observability features.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -177,9 +177,10 @@ class SearchFilters(BaseMemoryModel):
     def convert_collection_to_model_optional_string_list(
         cls, v: Any
     ) -> ModelOptionalStringList | Any:
-        """Convert list or set inputs to ModelOptionalStringList for backward compatibility.
+        """Convert string, list, or set inputs to ModelOptionalStringList for backward compatibility.
 
         Accepts:
+        - str: Converts to ModelOptionalStringList(values=[str])
         - list[str]: Converts to ModelOptionalStringList(values=list)
         - set[str]: Converts to ModelOptionalStringList(values=sorted list)
         - ModelOptionalStringList: Passes through unchanged
@@ -187,6 +188,8 @@ class SearchFilters(BaseMemoryModel):
         """
         if v is None:
             return None
+        if isinstance(v, str):
+            return ModelOptionalStringList(values=[v])
         if isinstance(v, list):
             return ModelOptionalStringList(values=v)
         if isinstance(v, set | frozenset):
@@ -226,7 +229,7 @@ class BaseMemoryRequest(BaseMemoryModel):
         default_factory=uuid4, description="Correlation ID for request tracking"
     )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Request timestamp",
     )
     user_context: UserContext | None = Field(
@@ -246,7 +249,7 @@ class BaseMemoryResponse(BaseMemoryModel):
     correlation_id: UUID = Field(description="Correlation ID matching request")
     status: OperationStatus = Field(description="Operation execution status")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Response timestamp",
     )
     execution_time_ms: int = Field(ge=0, description="Execution time in milliseconds")
@@ -311,11 +314,11 @@ class MemoryRecord(BaseMemoryModel):
         MemoryPriority.NORMAL, description="Memory priority level"
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Creation timestamp",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Last update timestamp",
     )
     expires_at: datetime | None = Field(

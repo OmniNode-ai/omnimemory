@@ -77,8 +77,13 @@ jobs:
             venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
             ${{ hashFiles('**/poetry.lock') }}-
             ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
           restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
@@ -131,8 +136,13 @@ jobs:
             venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
             ${{ hashFiles('**/poetry.lock') }}-
             ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
           restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
@@ -178,8 +188,13 @@ jobs:
             venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
             ${{ hashFiles('**/poetry.lock') }}-
             ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
           restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
@@ -261,8 +276,13 @@ jobs:
             venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
             ${{ hashFiles('**/poetry.lock') }}-
             ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
           restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
