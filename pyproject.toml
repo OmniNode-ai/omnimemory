@@ -124,10 +124,9 @@ ignore = [
     "E501",      # Line too long (technical debt - will fix incrementally)
     "BLE001",    # Blind exception catching (technical debt)
     "E402",      # Module level import not at top (technical debt)
-    "TC001",     # Type checking imports (technical debt)
-    "TC003",     # Type checking imports (technical debt)
-    "TC004",     # Type checking imports in __all__ re-exports (technical debt)
-    "TC006",     # Quotes in typing.cast() (technical debt)
+    "TCH001",    # Type checking imports (technical debt)
+    "TCH003",    # Type checking imports (technical debt)
+    "TCH004",    # Type checking imports in __all__ re-exports (technical debt)
     "PLR0911",   # Too many returns (technical debt)
     "PLR0912",   # Too many branches (technical debt)
     "PLR0913",   # Too many arguments (technical debt)
@@ -246,6 +245,7 @@ module = [
     "omnibase_core.*",
     "omnibase_infra",
     "omnibase_infra.*",
+    "pkg_resources",
 ]
 ignore_missing_imports = true
 

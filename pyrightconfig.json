@@ -1,6 +1,4 @@
 {
-  "_comment": "Pyright configuration for omnimemory - Basic mode for complementary type checking alongside mypy strict",
-
   "include": ["src/omnimemory"],
   "exclude": [
     "**/__pycache__",
@@ -14,13 +12,9 @@
   "pythonVersion": "3.12",
   "pythonPlatform": "Linux",
 
-  "_section_baseline": "=== BASELINE - Rules kept at warning or false ===",
-
   "reportUnusedVariable": "warning",
   "reportPossiblyUnbound": "warning",
   "reportIncompatibleMethodOverride": "warning",
-
-  "_section_disabled": "=== DISABLED - Enable incrementally as codebase matures ===",
 
   "reportReturnType": false,
   "reportArgumentType": false,

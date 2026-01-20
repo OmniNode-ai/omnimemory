@@ -12,13 +12,10 @@ Usage:
 from __future__ import annotations
 
 import ast
-import logging
 import sys
+import warnings
 from pathlib import Path
 from typing import NamedTuple
-
-# Configure logging - default to WARNING so scripts are quiet unless debugging
-logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 
 class Violation(NamedTuple):
@@ -65,17 +62,51 @@ def is_enum_class(node: ast.ClassDef) -> bool:
 def count_classes(filepath: Path) -> tuple[int, list[str], int, list[str]]:
     """Count top-level class definitions in a file.
 
+    Handles file reading and parsing errors gracefully by emitting warnings
+    and returning zero counts rather than crashing.
+
     Returns:
         Tuple of (non_enum_count, non_enum_names, enum_count, enum_names)
     """
     try:
         content = filepath.read_text(encoding="utf-8")
+    except PermissionError:
+        warnings.warn(
+            f"Permission denied reading file: {filepath}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 0, [], 0, []
+    except FileNotFoundError:
+        warnings.warn(
+            f"File not found (possibly deleted during scan): {filepath}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 0, [], 0, []
+    except OSError as e:
+        warnings.warn(
+            f"OS error reading file {filepath}: {e}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 0, [], 0, []
+    except UnicodeDecodeError as e:
+        warnings.warn(
+            f"Unicode decode error in file {filepath}: {e}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 0, [], 0, []
+
+    try:
         tree = ast.parse(content, filename=str(filepath))
     except SyntaxError as e:
-        logging.debug("Skipping file with syntax error: %s (%s)", filepath, e)
-        return 0, [], 0, []
-    except Exception as e:
-        logging.debug("Skipping unprocessable file: %s (%s)", filepath, e)
+        warnings.warn(
+            f"Syntax error parsing file {filepath}: {e}",
+            UserWarning,
+            stacklevel=2,
+        )
         return 0, [], 0, []
 
     non_enum_names: list[str] = []

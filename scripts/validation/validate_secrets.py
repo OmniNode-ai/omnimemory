@@ -310,14 +310,54 @@ def _check_skip_patterns(
     filepath: Path,
     line_num: int,
     verbose: bool,
+    secret_match: re.Match[str] | None = None,
 ) -> tuple[bool, str | None]:
-    """Check if a line matches any skip pattern.
+    """Check if a line matches any skip pattern that covers the detected secret.
+
+    SECURITY: Only skip if the skip pattern match OVERLAPS with the secret match.
+    This prevents safe patterns (like os.getenv("VAR")) from masking secrets
+    elsewhere on the same line (like "; password = 'secret'").
+
+    Args:
+        line: The line of code to check.
+        patterns: List of (pattern, reason) tuples to check against.
+        filepath: Path to the file (for logging).
+        line_num: Line number (for logging).
+        verbose: Whether to log skip decisions.
+        secret_match: The regex match object for the detected secret.
+                     If provided, skip patterns must overlap with this match.
 
     Returns:
         Tuple of (should_skip, reason) where reason is None if not skipped.
     """
     for pattern, reason in patterns:
-        if pattern.search(line):
+        skip_match = pattern.search(line)
+        if skip_match:
+            # If we have a secret_match, verify the skip pattern overlaps with it
+            # This prevents safe patterns from masking unrelated secrets on same line
+            if secret_match is not None:
+                # Check if the skip pattern match overlaps with secret match
+                skip_start, skip_end = skip_match.span()
+                secret_start, secret_end = secret_match.span()
+
+                # Overlap exists if: NOT (skip ends before secret starts OR
+                #                        skip starts after secret ends)
+                overlaps = not (skip_end <= secret_start or skip_start >= secret_end)
+
+                if not overlaps:
+                    if verbose:
+                        logger.debug(
+                            "SKIP REJECTED: %s:%d - skip pattern at [%d:%d] does not "
+                            "overlap with secret at [%d:%d]",
+                            filepath,
+                            line_num,
+                            skip_start,
+                            skip_end,
+                            secret_start,
+                            secret_end,
+                        )
+                    continue  # Skip pattern doesn't cover the secret, try next pattern
+
             if verbose:
                 logger.debug(
                     "SKIP: %s:%d matched pattern '%s' - %s",
@@ -353,9 +393,12 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
     for line_num, line in enumerate(content.splitlines(), start=1):
         # First, check if line potentially contains a secret
         potential_secret = None
+        secret_match: re.Match[str] | None = None
         for pattern, message in SECRET_PATTERNS:
-            if pattern.search(line):
+            match = pattern.search(line)
+            if match:
                 potential_secret = message
+                secret_match = match
                 break
 
         # If no potential secret, skip further analysis
@@ -363,8 +406,10 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
             continue
 
         # Check if line matches general skip patterns
+        # SECURITY: Pass the secret_match to ensure skip patterns only apply
+        # if they overlap with the detected secret, not just anywhere on the line
         skipped, reason = _check_skip_patterns(
-            line, SKIP_PATTERNS, filepath, line_num, verbose
+            line, SKIP_PATTERNS, filepath, line_num, verbose, secret_match
         )
         if skipped:
             if verbose:
@@ -380,7 +425,7 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
         # Check test-only patterns if in test file
         if is_test:
             skipped, reason = _check_skip_patterns(
-                line, TEST_ONLY_SKIP_PATTERNS, filepath, line_num, verbose
+                line, TEST_ONLY_SKIP_PATTERNS, filepath, line_num, verbose, secret_match
             )
             if skipped:
                 if verbose:

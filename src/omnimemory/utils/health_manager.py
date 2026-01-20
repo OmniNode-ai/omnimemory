@@ -114,7 +114,7 @@ def _get_package_version() -> str:
     except ImportError:
         # Fallback for older Python versions
         try:
-            import pkg_resources  # type: ignore[import-not-found]
+            import pkg_resources
 
             pkg_version: str = pkg_resources.get_distribution("omnimemory").version
             return pkg_version
@@ -721,7 +721,7 @@ async def create_redis_health_check(
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 
         try:
-            client = redis.from_url(redis_url)  # type: ignore[no-untyped-call]
+            client = redis.from_url(redis_url)
             await client.ping()
             await client.close()
 

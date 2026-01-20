@@ -247,7 +247,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
 
         # Enhance context with category information
         # Normalize ModelMetadata to dict using to_dict() for proper key-value extraction
-        enhanced_context: dict[str, Any] = _normalize_context_to_dict(context)
+        enhanced_context: dict[str, object] = _normalize_context_to_dict(context)
         if category_info:
             enhanced_context.update(
                 {
@@ -296,9 +296,9 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         """Get suggested backoff factor for retries."""
         return self.category_info.default_backoff_factor if self.category_info else 1.0
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Convert error to dictionary for serialization."""
-        base_dict: dict[str, Any] = {
+        base_dict: dict[str, object] = {
             "error_code": self.omnimemory_error_code.value,
             "message": self.message,
             "context": self.context,
@@ -346,7 +346,7 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
         # Build context with validation details - normalize to mutable dict
-        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
+        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
         if field_name:
             context["field_name"] = field_name
         if field_value is not None:
@@ -392,7 +392,7 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.TRANSACTION_FAILED
 
         # Build context with storage details - normalize to mutable dict
-        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
+        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
         if storage_system:
             context["storage_system"] = storage_system
         if operation:
@@ -439,7 +439,7 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.FILTER_INVALID
 
         # Build context with retrieval details - normalize to mutable dict
-        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
+        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
         if memory_id:
             context["memory_id"] = str(memory_id)
         if query:
@@ -483,7 +483,7 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
         # Build context with processing details - normalize to mutable dict
-        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
+        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
         if processing_stage:
             context["processing_stage"] = processing_stage
         if model_name:
@@ -527,7 +527,7 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.ORCHESTRATION_FAILED
 
         # Build context with coordination details - normalize to mutable dict
-        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
+        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
         if workflow_id:
             context["workflow_id"] = str(workflow_id)
         if agent_ids:
@@ -570,7 +570,7 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
         # Build context with system details - normalize to mutable dict
-        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
+        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
         if system_component:
             context["system_component"] = system_component
 
@@ -637,7 +637,7 @@ def chain_errors(
     return primary_error
 
 
-def create_error_summary(errors: list[ProtocolOmniMemoryError]) -> dict[str, Any]:
+def create_error_summary(errors: list[ProtocolOmniMemoryError]) -> dict[str, object]:
     """
     Create a summary of multiple errors for reporting.
 

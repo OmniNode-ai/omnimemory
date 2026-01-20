@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -175,9 +174,13 @@ class SearchFilters(BaseMemoryModel):
     @field_validator("tags", "source_agents", mode="before")
     @classmethod
     def convert_collection_to_model_optional_string_list(
-        cls, v: Any
-    ) -> ModelOptionalStringList | Any:
+        cls,
+        v: str | list[str] | set[str] | frozenset[str] | ModelOptionalStringList | None,
+    ) -> ModelOptionalStringList | None:
         """Convert string, list, or set inputs to ModelOptionalStringList for backward compatibility.
+
+        Note: Input type annotation covers all expected input types for this before-validator.
+        Pydantic before-validators receive raw input before type coercion.
 
         Accepts:
         - str: Converts to ModelOptionalStringList(values=[str])
@@ -188,13 +191,16 @@ class SearchFilters(BaseMemoryModel):
         """
         if v is None:
             return None
+        if isinstance(v, ModelOptionalStringList):
+            return v
         if isinstance(v, str):
             return ModelOptionalStringList(values=[v])
         if isinstance(v, list):
             return ModelOptionalStringList(values=v)
         if isinstance(v, set | frozenset):
             return ModelOptionalStringList(values=sorted(v))
-        return v
+        # Should not reach here given type annotation, but satisfy type checker
+        return None
 
 
 class SearchResult(BaseMemoryModel):
@@ -272,11 +278,22 @@ class BaseMemoryResponse(BaseMemoryModel):
 
     @field_validator("provenance", "warnings", mode="before")
     @classmethod
-    def convert_list_to_model_string_list(cls, v: Any) -> ModelStringList | Any:
-        """Convert plain lists to ModelStringList for easier API usage."""
+    def convert_list_to_model_string_list(
+        cls, v: list[str] | ModelStringList | None
+    ) -> ModelStringList | None:
+        """Convert plain lists to ModelStringList for easier API usage.
+
+        Note: Input type annotation covers all expected input types for this before-validator.
+        Pydantic before-validators receive raw input before type coercion.
+        """
+        if v is None:
+            return None
+        if isinstance(v, ModelStringList):
+            return v
         if isinstance(v, list):
             return ModelStringList(values=v)
-        return v
+        # Should not reach here given type annotation, but satisfy type checker
+        return None
 
 
 # === CORE DATA MODELS ===
@@ -348,11 +365,22 @@ class MemoryRecord(BaseMemoryModel):
 
     @field_validator("tags", "provenance", mode="before")
     @classmethod
-    def convert_list_to_model_string_list(cls, v: Any) -> ModelStringList | Any:
-        """Convert plain lists to ModelStringList for easier API usage."""
+    def convert_list_to_model_string_list(
+        cls, v: list[str] | ModelStringList | None
+    ) -> ModelStringList | None:
+        """Convert plain lists to ModelStringList for easier API usage.
+
+        Note: Input type annotation covers all expected input types for this before-validator.
+        Pydantic before-validators receive raw input before type coercion.
+        """
+        if v is None:
+            return None
+        if isinstance(v, ModelStringList):
+            return v
         if isinstance(v, list):
             return ModelStringList(values=v)
-        return v
+        # Should not reach here given type annotation, but satisfy type checker
+        return None
 
 
 # === MEMORY OPERATION REQUESTS/RESPONSES ===
