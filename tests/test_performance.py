@@ -18,6 +18,7 @@ issues with external dependencies like omnibase_core.
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import re
 import time
@@ -29,6 +30,11 @@ from uuid import UUID, uuid4
 
 import pytest
 from pydantic import BaseModel, Field, field_validator
+
+# Performance threshold in milliseconds
+# Default: 50ms for local development (stricter)
+# CI can override via PERF_THRESHOLD_MS=100 for variance tolerance
+PERF_THRESHOLD_MS = int(os.getenv("PERF_THRESHOLD_MS", "50"))
 
 # =============================================================================
 # Self-Contained Implementations for Testing
@@ -1533,18 +1539,18 @@ class TestVectorSearchPerformance:
             sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:10]
             elapsed_ms = (time.perf_counter() - start) * 1000
 
-            # Target: <100ms for similarity search (100 vectors, pure Python)
-            # Relaxed from 50ms to 100ms to account for CI machine variance
+            # Target: configurable threshold for similarity search (100 vectors, pure Python)
+            # Default 50ms for local dev, CI can set PERF_THRESHOLD_MS=100 for variance
             # Production with numpy should handle 1000+ vectors in <50ms
-            assert elapsed_ms < 100, (
+            assert elapsed_ms < PERF_THRESHOLD_MS, (
                 f"Vector similarity for dim={dim} took {elapsed_ms:.2f}ms, "
-                f"exceeds 100ms target"
+                f"exceeds {PERF_THRESHOLD_MS}ms target"
             )
 
         print("\nVector Search Simulation Report:")
         print(f"  Dimensions tested: {dimensions}")
         print(f"  Candidate pool: {num_vectors} vectors (pure Python)")
-        print("  All under 100ms target: PASS")
+        print(f"  All under {PERF_THRESHOLD_MS}ms target: PASS")
         print("  Note: Production with numpy should handle 10x more vectors")
 
     @pytest.mark.benchmark
@@ -1572,10 +1578,11 @@ class TestVectorSearchPerformance:
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         # Target: preprocessing should be fast (<10ms per 100 vectors)
-        # Relaxed from 50ms to 100ms to account for CI environment variability
-        assert (
-            elapsed_ms < 100
-        ), f"Vector preprocessing took {elapsed_ms:.2f}ms, exceeds 100ms target"
+        # Default 50ms for local dev, CI can set PERF_THRESHOLD_MS=100 for variance
+        assert elapsed_ms < PERF_THRESHOLD_MS, (
+            f"Vector preprocessing took {elapsed_ms:.2f}ms, "
+            f"exceeds {PERF_THRESHOLD_MS}ms target"
+        )
 
         print("\nVector Preprocessing Report:")
         print(f"  Vectors processed: {num_vectors}")

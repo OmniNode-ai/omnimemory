@@ -250,6 +250,10 @@ jobs:
     needs: [lint, pyright, onex-validation]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Performance test threshold (relaxed for CI variance)
+      # Local dev uses 50ms default, CI uses 100ms for tolerance
+      PERF_THRESHOLD_MS: "100"
 
     steps:
       - name: Checkout code
