@@ -13,18 +13,18 @@ Validates that the foundational ONEX implementation is working correctly:
 import sys
 import traceback
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
-def validate_protocol_imports() -> Dict[str, Any]:
+def validate_protocol_imports() -> dict[str, Any]:
     """Validate that all protocol imports work correctly."""
     print("🔍 Testing protocol imports...")
 
     try:
-        from omnimemory.protocols.base_protocols import (
+        from omnimemory.protocols.base_protocols import (  # noqa: F401
             ProtocolAgentCoordinator,
             ProtocolIntelligenceProcessor,
             ProtocolMemoryAggregator,
@@ -50,12 +50,15 @@ def validate_protocol_imports() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def validate_data_models() -> Dict[str, Any]:
+def validate_data_models() -> dict[str, Any]:
     """Validate data model imports and basic functionality."""
     print("🔍 Testing data model imports...")
 
     try:
-        from omnimemory.protocols.data_models import (
+        # Test basic model creation
+        from uuid import uuid4
+
+        from omnimemory.protocols.data_models import (  # noqa: F401
             AccessLevel,
             BaseMemoryRequest,
             BaseMemoryResponse,
@@ -70,21 +73,24 @@ def validate_data_models() -> Dict[str, Any]:
             UserContext,
         )
 
-        # Test basic model creation
-        user_context = UserContext(user_id="test-user", session_id="test-session")
+        user_context = UserContext(
+            user_id=uuid4(),
+            agent_id=uuid4(),
+            session_id=uuid4(),
+        )
 
         memory_record = MemoryRecord(
             content="Test memory content",
             content_type=ContentType.TEXT,
-            priority=MemoryPriority.MEDIUM,
-            access_level=AccessLevel.PRIVATE,
-            user_context=user_context,
+            priority=MemoryPriority.NORMAL,
+            access_level=AccessLevel.RESTRICTED,
+            source_agent="test-agent",
         )
 
         print("✅ Data model imports and creation successful")
         return {
             "success": True,
-            "user_id": user_context.user_id,
+            "user_id": str(user_context.user_id),
             "memory_id": str(memory_record.memory_id),
         }
 
@@ -94,35 +100,34 @@ def validate_data_models() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def validate_error_handling() -> Dict[str, Any]:
+def validate_error_handling() -> dict[str, Any]:
     """Validate error handling and monadic patterns."""
     print("🔍 Testing error handling...")
 
     try:
-        from omnimemory.protocols.error_models import (
+        from omnimemory.protocols.error_models import (  # noqa: F401
             OmniMemoryError,
-            OmniMemoryErrorCode,
             StorageError,
             ValidationError,
         )
 
         # Test error creation and chaining
         base_error = ValidationError(
-            error_code=OmniMemoryErrorCode.VALIDATION_FAILED,
             message="Test validation error",
-            details={"field": "content", "issue": "too_long"},
+            field_name="content",
+            validation_rule="max_length",
         )
 
         chained_error = StorageError(
-            error_code=OmniMemoryErrorCode.STORAGE_UNAVAILABLE,
             message="Storage system down",
+            storage_system="postgres",
             cause=base_error,
         )
 
         print("✅ Error handling validation successful")
         return {
             "success": True,
-            "base_error_code": base_error.error_code.value,
+            "base_error_code": base_error.omnimemory_error_code.value,
             "chained_error_has_cause": chained_error.cause is not None,
         }
 
@@ -132,12 +137,12 @@ def validate_error_handling() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def validate_container_creation() -> Dict[str, Any]:
+def validate_container_creation() -> dict[str, Any]:
     """Validate ONEX container creation and basic functionality."""
     print("🔍 Testing ONEX container creation...")
 
     try:
-        from omnibase_core.core.model_onex_container import ModelOnexContainer
+        from omnimemory.compat import ModelOnexContainer
 
         # Test container creation
         container = ModelOnexContainer()
@@ -161,26 +166,24 @@ def validate_container_creation() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def validate_base_implementations() -> Dict[str, Any]:
+def validate_base_implementations() -> dict[str, Any]:
     """Validate base implementation classes."""
     print("🔍 Testing base implementations...")
 
     try:
-        from omnimemory.core.base_implementations import (
-            BaseComputeService,
-            BaseEffectService,
-            BaseMemoryService,
-            BaseOrchestratorService,
-            BaseReducerService,
+        from omnimemory.nodes.base import (
+            BaseComputeNode,
+            BaseEffectNode,
+            BaseOrchestratorNode,
+            BaseReducerNode,
         )
 
         # Verify all base classes are importable and have expected structure
         base_classes = [
-            BaseMemoryService,
-            BaseEffectService,
-            BaseComputeService,
-            BaseReducerService,
-            BaseOrchestratorService,
+            BaseEffectNode,
+            BaseComputeNode,
+            BaseReducerNode,
+            BaseOrchestratorNode,
         ]
 
         class_methods = {}
@@ -201,16 +204,14 @@ def validate_base_implementations() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def validate_async_patterns() -> Dict[str, Any]:
+async def validate_async_patterns() -> dict[str, Any]:
     """Validate async patterns and NodeResult usage."""
     print("🔍 Testing async patterns...")
 
     try:
-        # Import async components
-        from omnibase_core.core.model_onex_container import ModelOnexContainer
-        from omnibase_core.core.monadic.model_node_result import NodeResult
-
-        from omnimemory.protocols.data_models import UserContext
+        # Import async components from local compat layer
+        from omnimemory.compat import ModelOnexContainer, NodeResult  # noqa: F401
+        from omnimemory.protocols.data_models import UserContext  # noqa: F401
 
         # Create container and test ONEX patterns
         container = ModelOnexContainer()

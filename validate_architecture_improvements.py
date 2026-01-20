@@ -5,13 +5,11 @@ Validation script for advanced architecture improvements.
 This script validates the implementation without requiring external dependencies.
 """
 
-import importlib.util
 import os
 import sys
-from typing import List, Tuple
 
 
-def validate_file_syntax(file_path: str) -> Tuple[bool, str]:
+def validate_file_syntax(file_path: str) -> tuple[bool, str]:
     """Validate Python file syntax."""
     try:
         with open(file_path, "r") as f:
@@ -26,7 +24,7 @@ def validate_file_syntax(file_path: str) -> Tuple[bool, str]:
         return False, f"❌ Error: {e}"
 
 
-def validate_architecture_improvements() -> List[Tuple[str, bool, str]]:
+def validate_architecture_improvements() -> list[tuple[str, bool, str]]:
     """Validate all architecture improvement files."""
     base_path = "src/omnimemory"
 

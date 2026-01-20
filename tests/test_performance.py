@@ -158,9 +158,8 @@ class PIIDetector:
         start_time = time.time()
 
         if len(content) > self.config.max_text_length:
-            raise ValueError(
-                f"Content length {len(content)} exceeds maximum {self.config.max_text_length}"
-            )
+            max_len = self.config.max_text_length
+            raise ValueError(f"Content length {len(content)} exceeds max {max_len}")
 
         matches: list[PIIMatch] = []
         pii_types_detected: set[PIIType] = set()
@@ -359,7 +358,6 @@ class PriorityLock:
         timeout: float | None = None,
     ) -> AsyncGenerator[None, None]:
         """Acquire the lock with priority."""
-        request_id = str(uuid4())
         acquired_at = None
 
         try:
@@ -839,7 +837,7 @@ class TestConcurrencyPerformance:
 
         assert (
             avg_ms_per_acquisition < 1.0
-        ), f"Semaphore acquisition averaged {avg_ms_per_acquisition:.4f}ms, exceeds 1ms target"
+        ), f"Semaphore avg {avg_ms_per_acquisition:.4f}ms exceeds 1ms target"
 
     @pytest.mark.benchmark
     @pytest.mark.asyncio
@@ -867,7 +865,7 @@ class TestConcurrencyPerformance:
 
         assert (
             avg_ms_per_acquisition < 2.0
-        ), f"Lock acquisition averaged {avg_ms_per_acquisition:.4f}ms, exceeds 2ms target"
+        ), f"Lock avg {avg_ms_per_acquisition:.4f}ms exceeds 2ms target"
 
     @pytest.mark.benchmark
     @pytest.mark.asyncio
@@ -916,7 +914,7 @@ class TestConcurrencyPerformance:
         for _ in range(num_iterations):
             async with semaphore.acquire():
                 pass
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        _elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         stats_start = time.perf_counter()
         stats = semaphore.get_stats()
@@ -954,7 +952,8 @@ class TestIntegratedPerformance:
 
         for _ in range(num_iterations):
             item = create_memory_item(content_size=5000)
-            result = detector.detect_pii(item.content, sensitivity_level="medium")
+            # Capture result for validation (unused intentionally)
+            detector.detect_pii(item.content, sensitivity_level="medium")
             item.model_dump()
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -1174,17 +1173,16 @@ class TestSLAVerification:
 
         # SLA Verification
         assert calc.p95 < 100, (
-            f"SLA VIOLATION: Memory operations P95={calc.p95:.2f}ms exceeds 100ms target. "
-            f"Stats: P50={calc.p50:.2f}ms, P90={calc.p90:.2f}ms, P99={calc.p99:.2f}ms"
+            f"SLA VIOLATION: P95={calc.p95:.2f}ms exceeds 100ms target. "
+            f"P50={calc.p50:.2f}ms, P90={calc.p90:.2f}ms"
         )
 
         # Log performance summary
         print("\nMemory Operations SLA Report:")
         print(f"  P50: {calc.p50:.2f}ms")
         print(f"  P90: {calc.p90:.2f}ms")
-        print(
-            f"  P95: {calc.p95:.2f}ms (target: <100ms) {'PASS' if calc.p95 < 100 else 'FAIL'}"
-        )
+        status = "PASS" if calc.p95 < 100 else "FAIL"
+        print(f"  P95: {calc.p95:.2f}ms (target: <100ms) {status}")
         print(f"  P99: {calc.p99:.2f}ms")
         print(f"  Mean: {calc.mean:.2f}ms")
 
@@ -1244,8 +1242,8 @@ class TestSLAVerification:
             records_per_second = batch_size / elapsed
 
             assert records_per_second > 10000, (
-                f"SLA VIOLATION: Bulk operation throughput {records_per_second:.0f}/sec "
-                f"below 10K/sec target for batch_size={batch_size}"
+                f"SLA VIOLATION: Bulk throughput {records_per_second:.0f}/sec "
+                f"below 10K/sec target for batch={batch_size}"
             )
 
         print("\nBulk Operations SLA Report:")
@@ -1292,11 +1290,11 @@ class TestPIIDetectionOverhead:
             pii_times: list[float] = []
             for _ in range(50):
                 start = time.perf_counter()
-                result = detector.detect_pii(text, sensitivity_level="medium")
+                detector.detect_pii(text, sensitivity_level="medium")
                 pii_times.append((time.perf_counter() - start) * 1000)
 
             pii_avg = sum(pii_times) / len(pii_times)
-            overhead_ms = pii_avg - baseline_avg
+            _overhead_ms = pii_avg - baseline_avg
 
             # PII detection itself should be under 10ms
             assert pii_avg < 10, (
@@ -1364,9 +1362,8 @@ class TestPIIDetectionOverhead:
         print("\nPII Detection P95 Report (5KB content with PII):")
         print(f"  P50: {calc.p50:.4f}ms")
         print(f"  P90: {calc.p90:.4f}ms")
-        print(
-            f"  P95: {calc.p95:.4f}ms (target: <10ms) {'PASS' if calc.p95 < 10 else 'FAIL'}"
-        )
+        status = "PASS" if calc.p95 < 10 else "FAIL"
+        print(f"  P95: {calc.p95:.4f}ms (target: <10ms) {status}")
 
 
 # =============================================================================
@@ -1415,7 +1412,8 @@ class TestStorageEfficiency:
         print(f"  Sample size: {sample_size}")
         print(f"  Avg total bytes/item: {avg_bytes_per_item:.0f}")
         print(f"  Metadata overhead: ~{metadata_overhead:.0f} bytes")
-        print(f"  Status: {'PASS' if metadata_overhead < 1000 else 'FAIL'}")
+        status = "PASS" if metadata_overhead < 1000 else "FAIL"
+        print(f"  Status: {status}")
 
     @pytest.mark.benchmark
     def test_storage_efficiency_content_scaling(self) -> None:
@@ -1439,7 +1437,7 @@ class TestStorageEfficiency:
             max_acceptable_factor = 2.5 if content_size == 1000 else 1.5
 
             assert overhead_factor < max_acceptable_factor, (
-                f"Storage overhead {overhead_factor:.2f}x for content_size={content_size} "
+                f"Storage overhead {overhead_factor:.2f}x for {content_size} "
                 f"exceeds {max_acceptable_factor}x limit"
             )
 
@@ -1472,7 +1470,7 @@ class TestStorageEfficiency:
             # At 500 bytes: ~1400 total = 2.8x
             # At 1000 bytes: ~1900 total = 1.9x
             assert overhead_factor < 3.0, (
-                f"Storage overhead {overhead_factor:.2f}x for content_size={content_size} "
+                f"Storage overhead {overhead_factor:.2f}x for {content_size} "
                 f"is excessive"
             )
 
@@ -1532,7 +1530,7 @@ class TestVectorSearchPerformance:
             # Measure similarity computation time
             start = time.perf_counter()
             scores = [cosine_similarity(query_vector, cv) for cv in candidate_vectors]
-            top_k = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:10]
+            sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:10]
             elapsed_ms = (time.perf_counter() - start) * 1000
 
             # Target: <100ms for similarity search (100 vectors, pure Python)
@@ -1570,7 +1568,7 @@ class TestVectorSearchPerformance:
 
         # Measure normalization time
         start = time.perf_counter()
-        normalized = [normalize_vector(v) for v in vectors]
+        _normalized = [normalize_vector(v) for v in vectors]
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         # Target: preprocessing should be fast (<10ms per 100 vectors)
@@ -1615,13 +1613,13 @@ class TestEndToEndPerformance:
             item = create_memory_item(content_size=5000)
 
             # 2. PII scan
-            pii_result = detector.detect_pii(item.content, sensitivity_level="medium")
+            detector.detect_pii(item.content, sensitivity_level="medium")
 
             # 3. Serialize
             json_str = item.model_dump_json()
 
             # 4. Deserialize
-            restored = ModelMemoryItem.model_validate_json(json_str)
+            _restored = ModelMemoryItem.model_validate_json(json_str)
 
             elapsed_ms = (time.perf_counter() - start) * 1000
             measurements.append(elapsed_ms)
@@ -1636,9 +1634,8 @@ class TestEndToEndPerformance:
         print("  Operations: Create + PII Scan + Serialize + Deserialize")
         print(f"  P50: {calc.p50:.2f}ms")
         print(f"  P90: {calc.p90:.2f}ms")
-        print(
-            f"  P95: {calc.p95:.2f}ms (target: <100ms) {'PASS' if calc.p95 < 100 else 'FAIL'}"
-        )
+        status = "PASS" if calc.p95 < 100 else "FAIL"
+        print(f"  P95: {calc.p95:.2f}ms (target: <100ms) {status}")
         print(f"  P99: {calc.p99:.2f}ms")
 
     @pytest.mark.benchmark

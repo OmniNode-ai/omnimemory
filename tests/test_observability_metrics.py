@@ -531,7 +531,7 @@ class TestStrictLabelsValidation:
         assert "handler" in str(exc_info.value)
 
     def test_histogram_strict_labels_extra(self) -> None:
-        """Test Histogram raises ValueError when extra labels provided in strict mode."""
+        """Test Histogram raises ValueError when extra labels provided."""
         hist = Histogram("test_hist", ["operation"], strict_labels=True)
         with pytest.raises(ValueError) as exc_info:
             hist.observe(10.0, operation="store", extra="bad")
@@ -659,7 +659,7 @@ class TestGetHandlerStatsFiltering:
 
     @pytest.mark.asyncio
     async def test_handler_stats_with_similar_names(self) -> None:
-        """Test filtering works correctly with handler names that could match as substrings."""
+        """Test filtering works correctly with similar handler names."""
         # Names that could potentially cause false matches if filtering is broken
         wrapper_store = HandlerObservabilityWrapper(
             handler_name="store"

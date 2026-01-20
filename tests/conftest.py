@@ -117,3 +117,15 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "scaffold: Tests that may skip during scaffold phase when files don't exist",
     )
+    config.addinivalue_line(
+        "markers",
+        "config: Tests for configuration models and settings",
+    )
+    config.addinivalue_line(
+        "markers",
+        "bootstrap: Tests for bootstrap initialization",
+    )
+    config.addinivalue_line(
+        "markers",
+        "secrets: Tests for secrets provider",
+    )

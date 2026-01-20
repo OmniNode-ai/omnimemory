@@ -250,3 +250,6 @@ cache/
 
 # Claude Code configuration (contains sensitive MCP permissions)
 .claude/settings.local.json
+
+# Temporary files and caches
+tmp/

@@ -433,7 +433,7 @@ class MemoryRetrieveRequest(BaseMemoryRequest):
 class MemoryRetrieveResponse(BaseMemoryResponse):
     """Response from memory retrieve operation."""
 
-    memory: MemoryRecord | None = Field(description="Retrieved memory record")
+    memory: MemoryRecord | None = Field(None, description="Retrieved memory record")
     related_memories: list[MemoryRecord] = Field(
         default_factory=list, description="Related memory records (if requested)"
     )
@@ -757,7 +757,7 @@ class PatternPredictionResponse(BaseMemoryResponse):
         default_factory=ModelResultCollection, description="Pattern predictions"
     )
     confidence_intervals: list[dict[str, float]] = Field(
-        description="Prediction confidence"
+        default_factory=list, description="Prediction confidence intervals"
     )
 
 

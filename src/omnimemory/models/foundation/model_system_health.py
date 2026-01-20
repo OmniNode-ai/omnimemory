@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelSystemHealth(BaseModel):
     """System health information following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # System identification
     system_id: str = Field(
@@ -39,6 +39,7 @@ class ModelSystemHealth(BaseModel):
 
     # System uptime
     uptime_seconds: int = Field(
+        ge=0,
         description="System uptime in seconds",
     )
     last_restart_at: datetime | None = Field(
@@ -53,6 +54,7 @@ class ModelSystemHealth(BaseModel):
         description="Current CPU usage percentage",
     )
     memory_usage_mb: float = Field(
+        ge=0.0,
         description="Current memory usage in megabytes",
     )
     memory_usage_percent: float = Field(
@@ -68,9 +70,11 @@ class ModelSystemHealth(BaseModel):
 
     # Performance metrics
     average_response_time_ms: float = Field(
+        ge=0.0,
         description="Average response time in milliseconds",
     )
     requests_per_second: float = Field(
+        ge=0.0,
         description="Current requests per second",
     )
     error_rate: float = Field(
@@ -81,26 +85,33 @@ class ModelSystemHealth(BaseModel):
 
     # Service health
     total_services: int = Field(
+        ge=0,
         description="Total number of services",
     )
     healthy_services: int = Field(
+        ge=0,
         description="Number of healthy services",
     )
     degraded_services: int = Field(
+        ge=0,
         description="Number of degraded services",
     )
     unhealthy_services: int = Field(
+        ge=0,
         description="Number of unhealthy services",
     )
 
     # Database health
     database_connections_active: int = Field(
+        ge=0,
         description="Number of active database connections",
     )
     database_connections_max: int = Field(
+        ge=0,
         description="Maximum database connections allowed",
     )
     database_response_time_ms: float = Field(
+        ge=0.0,
         description="Average database response time in milliseconds",
     )
 
@@ -111,14 +122,17 @@ class ModelSystemHealth(BaseModel):
         description="Cache hit rate percentage",
     )
     cache_memory_usage_mb: float = Field(
+        ge=0.0,
         description="Cache memory usage in megabytes",
     )
 
     # Network health
     network_latency_ms: float = Field(
+        ge=0.0,
         description="Average network latency in milliseconds",
     )
     network_throughput_mbps: float = Field(
+        ge=0.0,
         description="Network throughput in megabits per second",
     )
 
@@ -152,6 +166,7 @@ class ModelSystemHealth(BaseModel):
         description="When the health check was performed",
     )
     health_check_duration_ms: float = Field(
+        ge=0.0,
         description="Duration of the health check in milliseconds",
     )
     next_health_check: datetime | None = Field(

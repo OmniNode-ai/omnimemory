@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ModelTag(BaseModel):
     """Individual tag model with metadata."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     name: str = Field(
         description="Tag name",
@@ -59,7 +59,7 @@ class ModelTag(BaseModel):
 class ModelTagCollection(BaseModel):
     """Collection of tags with validation and management."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     tags: list[ModelTag] = Field(
         default_factory=list,
@@ -92,6 +92,10 @@ class ModelTagCollection(BaseModel):
         created_by: UUID | None = None,
     ) -> None:
         """Add a new tag to the collection."""
+        # Enforce maximum tag limit
+        if len(self.tags) >= 100:
+            raise ValueError("Maximum of 100 tags allowed")
+
         # Check if tag already exists
         if any(
             tag.name == name.strip().lower().replace(" ", "_").replace("-", "_")

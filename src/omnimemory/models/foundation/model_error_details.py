@@ -19,7 +19,7 @@ from ...enums.enum_severity import EnumSeverity
 class ModelErrorDetails(BaseModel):
     """Error details model following ONEX standards with omnibase_core integration."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     # Error identification
     error_id: UUID = Field(

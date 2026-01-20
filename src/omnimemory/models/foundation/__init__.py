@@ -67,9 +67,13 @@ from .model_migration_progress import (
     MigrationProgressTracker,
 )
 from .model_notes import ModelNote, ModelNotesCollection
-from .model_progress_summary import ProgressSummaryResponse
+from .model_progress_summary import (
+    ModelProgressPerformanceMetrics,
+    ProgressSummaryResponse,
+)
 from .model_semver import ModelSemVer
 from .model_success_metrics import (
+    ModelConfidenceInterval,
     ModelConfidenceScore,
     ModelQualityMetrics,
     ModelSuccessRate,
@@ -137,6 +141,7 @@ __all__ = [
     # New foundation models
     "ModelSemVer",
     "ModelSuccessRate",
+    "ModelConfidenceInterval",
     "ModelConfidenceScore",
     "ModelQualityMetrics",
     "ModelNote",
@@ -156,6 +161,7 @@ __all__ = [
     "ConnectionMetadata",
     "ConnectionPoolStats",
     "SemaphoreMetrics",
+    "ModelProgressPerformanceMetrics",
     "ProgressSummaryResponse",
     # Contract versioning support
     "ModelContractVersion",

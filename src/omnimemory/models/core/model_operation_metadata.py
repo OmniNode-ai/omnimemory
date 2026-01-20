@@ -12,11 +12,11 @@ from ..foundation.model_typed_collections import ModelConfiguration, ModelMetada
 class ModelOperationMetadata(BaseModel):
     """Operation metadata for tracking operation-specific information."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Operation identification
     operation_type: str = Field(
-        description="Type of operation performed (e.g., 'memory_store', 'semantic_search')"
+        description="Type of operation (e.g., 'memory_store', 'semantic_search')"
     )
     operation_version: str = Field(
         default="1.0.0", description="Version of the operation implementation"

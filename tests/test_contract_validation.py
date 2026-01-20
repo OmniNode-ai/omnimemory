@@ -127,7 +127,7 @@ class TestContractRuntimeLoad:
         if not node_path.exists():
             pytest.skip(f"File not yet implemented: {node_path}")
 
-        # Convert node_name to class name (e.g., memory_storage_effect -> NodeMemoryStorageEffect)
+        # Convert node_name to class name (e.g., memory_storage_effect -> Node...)
         class_name: str = "Node" + "".join(
             word.capitalize() for word in node_name.split("_")
         )

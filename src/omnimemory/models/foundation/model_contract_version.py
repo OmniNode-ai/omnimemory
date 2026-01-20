@@ -32,11 +32,11 @@ class ModelContractVersion(BaseModel):
         print(request.contract_version)  # "1.0.0"
     """
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     contract_version: str = Field(
         default=DEFAULT_CONTRACT_VERSION,
-        description="Schema version for this contract (semver format: major.minor.patch)",
+        description="Schema version for this contract (semver format)",
     )
 
     def get_semver(self) -> ModelSemVer:

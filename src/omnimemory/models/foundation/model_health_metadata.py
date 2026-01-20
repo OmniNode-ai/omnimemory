@@ -5,7 +5,7 @@ This module provides strongly typed replacements for Dict[str, Any] patterns
 in health management, ensuring type safety and validation.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class HealthCheckMetadata(BaseModel):
     """Strongly typed metadata for health check operations."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     connection_url: str | None = Field(
         default=None, description="Connection URL for dependency checks"
@@ -47,7 +47,7 @@ class HealthCheckMetadata(BaseModel):
 class AggregateHealthMetadata(BaseModel):
     """Strongly typed metadata for aggregate health status."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     total_dependencies: int = Field(description="Total number of dependencies checked")
 
@@ -63,11 +63,11 @@ class AggregateHealthMetadata(BaseModel):
     )
 
     overall_health_score: float = Field(
-        description="Calculated overall health score (0.0-1.0)"
+        ge=0.0, le=1.0, description="Calculated overall health score (0.0-1.0)"
     )
 
     last_update_timestamp: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When this aggregate was last calculated",
     )
 
@@ -79,7 +79,7 @@ class AggregateHealthMetadata(BaseModel):
 class ConfigurationChangeMetadata(BaseModel):
     """Strongly typed metadata for configuration changes."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     changed_keys: list[str] = Field(
         description="List of configuration keys that were modified"

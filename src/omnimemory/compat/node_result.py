@@ -29,6 +29,17 @@ class NodeResult(Generic[T]):
 
     Provides Railway-oriented programming patterns for
     clean error handling in async operations.
+
+    None Semantics:
+        - Success results CAN have None as a valid value when T is Optional[X]
+        - The `is_success` flag determines success/failure, NOT the value
+        - Use `is_success` to check result state, not `value is not None`
+        - Example: NodeResult[Optional[str]].success(None) is valid
+
+    Type Safety:
+        - Methods like map/flat_map/unwrap work with any T, including Optional types
+        - The value field is Optional[T] to handle both failure (None) and
+          success-with-None-value cases
     """
 
     value: T | None = None
@@ -216,8 +227,11 @@ class NodeResult(Generic[T]):
         """
         Get the success value or raise the error.
 
+        Note: If T is Optional[X] and success(None) was called, this returns None.
+        The return type is T, which may itself be Optional.
+
         Returns:
-            The success value
+            The success value (may be None if T is Optional)
 
         Raises:
             Exception: The stored error if this is a failure
@@ -233,11 +247,15 @@ class NodeResult(Generic[T]):
         """
         Get the success value or return a default.
 
+        Note: The default is ONLY used when is_success=False (failure case).
+        If this is a success result with value=None (when T is Optional[X]),
+        None is returned, NOT the default.
+
         Args:
             default: Value to return if this is a failure
 
         Returns:
-            The success value or the default
+            The success value (may be None if T is Optional) or the default on failure
         """
         if not self.is_success:
             return default

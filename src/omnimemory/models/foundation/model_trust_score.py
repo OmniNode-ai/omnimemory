@@ -47,7 +47,7 @@ def ensure_timezone_aware(
 class ModelTrustScore(BaseModel):
     """Trust score with time-based decay and validation."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     base_score: float = Field(
         ge=0.0,
@@ -143,15 +143,17 @@ class ModelTrustScore(BaseModel):
             expected_level = cls._score_to_level(score)
             if v != expected_level:
                 raise ValueError(
-                    f"Trust level {v} doesn't match score {score}, expected {expected_level}"
+                    f"Trust level {v} doesn't match {score}, expected {expected_level}"
                 )
         return v
 
     @staticmethod
     def _score_to_level(score: float) -> EnumTrustLevel:
         """Convert numeric score to trust level."""
-        if score >= 0.9:
+        if score >= 0.95:
             return EnumTrustLevel.VERIFIED
+        elif score >= 0.9:
+            return EnumTrustLevel.TRUSTED
         elif score >= 0.7:
             return EnumTrustLevel.HIGH
         elif score >= 0.5:
@@ -255,6 +257,9 @@ class ModelTrustScore(BaseModel):
 
     def record_violation(self, penalty: float = 0.1) -> None:
         """Record a trust violation with penalty."""
+        # Invalidate cache since base parameters will change
+        self.invalidate_cache()
+
         self.violation_count += 1
         penalty_factor = min(penalty * self.violation_count, 0.5)  # Max 50% penalty
         self.base_score = max(0.0, self.base_score - penalty_factor)

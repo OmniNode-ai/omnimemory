@@ -13,13 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelDependencyStatus(BaseModel):
     """Status of a system dependency."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     name: str = Field(description="Name of the dependency")
     status: Literal["healthy", "degraded", "unhealthy"] = Field(
         description="Health status of the dependency"
     )
-    latency_ms: float = Field(description="Response latency in milliseconds")
+    latency_ms: float = Field(ge=0.0, description="Response latency in milliseconds")
     last_check: datetime = Field(description="When the dependency was last checked")
     error_message: str | None = Field(
         default=None, description="Error message if unhealthy"
@@ -29,12 +29,12 @@ class ModelDependencyStatus(BaseModel):
 class ModelResourceMetrics(BaseModel):
     """System resource utilization metrics."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     cpu_usage_percent: float = Field(
         ge=0.0, le=100.0, description="CPU usage percentage"
     )
-    memory_usage_mb: float = Field(description="Memory usage in megabytes")
+    memory_usage_mb: float = Field(ge=0.0, description="Memory usage in megabytes")
     memory_usage_percent: float = Field(
         ge=0.0, le=100.0, description="Memory usage percentage"
     )
@@ -42,19 +42,21 @@ class ModelResourceMetrics(BaseModel):
         ge=0.0, le=100.0, description="Disk usage percentage"
     )
     network_throughput_mbps: float = Field(
-        description="Network throughput in megabits per second"
+        ge=0.0, description="Network throughput in megabits per second"
     )
 
 
 class ModelHealthResponse(BaseModel):
     """Health check response following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     status: Literal["healthy", "degraded", "unhealthy"] = Field(
         description="Overall system health status"
     )
-    latency_ms: float = Field(description="Health check response time in milliseconds")
+    latency_ms: float = Field(
+        ge=0.0, description="Health check response time in milliseconds"
+    )
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="When the health check was performed",
@@ -65,7 +67,7 @@ class ModelHealthResponse(BaseModel):
     dependencies: list[ModelDependencyStatus] = Field(
         default_factory=list, description="Status of system dependencies"
     )
-    uptime_seconds: int = Field(description="System uptime in seconds")
+    uptime_seconds: int = Field(ge=0, description="System uptime in seconds")
     version: str = Field(description="System version information")
     environment: str = Field(description="Deployment environment")
 
@@ -73,7 +75,7 @@ class ModelHealthResponse(BaseModel):
 class ModelCircuitBreakerStats(BaseModel):
     """Circuit breaker statistics for a single dependency."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     state: Literal["closed", "open", "half_open"] = Field(
         description="Current circuit breaker state"
@@ -93,7 +95,7 @@ class ModelCircuitBreakerStats(BaseModel):
 class ModelCircuitBreakerStatsCollection(BaseModel):
     """Collection of circuit breaker statistics for all dependencies."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     circuit_breakers: dict[str, ModelCircuitBreakerStats] = Field(
         description="Circuit breaker statistics keyed by dependency name"
@@ -107,7 +109,7 @@ class ModelCircuitBreakerStatsCollection(BaseModel):
 class ModelRateLimitedHealthCheckResponse(BaseModel):
     """Rate-limited health check response."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     status: str = Field(
         default="rate_limited", description="Status of the rate-limited response"
@@ -118,7 +120,7 @@ class ModelRateLimitedHealthCheckResponse(BaseModel):
     )
     details: dict[str, str | int | float] = Field(
         default_factory=dict,
-        description="Additional details including retry_after and current_window_requests",
+        description="Additional details including retry_after and requests count",
     )
     health_check: ModelHealthResponse | None = Field(
         default=None, description="Health check result if within rate limit"

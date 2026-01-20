@@ -16,20 +16,23 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
-from omnimemory.enums import (
+from ...enums import (
     EnumFileProcessingStatus,
     EnumMigrationPriority,
     EnumMigrationStatus,
+    EnumPriorityLevel,
 )
-
-from .model_progress_summary import ProgressSummaryResponse
+from .model_progress_summary import (
+    ModelProgressPerformanceMetrics,
+    ProgressSummaryResponse,
+)
 from .model_typed_collections import ModelConfiguration, ModelMetadata
 
 
 class BatchProcessingMetrics(BaseModel):
     """Metrics for batch processing operations."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     batch_id: str = Field(description="Unique batch identifier")
     batch_size: int = Field(description="Number of items in batch")
@@ -61,7 +64,7 @@ class BatchProcessingMetrics(BaseModel):
 class FileProcessingInfo(BaseModel):
     """Information about individual file processing."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     file_path: str = Field(description="Path to the file being processed")
     file_size: int | None = Field(default=None, description="File size in bytes")
@@ -91,7 +94,7 @@ class FileProcessingInfo(BaseModel):
 class MigrationProgressMetrics(BaseModel):
     """Comprehensive metrics for migration progress tracking."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     total_files: int = Field(description="Total number of files to process")
     processed_files: int = Field(default=0, description="Number of files processed")
@@ -182,6 +185,15 @@ class MigrationProgressMetrics(BaseModel):
         """Calculate number of remaining files."""
         return self.total_files - self.processed_files
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def average_processing_time_ms(self) -> float:
+        """Calculate average processing time per file in milliseconds."""
+        if self.processed_files == 0:
+            return 0.0
+        elapsed_ms = self.elapsed_time.total_seconds() * 1000
+        return elapsed_ms / self.processed_files
+
     def update_processing_rates(self) -> None:
         """Update processing rates based on current progress."""
         elapsed_seconds = self.elapsed_time.total_seconds()
@@ -229,7 +241,7 @@ class MigrationProgressTracker(BaseModel):
     - Error tracking and recovery
     """
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     migration_id: UUID = Field(
         default_factory=uuid4, description="Unique migration identifier"
@@ -326,9 +338,9 @@ class MigrationProgressTracker(BaseModel):
                 file_info.error_message = error_message
                 self.metrics.failed_files += 1
 
-                # Track error types
+                # Track error types - extract from message pattern "ErrorType: message"
                 if error_message:
-                    error_type = type(Exception(error_message)).__name__
+                    error_type = self._extract_error_type(error_message)
                     self.error_summary[error_type] = (
                         self.error_summary.get(error_type, 0) + 1
                     )
@@ -368,11 +380,13 @@ class MigrationProgressTracker(BaseModel):
 
     def get_progress_summary(self) -> ProgressSummaryResponse:
         """Get a comprehensive progress summary."""
+        # Convert MigrationPriority to EnumPriorityLevel (both use same string values)
+        priority_level = EnumPriorityLevel(self.priority.value)
         return ProgressSummaryResponse(
             migration_id=str(self.migration_id),
             name=self.name,
             status=self.status,
-            priority=self.priority,
+            priority=priority_level,
             completion_percentage=self.metrics.completion_percentage,
             success_rate=self.metrics.success_rate,
             elapsed_time=str(self.metrics.elapsed_time),
@@ -381,7 +395,7 @@ class MigrationProgressTracker(BaseModel):
             processed_items=self.metrics.processed_files,
             successful_items=self.metrics.processed_files - self.metrics.failed_files,
             failed_items=self.metrics.failed_files,
-            current_batch_id=getattr(self.metrics, "current_batch", None),
+            current_batch_id=self.metrics.current_batch,
             active_workers=len(
                 [b for b in self.metrics.batch_metrics if b.end_time is None]
             ),
@@ -393,18 +407,65 @@ class MigrationProgressTracker(BaseModel):
                 if self.error_summary
                 else []
             ),
-            performance_metrics={
-                "files_per_second": self.metrics.files_per_second,
-                "bytes_per_second": self.metrics.bytes_per_second,
-                "average_processing_time": getattr(
-                    self.metrics, "average_processing_time_ms", 0.0
-                ),
-            },
+            performance_metrics=ModelProgressPerformanceMetrics(
+                files_per_second=self.metrics.files_per_second,
+                bytes_per_second=self.metrics.bytes_per_second,
+                average_processing_time=self.metrics.average_processing_time_ms,
+            ),
         )
 
     def _find_file(self, file_path: str) -> FileProcessingInfo | None:
         """Find file info by path."""
         return next((f for f in self.files if f.file_path == file_path), None)
+
+    def _extract_error_type(self, error_message: str) -> str:
+        """Extract error type from error message string.
+
+        Handles various error message formats:
+        - Simple: "ValueError: message"
+        - Module-qualified: "requests.exceptions.HTTPError: message"
+        - Chained: "ValueError: IOError: message" (extracts first error type)
+        - Custom exceptions without standard suffix
+
+        Args:
+            error_message: Error message string to parse
+
+        Returns:
+            Extracted error type name, or "UnknownError" if not parseable
+        """
+        if not error_message or ": " not in error_message:
+            return "UnknownError"
+
+        potential_type = error_message.split(": ", 1)[0].strip()
+
+        if not potential_type:
+            return "UnknownError"
+
+        # Handle module-qualified names (e.g., "requests.exceptions.HTTPError")
+        # Extract only the final class name
+        if "." in potential_type:
+            parts = potential_type.split(".")
+            # Validate each part is non-empty and looks like a Python identifier
+            # (empty parts indicate invalid paths like "module..name")
+            if all(part and part.isidentifier() for part in parts):
+                # Use the last part (the actual class name)
+                potential_type = parts[-1]
+            else:
+                return "UnknownError"
+
+        # Validate it looks like an exception class name:
+        # - Starts with uppercase letter
+        # - Is a valid Python identifier
+        # - Not too long (avoid false matches on long sentences)
+        if (
+            potential_type
+            and potential_type[0].isupper()
+            and potential_type.isidentifier()
+            and len(potential_type) <= 100  # Reasonable max for exception name
+        ):
+            return potential_type
+
+        return "UnknownError"
 
     def _find_batch(self, batch_id: str) -> BatchProcessingMetrics | None:
         """Find batch metrics by ID."""

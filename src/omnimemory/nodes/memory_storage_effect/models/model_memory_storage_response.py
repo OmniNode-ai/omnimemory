@@ -37,7 +37,7 @@ class ModelMemoryStorageResponse(BaseModel):
     the operation outcome, while optional fields carry operation-specific results.
 
     Attributes:
-        status: Operation status indicating success, error, not_found, or permission_denied.
+        status: Operation status (success, error, not_found, permission_denied).
         snapshot: The retrieved or stored memory snapshot (for retrieve/store/update).
         snapshot_ids: List of snapshot identifiers (for list operations).
         error_message: Detailed error information when status is "error".

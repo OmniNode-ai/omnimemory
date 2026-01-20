@@ -83,7 +83,12 @@ class ModelOptionalStringList(BaseModel):
     @field_validator("values")
     @classmethod
     def validate_optional_strings(cls, v: list[str] | None) -> list[str] | None:
-        """Validate optional string values."""
+        """Validate optional string values.
+
+        Note: An explicitly provided empty list is preserved as an empty list,
+        not silently converted to None. This allows distinguishing between
+        "not set" (None) and "explicitly set to empty" ([]).
+        """
         if v is None:
             return None
 
@@ -101,7 +106,7 @@ class ModelOptionalStringList(BaseModel):
                     seen.add(stripped_item)
                     result.append(stripped_item)
 
-        return result if result else None
+        return result
 
     def __contains__(self, item: str) -> bool:
         """Support 'in' operator for checking membership.
@@ -116,6 +121,9 @@ class ModelOptionalStringList(BaseModel):
         """Support iteration over values.
 
         Returns empty iterator if values is None.
+
+        Note: We use iterate() instead of __iter__ to avoid conflict with
+        Pydantic's BaseModel.__iter__ which returns field-value pairs.
         """
         if self.values is None:
             return iter([])
@@ -331,7 +339,15 @@ class ModelConfiguration(BaseModel):
         description: str | None = None,
         is_sensitive: bool = False,
     ) -> None:
-        """Set configuration option with metadata."""
+        """Set configuration option with metadata.
+
+        Args:
+            key: Configuration option key.
+            value: Configuration option value.
+            description: Optional description. Only updates if not None.
+            is_sensitive: Whether this option contains sensitive data.
+                Only updates if not None. Defaults to False for new options.
+        """
         # Update existing or add new
         for option in self.options:
             if option.key == key:
@@ -341,9 +357,13 @@ class ModelConfiguration(BaseModel):
                 option.is_sensitive = is_sensitive
                 return
 
+        # For new options, default is_sensitive to False if not specified
         self.options.append(
             ModelConfigurationOption(
-                key=key, value=value, description=description, is_sensitive=is_sensitive
+                key=key,
+                value=value,
+                description=description,
+                is_sensitive=is_sensitive,
             )
         )
 
@@ -502,19 +522,34 @@ def convert_list_to_string_list(data: list[str]) -> ModelStringList:
 
 def convert_list_of_dicts_to_structured_data(
     data: list[dict[str, object]],
+    default_status: str = "success",
 ) -> ModelResultCollection:
-    """Convert a list of dictionaries to structured result collection."""
+    """Convert a list of dictionaries to structured result collection.
+
+    Args:
+        data: List of dictionaries to convert
+        default_status: Default status to use if item doesn't have a "status" field.
+            Valid values are "success", "failure", "pending", "partial", "cancelled".
+
+    Returns:
+        ModelResultCollection with converted items
+    """
     collection = ModelResultCollection()
 
     for i, item in enumerate(data):
         # Convert dict to structured data
         structured_data = ModelStructuredData()
         for key, value in item.items():
-            structured_data.set_field_value(key, str(value))
+            if key != "status":  # Don't include status in structured data
+                structured_data.set_field_value(key, str(value))
+
+        # Use status from item if present, otherwise use default_status
+        item_status = item.get("status")
+        status = item_status if isinstance(item_status, str) else default_status
 
         collection.add_result(
             id=str(i),
-            status="success",
+            status=status,
             message=f"Converted item {i}",
             data=structured_data,
         )

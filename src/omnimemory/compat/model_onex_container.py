@@ -50,12 +50,8 @@ class ModelOnexContainer:
             interface: The interface/protocol type to register
             implementation: The implementation class or factory function
         """
-        if callable(implementation) and isinstance(implementation, type):
-            # It's a class, create a factory
-            self._singleton_factories[interface] = implementation
-        else:
-            # It's already a factory function
-            self._singleton_factories[interface] = implementation
+        # Both classes and factory functions are stored directly as factories
+        self._singleton_factories[interface] = implementation
 
     def register_transient(
         self,
@@ -71,10 +67,8 @@ class ModelOnexContainer:
             interface: The interface/protocol type to register
             implementation: The implementation class or factory function
         """
-        if callable(implementation) and isinstance(implementation, type):
-            self._transient_factories[interface] = implementation
-        else:
-            self._transient_factories[interface] = implementation
+        # Both classes and factory functions are stored directly as factories
+        self._transient_factories[interface] = implementation
 
     def _create_instance(self, factory: Callable[..., T]) -> T:
         """
@@ -97,11 +91,10 @@ class ModelOnexContainer:
             # Check for 'container' parameter
             if "container" in params:
                 param = params["container"]
-                # Only inject if it's a positional/keyword parameter (not *args/**kwargs)
-                if param.kind in (
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                    inspect.Parameter.KEYWORD_ONLY,
-                ):
+                # Only inject if positional/keyword param (not *args/**kwargs)
+                pos_or_kw = inspect.Parameter.POSITIONAL_OR_KEYWORD
+                kw_only = inspect.Parameter.KEYWORD_ONLY
+                if param.kind in (pos_or_kw, kw_only):
                     return factory(container=self)
         except (ValueError, TypeError):
             # inspect.signature can fail for some built-in types

@@ -31,6 +31,7 @@ class ModelServiceHealth(BaseModel):
 
     # Uptime information
     uptime_seconds: int = Field(
+        ge=0,
         description="Service uptime in seconds",
     )
     last_restart_at: datetime | None = Field(
@@ -40,9 +41,11 @@ class ModelServiceHealth(BaseModel):
 
     # Performance metrics
     response_time_ms: float = Field(
+        ge=0.0,
         description="Average response time in milliseconds",
     )
     requests_per_second: float = Field(
+        ge=0.0,
         description="Current requests per second",
     )
     error_rate: float = Field(
@@ -58,6 +61,7 @@ class ModelServiceHealth(BaseModel):
         description="Current CPU usage percentage",
     )
     memory_usage_mb: float = Field(
+        ge=0.0,
         description="Current memory usage in megabytes",
     )
     memory_usage_percent: float = Field(
@@ -68,9 +72,11 @@ class ModelServiceHealth(BaseModel):
 
     # Connection information
     active_connections: int = Field(
+        ge=0,
         description="Number of active connections",
     )
     max_connections: int = Field(
+        ge=0,
         description="Maximum allowed connections",
     )
     connection_pool_utilization: float = Field(
@@ -95,6 +101,7 @@ class ModelServiceHealth(BaseModel):
     )
     critical_errors: int = Field(
         default=0,
+        ge=0,
         description="Number of critical errors in the last hour",
     )
 
@@ -104,6 +111,7 @@ class ModelServiceHealth(BaseModel):
         description="When the health check was performed",
     )
     health_check_duration_ms: float = Field(
+        ge=0.0,
         description="Duration of the health check in milliseconds",
     )
 

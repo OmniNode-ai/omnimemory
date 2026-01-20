@@ -9,20 +9,25 @@ snapshots as JSON files on the filesystem.
 The adapter translates between the memory storage request/response models and
 the underlying filesystem handler's envelope-based protocol.
 
-Example:
-    >>> from omnimemory.nodes.memory_storage_effect.handlers import (
-    ...     HandlerFileSystemAdapter,
-    ...     HandlerFileSystemAdapterConfig,
-    ... )
-    >>> from pathlib import Path
-    >>>
-    >>> config = HandlerFileSystemAdapterConfig(base_path=Path("/data/memory"))
-    >>> adapter = HandlerFileSystemAdapter(config)
-    >>> await adapter.initialize()
-    >>>
-    >>> # Store a snapshot
-    >>> request = ModelMemoryStorageRequest(operation="store", snapshot=my_snapshot)
-    >>> response = await adapter.execute(request)
+Example::
+
+    import asyncio
+    from omnimemory.nodes.memory_storage_effect.handlers import (
+        HandlerFileSystemAdapter,
+        HandlerFileSystemAdapterConfig,
+    )
+    from pathlib import Path
+
+    async def example():
+        config = HandlerFileSystemAdapterConfig(base_path=Path("/data/memory"))
+        adapter = HandlerFileSystemAdapter(config)
+        await adapter.initialize()
+
+        # Store a snapshot
+        request = ModelMemoryStorageRequest(operation="store", snapshot=my_snapshot)
+        response = await adapter.execute(request)
+
+    asyncio.run(example())
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1384.
@@ -36,9 +41,35 @@ import logging
 import uuid
 from pathlib import Path
 
-from omnibase_infra.errors.error_infra import InfraConnectionError
-from omnibase_infra.handlers.handler_filesystem import HandlerFileSystem
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+# omnibase_infra is a dev dependency - make imports conditional
+# to allow test collection and provide clear error messages
+_OMNIBASE_INFRA_AVAILABLE = False
+_OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
+
+try:
+    from omnibase_infra.errors.error_infra import InfraConnectionError
+    from omnibase_infra.handlers.handler_filesystem import HandlerFileSystem
+
+    _OMNIBASE_INFRA_AVAILABLE = True
+except ImportError as e:
+    _OMNIBASE_INFRA_IMPORT_ERROR = str(e)
+
+    # Provide stub types for type checking and to allow module to load
+    class InfraConnectionError(Exception):  # type: ignore[no-redef]
+        """Stub for InfraConnectionError when omnibase_infra is not installed."""
+
+    class HandlerFileSystem:  # type: ignore[no-redef]
+        """Stub for HandlerFileSystem when omnibase_infra is not installed."""
+
+        def __init__(self) -> None:
+            raise ImportError(
+                f"omnibase_infra is required for HandlerFileSystemAdapter. "
+                f"Install it with: poetry install --with dev. "
+                f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
+            )
+
 
 from ..models import ModelMemoryStorageRequest, ModelMemoryStorageResponse
 
@@ -204,18 +235,20 @@ class HandlerFileSystemAdapter:
         config: The adapter configuration.
         handler: The underlying HandlerFileSystem instance.
 
-    Example:
-        >>> config = HandlerFileSystemAdapterConfig(base_path=Path("/data"))
-        >>> adapter = HandlerFileSystemAdapter(config)
-        >>> await adapter.initialize()
-        >>>
-        >>> # Store operation
-        >>> store_req = ModelMemoryStorageRequest(
-        ...     operation="store",
-        ...     snapshot=snapshot
-        ... )
-        >>> response = await adapter.execute(store_req)
-        >>> assert response.status == "success"
+    Example::
+
+        async def example():
+            config = HandlerFileSystemAdapterConfig(base_path=Path("/data"))
+            adapter = HandlerFileSystemAdapter(config)
+            await adapter.initialize()
+
+            # Store operation
+            store_req = ModelMemoryStorageRequest(
+                operation="store",
+                snapshot=snapshot
+            )
+            response = await adapter.execute(store_req)
+            assert response.status == "success"
     """
 
     def __init__(self, config: HandlerFileSystemAdapterConfig) -> None:
@@ -681,7 +714,8 @@ class HandlerFileSystemAdapter:
             )
         except InfraConnectionError as e:
             # Handler raises InfraConnectionError for file not found
-            # Use helper to detect "not found" condition (see _is_not_found_infra_error docs)
+            # Use helper to detect "not found" condition
+            # (see _is_not_found_infra_error docs)
             if _is_not_found_infra_error(e):
                 return ModelMemoryStorageResponse(
                     status="not_found",
@@ -1031,7 +1065,8 @@ class HandlerFileSystemAdapter:
             )
         except InfraConnectionError as e:
             # Handler raises InfraConnectionError for directory not found
-            # Use helper to detect "not found" condition (see _is_not_found_infra_error docs)
+            # Use helper to detect "not found" condition
+            # (see _is_not_found_infra_error docs)
             if _is_not_found_infra_error(e):
                 return ModelMemoryStorageResponse(
                     status="error",

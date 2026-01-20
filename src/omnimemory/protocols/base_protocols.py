@@ -923,7 +923,8 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
             request: Retrieval optimization request with optimization parameters
 
         Returns:
-            NodeResult with RetrievalOptimizationResponse containing optimization results
+            NodeResult with RetrievalOptimizationResponse containing
+            optimization results
         """
         ...
 

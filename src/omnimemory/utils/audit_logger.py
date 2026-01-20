@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation.model_audit_metadata import (
     AuditEventDetails,
@@ -85,10 +85,12 @@ class AuditEvent(BaseModel):
     pii_detected: bool = Field(default=False, description="Whether PII was detected")
     sanitized: bool = Field(default=False, description="Whether data was sanitized")
 
-    class Config:
-        """Pydantic config for audit events."""
-
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_default=True,
+        str_strip_whitespace=True,
+        ser_json_timedelta="iso8601",
+    )
 
 
 class AuditLogger:
@@ -189,8 +191,8 @@ class AuditLogger:
             exc_info=None,
         )
 
-        # Attach audit event data
-        record.audit_event = event.model_dump()
+        # Attach audit event data (mode="json" ensures datetime serialization)
+        record.audit_event = event.model_dump(mode="json")
 
         # Log the event
         self.logger.handle(record)
@@ -228,8 +230,12 @@ class AuditLogger:
             severity=AuditSeverity.LOW if success else AuditSeverity.HIGH,
             operation=f"memory_{operation_type}",
             component="memory_manager",
-            message=f"Memory {operation_type} {'succeeded' if success else 'failed'} for ID: {memory_id}",
-            details=details or {},
+            message=(
+                f"Memory {operation_type} "
+                f"{'succeeded' if success else 'failed'} for ID: {memory_id}"
+            ),
+            details=details
+            or AuditEventDetails(operation_type=f"memory_{operation_type}"),
             duration_ms=duration_ms,
             user_context=user_context,
         )
@@ -246,6 +252,20 @@ class AuditLogger:
         """Log PII detection event."""
         severity = AuditSeverity.HIGH if pii_types else AuditSeverity.LOW
 
+        # Build details model, merging with any provided details
+        pii_details = details or AuditEventDetails(operation_type="pii_scan")
+        # Store PII-specific info in request_parameters
+        pii_details = AuditEventDetails(
+            operation_type=pii_details.operation_type or "pii_scan",
+            resource_id=pii_details.resource_id,
+            resource_type=pii_details.resource_type,
+            request_parameters={
+                "pii_types_detected": ",".join(pii_types) if pii_types else "",
+                "content_length": str(content_length),
+                "sanitized": str(sanitized),
+            },
+        )
+
         event = AuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
@@ -258,12 +278,7 @@ class AuditLogger:
             operation="pii_scan",
             component="pii_detector",
             message=f"PII detection scan found {len(pii_types)} PII types in {content_length} chars",
-            details={
-                "pii_types_detected": pii_types,
-                "content_length": content_length,
-                "sanitized": sanitized,
-                **(details.model_dump() if details else {}),
-            },
+            details=pii_details,
             pii_detected=bool(pii_types),
             sanitized=sanitized,
         )
@@ -287,7 +302,7 @@ class AuditLogger:
             operation="security_check",
             component="security_monitor",
             message=f"Security violation: {violation_type} - {description}",
-            details=details or {},
+            details=details or AuditEventDetails(operation_type="security_check"),
             source_ip=source_ip,
             user_context=user_context,
         )
@@ -303,6 +318,37 @@ class AuditLogger:
         details: AuditEventDetails | None = None,
     ) -> None:
         """Log configuration change event."""
+        # Build details model with config change info
+        redacted_old = (
+            "***REDACTED***"
+            if old_value and "secret" in config_key.lower()
+            else old_value
+        )
+        redacted_new = "***REDACTED***" if "secret" in config_key.lower() else new_value
+
+        config_details = AuditEventDetails(
+            operation_type="config_update",
+            resource_id=config_key,
+            resource_type="configuration",
+            old_value=redacted_old,
+            new_value=redacted_new,
+        )
+
+        # Merge with any provided details
+        if details:
+            config_details = AuditEventDetails(
+                operation_type=details.operation_type or config_details.operation_type,
+                resource_id=details.resource_id or config_details.resource_id,
+                resource_type=details.resource_type or config_details.resource_type,
+                old_value=config_details.old_value,
+                new_value=config_details.new_value,
+                request_parameters=details.request_parameters,
+                response_status=details.response_status,
+                error_details=details.error_details,
+                ip_address=details.ip_address,
+                user_agent=details.user_agent,
+            )
+
         event = AuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
@@ -311,18 +357,7 @@ class AuditLogger:
             operation="config_update",
             component="config_manager",
             message=f"Configuration changed: {config_key}",
-            details={
-                "config_key": config_key,
-                "old_value": (
-                    "***REDACTED***"
-                    if old_value and "secret" in config_key.lower()
-                    else old_value
-                ),
-                "new_value": (
-                    "***REDACTED***" if "secret" in config_key.lower() else new_value
-                ),
-                **(details.model_dump() if details else {}),
-            },
+            details=config_details,
             user_context=user_context,
         )
 

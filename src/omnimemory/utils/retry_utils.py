@@ -8,32 +8,32 @@ failures in OmniMemory operations with configurable backoff strategies.
 from __future__ import annotations
 
 __all__ = [
-    "RetryAttempt",
     "RetryConfig",
-    "RetryResult",
-    "RetryStats",
-    "execute_with_retry",
+    "RetryAttemptInfo",
+    "RetryStatistics",
+    "RetryManager",
+    "calculate_delay",
     "is_retryable_exception",
     "retry_decorator",
+    "retry_with_backoff",
+    "default_retry_manager",
 ]
 
 import asyncio
+import concurrent.futures
 import functools
 import logging
 import random
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .error_sanitizer import ErrorSanitizer, SanitizationLevel
+from .error_sanitizer import SanitizationLevel, sanitize_error
 
 logger = logging.getLogger(__name__)
-
-# Initialize error sanitizer for secure logging
-_error_sanitizer = ErrorSanitizer(level=SanitizationLevel.STANDARD)
 
 T = TypeVar("T")
 
@@ -168,12 +168,12 @@ def calculate_delay(attempt: int, config: RetryConfig) -> int:
 
 
 async def retry_with_backoff(
-    operation: Callable[..., Any],
+    operation: Callable[..., T],
     config: RetryConfig,
     correlation_id: UUID | None = None,
     *args: Any,
     **kwargs: Any,
-) -> Any:
+) -> T:
     """
     Execute an operation with retry and exponential backoff.
 
@@ -212,7 +212,7 @@ async def retry_with_backoff(
 
             # Execute operation
             if asyncio.iscoroutinefunction(operation):
-                result = await operation(*args, **kwargs)
+                result: T = await operation(*args, **kwargs)
             else:
                 result = operation(*args, **kwargs)
 
@@ -235,19 +235,20 @@ async def retry_with_backoff(
             if attempt < config.max_attempts and is_retryable_exception(
                 e, config.retryable_exceptions
             ):
-                # Sanitize error message to prevent information disclosure
-                sanitized_error = _error_sanitizer.sanitize_error(e)
+                # Sanitize error message for logging
+                sanitized_msg = sanitize_error(e)
                 logger.warning(
-                    f"Attempt {attempt}/{config.max_attempts} failed with {type(e).__name__}: {sanitized_error} "
-                    f"(correlation_id: {correlation_id})"
+                    f"Attempt {attempt}/{config.max_attempts} failed: "
+                    f"{type(e).__name__}: {sanitized_msg} "
+                    f"(cid: {correlation_id})"
                 )
                 continue
             # Final failure or non-retryable exception
             # Use stricter sanitization for final failures
-            sanitized_error = _error_sanitizer.sanitize_error(e)
+            sanitized_msg = sanitize_error(e, level=SanitizationLevel.STRICT)
             logger.error(
                 f"Operation failed permanently after {attempt} attempts "
-                f"with {type(e).__name__}: {sanitized_error} "
+                f"with {type(e).__name__}: {sanitized_msg} "
                 f"(correlation_id: {correlation_id})"
             )
             break
@@ -282,53 +283,58 @@ def retry_decorator(
     Returns:
         Decorated function with retry behavior
     """
+    # Build config with proper defaults - honor RetryConfig defaults when
+    # retryable_exceptions is None
     effective_config: RetryConfig
-    if config is None:
-        effective_config = RetryConfig(
-            max_attempts=max_attempts,
-            base_delay_ms=base_delay_ms,
-            max_delay_ms=max_delay_ms,
-            exponential_multiplier=exponential_multiplier,
-            jitter=jitter,
-            retryable_exceptions=retryable_exceptions or [],
-        )
-    else:
+    if config is not None:
         effective_config = config
+    else:
+        config_kwargs: dict[str, Any] = {
+            "max_attempts": max_attempts,
+            "base_delay_ms": base_delay_ms,
+            "max_delay_ms": max_delay_ms,
+            "exponential_multiplier": exponential_multiplier,
+            "jitter": jitter,
+        }
+        # Only override retryable_exceptions if explicitly provided
+        if retryable_exceptions is not None:
+            config_kwargs["retryable_exceptions"] = retryable_exceptions
+        effective_config = RetryConfig(**config_kwargs)
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            correlation_id = kwargs.pop("correlation_id", None)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            correlation_id = cast(UUID | None, kwargs.pop("correlation_id", None))
             return await retry_with_backoff(
                 func, effective_config, correlation_id, *args, **kwargs
             )
 
         @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             # For sync functions, run in event loop
-            correlation_id = kwargs.pop("correlation_id", None)
+            correlation_id = cast(UUID | None, kwargs.pop("correlation_id", None))
 
-            async def async_operation() -> Any:
+            async def async_operation() -> T:
                 return await retry_with_backoff(
                     func, effective_config, correlation_id, *args, **kwargs
                 )
 
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If we're already in an event loop, create a task
-                    task = loop.create_task(async_operation())
-                    return loop.run_until_complete(task)
-                else:
-                    return loop.run_until_complete(async_operation())
+                asyncio.get_running_loop()
+                # Loop is already running - run in separate thread to avoid
+                # blocking the current event loop. This handles the case where
+                # sync code is called from within an async context.
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(asyncio.run, async_operation())
+                    return future.result()
             except RuntimeError:
-                # No event loop, create new one
+                # No running loop, safe to use asyncio.run directly
                 return asyncio.run(async_operation())
 
         if asyncio.iscoroutinefunction(func):
-            return async_wrapper  # type: ignore[return-value]
+            return cast(Callable[..., T], async_wrapper)
         else:
-            return sync_wrapper
+            return cast(Callable[..., T], sync_wrapper)
 
     return decorator
 
@@ -338,7 +344,7 @@ class RetryManager:
     Manager for retry operations with statistics tracking.
     """
 
-    def __init__(self, default_config: RetryConfig | None = None):
+    def __init__(self, default_config: RetryConfig | None = None) -> None:
         """
         Initialize retry manager.
 

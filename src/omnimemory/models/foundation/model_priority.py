@@ -2,18 +2,16 @@
 Priority model following ONEX foundation patterns.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from omnibase_core.enums.enum_priority_level import (
-    EnumPriorityLevel,
-)
+from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelPriority(BaseModel):
     """Priority model with level, context, and metadata."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     level: EnumPriorityLevel = Field(
         description="Priority level using ONEX standard enum",
@@ -110,8 +108,6 @@ class ModelPriority(BaseModel):
         """Create critical priority with optional expiration."""
         expires_at = None
         if expires_in_minutes:
-            from datetime import timedelta
-
             expires_at = datetime.now(timezone.utc) + timedelta(
                 minutes=expires_in_minutes
             )
@@ -134,8 +130,6 @@ class ModelPriority(BaseModel):
         reason: str,
     ) -> "ModelPriority":
         """Create temporarily boosted priority."""
-        from datetime import timedelta
-
         return cls(
             level=base_level,
             reason=reason,

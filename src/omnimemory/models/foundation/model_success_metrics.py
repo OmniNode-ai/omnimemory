@@ -4,13 +4,13 @@ Success metrics models following ONEX standards.
 
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 
 class ModelSuccessRate(BaseModel):
     """Success rate metric following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     rate: float = Field(
         ge=0.0,
@@ -37,7 +37,7 @@ class ModelSuccessRate(BaseModel):
 
     @field_validator("successful_operations")
     @classmethod
-    def validate_successful_operations(cls, v: int, info: object) -> int:
+    def validate_successful_operations(cls, v: int, info: ValidationInfo) -> int:
         """Validate successful operations doesn't exceed total."""
         if hasattr(info, "data") and "total_operations" in getattr(info, "data", {}):
             total = info.data["total_operations"]
@@ -60,10 +60,49 @@ class ModelSuccessRate(BaseModel):
         return self.rate * 100.0
 
 
+class ModelConfidenceInterval(BaseModel):
+    """Confidence interval for statistical predictions following ONEX standards."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lower_bound: float = Field(description="Lower bound of the confidence interval")
+    upper_bound: float = Field(description="Upper bound of the confidence interval")
+    confidence_level: float = Field(
+        ge=0.0,
+        le=1.0,
+        default=0.95,
+        description="Confidence level (e.g., 0.95 for 95% confidence)",
+    )
+    point_estimate: float | None = Field(
+        default=None,
+        description="Point estimate (optional, typically the mean or median)",
+    )
+
+    @field_validator("upper_bound")
+    @classmethod
+    def validate_bounds(cls, v: float, info: ValidationInfo) -> float:
+        """Validate that upper bound is greater than or equal to lower bound."""
+        if hasattr(info, "data") and "lower_bound" in info.data:
+            lower = info.data["lower_bound"]
+            if v < lower:
+                raise ValueError("Upper bound must be >= lower bound")
+        return v
+
+    @property
+    def interval_width(self) -> float:
+        """Calculate the width of the confidence interval."""
+        return self.upper_bound - self.lower_bound
+
+    @property
+    def midpoint(self) -> float:
+        """Calculate the midpoint of the confidence interval."""
+        return (self.lower_bound + self.upper_bound) / 2
+
+
 class ModelConfidenceScore(BaseModel):
     """Confidence score metric following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     score: float = Field(
         ge=0.0,
@@ -71,7 +110,7 @@ class ModelConfidenceScore(BaseModel):
         description="Confidence score as a decimal between 0.0 and 1.0",
     )
     measurement_basis: str = Field(
-        description="Basis for confidence measurement (e.g., 'data_quality', 'algorithm_certainty')",
+        description="Basis for confidence measurement (e.g., 'data_quality')",
     )
     contributing_factors: list[str] = Field(
         default_factory=list,
@@ -87,7 +126,7 @@ class ModelConfidenceScore(BaseModel):
         description="Sample size used for confidence calculation",
     )
     calculation_method: str = Field(
-        description="Method used to calculate confidence (e.g., 'statistical', 'heuristic', 'ml_based')",
+        description="Confidence calculation method (e.g., 'statistical')",
     )
     measured_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -120,7 +159,7 @@ class ModelConfidenceScore(BaseModel):
 class ModelQualityMetrics(BaseModel):
     """Combined quality metrics following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     success_rate: ModelSuccessRate = Field(
         description="Success rate metrics",

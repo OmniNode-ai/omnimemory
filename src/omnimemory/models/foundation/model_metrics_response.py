@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelOperationCounts(BaseModel):
     """Count of operations by type."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     storage_operations: int = Field(
         default=0, description="Number of storage operations"
@@ -28,15 +28,19 @@ class ModelOperationCounts(BaseModel):
 class ModelPerformanceMetrics(BaseModel):
     """Performance metrics for operations."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     average_latency_ms: float = Field(
-        description="Average operation latency in milliseconds"
+        ge=0.0, description="Average operation latency in milliseconds"
     )
-    p95_latency_ms: float = Field(description="95th percentile latency in milliseconds")
-    p99_latency_ms: float = Field(description="99th percentile latency in milliseconds")
+    p95_latency_ms: float = Field(
+        ge=0.0, description="95th percentile latency in milliseconds"
+    )
+    p99_latency_ms: float = Field(
+        ge=0.0, description="99th percentile latency in milliseconds"
+    )
     throughput_ops_per_second: float = Field(
-        description="Operations per second throughput"
+        ge=0.0, description="Operations per second throughput"
     )
     error_rate_percent: float = Field(
         ge=0.0, le=100.0, description="Error rate as percentage"
@@ -49,33 +53,37 @@ class ModelPerformanceMetrics(BaseModel):
 class ModelResourceMetricsDetailed(BaseModel):
     """Detailed resource utilization metrics."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
-    memory_allocated_mb: float = Field(description="Memory allocated in megabytes")
-    memory_used_mb: float = Field(description="Memory currently used in megabytes")
+    memory_allocated_mb: float = Field(
+        ge=0.0, description="Memory allocated in megabytes"
+    )
+    memory_used_mb: float = Field(
+        ge=0.0, description="Memory currently used in megabytes"
+    )
     cache_hit_rate_percent: float = Field(
         ge=0.0, le=100.0, description="Cache hit rate percentage"
     )
-    cache_size_mb: float = Field(description="Cache size in megabytes")
+    cache_size_mb: float = Field(ge=0.0, description="Cache size in megabytes")
     database_connections_active: int = Field(
-        description="Number of active database connections"
+        ge=0, description="Number of active database connections"
     )
     database_connections_idle: int = Field(
-        description="Number of idle database connections"
+        ge=0, description="Number of idle database connections"
     )
 
 
 class ModelMetricsResponse(BaseModel):
     """Comprehensive metrics response following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="When metrics were collected",
     )
     collection_duration_ms: float = Field(
-        description="Time taken to collect metrics in milliseconds"
+        ge=0.0, description="Time taken to collect metrics in milliseconds"
     )
     operation_counts: ModelOperationCounts = Field(
         description="Count of operations by type"

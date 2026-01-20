@@ -222,9 +222,9 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         self,
         error_code: EnumOmniMemoryErrorCode,
         message: str,
-        context: ModelMetadata | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: Exception | None = None,
+        cause: BaseException | None = None,
         recovery_hint: str | None = None,
         retry_after: int | None = None,
         **kwargs: Any,
@@ -235,7 +235,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         Args:
             error_code: Specific error code from EnumOmniMemoryErrorCode
             message: Human-readable error message
-            context: Additional error context information
+            context: Additional error context information (ModelMetadata or dict)
             correlation_id: Request correlation ID for tracing
             cause: Underlying exception that caused this error
             recovery_hint: Suggestion for error recovery
@@ -278,7 +278,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         self.category_info = category_info
         self.recovery_hint = recovery_hint
         self.retry_after = retry_after
-        self.cause = cause
+        self.cause: BaseException | None = cause
 
         # Chain the underlying cause if provided
         if cause:
@@ -330,6 +330,8 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
         field_name: str | None = None,
         field_value: FieldValueType | None = None,
         validation_rule: str | None = None,
+        correlation_id: UUID | None = None,
+        cause: BaseException | None = None,
         **kwargs: Any,
     ) -> None:
         # Determine specific validation error code
@@ -346,20 +348,24 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
         # Build context with validation details - normalize to mutable dict
-        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
-        if field_name:
-            context["field_name"] = field_name
-        if field_value is not None:
-            context["field_value"] = str(field_value)
-        if validation_rule:
-            context["validation_rule"] = validation_rule
-
-        kwargs["context"] = context
-        kwargs["recovery_hint"] = (
-            "Review and correct the input data according to the schema requirements"
+        context_dict: dict[str, object] = _normalize_context_to_dict(
+            kwargs.get("context")
         )
+        if field_name:
+            context_dict["field_name"] = field_name
+        if field_value is not None:
+            context_dict["field_value"] = str(field_value)
+        if validation_rule:
+            context_dict["validation_rule"] = validation_rule
 
-        super().__init__(error_code=error_code, message=message, **kwargs)
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            context=context_dict,
+            correlation_id=correlation_id,
+            cause=cause,
+            recovery_hint="Review and correct input data per schema requirements",
+        )
 
 
 class ProtocolStorageError(ProtocolOmniMemoryError):
@@ -370,6 +376,8 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
         message: str,
         storage_system: str | None = None,
         operation: str | None = None,
+        correlation_id: UUID | None = None,
+        cause: BaseException | None = None,
         **kwargs: Any,
     ) -> None:
         # Determine specific storage error code
@@ -392,19 +400,23 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.TRANSACTION_FAILED
 
         # Build context with storage details - normalize to mutable dict
-        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
-        if storage_system:
-            context["storage_system"] = storage_system
-        if operation:
-            context["operation"] = operation
-
-        kwargs["context"] = context
-        kwargs["recovery_hint"] = (
-            "Check storage system health and retry with exponential backoff"
+        context_dict: dict[str, object] = _normalize_context_to_dict(
+            kwargs.get("context")
         )
-        kwargs["retry_after"] = 5  # Suggest 5 second retry delay
+        if storage_system:
+            context_dict["storage_system"] = storage_system
+        if operation:
+            context_dict["operation"] = operation
 
-        super().__init__(error_code=error_code, message=message, **kwargs)
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            context=context_dict,
+            correlation_id=correlation_id,
+            cause=cause,
+            recovery_hint="Check storage health and retry with backoff",
+            retry_after=5,  # Suggest 5 second retry delay
+        )
 
 
 class ProtocolRetrievalError(ProtocolOmniMemoryError):
@@ -415,6 +427,8 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
         message: str,
         memory_id: UUID | None = None,
         query: str | None = None,
+        correlation_id: UUID | None = None,
+        cause: BaseException | None = None,
         **kwargs: Any,
     ) -> None:
         # Determine specific retrieval error code
@@ -439,16 +453,22 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.FILTER_INVALID
 
         # Build context with retrieval details - normalize to mutable dict
-        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
+        context_dict: dict[str, object] = _normalize_context_to_dict(
+            kwargs.get("context")
+        )
         if memory_id:
-            context["memory_id"] = str(memory_id)
+            context_dict["memory_id"] = str(memory_id)
         if query:
-            context["query"] = query
+            context_dict["query"] = query
 
-        kwargs["context"] = context
-        kwargs["recovery_hint"] = "Verify search parameters and check index health"
-
-        super().__init__(error_code=error_code, message=message, **kwargs)
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            context=context_dict,
+            correlation_id=correlation_id,
+            cause=cause,
+            recovery_hint="Verify search parameters and check index health",
+        )
 
 
 class ProtocolProcessingError(ProtocolOmniMemoryError):
@@ -459,6 +479,8 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
         message: str,
         processing_stage: str | None = None,
         model_name: str | None = None,
+        correlation_id: UUID | None = None,
+        cause: BaseException | None = None,
         **kwargs: Any,
     ) -> None:
         # Determine specific processing error code
@@ -483,16 +505,22 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
         # Build context with processing details - normalize to mutable dict
-        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
+        context_dict: dict[str, object] = _normalize_context_to_dict(
+            kwargs.get("context")
+        )
         if processing_stage:
-            context["processing_stage"] = processing_stage
+            context_dict["processing_stage"] = processing_stage
         if model_name:
-            context["model_name"] = model_name
+            context_dict["model_name"] = model_name
 
-        kwargs["context"] = context
-        kwargs["recovery_hint"] = "Check model availability and processing resources"
-
-        super().__init__(error_code=error_code, message=message, **kwargs)
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            context=context_dict,
+            correlation_id=correlation_id,
+            cause=cause,
+            recovery_hint="Check model availability and processing resources",
+        )
 
 
 class ProtocolCoordinationError(ProtocolOmniMemoryError):
@@ -503,6 +531,8 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
         message: str,
         workflow_id: UUID | None = None,
         agent_ids: list[UUID] | None = None,
+        correlation_id: UUID | None = None,
+        cause: BaseException | None = None,
         **kwargs: Any,
     ) -> None:
         # Determine specific coordination error code
@@ -527,16 +557,22 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.ORCHESTRATION_FAILED
 
         # Build context with coordination details - normalize to mutable dict
-        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
+        context_dict: dict[str, object] = _normalize_context_to_dict(
+            kwargs.get("context")
+        )
         if workflow_id:
-            context["workflow_id"] = str(workflow_id)
+            context_dict["workflow_id"] = str(workflow_id)
         if agent_ids:
-            context["agent_ids"] = [str(aid) for aid in agent_ids]
+            context_dict["agent_ids"] = [str(aid) for aid in agent_ids]
 
-        kwargs["context"] = context
-        kwargs["recovery_hint"] = "Check agent availability and retry coordination"
-
-        super().__init__(error_code=error_code, message=message, **kwargs)
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            context=context_dict,
+            correlation_id=correlation_id,
+            cause=cause,
+            recovery_hint="Check agent availability and retry coordination",
+        )
 
 
 class ProtocolSystemError(ProtocolOmniMemoryError):
@@ -546,6 +582,8 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
         self,
         message: str,
         system_component: str | None = None,
+        correlation_id: UUID | None = None,
+        cause: BaseException | None = None,
         **kwargs: Any,
     ) -> None:
         # Determine specific system error code
@@ -570,24 +608,33 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
         # Build context with system details - normalize to mutable dict
-        context: dict[str, object] = _normalize_context_to_dict(kwargs.get("context"))
+        context_dict: dict[str, object] = _normalize_context_to_dict(
+            kwargs.get("context")
+        )
         if system_component:
-            context["system_component"] = system_component
+            context_dict["system_component"] = system_component
 
-        kwargs["context"] = context
-        kwargs["recovery_hint"] = "Contact system administrator for system-level issues"
-
-        super().__init__(error_code=error_code, message=message, **kwargs)
+        super().__init__(
+            error_code=error_code,
+            message=message,
+            context=context_dict,
+            correlation_id=correlation_id,
+            cause=cause,
+            recovery_hint="Contact system administrator for system-level issues",
+        )
 
 
 # === ERROR UTILITIES ===
 
 
 def wrap_exception(
-    exception: Exception,
+    exception: BaseException,
     error_code: EnumOmniMemoryErrorCode,
     message: str | None = None,
-    **kwargs: Any,
+    context: ModelMetadata | dict[str, object] | None = None,
+    correlation_id: UUID | None = None,
+    recovery_hint: str | None = None,
+    retry_after: int | None = None,
 ) -> ProtocolOmniMemoryError:
     """
     Wrap a generic exception in an ProtocolOmniMemoryError.
@@ -596,7 +643,10 @@ def wrap_exception(
         exception: The original exception to wrap
         error_code: The OmniMemory error code to use
         message: Optional custom message (uses exception message if not provided)
-        **kwargs: Additional arguments for ProtocolOmniMemoryError constructor
+        context: Optional error context information
+        correlation_id: Optional request correlation ID
+        recovery_hint: Optional suggestion for error recovery
+        retry_after: Optional suggested retry delay in seconds
 
     Returns:
         ProtocolOmniMemoryError wrapping the original exception
@@ -605,14 +655,17 @@ def wrap_exception(
     return ProtocolOmniMemoryError(
         error_code=error_code,
         message=error_message,
+        context=context,
+        correlation_id=correlation_id,
         cause=exception,
-        **kwargs,
+        recovery_hint=recovery_hint,
+        retry_after=retry_after,
     )
 
 
 def chain_errors(
     primary_error: ProtocolOmniMemoryError,
-    secondary_error: Exception,
+    secondary_error: BaseException,
 ) -> ProtocolOmniMemoryError:
     """
     Chain a secondary error to a primary ProtocolOmniMemoryError.
@@ -645,10 +698,17 @@ def create_error_summary(errors: list[ProtocolOmniMemoryError]) -> dict[str, obj
         errors: List of ProtocolOmniMemoryError instances
 
     Returns:
-        Dictionary containing error summary statistics
+        ErrorSummary containing error summary statistics with all fields populated
     """
     if not errors:
-        return {"total_errors": 0}
+        return {
+            "total_errors": 0,
+            "recoverable_errors": 0,
+            "non_recoverable_errors": 0,
+            "error_counts_by_code": {},
+            "error_counts_by_category": {},
+            "recovery_rate": 0.0,
+        }
 
     error_counts: dict[str, int] = {}
     category_counts: dict[str, int] = {}

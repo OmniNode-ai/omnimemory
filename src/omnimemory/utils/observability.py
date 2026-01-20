@@ -133,7 +133,10 @@ MetadataValue = str | int | float | bool | None
 import structlog
 from pydantic import BaseModel, Field
 
-from ..models.foundation.model_typed_collections import ModelMetadata
+from ..models.foundation.model_typed_collections import (
+    ModelKeyValuePair,
+    ModelMetadata,
+)
 
 # === LABEL VALIDATION UTILITIES ===
 
@@ -1402,7 +1405,7 @@ class CorrelationContext(BaseModel):
     parent_correlation_id: str | None = Field(default=None)
     trace_level: TraceLevel = Field(default=TraceLevel.INFO)
     metadata: ModelMetadata = Field(default_factory=ModelMetadata)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ObservabilityManager:
@@ -1468,10 +1471,13 @@ class ObservabilityManager:
         if correlation_id and not validate_correlation_id(correlation_id):
             raise ValueError(f"Invalid correlation ID format: {correlation_id}")
 
-        # Sanitize metadata values
-        sanitized_metadata = {
-            key: sanitize_metadata_value(value) for key, value in metadata.items()
-        }
+        # Sanitize metadata values and convert to ModelMetadata
+        metadata_pairs = [
+            ModelKeyValuePair(key=key, value=str(sanitize_metadata_value(value)))
+            for key, value in metadata.items()
+            if sanitize_metadata_value(value) is not None
+        ]
+        sanitized_metadata = ModelMetadata(pairs=metadata_pairs)
 
         # Create context
         context = CorrelationContext(
@@ -1980,7 +1986,7 @@ class HandlerObservabilityWrapper:
             )
 
         self.handler_name = handler_name
-        self._custom_registry = registry
+        self._custom_registry: MetricsRegistry | None = registry
         self._validate_log_schema = validate_log_schema
         self._logger = structlog.get_logger(f"omnimemory.handler.{handler_name}")
 

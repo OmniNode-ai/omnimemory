@@ -12,10 +12,32 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnimemory.enums import EnumMigrationStatus, EnumPriorityLevel
 
 
+class ModelProgressPerformanceMetrics(BaseModel):
+    """Typed model for progress performance metrics."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    files_per_second: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="File processing rate in files per second",
+    )
+    bytes_per_second: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Data processing rate in bytes per second",
+    )
+    average_processing_time: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Average processing time per file in milliseconds",
+    )
+
+
 class ProgressSummaryResponse(BaseModel):
     """Strongly typed progress summary response."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     migration_id: str = Field(description="Unique identifier for the migration")
 
@@ -55,7 +77,7 @@ class ProgressSummaryResponse(BaseModel):
         default_factory=list, description="Recent error messages"
     )
 
-    performance_metrics: dict[str, float] = Field(
-        default_factory=dict,
-        description="Performance metrics for the migration (e.g., latency_ms, throughput)",
+    performance_metrics: ModelProgressPerformanceMetrics = Field(
+        default_factory=ModelProgressPerformanceMetrics,
+        description="Performance metrics (files/s, bytes/s, avg time)",
     )

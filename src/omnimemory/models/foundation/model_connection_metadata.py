@@ -5,7 +5,8 @@ This module provides strongly typed replacements for Dict[str, Any] patterns
 in connection pooling, ensuring type safety and validation.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,12 +14,16 @@ from pydantic import BaseModel, ConfigDict, Field
 class ConnectionMetadata(BaseModel):
     """Strongly typed metadata for connection objects."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
-    connection_id: str = Field(description="Unique identifier for this connection")
+    connection_id: str = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Unique identifier for this connection",
+    )
 
     created_at: datetime = Field(
-        default_factory=datetime.now, description="When this connection was created"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When this connection was created",
     )
 
     last_used_at: datetime | None = Field(
@@ -59,7 +64,7 @@ class ConnectionMetadata(BaseModel):
 class ConnectionPoolStats(BaseModel):
     """Strongly typed connection pool statistics."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     pool_name: str = Field(description="Name of the connection pool")
 
@@ -101,7 +106,7 @@ class ConnectionPoolStats(BaseModel):
 class SemaphoreMetrics(BaseModel):
     """Strongly typed semaphore performance metrics."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     name: str = Field(description="Name of the semaphore")
 

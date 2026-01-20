@@ -23,7 +23,7 @@ from .model_provenance import ModelProvenanceChain
 class ModelMemoryResponse(BaseModel):
     """Base memory response model following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Contract version for schema tracking
     contract_version: str = Field(
@@ -53,7 +53,7 @@ class ModelMemoryResponse(BaseModel):
         description="Structured response data following ONEX standards",
     )
 
-    # Error information - replaced individual error fields with comprehensive error model
+    # Error information - replaced individual fields with comprehensive error model
     error: ModelErrorDetails | None = Field(
         default=None,
         description="Comprehensive error details if operation failed",
@@ -88,7 +88,7 @@ class ModelMemoryResponse(BaseModel):
     # Provenance tracking - using structured model instead of list[str]
     provenance: ModelProvenanceChain | None = Field(
         default=None,
-        description="Comprehensive provenance chain for traceability following ONEX standards",
+        description="Provenance chain for traceability following ONEX standards",
     )
 
     # Quality indicators

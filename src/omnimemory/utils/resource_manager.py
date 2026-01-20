@@ -11,8 +11,8 @@ NOTE ON Any TYPES:
 This module intentionally uses 'Any' types for generic resource management:
 - ResourcePool manages arbitrary resource types (connections, handles, etc.)
 - resource_id/resource fields use Any for generic resource references
-- config: Dict[str, Any] - Resource pool configs contain various value types
-- Pool health/stats methods return Dict[str, Any] for flexible monitoring data
+- config: dict[str, Any] - Resource pool configs contain various value types
+- Pool health/stats methods return dict[str, Any] for flexible monitoring data
 
 This design enables a single resource pool implementation to work with any
 resource type without complex generic type hierarchies.
@@ -28,7 +28,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any
 
 import structlog
 from pydantic import BaseModel, Field
@@ -54,9 +54,6 @@ def _sanitize_error(error: Exception) -> str:
     return _base_sanitize_error(
         error, context="resource_manager", level=SanitizationLevel.STANDARD
     )
-
-
-T = TypeVar("T")
 
 
 class CircuitState(Enum):
@@ -140,7 +137,7 @@ class AsyncCircuitBreaker:
         async with self._lock:
             if self.state == CircuitState.OPEN:
                 if self._should_attempt_reset():
-                    await self._transition_to_half_open()
+                    self._transition_to_half_open()
                 else:
                     raise CircuitBreakerError(self.name, self.state)
 
@@ -174,8 +171,12 @@ class AsyncCircuitBreaker:
         time_since_failure = datetime.now(timezone.utc) - self.stats.last_failure_time
         return time_since_failure.total_seconds() >= effective_timeout
 
-    async def _transition_to_half_open(self) -> None:
-        """Transition circuit breaker to half-open state."""
+    def _transition_to_half_open(self) -> None:
+        """Transition circuit breaker to half-open state.
+
+        Note: This is a synchronous method as it only modifies internal state.
+        No I/O operations are performed.
+        """
         self.state = CircuitState.HALF_OPEN
         self.stats.state_changed_at = datetime.now(timezone.utc)
         self.stats.success_count = 0
@@ -195,7 +196,7 @@ class AsyncCircuitBreaker:
             if self.state == CircuitState.HALF_OPEN:
                 self.stats.success_count += 1
                 if self.stats.success_count >= self.config.success_threshold:
-                    await self._transition_to_closed()
+                    self._transition_to_closed()
             elif self.state == CircuitState.CLOSED:
                 self.stats.failure_count = 0  # Reset failure count on success
 
@@ -210,10 +211,14 @@ class AsyncCircuitBreaker:
                 self.state == CircuitState.CLOSED
                 and self.stats.failure_count >= self.config.failure_threshold
             ) or self.state == CircuitState.HALF_OPEN:
-                await self._transition_to_open()
+                self._transition_to_open()
 
-    async def _transition_to_closed(self) -> None:
-        """Transition circuit breaker to closed state."""
+    def _transition_to_closed(self) -> None:
+        """Transition circuit breaker to closed state.
+
+        Note: This is a synchronous method as it only modifies internal state.
+        No I/O operations are performed.
+        """
         self.state = CircuitState.CLOSED
         self.stats.state_changed_at = datetime.now(timezone.utc)
         self.stats.failure_count = 0
@@ -225,8 +230,12 @@ class AsyncCircuitBreaker:
             reason="success_threshold_reached",
         )
 
-    async def _transition_to_open(self) -> None:
-        """Transition circuit breaker to open state."""
+    def _transition_to_open(self) -> None:
+        """Transition circuit breaker to open state.
+
+        Note: This is a synchronous method as it only modifies internal state.
+        No I/O operations are performed.
+        """
         self.state = CircuitState.OPEN
         self.stats.state_changed_at = datetime.now(timezone.utc)
 
@@ -537,7 +546,8 @@ class ResourcePool:
         self._scale_increment = config.get("scale_increment", 1)
         self._health_check_interval = config.get("health_check_interval", 60.0)
 
-        self.available_resources: list[Any] = []
+        # Store (resource, added_time) tuples to enable TTL tracking
+        self.available_resources: list[tuple[Any, float]] = []
         self.active_resources: dict[Any, ResourceHandle] = {}
         self.current_size = 0
 
@@ -551,7 +561,7 @@ class ResourcePool:
             for _ in range(self.min_size):
                 resource = self._create_resource()
                 if resource:
-                    self.available_resources.append(resource)
+                    self.available_resources.append((resource, time.time()))
                     self.current_size += 1
 
             self._initialized = True
@@ -594,7 +604,7 @@ class ResourcePool:
             async with self._lock:
                 # Try to get an available resource
                 if self.available_resources:
-                    resource = self.available_resources.pop()
+                    resource, _added_time = self.available_resources.pop()
                     resource_id = id(resource)
                     handle = ResourceHandle(
                         resource_id=resource_id,
@@ -663,7 +673,7 @@ class ResourcePool:
 
             # Return to pool if was healthy and not expired
             if should_return_to_pool:
-                self.available_resources.append(handle.resource)
+                self.available_resources.append((handle.resource, time.time()))
                 self._available_event.set()
 
 
@@ -838,9 +848,41 @@ class ResourceManager:
             "total_releases": self._metrics["total_releases"],
         }
 
+    async def _close_resource(self, resource: Any) -> None:
+        """
+        Close a resource if it has a close method.
+
+        Handles both sync and async close methods. Errors during close
+        are logged but not raised to ensure cleanup continues.
+
+        Args:
+            resource: The resource to close
+        """
+        if resource is None:
+            return
+
+        if hasattr(resource, "close"):
+            try:
+                close_method = resource.close
+                if asyncio.iscoroutinefunction(close_method):
+                    await close_method()
+                else:
+                    close_method()
+                logger.debug("resource_closed", resource_type=type(resource).__name__)
+            except Exception as e:
+                logger.warning(
+                    "resource_close_error",
+                    resource_type=type(resource).__name__,
+                    error=_sanitize_error(e),
+                )
+
     async def _check_resource_expiration(self, resource_type: ResourceType) -> None:
         """
         Check and handle expired resources in a pool.
+
+        Filters out resources that have exceeded the pool's TTL configuration.
+        Resources without TTL configured are never expired. Expired resources
+        are explicitly closed if they have a close() method.
 
         Args:
             resource_type: Type of resource pool to check
@@ -849,26 +891,69 @@ class ResourceManager:
             return
 
         pool = self.resource_pools[resource_type]
+        expired_resources: list[Any] = []
 
         async with pool._lock:
-            # Check available resources for expiration
-            valid_resources = []
-            for resource in pool.available_resources:
-                # Simple TTL check based on pool config
-                valid_resources.append(resource)
+            # If no TTL configured, all resources are valid
+            if pool._ttl is None:
+                return
+
+            current_time = time.time()
+            valid_resources: list[tuple[Any, float]] = []
+
+            for resource, added_time in pool.available_resources:
+                elapsed = current_time - added_time
+                if elapsed < pool._ttl:
+                    valid_resources.append((resource, added_time))
+                else:
+                    expired_resources.append(resource)
+                    pool.current_size -= 1
+
+            if expired_resources:
+                logger.debug(
+                    "expired_resources_cleaned",
+                    resource_type=resource_type.value,
+                    expired_count=len(expired_resources),
+                    remaining_count=len(valid_resources),
+                )
 
             pool.available_resources = valid_resources
 
+        # Close expired resources outside the lock to avoid blocking
+        for resource in expired_resources:
+            await self._close_resource(resource)
+
     async def shutdown(self) -> None:
-        """Shut down the resource manager and release all resources."""
+        """Shut down the resource manager and close all resources.
+
+        Explicitly closes all active and available resources that have
+        a close() method before clearing the pools.
+        """
         for resource_type, pool in self.resource_pools.items():
+            resources_to_close: list[Any] = []
+
             async with pool._lock:
-                # Release all active resources
+                # Collect active resources for closing
                 for handle in list(pool.active_resources.values()):
                     handle.status = ResourceStatus.RELEASED
+                    resources_to_close.append(handle.resource)
+
+                # Collect available resources for closing
+                for resource, _added_time in pool.available_resources:
+                    resources_to_close.append(resource)
 
                 pool.active_resources.clear()
                 pool.available_resources.clear()
                 pool.current_size = 0
+
+            # Close resources outside the lock to avoid blocking
+            for resource in resources_to_close:
+                await self._close_resource(resource)
+
+            logger.debug(
+                "resource_pool_shutdown",
+                resource_type=resource_type.value,
+                resources_closed=len(resources_to_close),
+            )
 
         logger.info("resource_manager_shutdown_completed")

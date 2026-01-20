@@ -115,7 +115,7 @@ class TestNodeStructure:
         Handlers are reused from omnibase_infra, not duplicated locally.
         Contracts reference handlers by import path:
         - EFFECT nodes: omnibase_infra.handlers.handler_db, handler_qdrant, etc.
-        - ORCHESTRATOR nodes: omnibase_infra.nodes.node_registration_orchestrator.handlers.*
+        - ORCHESTRATOR nodes: omnibase_infra.nodes...handlers.*
         """
         node_dir: Path = NODES_DIR / node_name
         if not node_dir.exists():
