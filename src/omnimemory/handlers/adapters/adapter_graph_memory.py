@@ -179,19 +179,8 @@ class CypherTemplates:
     LIMIT $limit
     """
 
-    # Find connections filtered by relationship type (bidirectional)
-    GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]-(n:Memory)
-    WHERE type(r) IN $relationship_types
-    RETURN
-        m.memory_id AS source_id,
-        n.memory_id AS target_id,
-        type(r) AS relationship_type,
-        r.weight AS weight,
-        r.created_at AS created_at,
-        startNode(r) = m AS is_outgoing
-    LIMIT $limit
-    """
+    # Alias for GET_CONNECTIONS_BY_TYPE - both are bidirectional
+    GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL = GET_CONNECTIONS_BY_TYPE
 
     # Count connections for a memory
     COUNT_CONNECTIONS = """
