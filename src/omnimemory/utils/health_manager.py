@@ -1070,27 +1070,26 @@ class HealthManager:
         # Check circuit breaker
         if name in self.circuit_breakers:
             cb = self.circuit_breakers[name]
-            # Import here to avoid circular dependency
-            from .resource_manager import CircuitState
-
-            if hasattr(cb, "state") and cb.state == CircuitState.OPEN:
-                failure_count = getattr(cb, "failure_count", None)
-                return ResourceHealthCheck(
-                    status=HealthStatus.CIRCUIT_OPEN,
-                    response_time=0.0,
-                    details=HealthCheckDetails(
-                        message="Circuit breaker is open",
-                        circuit_open=True,
-                        circuit_state=(
-                            cb.state.value
-                            if hasattr(cb.state, "value")
-                            else str(cb.state)
+            # Check if circuit is open by comparing state value (string)
+            # This supports both CircuitState (resource_manager) and
+            # CircuitBreakerState (concurrency) enums since both use
+            # the same string values ("open", "closed", "half_open")
+            if hasattr(cb, "state"):
+                state_value = getattr(cb.state, "value", str(cb.state))
+                if state_value == "open":
+                    failure_count = getattr(cb, "failure_count", None)
+                    return ResourceHealthCheck(
+                        status=HealthStatus.CIRCUIT_OPEN,
+                        response_time=0.0,
+                        details=HealthCheckDetails(
+                            message="Circuit breaker is open",
+                            circuit_open=True,
+                            circuit_state=state_value,
+                            circuit_failure_count=failure_count,
+                            result_type="circuit_open",
                         ),
-                        circuit_failure_count=failure_count,
-                        result_type="circuit_open",
-                    ),
-                    correlation_id=correlation_id,
-                )
+                        correlation_id=correlation_id,
+                    )
 
         if name not in self.health_checks:
             return ResourceHealthCheck(
