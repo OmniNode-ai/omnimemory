@@ -127,6 +127,7 @@ SKIP_DIRECTORIES = {
     ".tox",
     "tests",  # Test files have different naming conventions
     "compat",  # Compatibility stubs
+    "migrations",  # Database migrations have different naming
 }
 
 # Directories where class prefix naming is relaxed for readability
@@ -158,6 +159,20 @@ SKIP_PATHS_PATTERNS: list[re.Pattern[str]] = [
     # Skip data_models.py and error_models.py in protocols/ - they contain data types
     re.compile(r".*/protocols/(data_models|error_models)\.py$"),
 ]
+
+# Directory name to class prefix mapping
+# Used to enforce ONEX naming conventions for classes in typed directories
+# Maps: directory name -> expected class name prefix
+DIR_PREFIXES: dict[str, str] = {
+    "models": "Model",
+    "enums": "Enum",
+    "protocols": "Protocol",
+    "services": "Service",
+    "handlers": "Handler",
+    "mixins": "Mixin",
+    "nodes": "Node",
+    "validators": "Validator",
+}
 
 
 def get_directory_type(filepath: Path) -> str | None:
@@ -406,19 +421,10 @@ def validate_file(filepath: Path) -> list[Violation]:
             # This ensures files in typed directories enforce naming even without
             # inheriting from known base classes
             if expected_prefix is None and dir_type:
-                # Map directory type to class pattern
-                dir_to_pattern = {
-                    "models": ("Model", CLASS_PATTERNS["Model"]),
-                    "enums": ("Enum", CLASS_PATTERNS["Enum"]),
-                    "protocols": ("Protocol", CLASS_PATTERNS["Protocol"]),
-                    "services": ("Service", CLASS_PATTERNS["Service"]),
-                    "handlers": ("Handler", CLASS_PATTERNS["Handler"]),
-                    "mixins": ("Mixin", CLASS_PATTERNS["Mixin"]),
-                    "nodes": ("Node", CLASS_PATTERNS["Node"]),
-                    "validators": ("Validator", CLASS_PATTERNS["Validator"]),
-                }
-                if dir_type in dir_to_pattern:
-                    expected_prefix, expected_pattern = dir_to_pattern[dir_type]
+                # Use module-level DIR_PREFIXES mapping for consistency
+                if dir_type in DIR_PREFIXES:
+                    expected_prefix = DIR_PREFIXES[dir_type]
+                    expected_pattern = CLASS_PATTERNS[expected_prefix]
 
             # Skip class prefix validation for relaxed directories
             # (utils, foundation, adapters - these use semantic names for readability)

@@ -23,7 +23,7 @@ import re
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from uuid import UUID, uuid4
 
@@ -300,7 +300,7 @@ class FairSemaphore:
             else:
                 await self._semaphore.acquire()
 
-            acquired_at = datetime.now(UTC)
+            acquired_at = datetime.now(timezone.utc)
 
             async with self._lock:
                 self._active_holders[holder_id] = acquired_at
@@ -317,7 +317,7 @@ class FairSemaphore:
             raise
         finally:
             if acquired_at:
-                hold_time = (datetime.now(UTC) - acquired_at).total_seconds()
+                hold_time = (datetime.now(timezone.utc) - acquired_at).total_seconds()
 
                 async with self._lock:
                     self._active_holders.pop(holder_id, None)
@@ -368,7 +368,7 @@ class PriorityLock:
             else:
                 await self._lock.acquire()
 
-            acquired_at = datetime.now(UTC)
+            acquired_at = datetime.now(timezone.utc)
             yield
 
         except TimeoutError:
@@ -409,7 +409,7 @@ class ModelMemoryItem(BaseModel):
         default=None, description="Previous version ID"
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC), description="Creation time"
+        default_factory=lambda: datetime.now(timezone.utc), description="Creation time"
     )
     updated_at: datetime | None = Field(default=None, description="Last update time")
     expires_at: datetime | None = Field(default=None, description="Expiration time")
@@ -573,7 +573,7 @@ def create_memory_item(content_size: int = 1000) -> ModelMemoryItem:
         storage_type=EnumMemoryStorageType.PERSISTENT,
         storage_location="benchmark/test",
         version=1,
-        created_at=datetime.now(UTC),
+        created_at=datetime.now(timezone.utc),
         access_count=0,
         importance_score=0.8,
         relevance_score=0.7,

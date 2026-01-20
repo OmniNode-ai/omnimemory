@@ -92,17 +92,20 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
-      # SYNC: Pre-commit hook 'ruff-format' (auto-fixes, CI checks)
+      # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
+      # Both pre-commit and CI use --check for consistent validation
       - name: Check ruff formatting
         run: poetry run ruff format --check src/ tests/
 
-      # SYNC: Pre-commit hook 'ruff-fix' (auto-fixes, CI checks)
+      # SYNC: Pre-commit hook 'ruff-check' at pre-commit stage
+      # Both pre-commit and CI use check-only mode (no --fix)
       - name: Check ruff linting (includes import sorting)
         run: poetry run ruff check src/ tests/
 
       # SYNC: Pre-commit hook 'mypy-type-check' at pre-push stage
+      # Both pre-commit and CI use same flags for consistent output
       - name: Run mypy type checking (strict)
-        run: poetry run mypy src/omnimemory
+        run: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
 
   # Phase 1 - Pyright Type Checking
   pyright:
@@ -223,10 +226,8 @@ jobs:
       - name: Validate secrets
         run: poetry run python scripts/validation/validate_secrets.py src/
 
-      # SYNC: Pre-commit hook 'validate-naming-conventions'
-      # Stage alignment: pre-push (local) vs Phase 1 (CI) is INTENTIONAL
-      # - Local: Runs at pre-push to avoid slowing down regular commits
-      # - CI: Runs in Phase 1 (parallel with lint/pyright) for early failure detection
+      # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-commit stage
+      # Both local and CI run naming validation at the same stage for consistency
       - name: Validate naming conventions
         run: poetry run python scripts/validation/validate_naming.py src/
 

@@ -721,7 +721,7 @@ async def create_redis_health_check(
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 
         try:
-            client = redis.from_url(redis_url)
+            client = redis.from_url(redis_url)  # type: ignore[no-untyped-call]
             await client.ping()
             await client.close()
 

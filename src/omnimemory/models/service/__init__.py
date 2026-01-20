@@ -5,6 +5,8 @@ This module provides models for service configurations, orchestration,
 and coordination in the ONEX 4-node architecture.
 """
 
+from __future__ import annotations
+
 try:
     from omnibase_core.enums import EnumHealthStatus
 except ImportError:

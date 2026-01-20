@@ -249,6 +249,11 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Redis module has incomplete type stubs - allow untyped calls
+[[tool.mypy.overrides]]
+module = ["redis.*"]
+disallow_untyped_calls = false
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = false

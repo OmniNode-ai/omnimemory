@@ -13,7 +13,6 @@ from pydantic import (
     PrivateAttr,
     ValidationInfo,
     field_validator,
-    model_validator,
 )
 
 from omnimemory.enums import EnumDecayFunction, EnumTrustLevel
@@ -117,25 +116,21 @@ class ModelTrustScore(BaseModel):
     _cache_timestamp: datetime | None = PrivateAttr(default=None)
     _cache_ttl_seconds: int = PrivateAttr(default=300)
 
-    @model_validator(mode="after")
-    def validate_timezone_aware(self) -> "ModelTrustScore":
-        """Ensure all datetime values are timezone-aware to prevent comparison errors.
+    @field_validator("initial_timestamp", "last_updated", "last_verified", mode="after")
+    @classmethod
+    def _ensure_utc(cls, v: datetime | None) -> datetime | None:
+        """Ensure datetime fields are UTC-aware to prevent TypeError in comparisons.
 
-        Uses model_validator(mode='after') to run after all fields are parsed,
-        ensuring datetime fields are already coerced from strings/other formats.
+        Uses mode='after' to run after Pydantic has coerced the value to datetime,
+        ensuring we receive a proper datetime object (or None) rather than a string.
         """
-        # Guard against naive datetimes and convert to UTC
-        result = ensure_timezone_aware(self.initial_timestamp, "initial_timestamp")
-        if result is not None:
-            self.initial_timestamp = result
-
-        result = ensure_timezone_aware(self.last_updated, "last_updated")
-        if result is not None:
-            self.last_updated = result
-
-        self.last_verified = ensure_timezone_aware(self.last_verified, "last_verified")
-
-        return self
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            # Naive datetime - assume it represents UTC time and attach timezone
+            return v.replace(tzinfo=timezone.utc)
+        # Convert to UTC for consistent comparisons
+        return v.astimezone(timezone.utc)
 
     @field_validator("trust_level")
     @classmethod

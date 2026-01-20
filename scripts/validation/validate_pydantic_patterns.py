@@ -207,16 +207,39 @@ class PydanticPatternVisitor(ast.NodeVisitor):
     def _check_model_config_value(
         self, value: ast.expr, lineno: int, class_name: str
     ) -> None:
-        """Check the value assigned to model_config and add violations if needed."""
-        if isinstance(value, ast.Call) and self._is_config_dict_call(value):
-            # Check if ConfigDict() with no args
-            if self._is_empty_config_dict(value):
+        """Check the value assigned to model_config and add violations if needed.
+
+        Detects:
+        - Empty ConfigDict() calls (no arguments)
+        - Bare dict assignments (model_config = {} or model_config = {...})
+        - Non-ConfigDict callables (model_config = SomeOtherCallable())
+        - Other invalid value types (variables, constants, etc.)
+        """
+        if isinstance(value, ast.Call):
+            if self._is_config_dict_call(value):
+                # Check if ConfigDict() with no args
+                if self._is_empty_config_dict(value):
+                    self.violations.append(
+                        Violation(
+                            self.filepath,
+                            lineno,
+                            f"Empty ConfigDict() in {class_name} - "
+                            "add explicit configuration like ConfigDict(frozen=True)",
+                        )
+                    )
+            else:
+                # Non-ConfigDict callable - extract function name for better error message
+                func_name = "unknown"
+                if isinstance(value.func, ast.Name):
+                    func_name = value.func.id
+                elif isinstance(value.func, ast.Attribute):
+                    func_name = value.func.attr
                 self.violations.append(
                     Violation(
                         self.filepath,
                         lineno,
-                        f"Empty ConfigDict() in {class_name} - "
-                        "add explicit configuration like ConfigDict(frozen=True)",
+                        f"model_config uses non-ConfigDict callable '{func_name}' in {class_name} - "
+                        "use ConfigDict() from pydantic",
                     )
                 )
         elif isinstance(value, ast.Dict):
@@ -239,6 +262,16 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                         "use ConfigDict() instead of plain dict",
                     )
                 )
+        else:
+            # Other invalid value types (variables, constants, etc.)
+            self.violations.append(
+                Violation(
+                    self.filepath,
+                    lineno,
+                    f"model_config has invalid value type in {class_name} - "
+                    "use ConfigDict() from pydantic",
+                )
+            )
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""

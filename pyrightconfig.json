@@ -13,7 +13,7 @@
   "pythonPlatform": "Linux",
 
   "reportUnusedVariable": "warning",
-  "reportPossiblyUnbound": "warning",
+  "reportPossiblyUnboundVariable": "warning",
   "reportIncompatibleMethodOverride": "warning",
 
   "reportReturnType": false,

@@ -19,16 +19,18 @@
 # ====================================
 # Two-stage validation strategy for optimal developer experience:
 #
-# PRE-COMMIT (target: <15 seconds):
-#   - Formatting (ruff format/fix, yamlfmt)
+# PRE-COMMIT:
+#   - Formatting checks (ruff format --check, yamlfmt)
+#   - Linting checks (ruff check)
 #   - Basic file checks (whitespace, large files, merge conflicts)
 #   - Security checks (secrets)
-#   - Fast pattern validations
+#   - ONEX pattern validations (pydantic, single-class, enums, naming)
+#   NOTE: Run `poetry run ruff format src/ tests/` and
+#         `poetry run ruff check --fix src/ tests/` manually to auto-fix
 #
 # PRE-PUSH (quick validation before sharing):
 #   - mypy type checking (full src/omnimemory - synced with CI)
 #   - pyright type checking (full src/omnimemory - synced with CI)
-#   - Naming convention validation
 #
 # USAGE:
 #   pre-commit install                    # Install pre-commit hooks
@@ -66,37 +68,35 @@ repos:
   # Configuration: pyproject.toml [tool.ruff] section (shared with CI)
   - repo: local
     hooks:
-      # FULL CODEBASE FORMATTING: These hooks run on src/ and tests/ (not just staged files)
+      # FULL CODEBASE VALIDATION: These hooks run on src/ and tests/ (not just staged files)
       # to match CI behavior and prevent "works locally, fails in CI" issues.
+      # NOTE: Both pre-commit and CI use check-only mode. Run `poetry run ruff format src/ tests/`
+      # and `poetry run ruff check --fix src/ tests/` manually to auto-fix issues.
       - id: ruff-format
-        name: ruff format (auto-format entire codebase)
-        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml lint job
-        # CI runs: poetry run ruff format --check src/ tests/
-        # Pre-commit auto-formats, CI validates (no --check here, CI uses --check)
-        entry: poetry run ruff format src/ tests/
+        name: ruff format (check entire codebase)
+        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
+        # Both pre-commit and CI use --check for consistent validation
+        entry: poetry run ruff format --check src/ tests/
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
 
-      - id: ruff-fix
-        name: ruff check (auto-fix entire codebase)
-        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml lint job
-        # CI runs: poetry run ruff check src/ tests/
-        # Pre-commit auto-fixes (--fix), CI validates (no --fix)
-        entry: poetry run ruff check --fix --exit-non-zero-on-fix src/ tests/
+      - id: ruff-check
+        name: ruff check (lint entire codebase)
+        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
+        # Both pre-commit and CI use check-only mode (no --fix)
+        entry: poetry run ruff check src/ tests/
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
-        # Note: --exit-non-zero-on-fix ensures pre-commit fails if files were modified,
-        # forcing you to re-stage the changes. This keeps pre-commit and CI in sync.
 
       - id: mypy-type-check
         name: mypy (type checking - strict)
-        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml lint job
-        # CI runs: poetry run mypy src/omnimemory
-        entry: poetry run mypy src/omnimemory
+        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
+        # Both pre-commit and CI use same flags for consistent output
+        entry: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
         language: system
         types: [python]
         files: ^src/omnimemory/.*\.py$
@@ -178,11 +178,9 @@ repos:
         exclude: ^tests/.*\.py$
         stages: [pre-commit]
 
-      # Naming Convention Validation (pre-push - slower scan)
-      # STAGE ALIGNMENT NOTE: pre-push (local) vs Phase 1 (CI) is INTENTIONAL
-      # - Local: Runs at pre-push to avoid slowing down regular commits
-      # - CI: Runs in Phase 1 (parallel with lint/pyright) for early failure detection
-      # See .github/workflows/test.yml for CI counterpart
+      # Naming Convention Validation
+      # SYNCHRONIZED WITH CI: Runs at pre-commit stage to match CI Phase 1
+      # Both local and CI validate naming conventions at the same point
       - id: validate-naming-conventions
         name: ONEX Naming Convention Validation
         entry: poetry run python scripts/validation/validate_naming.py
@@ -191,7 +189,7 @@ repos:
         pass_filenames: false
         files: ^src/.*\.py$
         exclude: ^tests/.*\.py$
-        stages: [pre-push]
+        stages: [pre-commit]
 
 # Configuration
 default_install_hook_types: [pre-commit, pre-push]
