@@ -267,6 +267,11 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+# Filter deprecation warnings from third-party libraries we can't fix
+filterwarnings = [
+    # Google protobuf PyType_Spec metaclass warning - upstream issue, can't fix
+    "ignore:Type google._upb._message.*:DeprecationWarning",
+]
 markers = [
     "integration: marks tests as integration tests (may require external services)",
     "unit: marks tests as unit tests (no external dependencies)",
