@@ -38,7 +38,7 @@ from omnimemory.handlers.adapters.adapter_graph_memory import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from unittest.mock import MagicMock as MagicMockType  # noqa: F401
 
 
 # =============================================================================
@@ -60,8 +60,17 @@ def config() -> AdapterGraphMemoryConfig:
 
 @pytest.fixture
 def mock_handler() -> MagicMock:
-    """Create a mock HandlerGraph."""
-    handler = MagicMock()
+    """Create a mock HandlerGraph.
+
+    Returns:
+        MagicMock configured with async methods matching HandlerGraph interface:
+            - initialize: AsyncMock for handler initialization
+            - shutdown: AsyncMock for handler shutdown
+            - execute_query: AsyncMock for Cypher query execution
+            - traverse: AsyncMock for graph traversal operations
+            - health_check: AsyncMock for health status checks
+    """
+    handler: MagicMock = MagicMock()
     handler.initialize = AsyncMock()
     handler.shutdown = AsyncMock()
     handler.execute_query = AsyncMock()
@@ -75,8 +84,17 @@ def adapter_with_mock(
     config: AdapterGraphMemoryConfig,
     mock_handler: MagicMock,
 ) -> AdapterGraphMemory:
-    """Create an adapter with a mock handler injected."""
-    adapter = AdapterGraphMemory(config)
+    """Create an adapter with a mock handler injected.
+
+    Args:
+        config: AdapterGraphMemoryConfig fixture with test configuration.
+        mock_handler: MagicMock fixture configured as HandlerGraph.
+
+    Returns:
+        AdapterGraphMemory instance with mock handler injected and
+        initialization state set to True for immediate use in tests.
+    """
+    adapter: AdapterGraphMemory = AdapterGraphMemory(config)
     adapter._handler = mock_handler
     adapter._initialized = True
     return adapter
@@ -606,12 +624,15 @@ class TestLifecycle:
         adapter_with_mock: AdapterGraphMemory,
         mock_handler: MagicMock,
     ) -> None:
-        """Test health check returns True when healthy."""
+        """Test health check returns healthy status when handler is healthy."""
         mock_handler.health_check.return_value = MagicMock(healthy=True)
 
         result = await adapter_with_mock.health_check()
 
-        assert result is True
+        assert result.is_healthy is True
+        assert result.initialized is True
+        assert result.handler_healthy is True
+        assert result.error_message is None
 
     @pytest.mark.asyncio
     async def test_health_check_unhealthy(
@@ -619,24 +640,30 @@ class TestLifecycle:
         adapter_with_mock: AdapterGraphMemory,
         mock_handler: MagicMock,
     ) -> None:
-        """Test health check returns False when unhealthy."""
+        """Test health check returns unhealthy status when handler is unhealthy."""
         mock_handler.health_check.return_value = MagicMock(healthy=False)
 
         result = await adapter_with_mock.health_check()
 
-        assert result is False
+        assert result.is_healthy is False
+        assert result.initialized is True
+        assert result.handler_healthy is False
+        assert result.error_message is not None
 
     @pytest.mark.asyncio
     async def test_health_check_not_initialized(
         self,
         config: AdapterGraphMemoryConfig,
     ) -> None:
-        """Test health check returns False when not initialized."""
+        """Test health check returns unhealthy status when not initialized."""
         adapter = AdapterGraphMemory(config)
 
         result = await adapter.health_check()
 
-        assert result is False
+        assert result.is_healthy is False
+        assert result.initialized is False
+        assert result.handler_healthy is None
+        assert result.error_message is not None
 
 
 # =============================================================================

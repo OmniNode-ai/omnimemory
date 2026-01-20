@@ -48,8 +48,9 @@ import asyncio
 import logging
 from collections.abc import Mapping
 from typing import Literal
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # omnibase_infra is a dev dependency - make imports conditional
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -117,6 +118,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "AdapterGraphMemory",
     "AdapterGraphMemoryConfig",
+    "ModelGraphMemoryHealth",
     "ModelMemoryConnection",
     "ModelRelatedMemoryResult",
     "ModelRelatedMemory",
@@ -248,7 +250,12 @@ class ModelRelatedMemory(BaseModel):
     )
     path: list[str] = Field(
         default_factory=list,
-        description="Traversal path from start to this memory",
+        description=(
+            "Partial traversal path containing start and end memory IDs. "
+            "Note: Intermediate nodes are not included; full path reconstruction "
+            "would require additional queries. For complete path information, "
+            "use the depth field which indicates the number of hops."
+        ),
     )
     depth: int = Field(
         default=0,
@@ -335,6 +342,34 @@ class ModelConnectionsResult(BaseModel):
     )
 
 
+class ModelGraphMemoryHealth(BaseModel):
+    """Health status information for the graph memory adapter.
+
+    Attributes:
+        is_healthy: Overall health status.
+        initialized: Whether the adapter has been initialized.
+        handler_healthy: Health status from the underlying graph handler.
+        error_message: Error details if unhealthy.
+    """
+
+    is_healthy: bool = Field(
+        ...,
+        description="Overall health status",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the adapter has been initialized",
+    )
+    handler_healthy: bool | None = Field(
+        default=None,
+        description="Health status from underlying graph handler (None if not checked)",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Error details if unhealthy",
+    )
+
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -389,6 +424,17 @@ class AdapterGraphMemoryConfig(BaseModel):
         gt=0.0,
         description="Query timeout in seconds",
     )
+
+    @model_validator(mode="after")
+    def validate_depth_bounds(self) -> "AdapterGraphMemoryConfig":
+        """Ensure default_depth does not exceed max_depth."""
+        if self.default_depth > self.max_depth:
+            msg = (
+                f"default_depth ({self.default_depth}) "
+                f"must be <= max_depth ({self.max_depth})"
+            )
+            raise ValueError(msg)
+        return self
 
 
 # =============================================================================
@@ -517,9 +563,14 @@ class AdapterGraphMemory:
                 )
 
                 self._initialized = True
+                # Safely extract host info without credentials
+                parsed_uri = urlparse(connection_uri)
+                safe_uri = f"{parsed_uri.scheme}://{parsed_uri.hostname}"
+                if parsed_uri.port:
+                    safe_uri += f":{parsed_uri.port}"
                 logger.info(
                     "AdapterGraphMemory initialized with connection to %s",
-                    connection_uri.split("@")[-1],  # Log without credentials
+                    safe_uri,
                 )
 
             except InfraConnectionError:
@@ -626,21 +677,24 @@ class AdapterGraphMemory:
             memories: list[ModelRelatedMemory] = []
 
             for node in traversal_result.nodes:
-                # Extract memory_id from properties
+                # Extract memory_id from properties with explicit type check
                 node_memory_id = node.properties.get("memory_id")
-                if not node_memory_id or node_memory_id == memory_id:
+                if not isinstance(node_memory_id, str) or node_memory_id == memory_id:
                     continue
 
-                # Calculate score based on path depth
-                # Find the shortest path to this node
+                # Calculate relevance score based on traversal depth (edge count).
+                # In path array, index 0 is start node, so node at index N is N
+                # edges away. Score: 1/(depth+1) gives closer nodes higher scores.
+                # E.g.: depth=1 -> 0.5, depth=2 -> 0.33, depth=3 -> 0.25
                 node_paths = [p for p in traversal_result.paths if node.element_id in p]
                 if node_paths:
                     shortest_path = min(node_paths, key=len)
+                    # Position in path = number of edges from start (depth)
                     depth_to_node = shortest_path.index(node.element_id)
                 else:
+                    # Default to depth 1 if path info unavailable
                     depth_to_node = 1
 
-                # Score: inverse relationship with depth (closer = higher score)
                 score = 1.0 / (depth_to_node + 1)
 
                 if score < min_score:
@@ -813,20 +867,36 @@ class AdapterGraphMemory:
                 error_message=f"Unexpected error: {e}",
             )
 
-    async def health_check(self) -> bool:
+    async def health_check(self) -> ModelGraphMemoryHealth:
         """Check if the graph connection is healthy.
 
         Returns:
-            True if connected and healthy, False otherwise.
+            ModelGraphMemoryHealth with detailed health status information.
         """
         if not self._initialized or self._handler is None:
-            return False
+            return ModelGraphMemoryHealth(
+                is_healthy=False,
+                initialized=False,
+                handler_healthy=None,
+                error_message="Adapter not initialized",
+            )
 
         try:
             health = await self._handler.health_check()
-            return bool(health.healthy)
-        except Exception:
-            return False
+            handler_healthy = bool(health.healthy)
+            return ModelGraphMemoryHealth(
+                is_healthy=handler_healthy,
+                initialized=True,
+                handler_healthy=handler_healthy,
+                error_message=None if handler_healthy else "Handler reports unhealthy",
+            )
+        except Exception as e:
+            return ModelGraphMemoryHealth(
+                is_healthy=False,
+                initialized=True,
+                handler_healthy=None,
+                error_message=f"Health check failed: {e}",
+            )
 
     async def shutdown(self) -> None:
         """Shutdown the adapter and release resources."""
