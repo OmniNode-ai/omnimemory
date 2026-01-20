@@ -23,7 +23,6 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,10 +40,6 @@ from omnimemory.handlers.adapters.adapter_graph_memory import (  # noqa: E402
     ModelRelatedMemory,
     ModelRelatedMemoryResult,
 )
-
-if TYPE_CHECKING:
-    from unittest.mock import MagicMock as MagicMockType  # noqa: F401
-
 
 # =============================================================================
 # Test Fixtures
@@ -161,6 +156,13 @@ class TestAdapterGraphMemoryConfig:
 
         with pytest.raises(ValidationError):
             AdapterGraphMemoryConfig(timeout_seconds=0)
+
+    def test_default_depth_exceeds_max_depth_raises(self) -> None:
+        """Test that default_depth > max_depth raises validation error."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="default_depth"):
+            AdapterGraphMemoryConfig(max_depth=3, default_depth=5)
 
 
 # =============================================================================
