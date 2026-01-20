@@ -35,10 +35,16 @@ class Violation(NamedTuple):
 
 
 class ImportAliasCollector(ast.NodeVisitor):
-    """Collect ConfigDict import aliases from a module."""
+    """Collect ConfigDict import aliases from a module.
+
+    Recognizes both:
+    - ConfigDict from pydantic (for BaseModel classes)
+    - SettingsConfigDict from pydantic_settings (for BaseSettings classes)
+    """
 
     def __init__(self) -> None:
-        self.config_dict_aliases: set[str] = {"ConfigDict"}  # Always include default
+        # Include both ConfigDict and SettingsConfigDict as valid config callables
+        self.config_dict_aliases: set[str] = {"ConfigDict", "SettingsConfigDict"}
 
     def visit_Import(self, node: ast.Import) -> None:
         """Visit import statements."""
@@ -53,8 +59,14 @@ class ImportAliasCollector(ast.NodeVisitor):
         """Visit from-import statements."""
         if node.module and ("pydantic" in node.module):
             for alias in node.names:
+                # Handle ConfigDict from pydantic
                 if alias.name == "ConfigDict":
                     # from pydantic import ConfigDict as CD
+                    actual_name = alias.asname if alias.asname else alias.name
+                    self.config_dict_aliases.add(actual_name)
+                # Handle SettingsConfigDict from pydantic_settings
+                elif alias.name == "SettingsConfigDict":
+                    # from pydantic_settings import SettingsConfigDict as SCD
                     actual_name = alias.asname if alias.asname else alias.name
                     self.config_dict_aliases.add(actual_name)
         self.generic_visit(node)
@@ -163,15 +175,23 @@ class PydanticPatternVisitor(ast.NodeVisitor):
         self.model_config_collector = model_config_collector
 
     def _is_config_dict_call(self, node: ast.expr) -> bool:
-        """Check if a node is a ConfigDict() call (handles aliases and attributes)."""
+        """Check if a node is a ConfigDict() or SettingsConfigDict() call.
+
+        Handles:
+        - Direct calls: ConfigDict(), SettingsConfigDict()
+        - Aliased calls: CD(), SCD() (if imported with alias)
+        - Attribute access: pydantic.ConfigDict(), pydantic_settings.SettingsConfigDict()
+        """
         if not isinstance(node, ast.Call):
             return False
         func = node.func
-        # Handle: ConfigDict() or aliased name like CD()
+        # Handle: ConfigDict(), SettingsConfigDict(), or aliased names like CD()
         if isinstance(func, ast.Name) and func.id in self.config_dict_aliases:
             return True
-        # Handle: pydantic.ConfigDict()
-        return isinstance(func, ast.Attribute) and func.attr == "ConfigDict"
+        # Handle: pydantic.ConfigDict() or pydantic_settings.SettingsConfigDict()
+        if isinstance(func, ast.Attribute):
+            return func.attr in {"ConfigDict", "SettingsConfigDict"}
+        return False
 
     def _check_inherited_model_config(self, node: ast.ClassDef) -> bool:
         """Check if model_config is inherited from a parent class.

@@ -37,6 +37,10 @@ CLASS_PATTERNS = {
     "Mixin": re.compile(r"^Mixin[A-Z][a-zA-Z0-9]*$"),
     "Node": re.compile(r"^Node[A-Z][a-zA-Z0-9]*$"),
     "Validator": re.compile(r"^Validator[A-Z][a-zA-Z0-9]*$"),
+    # Settings classes use suffix pattern (XxxSettings) not prefix pattern
+    # This applies to pydantic_settings.BaseSettings subclasses which are
+    # configuration classes, NOT data models
+    "Settings": re.compile(r"^[A-Z][a-zA-Z0-9]*Settings$"),
 }
 
 # Base class names that indicate expected naming prefix
@@ -46,8 +50,11 @@ CLASS_PATTERNS = {
 BASE_CLASS_TO_PREFIX = {
     # Model base classes (Pydantic and similar)
     "BaseModel": "Model",
-    "BaseSettings": "Model",  # Pydantic settings are also models
     "RootModel": "Model",  # Pydantic RootModel
+    # Settings base classes (pydantic-settings configuration)
+    # These use XxxSettings suffix naming, NOT ModelXxx prefix
+    # Settings classes are configuration containers, not data models
+    "BaseSettings": "Settings",
     # Enum base classes (stdlib and extensions)
     "Enum": "Enum",
     "StrEnum": "Enum",

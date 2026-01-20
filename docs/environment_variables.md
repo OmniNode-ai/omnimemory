@@ -11,7 +11,7 @@ OmniMemory uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/py
 ## Configuration Hierarchy
 
 ```
-SettingsMemoryService (top-level)
+MemoryServiceSettings (top-level)
 |-- postgres_enabled (bool)
 |-- qdrant_enabled (bool)
 |-- service_name (str)
@@ -369,7 +369,7 @@ export OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
 ### "extra fields not permitted" Error
 
 ```
-pydantic.ValidationError: 1 validation error for SettingsMemoryService
+pydantic.ValidationError: 1 validation error for MemoryServiceSettings
 OMNIMEMORY__TYPO_SETTING
   extra fields not permitted [type=extra_forbidden]
 ```
