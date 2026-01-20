@@ -164,6 +164,13 @@ class TestAdapterGraphMemoryConfig:
         with pytest.raises(ValidationError, match="default_depth"):
             AdapterGraphMemoryConfig(max_depth=3, default_depth=5)
 
+    def test_default_limit_exceeds_max_limit_raises(self) -> None:
+        """Test that default_limit > max_limit raises ValidationError."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="default_limit"):
+            AdapterGraphMemoryConfig(max_limit=500, default_limit=1000)
+
 
 # =============================================================================
 # Model Tests
@@ -594,43 +601,6 @@ class TestGetConnections:
         query = call_args[1]["query"]
         assert "-[r]-" in query.replace(" ", "").replace("\n", "")
         assert "-[r]->" not in query.replace(" ", "").replace("\n", "")
-
-    @pytest.mark.asyncio
-    async def test_get_connections_outgoing_only_with_type_filter(
-        self,
-        config: AdapterGraphMemoryConfig,
-        mock_handler: MagicMock,
-    ) -> None:
-        """Test get_connections with bidirectional=False uses outgoing-only template."""
-        # Create adapter with bidirectional=False in config
-        config.bidirectional = False
-        adapter = AdapterGraphMemory(config)
-        adapter._handler = mock_handler
-        adapter._initialized = True
-
-        mock_handler.execute_query.return_value = MagicMock(
-            records=[
-                {
-                    "source_id": "mem_1",
-                    "target_id": "mem_2",
-                    "relationship_type": "related_to",
-                    "weight": 1.0,
-                    "is_outgoing": True,
-                    "created_at": None,
-                }
-            ]
-        )
-
-        result = await adapter.get_connections(
-            "mem_1",
-            relationship_types=["related_to"],
-        )
-
-        assert result.status == "success"
-        # Verify the outgoing-only template was used (contains -[r]->)
-        call_args = mock_handler.execute_query.call_args
-        query = call_args[1]["query"]
-        assert "-[r]->" in query.replace(" ", "").replace("\n", "")
 
 
 # =============================================================================

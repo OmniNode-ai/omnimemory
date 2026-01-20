@@ -139,12 +139,13 @@ class CypherTemplates:
     """Parameterized Cypher query templates for memory graph operations.
 
     Direction Behavior:
-        - GET_CONNECTIONS: Bidirectional by default (matches both incoming and outgoing)
-        - GET_CONNECTIONS_BY_TYPE: Outgoing-only (for directed relationship queries)
+        - GET_CONNECTIONS: Bidirectional (matches both incoming and outgoing)
+        - GET_CONNECTIONS_BY_TYPE: Bidirectional with type filtering
         - GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL: Bidirectional with type filtering
+          (alias for GET_CONNECTIONS_BY_TYPE)
 
-        The `get_connections()` method accepts a `bidirectional` parameter to select
-        the appropriate template when filtering by relationship type.
+        All templates use `startNode(r) = m AS is_outgoing` to dynamically determine
+        edge direction.
 
     Security:
         All queries use parameters ($param) instead of string interpolation.
@@ -164,9 +165,9 @@ class CypherTemplates:
     LIMIT $limit
     """
 
-    # Find connections filtered by relationship type (outgoing only)
+    # Find connections filtered by relationship type (bidirectional)
     GET_CONNECTIONS_BY_TYPE = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]->(n:Memory)
+    MATCH (m:Memory {memory_id: $memory_id})-[r]-(n:Memory)
     WHERE type(r) IN $relationship_types
     RETURN
         m.memory_id AS source_id,
@@ -174,7 +175,7 @@ class CypherTemplates:
         type(r) AS relationship_type,
         r.weight AS weight,
         r.created_at AS created_at,
-        true AS is_outgoing
+        startNode(r) = m AS is_outgoing
     LIMIT $limit
     """
 
@@ -451,12 +452,18 @@ class AdapterGraphMemoryConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_depth_bounds(self) -> "AdapterGraphMemoryConfig":
-        """Ensure default_depth does not exceed max_depth."""
+    def validate_bounds(self) -> "AdapterGraphMemoryConfig":
+        """Ensure default values do not exceed their maximums."""
         if self.default_depth > self.max_depth:
             msg = (
                 f"default_depth ({self.default_depth}) "
                 f"must be <= max_depth ({self.max_depth})"
+            )
+            raise ValueError(msg)
+        if self.default_limit > self.max_limit:
+            msg = (
+                f"default_limit ({self.default_limit}) "
+                f"must be <= max_limit ({self.max_limit})"
             )
             raise ValueError(msg)
         return self
