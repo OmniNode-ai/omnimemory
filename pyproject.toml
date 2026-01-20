@@ -184,7 +184,6 @@ ignore = [
     "N801",      # Invalid class name (technical debt)
     "N803",      # Invalid argument name (technical debt)
     "N999",      # Invalid module name (technical debt)
-    "UP007",     # Use X | Y for type annotations (tech debt - many occurrences)
     "F821",      # Undefined name (protocols use forward refs)
     "PLR0206",   # Cannot have defined parameters for properties (design choice)
     "A002",      # Function argument shadowing builtin (design choice)
@@ -224,7 +223,17 @@ explicit_package_bases = true
 
 # Third-party libraries without type stubs
 [[tool.mypy.overrides]]
-module = ["redis.*", "pinecone.*", "supabase.*", "asyncpg.*", "structlog.*"]
+module = [
+    "redis.*",
+    "pinecone.*",
+    "supabase.*",
+    "asyncpg.*",
+    "structlog.*",
+    "omnibase_core",
+    "omnibase_core.*",
+    "omnibase_infra",
+    "omnibase_infra.*",
+]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

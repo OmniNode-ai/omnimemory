@@ -16,7 +16,7 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Union, cast
+from typing import cast
 
 # Optional psutil import for resource metrics - gracefully degrade if unavailable
 _PSUTIL_AVAILABLE = False
@@ -770,7 +770,7 @@ async def create_pinecone_health_check(
 
 
 # Type alias for health check result values - replaces Dict[str, Any]
-HealthCheckResultValue = Union[str, int, float, bool, None]
+HealthCheckResultValue = str | int | float | bool | None
 HealthCheckResultDict = dict[str, HealthCheckResultValue]
 
 

@@ -25,7 +25,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Union
 from uuid import UUID, uuid4
 
 import pytest
@@ -39,7 +38,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 # Type alias for pattern configuration values
-PatternConfigValue = Union[str, float]
+PatternConfigValue = str | float
 
 
 class PIIType(str, Enum):

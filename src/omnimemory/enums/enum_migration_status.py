@@ -8,7 +8,7 @@ All enums inherit from (str, Enum) for proper Pydantic serialization.
 from enum import Enum
 
 
-class MigrationStatus(str, Enum):
+class EnumMigrationStatus(str, Enum):
     """
     Migration status enumeration.
 
@@ -24,7 +24,7 @@ class MigrationStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class MigrationPriority(str, Enum):
+class EnumMigrationPriority(str, Enum):
     """
     Migration priority levels.
 
@@ -37,7 +37,7 @@ class MigrationPriority(str, Enum):
     CRITICAL = "critical"
 
 
-class FileProcessingStatus(str, Enum):
+class EnumFileProcessingStatus(str, Enum):
     """
     File processing status enumeration.
 

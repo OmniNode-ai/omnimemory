@@ -39,7 +39,7 @@ except ImportError:
     _BASE_CLASS = OnexErrorCode
 
 
-class OmniMemoryErrorCode(_BASE_CLASS):  # type: ignore[valid-type,misc]
+class EnumOmniMemoryErrorCode(_BASE_CLASS):  # type: ignore[valid-type,misc]
     """Memory-specific error codes for the ONEX memory system."""
 
     # Memory operation errors (specific to omnimemory only)

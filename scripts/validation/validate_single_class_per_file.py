@@ -96,7 +96,27 @@ def validate_file(filepath: Path) -> list[Violation]:
     if filepath.name in EXEMPTIONS:
         return []
 
-    # Check if file is in an exempt directory
+    # Check if file is in an exempt directory.
+    #
+    # Design Decision: We check ALL path components, not just the immediate parent.
+    # This is intentional because:
+    #
+    # 1. Nested structures: Files in subdirectories of exempt directories should
+    #    inherit the exemption. For example, if "core" is exempt, then both
+    #    "models/core/base.py" AND "models/core/utils/helpers.py" are exempt.
+    #
+    # 2. Flexible project layouts: Different projects may nest exempt directories
+    #    at varying depths (e.g., "src/pkg/core/", "pkg/core/", or just "core/").
+    #    Checking any component handles all these cases uniformly.
+    #
+    # 3. Transitive exemption: Foundation/core modules often have internal
+    #    organization with subdirectories. The entire subtree should be treated
+    #    as a cohesive unit where related types may coexist in single files.
+    #
+    # Trade-off: This is more permissive than checking only immediate parent.
+    # If a non-exempt directory happens to be named "core" elsewhere in the path,
+    # it would incorrectly be exempt. However, this is rare in practice and the
+    # benefit of simpler, more robust exemption logic outweighs this edge case.
     for part in filepath.parts:
         if part in EXEMPT_DIRECTORIES:
             return []

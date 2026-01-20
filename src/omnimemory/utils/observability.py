@@ -120,7 +120,6 @@ from enum import Enum
 from typing import (
     Literal,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -129,7 +128,7 @@ F = TypeVar("F", bound=Callable[..., object])
 
 # Type alias for metadata values - supports common serializable types
 # This replaces Any with explicit types for type safety
-MetadataValue = Union[str, int, float, bool, None]
+MetadataValue = str | int | float | bool | None
 
 import structlog
 from pydantic import BaseModel, Field

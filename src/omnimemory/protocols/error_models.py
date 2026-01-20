@@ -9,14 +9,14 @@ that integrate with NodeResult for consistent error handling across the system.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Union
+from typing import Any
 from uuid import UUID
 
 # Type alias for field values in validation errors
 # Supports common field types that can fail validation
-FieldValueType = Union[
-    str, int, float, bool, bytes, list[object], dict[str, object], None
-]
+FieldValueType = (
+    str | int | float | bool | bytes | list[object] | dict[str, object] | None
+)
 
 # Use local compatibility stub until omnibase_core provides OnexError
 try:
@@ -33,7 +33,7 @@ from ..models.foundation import ModelMetadata
 # === ERROR CODES ===
 
 
-class OmniMemoryErrorCode(str, Enum):
+class EnumOmniMemoryErrorCode(str, Enum):
     """Comprehensive error codes for OmniMemory operations."""
 
     # Validation Errors (ONEX_OMNIMEMORY_VAL_XXX)
@@ -110,7 +110,7 @@ class OmniMemoryErrorCode(str, Enum):
 # === ERROR CATEGORY METADATA ===
 
 
-class ErrorCategoryInfo(BaseModel):
+class ModelErrorCategoryInfo(BaseModel):
     """Information about an error category."""
 
     model_config = ConfigDict(
@@ -129,43 +129,43 @@ class ErrorCategoryInfo(BaseModel):
     default_backoff_factor: float = Field(2.0, description="Default backoff multiplier")
 
 
-ERROR_CATEGORIES: dict[str, ErrorCategoryInfo] = {
-    "VALIDATION": ErrorCategoryInfo(
+ERROR_CATEGORIES: dict[str, ModelErrorCategoryInfo] = {
+    "VALIDATION": ModelErrorCategoryInfo(
         prefix="ONEX_OMNIMEMORY_VAL",
         description="Input validation errors",
         recoverable=False,
         default_retry_count=0,
         default_backoff_factor=1.0,
     ),
-    "STORAGE": ErrorCategoryInfo(
+    "STORAGE": ModelErrorCategoryInfo(
         prefix="ONEX_OMNIMEMORY_STO",
         description="Storage system errors",
         recoverable=True,
         default_retry_count=3,
         default_backoff_factor=2.0,
     ),
-    "RETRIEVAL": ErrorCategoryInfo(
+    "RETRIEVAL": ModelErrorCategoryInfo(
         prefix="ONEX_OMNIMEMORY_RET",
         description="Memory retrieval errors",
         recoverable=True,
         default_retry_count=2,
         default_backoff_factor=1.5,
     ),
-    "PROCESSING": ErrorCategoryInfo(
+    "PROCESSING": ModelErrorCategoryInfo(
         prefix="ONEX_OMNIMEMORY_PRO",
         description="Intelligence processing errors",
         recoverable=True,
         default_retry_count=2,
         default_backoff_factor=2.0,
     ),
-    "COORDINATION": ErrorCategoryInfo(
+    "COORDINATION": ModelErrorCategoryInfo(
         prefix="ONEX_OMNIMEMORY_COR",
         description="Coordination and workflow errors",
         recoverable=True,
         default_retry_count=3,
         default_backoff_factor=1.5,
     ),
-    "SYSTEM": ErrorCategoryInfo(
+    "SYSTEM": ModelErrorCategoryInfo(
         prefix="ONEX_OMNIMEMORY_SYS",
         description="System-level errors",
         recoverable=False,
@@ -175,7 +175,9 @@ ERROR_CATEGORIES: dict[str, ErrorCategoryInfo] = {
 }
 
 
-def get_error_category(error_code: OmniMemoryErrorCode) -> ErrorCategoryInfo | None:
+def get_error_category(
+    error_code: EnumOmniMemoryErrorCode,
+) -> ModelErrorCategoryInfo | None:
     """Get error category information for an error code."""
     for category_name, category_info in ERROR_CATEGORIES.items():
         if error_code.value.startswith(category_info.prefix):
@@ -186,7 +188,7 @@ def get_error_category(error_code: OmniMemoryErrorCode) -> ErrorCategoryInfo | N
 # === BASE EXCEPTION CLASSES ===
 
 
-class OmniMemoryError(BaseOnexError):  # type: ignore[misc]
+class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
     """
     Base exception class for all OmniMemory errors.
 
@@ -196,7 +198,7 @@ class OmniMemoryError(BaseOnexError):  # type: ignore[misc]
 
     def __init__(
         self,
-        error_code: OmniMemoryErrorCode,
+        error_code: EnumOmniMemoryErrorCode,
         message: str,
         context: ModelMetadata | None = None,
         correlation_id: UUID | None = None,
@@ -209,7 +211,7 @@ class OmniMemoryError(BaseOnexError):  # type: ignore[misc]
         Initialize OmniMemory error.
 
         Args:
-            error_code: Specific error code from OmniMemoryErrorCode
+            error_code: Specific error code from EnumOmniMemoryErrorCode
             message: Human-readable error message
             context: Additional error context information
             correlation_id: Request correlation ID for tracing
@@ -296,7 +298,7 @@ class OmniMemoryError(BaseOnexError):  # type: ignore[misc]
 # === CATEGORY-SPECIFIC EXCEPTION CLASSES ===
 
 
-class ValidationError(OmniMemoryError):
+class ProtocolValidationError(ProtocolOmniMemoryError):
     """Exception for input validation errors."""
 
     def __init__(
@@ -308,17 +310,17 @@ class ValidationError(OmniMemoryError):
         **kwargs: Any,
     ) -> None:
         # Determine specific validation error code
-        error_code = OmniMemoryErrorCode.INVALID_INPUT
+        error_code = EnumOmniMemoryErrorCode.INVALID_INPUT
         if "schema" in message.lower():
-            error_code = OmniMemoryErrorCode.SCHEMA_VIOLATION
+            error_code = EnumOmniMemoryErrorCode.SCHEMA_VIOLATION
         elif "constraint" in message.lower():
-            error_code = OmniMemoryErrorCode.CONSTRAINT_VIOLATION
+            error_code = EnumOmniMemoryErrorCode.CONSTRAINT_VIOLATION
         elif "required" in message.lower():
-            error_code = OmniMemoryErrorCode.MISSING_REQUIRED_FIELD
+            error_code = EnumOmniMemoryErrorCode.MISSING_REQUIRED_FIELD
         elif "format" in message.lower():
-            error_code = OmniMemoryErrorCode.INVALID_FORMAT
+            error_code = EnumOmniMemoryErrorCode.INVALID_FORMAT
         elif "range" in message.lower():
-            error_code = OmniMemoryErrorCode.VALUE_OUT_OF_RANGE
+            error_code = EnumOmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
         # Build context with validation details - normalize to mutable dict
         context: dict[str, Any] = dict(kwargs.get("context") or {})
@@ -337,7 +339,7 @@ class ValidationError(OmniMemoryError):
         super().__init__(error_code=error_code, message=message, **kwargs)
 
 
-class StorageError(OmniMemoryError):
+class ProtocolStorageError(ProtocolOmniMemoryError):
     """Exception for storage system errors."""
 
     def __init__(
@@ -348,23 +350,23 @@ class StorageError(OmniMemoryError):
         **kwargs: Any,
     ) -> None:
         # Determine specific storage error code
-        error_code = OmniMemoryErrorCode.STORAGE_UNAVAILABLE
+        error_code = EnumOmniMemoryErrorCode.STORAGE_UNAVAILABLE
         if "quota" in message.lower() or "full" in message.lower():
-            error_code = OmniMemoryErrorCode.QUOTA_EXCEEDED
+            error_code = EnumOmniMemoryErrorCode.QUOTA_EXCEEDED
         elif "corrupt" in message.lower():
-            error_code = OmniMemoryErrorCode.CORRUPTION_DETECTED
+            error_code = EnumOmniMemoryErrorCode.CORRUPTION_DETECTED
         elif "persist" in message.lower():
-            error_code = OmniMemoryErrorCode.PERSISTENCE_FAILED
+            error_code = EnumOmniMemoryErrorCode.PERSISTENCE_FAILED
         elif "backup" in message.lower():
-            error_code = OmniMemoryErrorCode.BACKUP_FAILED
+            error_code = EnumOmniMemoryErrorCode.BACKUP_FAILED
         elif "restore" in message.lower():
-            error_code = OmniMemoryErrorCode.RESTORE_FAILED
+            error_code = EnumOmniMemoryErrorCode.RESTORE_FAILED
         elif "timeout" in message.lower():
-            error_code = OmniMemoryErrorCode.STORAGE_TIMEOUT
+            error_code = EnumOmniMemoryErrorCode.STORAGE_TIMEOUT
         elif "connection" in message.lower():
-            error_code = OmniMemoryErrorCode.CONNECTION_FAILED
+            error_code = EnumOmniMemoryErrorCode.CONNECTION_FAILED
         elif "transaction" in message.lower():
-            error_code = OmniMemoryErrorCode.TRANSACTION_FAILED
+            error_code = EnumOmniMemoryErrorCode.TRANSACTION_FAILED
 
         # Build context with storage details - normalize to mutable dict
         context: dict[str, Any] = dict(kwargs.get("context") or {})
@@ -382,7 +384,7 @@ class StorageError(OmniMemoryError):
         super().__init__(error_code=error_code, message=message, **kwargs)
 
 
-class RetrievalError(OmniMemoryError):
+class ProtocolRetrievalError(ProtocolOmniMemoryError):
     """Exception for memory retrieval errors."""
 
     def __init__(
@@ -393,25 +395,25 @@ class RetrievalError(OmniMemoryError):
         **kwargs: Any,
     ) -> None:
         # Determine specific retrieval error code
-        error_code = OmniMemoryErrorCode.SEARCH_FAILED
+        error_code = EnumOmniMemoryErrorCode.SEARCH_FAILED
         if "not found" in message.lower():
-            error_code = OmniMemoryErrorCode.MEMORY_NOT_FOUND
+            error_code = EnumOmniMemoryErrorCode.MEMORY_NOT_FOUND
         elif "index" in message.lower() and "unavailable" in message.lower():
-            error_code = OmniMemoryErrorCode.INDEX_UNAVAILABLE
+            error_code = EnumOmniMemoryErrorCode.INDEX_UNAVAILABLE
         elif "access denied" in message.lower():
-            error_code = OmniMemoryErrorCode.ACCESS_DENIED
+            error_code = EnumOmniMemoryErrorCode.ACCESS_DENIED
         elif "invalid" in message.lower() and "query" in message.lower():
-            error_code = OmniMemoryErrorCode.QUERY_INVALID
+            error_code = EnumOmniMemoryErrorCode.QUERY_INVALID
         elif "timeout" in message.lower():
-            error_code = OmniMemoryErrorCode.SEARCH_TIMEOUT
+            error_code = EnumOmniMemoryErrorCode.SEARCH_TIMEOUT
         elif "corrupt" in message.lower():
-            error_code = OmniMemoryErrorCode.INDEX_CORRUPTION
+            error_code = EnumOmniMemoryErrorCode.INDEX_CORRUPTION
         elif "embedding" in message.lower():
-            error_code = OmniMemoryErrorCode.EMBEDDING_UNAVAILABLE
+            error_code = EnumOmniMemoryErrorCode.EMBEDDING_UNAVAILABLE
         elif "similarity" in message.lower():
-            error_code = OmniMemoryErrorCode.SIMILARITY_COMPUTATION_FAILED
+            error_code = EnumOmniMemoryErrorCode.SIMILARITY_COMPUTATION_FAILED
         elif "filter" in message.lower():
-            error_code = OmniMemoryErrorCode.FILTER_INVALID
+            error_code = EnumOmniMemoryErrorCode.FILTER_INVALID
 
         # Build context with retrieval details - normalize to mutable dict
         context: dict[str, Any] = dict(kwargs.get("context") or {})
@@ -426,7 +428,7 @@ class RetrievalError(OmniMemoryError):
         super().__init__(error_code=error_code, message=message, **kwargs)
 
 
-class ProcessingError(OmniMemoryError):
+class ProtocolProcessingError(ProtocolOmniMemoryError):
     """Exception for intelligence processing errors."""
 
     def __init__(
@@ -437,25 +439,25 @@ class ProcessingError(OmniMemoryError):
         **kwargs: Any,
     ) -> None:
         # Determine specific processing error code
-        error_code = OmniMemoryErrorCode.PROCESSING_FAILED
+        error_code = EnumOmniMemoryErrorCode.PROCESSING_FAILED
         if "model unavailable" in message.lower():
-            error_code = OmniMemoryErrorCode.MODEL_UNAVAILABLE
+            error_code = EnumOmniMemoryErrorCode.MODEL_UNAVAILABLE
         elif "resource" in message.lower() and "exhaust" in message.lower():
-            error_code = OmniMemoryErrorCode.RESOURCE_EXHAUSTED
+            error_code = EnumOmniMemoryErrorCode.RESOURCE_EXHAUSTED
         elif "analysis failed" in message.lower():
-            error_code = OmniMemoryErrorCode.ANALYSIS_FAILED
+            error_code = EnumOmniMemoryErrorCode.ANALYSIS_FAILED
         elif "embedding" in message.lower():
-            error_code = OmniMemoryErrorCode.EMBEDDING_GENERATION_FAILED
+            error_code = EnumOmniMemoryErrorCode.EMBEDDING_GENERATION_FAILED
         elif "pattern" in message.lower():
-            error_code = OmniMemoryErrorCode.PATTERN_RECOGNITION_FAILED
+            error_code = EnumOmniMemoryErrorCode.PATTERN_RECOGNITION_FAILED
         elif "semantic" in message.lower():
-            error_code = OmniMemoryErrorCode.SEMANTIC_ANALYSIS_FAILED
+            error_code = EnumOmniMemoryErrorCode.SEMANTIC_ANALYSIS_FAILED
         elif "insight" in message.lower():
-            error_code = OmniMemoryErrorCode.INSIGHT_EXTRACTION_FAILED
+            error_code = EnumOmniMemoryErrorCode.INSIGHT_EXTRACTION_FAILED
         elif "model load" in message.lower():
-            error_code = OmniMemoryErrorCode.MODEL_LOAD_FAILED
+            error_code = EnumOmniMemoryErrorCode.MODEL_LOAD_FAILED
         elif "timeout" in message.lower():
-            error_code = OmniMemoryErrorCode.COMPUTATION_TIMEOUT
+            error_code = EnumOmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
         # Build context with processing details - normalize to mutable dict
         context: dict[str, Any] = dict(kwargs.get("context") or {})
@@ -470,7 +472,7 @@ class ProcessingError(OmniMemoryError):
         super().__init__(error_code=error_code, message=message, **kwargs)
 
 
-class CoordinationError(OmniMemoryError):
+class ProtocolCoordinationError(ProtocolOmniMemoryError):
     """Exception for coordination and workflow errors."""
 
     def __init__(
@@ -481,25 +483,25 @@ class CoordinationError(OmniMemoryError):
         **kwargs: Any,
     ) -> None:
         # Determine specific coordination error code
-        error_code = OmniMemoryErrorCode.WORKFLOW_FAILED
+        error_code = EnumOmniMemoryErrorCode.WORKFLOW_FAILED
         if "deadlock" in message.lower():
-            error_code = OmniMemoryErrorCode.DEADLOCK_DETECTED
+            error_code = EnumOmniMemoryErrorCode.DEADLOCK_DETECTED
         elif "sync" in message.lower() and "failed" in message.lower():
-            error_code = OmniMemoryErrorCode.SYNC_FAILED
+            error_code = EnumOmniMemoryErrorCode.SYNC_FAILED
         elif "agent unavailable" in message.lower():
-            error_code = OmniMemoryErrorCode.AGENT_UNAVAILABLE
+            error_code = EnumOmniMemoryErrorCode.AGENT_UNAVAILABLE
         elif "timeout" in message.lower():
-            error_code = OmniMemoryErrorCode.COORDINATION_TIMEOUT
+            error_code = EnumOmniMemoryErrorCode.COORDINATION_TIMEOUT
         elif "parallel" in message.lower():
-            error_code = OmniMemoryErrorCode.PARALLEL_EXECUTION_FAILED
+            error_code = EnumOmniMemoryErrorCode.PARALLEL_EXECUTION_FAILED
         elif "state" in message.lower():
-            error_code = OmniMemoryErrorCode.STATE_MANAGEMENT_FAILED
+            error_code = EnumOmniMemoryErrorCode.STATE_MANAGEMENT_FAILED
         elif "broadcast" in message.lower():
-            error_code = OmniMemoryErrorCode.BROADCAST_FAILED
+            error_code = EnumOmniMemoryErrorCode.BROADCAST_FAILED
         elif "migration" in message.lower():
-            error_code = OmniMemoryErrorCode.MIGRATION_FAILED
+            error_code = EnumOmniMemoryErrorCode.MIGRATION_FAILED
         elif "orchestration" in message.lower():
-            error_code = OmniMemoryErrorCode.ORCHESTRATION_FAILED
+            error_code = EnumOmniMemoryErrorCode.ORCHESTRATION_FAILED
 
         # Build context with coordination details - normalize to mutable dict
         context: dict[str, Any] = dict(kwargs.get("context") or {})
@@ -514,7 +516,7 @@ class CoordinationError(OmniMemoryError):
         super().__init__(error_code=error_code, message=message, **kwargs)
 
 
-class SystemError(OmniMemoryError):
+class ProtocolSystemError(ProtocolOmniMemoryError):
     """Exception for system-level errors."""
 
     def __init__(
@@ -524,25 +526,25 @@ class SystemError(OmniMemoryError):
         **kwargs: Any,
     ) -> None:
         # Determine specific system error code
-        error_code = OmniMemoryErrorCode.INTERNAL_ERROR
+        error_code = EnumOmniMemoryErrorCode.INTERNAL_ERROR
         if "config" in message.lower():
-            error_code = OmniMemoryErrorCode.CONFIG_ERROR
+            error_code = EnumOmniMemoryErrorCode.CONFIG_ERROR
         elif "dependency" in message.lower():
-            error_code = OmniMemoryErrorCode.DEPENDENCY_FAILED
+            error_code = EnumOmniMemoryErrorCode.DEPENDENCY_FAILED
         elif "service unavailable" in message.lower():
-            error_code = OmniMemoryErrorCode.SERVICE_UNAVAILABLE
+            error_code = EnumOmniMemoryErrorCode.SERVICE_UNAVAILABLE
         elif "initialization" in message.lower():
-            error_code = OmniMemoryErrorCode.INITIALIZATION_FAILED
+            error_code = EnumOmniMemoryErrorCode.INITIALIZATION_FAILED
         elif "shutdown" in message.lower():
-            error_code = OmniMemoryErrorCode.SHUTDOWN_FAILED
+            error_code = EnumOmniMemoryErrorCode.SHUTDOWN_FAILED
         elif "health check" in message.lower():
-            error_code = OmniMemoryErrorCode.HEALTH_CHECK_FAILED
+            error_code = EnumOmniMemoryErrorCode.HEALTH_CHECK_FAILED
         elif "metrics" in message.lower():
-            error_code = OmniMemoryErrorCode.METRICS_COLLECTION_FAILED
+            error_code = EnumOmniMemoryErrorCode.METRICS_COLLECTION_FAILED
         elif "security" in message.lower():
-            error_code = OmniMemoryErrorCode.SECURITY_VIOLATION
+            error_code = EnumOmniMemoryErrorCode.SECURITY_VIOLATION
         elif "rate limit" in message.lower():
-            error_code = OmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
+            error_code = EnumOmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
         # Build context with system details - normalize to mutable dict
         context: dict[str, Any] = dict(kwargs.get("context") or {})
@@ -560,24 +562,24 @@ class SystemError(OmniMemoryError):
 
 def wrap_exception(
     exception: Exception,
-    error_code: OmniMemoryErrorCode,
+    error_code: EnumOmniMemoryErrorCode,
     message: str | None = None,
     **kwargs: Any,
-) -> OmniMemoryError:
+) -> ProtocolOmniMemoryError:
     """
-    Wrap a generic exception in an OmniMemoryError.
+    Wrap a generic exception in an ProtocolOmniMemoryError.
 
     Args:
         exception: The original exception to wrap
         error_code: The OmniMemory error code to use
         message: Optional custom message (uses exception message if not provided)
-        **kwargs: Additional arguments for OmniMemoryError constructor
+        **kwargs: Additional arguments for ProtocolOmniMemoryError constructor
 
     Returns:
-        OmniMemoryError wrapping the original exception
+        ProtocolOmniMemoryError wrapping the original exception
     """
     error_message = message or str(exception)
-    return OmniMemoryError(
+    return ProtocolOmniMemoryError(
         error_code=error_code,
         message=error_message,
         cause=exception,
@@ -586,14 +588,14 @@ def wrap_exception(
 
 
 def chain_errors(
-    primary_error: OmniMemoryError,
+    primary_error: ProtocolOmniMemoryError,
     secondary_error: Exception,
-) -> OmniMemoryError:
+) -> ProtocolOmniMemoryError:
     """
-    Chain a secondary error to a primary OmniMemoryError.
+    Chain a secondary error to a primary ProtocolOmniMemoryError.
 
     Args:
-        primary_error: The primary OmniMemoryError
+        primary_error: The primary ProtocolOmniMemoryError
         secondary_error: The secondary exception to chain
 
     Returns:
@@ -612,12 +614,12 @@ def chain_errors(
     return primary_error
 
 
-def create_error_summary(errors: list[OmniMemoryError]) -> dict[str, Any]:
+def create_error_summary(errors: list[ProtocolOmniMemoryError]) -> dict[str, Any]:
     """
     Create a summary of multiple errors for reporting.
 
     Args:
-        errors: List of OmniMemoryError instances
+        errors: List of ProtocolOmniMemoryError instances
 
     Returns:
         Dictionary containing error summary statistics

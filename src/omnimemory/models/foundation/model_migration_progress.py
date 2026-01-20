@@ -16,7 +16,11 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
-from omnimemory.enums import FileProcessingStatus, MigrationPriority, MigrationStatus
+from omnimemory.enums import (
+    EnumFileProcessingStatus,
+    EnumMigrationPriority,
+    EnumMigrationStatus,
+)
 
 from .model_progress_summary import ProgressSummaryResponse
 from .model_typed_collections import ModelConfiguration, ModelMetadata
@@ -61,7 +65,7 @@ class FileProcessingInfo(BaseModel):
 
     file_path: str = Field(description="Path to the file being processed")
     file_size: int | None = Field(default=None, description="File size in bytes")
-    status: FileProcessingStatus = Field(default=FileProcessingStatus.PENDING)
+    status: EnumFileProcessingStatus = Field(default=EnumFileProcessingStatus.PENDING)
     start_time: datetime | None = Field(
         default=None, description="Processing start time"
     )
@@ -229,11 +233,11 @@ class MigrationProgressTracker(BaseModel):
         default_factory=uuid4, description="Unique migration identifier"
     )
     name: str = Field(description="Migration name or description")
-    status: MigrationStatus = Field(
-        default=MigrationStatus.PENDING, description="Current migration status"
+    status: EnumMigrationStatus = Field(
+        default=EnumMigrationStatus.PENDING, description="Current migration status"
     )
-    priority: MigrationPriority = Field(
-        default=MigrationPriority.NORMAL, description="Migration priority"
+    priority: EnumMigrationPriority = Field(
+        default=EnumMigrationPriority.NORMAL, description="Migration priority"
     )
 
     metrics: MigrationProgressMetrics = Field(description="Progress metrics")
@@ -295,7 +299,7 @@ class MigrationProgressTracker(BaseModel):
         """Mark a file as started processing."""
         file_info = self._find_file(file_path)
         if file_info:
-            file_info.status = FileProcessingStatus.PROCESSING
+            file_info.status = EnumFileProcessingStatus.PROCESSING
             file_info.start_time = datetime.now(UTC)
             file_info.batch_id = batch_id
             self._update_timestamp()
@@ -311,12 +315,12 @@ class MigrationProgressTracker(BaseModel):
             file_info.end_time = datetime.now(UTC)
 
             if success:
-                file_info.status = FileProcessingStatus.COMPLETED
+                file_info.status = EnumFileProcessingStatus.COMPLETED
                 self.metrics.processed_files += 1
                 if file_info.file_size:
                     self.metrics.processed_size_bytes += file_info.file_size
             else:
-                file_info.status = FileProcessingStatus.FAILED
+                file_info.status = EnumFileProcessingStatus.FAILED
                 file_info.error_message = error_message
                 self.metrics.failed_files += 1
 
@@ -334,7 +338,7 @@ class MigrationProgressTracker(BaseModel):
         """Mark a file as skipped."""
         file_info = self._find_file(file_path)
         if file_info:
-            file_info.status = FileProcessingStatus.SKIPPED
+            file_info.status = EnumFileProcessingStatus.SKIPPED
             file_info.error_message = f"Skipped: {reason}"
             self.metrics.skipped_files += 1
             self._update_timestamp()
@@ -424,11 +428,11 @@ class MigrationProgressTracker(BaseModel):
         retryable_files = []
         for file_info in self.files:
             if (
-                file_info.status == FileProcessingStatus.FAILED
+                file_info.status == EnumFileProcessingStatus.FAILED
                 and file_info.retry_count < max_retries
             ):
                 file_info.retry_count += 1
-                file_info.status = FileProcessingStatus.PENDING
+                file_info.status = EnumFileProcessingStatus.PENDING
                 retryable_files.append(file_info)
 
         if retryable_files:

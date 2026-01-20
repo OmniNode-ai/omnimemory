@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.enums import EnumPriorityLevel, MigrationStatus
+from omnimemory.enums import EnumMigrationStatus, EnumPriorityLevel
 
 
 class ProgressSummaryResponse(BaseModel):
@@ -21,7 +21,7 @@ class ProgressSummaryResponse(BaseModel):
 
     name: str = Field(description="Human-readable name of the migration")
 
-    status: MigrationStatus = Field(description="Current migration status")
+    status: EnumMigrationStatus = Field(description="Current migration status")
 
     priority: EnumPriorityLevel = Field(description="Migration priority level")
 

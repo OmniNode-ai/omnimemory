@@ -38,16 +38,44 @@ CLASS_PATTERNS = {
     "Validator": re.compile(r"^Validator[A-Z][a-zA-Z0-9]*$"),
 }
 
-# File naming patterns
+# Base class names that indicate expected naming prefix
+# Maps base class name -> expected prefix
+BASE_CLASS_TO_PREFIX = {
+    # Model base classes (Pydantic)
+    "BaseModel": "Model",
+    # Enum base classes
+    "Enum": "Enum",
+    "StrEnum": "Enum",
+    "IntEnum": "Enum",
+    "Flag": "Enum",
+    "IntFlag": "Enum",
+    # Protocol base classes
+    "Protocol": "Protocol",
+    # Node base classes (ONEX 4-node architecture)
+    "BaseNode": "Node",
+    "BaseEffectNode": "Node",
+    "BaseComputeNode": "Node",
+    "BaseReducerNode": "Node",
+    "BaseOrchestratorNode": "Node",
+    # Common base classes from omnibase
+    "NodeBase": "Node",
+    "EffectNode": "Node",
+    "ComputeNode": "Node",
+    "ReducerNode": "Node",
+    "OrchestratorNode": "Node",
+}
+
+# File naming patterns - applied when file is in a typed directory
 FILE_PATTERNS = {
     "models": re.compile(r"^model_[a-z][a-z0-9_]*\.py$"),
     "enums": re.compile(r"^enum_[a-z][a-z0-9_]*\.py$"),
-    "protocols": re.compile(r"^protocol_[a-z][a-z0-9_]*$|^[a-z_]+_protocols?\.py$"),
+    "protocols": re.compile(r"^protocol_[a-z][a-z0-9_]*\.py$|^[a-z_]+_protocols?\.py$"),
     "services": re.compile(r"^service_[a-z][a-z0-9_]*\.py$"),
     "handlers": re.compile(r"^handler_[a-z][a-z0-9_]*\.py$"),
     "mixins": re.compile(r"^mixin_[a-z][a-z0-9_]*\.py$"),
     "nodes": re.compile(r"^node_[a-z][a-z0-9_]*\.py$"),
     "validators": re.compile(r"^validator_[a-z][a-z0-9_]*\.py$"),
+    "adapters": re.compile(r"^adapter_[a-z][a-z0-9_]*\.py$"),
     "utils": re.compile(r"^[a-z][a-z0-9_]*\.py$"),  # Utils are more flexible
 }
 
@@ -71,10 +99,12 @@ SKIP_DIRECTORIES = {
 RELAXED_CLASS_PREFIX_DIRECTORIES = {
     "utils",  # Utility classes are not domain models
     "foundation",  # Foundation models are base infrastructure
+    "adapters",  # Adapter classes wrap external dependencies
 }
 
 # Directories where ONEX naming conventions are strictly enforced
 # Both file naming (e.g., model_xxx.py) and class naming (e.g., ModelXxx) are validated
+# Note: These apply only to IMMEDIATE parent directory, not ancestors
 STRICT_NAMING_DIRECTORIES = {
     "models",
     "enums",
@@ -89,18 +119,45 @@ STRICT_NAMING_DIRECTORIES = {
 # Exact relative paths to skip (for specific files that don't follow conventions)
 # Use forward slashes for cross-platform compatibility
 SKIP_PATHS_PATTERNS: list[re.Pattern[str]] = [
-    # Example: re.compile(r"src/omnimemory/legacy/.*"),
+    # Skip data_models.py and error_models.py in protocols/ - they contain data types
+    re.compile(r".*/protocols/(data_models|error_models)\.py$"),
 ]
 
 
 def get_directory_type(filepath: Path) -> str | None:
-    """Get the type based on parent directory name.
+    """Get the type based on immediate parent directory name.
 
-    Returns the immediate parent directory name if it's a known type directory.
+    Returns the immediate parent directory name if it's a known STRICT type directory.
+    This only returns a type for directories that enforce ONEX naming conventions.
+
+    Note: We check against STRICT_NAMING_DIRECTORIES first, then FILE_PATTERNS
+    to ensure we only enforce naming in directories that require it.
     """
     parent = filepath.parent.name
+
+    # First check if it's a strict naming directory
+    if parent in STRICT_NAMING_DIRECTORIES:
+        return parent
+
+    # Also check adapters for file naming (but not class naming - see RELAXED)
     if parent in FILE_PATTERNS:
         return parent
+
+    return None
+
+
+def get_ancestor_typed_directory(filepath: Path) -> str | None:
+    """Check if any ancestor is a typed directory.
+
+    This helps identify files that are deeply nested within a typed directory
+    (e.g., nodes/memory_storage_effect/adapters/) where the top-level type
+    should still influence validation behavior.
+
+    Returns the first ancestor typed directory name, or None.
+    """
+    for part in filepath.parts[:-1]:  # Exclude filename
+        if part in STRICT_NAMING_DIRECTORIES:
+            return part
     return None
 
 
@@ -145,6 +202,40 @@ def is_relaxed_naming_directory(filepath: Path) -> bool:
     return filepath.parent.name in RELAXED_CLASS_PREFIX_DIRECTORIES
 
 
+def detect_expected_prefix_from_bases(
+    bases: list[ast.expr],
+) -> tuple[str | None, re.Pattern[str] | None]:
+    """Detect expected naming prefix from base classes.
+
+    Examines the class's base classes and returns the expected prefix
+    based on known base class names.
+
+    Args:
+        bases: List of AST base class expressions
+
+    Returns:
+        Tuple of (expected_prefix, pattern) or (None, None) if not determined
+    """
+    for base in bases:
+        base_name = None
+        if isinstance(base, ast.Name):
+            base_name = base.id
+        elif isinstance(base, ast.Attribute):
+            base_name = base.attr
+        elif isinstance(base, ast.Subscript):
+            # Handle generic types like Generic[T]
+            if isinstance(base.value, ast.Name):
+                base_name = base.value.id
+            elif isinstance(base.value, ast.Attribute):
+                base_name = base.value.attr
+
+        if base_name and base_name in BASE_CLASS_TO_PREFIX:
+            prefix = BASE_CLASS_TO_PREFIX[base_name]
+            return prefix, CLASS_PATTERNS[prefix]
+
+    return None, None
+
+
 def validate_file(filepath: Path) -> list[Violation]:
     """Validate a single Python file.
 
@@ -161,17 +252,20 @@ def validate_file(filepath: Path) -> list[Violation]:
     violations: list[Violation] = []
     dir_type = get_directory_type(filepath)
     relaxed_prefix = is_relaxed_naming_directory(filepath)
+    ancestor_typed_dir = get_ancestor_typed_directory(filepath)
 
-    # Validate file naming based on directory type
-    # This applies to all files in typed directories
+    # Validate file naming based on immediate parent directory type
+    # Only enforce file naming in typed directories, not in nested subdirectories
     if dir_type and dir_type in FILE_PATTERNS:
         if not FILE_PATTERNS[dir_type].match(filepath.name):
+            # Get the singular form for the example (models -> model, enums -> enum)
+            singular = dir_type.rstrip("s") if dir_type.endswith("s") else dir_type
             violations.append(
                 Violation(
                     str(filepath),
                     0,
                     f"File '{filepath.name}' in {dir_type}/ should follow naming: "
-                    f"{dir_type[:-1]}_xxx.py (e.g., {dir_type[:-1]}_example.py)",
+                    f"{singular}_xxx.py (e.g., {singular}_example.py)",
                 )
             )
 
@@ -190,34 +284,14 @@ def validate_file(filepath: Path) -> list[Violation]:
             if class_name.startswith("_"):
                 continue
 
-            # Determine expected pattern based on parent class or directory
-            expected_pattern = None
-            expected_prefix = None
+            # Determine expected pattern based on parent class first
+            expected_prefix, expected_pattern = detect_expected_prefix_from_bases(
+                node.bases
+            )
 
-            # Check parent classes to infer expected naming
-            for base in node.bases:
-                base_name = None
-                if isinstance(base, ast.Name):
-                    base_name = base.id
-                elif isinstance(base, ast.Attribute):
-                    base_name = base.attr
-
-                if base_name:
-                    if base_name == "BaseModel":
-                        expected_pattern = CLASS_PATTERNS["Model"]
-                        expected_prefix = "Model"
-                    elif base_name in ("Enum", "StrEnum", "IntEnum"):
-                        expected_pattern = CLASS_PATTERNS["Enum"]
-                        expected_prefix = "Enum"
-                    elif base_name == "Protocol":
-                        expected_pattern = CLASS_PATTERNS["Protocol"]
-                        expected_prefix = "Protocol"
-
-                    # Found a pattern match from parent class, stop checking
-                    if expected_prefix:
-                        break
-
-            # Check by directory type if no parent class determined the pattern
+            # If no parent class determined the pattern, check by directory type
+            # This ensures files in typed directories enforce naming even without
+            # inheriting from known base classes
             if expected_prefix is None and dir_type:
                 # Map directory type to class pattern
                 dir_to_pattern = {
@@ -234,8 +308,17 @@ def validate_file(filepath: Path) -> list[Violation]:
                     expected_prefix, expected_pattern = dir_to_pattern[dir_type]
 
             # Skip class prefix validation for relaxed directories
-            # (utils, foundation - these use semantic names for readability)
+            # (utils, foundation, adapters - these use semantic names for readability)
             if relaxed_prefix:
+                continue
+
+            # For files deeply nested within a typed directory (e.g., nodes/xxx/internal/),
+            # only skip validation if we couldn't determine the expected prefix from parent class.
+            # If parent class detection found a known base (e.g., BaseModel, Enum, Protocol),
+            # we should still enforce naming even in nested directories.
+            if expected_prefix is None and ancestor_typed_dir and dir_type is None:
+                # No parent class detected AND file is nested within a typed directory
+                # Skip class naming enforcement - these are typically implementation details
                 continue
 
             # Validate class naming convention

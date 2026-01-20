@@ -47,14 +47,14 @@ from .data_models import (  # Core data models; Request/Response models; Enums
     UserContext,
 )
 from .error_models import (  # Error handling; Error codes
-    CoordinationError,
-    OmniMemoryError,
-    OmniMemoryErrorCode,
-    ProcessingError,
-    RetrievalError,
-    StorageError,
-    SystemError,
-    ValidationError,
+    EnumOmniMemoryErrorCode,
+    ProtocolCoordinationError,
+    ProtocolOmniMemoryError,
+    ProtocolProcessingError,
+    ProtocolRetrievalError,
+    ProtocolStorageError,
+    ProtocolSystemError,
+    ProtocolValidationError,
 )
 
 __all__ = [
@@ -100,12 +100,12 @@ __all__ = [
     "AccessLevel",
     "IndexingStatus",
     # Error handling
-    "OmniMemoryError",
-    "ValidationError",
-    "StorageError",
-    "RetrievalError",
-    "ProcessingError",
-    "CoordinationError",
-    "SystemError",
-    "OmniMemoryErrorCode",
+    "ProtocolOmniMemoryError",
+    "ProtocolValidationError",
+    "ProtocolStorageError",
+    "ProtocolRetrievalError",
+    "ProtocolProcessingError",
+    "ProtocolCoordinationError",
+    "ProtocolSystemError",
+    "EnumOmniMemoryErrorCode",
 ]

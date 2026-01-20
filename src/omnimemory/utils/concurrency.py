@@ -1136,8 +1136,9 @@ class ConnectionPool:
         """
         self.max_size = max_size
         self.timeout = timeout
-        self._connections: list[object] = []
-        self._active: dict[str, object] = {}
+        self._connections: list[Any] = []
+        # Maps connection_id -> actual connection object (Any type for generic pool)
+        self._active: dict[str, Any] = {}
         self._lock = asyncio.Lock()
         self._connection_counter = 0
 
@@ -1146,7 +1147,7 @@ class ConnectionPool:
         """Return the number of currently active connections."""
         return len(self._active)
 
-    def _create_connection(self) -> object:
+    def _create_connection(self) -> Any:
         """
         Create a new connection.
 
@@ -1168,7 +1169,7 @@ class ConnectionPool:
     @asynccontextmanager
     async def acquire(
         self, timeout: float | None = None, max_retries: int = 3
-    ) -> AsyncGenerator[object, None]:
+    ) -> AsyncGenerator[Any, None]:
         """
         Acquire a connection from the pool.
 

@@ -18,6 +18,32 @@ from pydantic import (
 from omnimemory.enums import EnumDecayFunction, EnumTrustLevel
 
 
+def ensure_timezone_aware(
+    dt: datetime | None, field_name: str = "datetime"
+) -> datetime | None:
+    """
+    Ensure a datetime is timezone-aware, converting naive datetimes to UTC.
+
+    Args:
+        dt: The datetime to validate
+        field_name: Name of the field for error messages
+
+    Returns:
+        Timezone-aware datetime or None
+
+    Raises:
+        TypeError: If the value is not a datetime or None
+    """
+    if dt is None:
+        return None
+    if not isinstance(dt, datetime):
+        raise TypeError(f"{field_name} must be a datetime, got {type(dt).__name__}")
+    if dt.tzinfo is None:
+        # Naive datetime - assume it represents UTC time and attach timezone
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
 class ModelTrustScore(BaseModel):
     """Trust score with time-based decay and validation."""
 
@@ -96,13 +122,7 @@ class ModelTrustScore(BaseModel):
     @classmethod
     def validate_timezone_aware(cls, v: datetime | None) -> datetime | None:
         """Ensure datetime values are timezone-aware to prevent comparison errors."""
-        if v is None:
-            return None
-        if isinstance(v, datetime):
-            if v.tzinfo is None:
-                # Convert naive datetime to UTC
-                return v.replace(tzinfo=UTC)
-        return v
+        return ensure_timezone_aware(v, "datetime field")
 
     @field_validator("trust_level")
     @classmethod
@@ -138,28 +158,36 @@ class ModelTrustScore(BaseModel):
     ) -> float:
         """Calculate current trust score with time decay and caching for performance."""
         if as_of is None:
-            as_of = datetime.now(UTC)
+            validated_as_of = datetime.now(UTC)
+        else:
+            # Ensure provided datetime is timezone-aware to prevent TypeError
+            result = ensure_timezone_aware(as_of, "as_of")
+            # ensure_timezone_aware only returns None if input is None, which we checked
+            assert (
+                result is not None
+            ), "as_of was not None but ensure_timezone_aware returned None"
+            validated_as_of = result
 
         # Check cache validity if not forcing recalculation
         if (
             not force_recalculate
-            and self._is_cache_valid(as_of)
+            and self._is_cache_valid(validated_as_of)
             and self._cached_score is not None
         ):
             return self._cached_score
 
         if self.decay_function == EnumDecayFunction.NONE:
             score = self.base_score
-            self._update_cache(score, as_of)
+            self._update_cache(score, validated_as_of)
             return score
 
         # Calculate time elapsed
-        time_elapsed = as_of - self.last_updated
+        time_elapsed = validated_as_of - self.last_updated
         days_elapsed = time_elapsed.total_seconds() / 86400  # Convert to days
 
         if days_elapsed <= 0:
             score = self.base_score
-            self._update_cache(score, as_of)
+            self._update_cache(score, validated_as_of)
             return score
 
         # Apply decay function
@@ -176,7 +204,7 @@ class ModelTrustScore(BaseModel):
         score = max(0.0, min(1.0, decayed_score))
 
         # Cache the calculated score
-        self._update_cache(score, as_of)
+        self._update_cache(score, validated_as_of)
         return score
 
     def _is_cache_valid(self, as_of: datetime) -> bool:
@@ -184,13 +212,19 @@ class ModelTrustScore(BaseModel):
         if self._cached_score is None or self._cache_timestamp is None:
             return False
 
-        cache_age = (as_of - self._cache_timestamp).total_seconds()
+        # Ensure as_of is timezone-aware for safe comparison
+        validated_as_of = ensure_timezone_aware(as_of, "as_of")
+        if validated_as_of is None:
+            return False
+
+        cache_age = (validated_as_of - self._cache_timestamp).total_seconds()
         return cache_age < self._cache_ttl_seconds
 
     def _update_cache(self, score: float, timestamp: datetime) -> None:
         """Update cached score and timestamp."""
         self._cached_score = score
-        self._cache_timestamp = timestamp
+        # Ensure cache timestamp is timezone-aware for safe comparisons
+        self._cache_timestamp = ensure_timezone_aware(timestamp, "timestamp")
 
     def invalidate_cache(self) -> None:
         """Manually invalidate the score cache."""

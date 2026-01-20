@@ -3,7 +3,6 @@ Memory data models following ONEX standards.
 """
 
 from datetime import UTC, datetime
-from typing import Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,14 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from ...enums.enum_data_type import EnumDataType
 
 # Type alias for JSON-compatible primitive values
-JsonPrimitive = Union[str, int, float, bool, None]
+JsonPrimitive = str | int | float | bool | None
 
 # Type alias for JSON-compatible nested values (one level of nesting)
 # Using 'object' for nested collections provides flexibility while avoiding
 # recursive type issues with Pydantic V2
-JsonNestedValue = Union[str, int, float, bool, list[object], dict[str, object], None]
+JsonNestedValue = str | int | float | bool | list[object] | dict[str, object] | None
 
-# Type alias for memory data values - explicit Union instead of Any
+# Type alias for memory data values - explicit union instead of Any
 # Supports common serializable types used in memory systems:
 # - Primitive types: str, int, float, bool
 # - Binary data: bytes (use with encoding="base64" metadata)
@@ -28,16 +27,16 @@ JsonNestedValue = Union[str, int, float, bool, list[object], dict[str, object], 
 # Note: For deeply nested JSON structures, the list[object] and dict[str, object]
 # types accept any JSON-serializable content. This is a deliberate design choice
 # to avoid recursive type definitions that cause Pydantic V2 compatibility issues.
-MemoryDataValueType = Union[
-    str,
-    int,
-    float,
-    bool,
-    bytes,  # Binary data support - use with encoding metadata
-    list[JsonNestedValue],  # JSON arrays with nested values
-    dict[str, JsonNestedValue],  # JSON objects with nested values
-    None,
-]
+MemoryDataValueType = (
+    str
+    | int
+    | float
+    | bool
+    | bytes  # Binary data support - use with encoding metadata
+    | list[JsonNestedValue]  # JSON arrays with nested values
+    | dict[str, JsonNestedValue]  # JSON objects with nested values
+    | None
+)
 
 
 class ModelMemoryDataValue(BaseModel):

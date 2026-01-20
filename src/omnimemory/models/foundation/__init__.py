@@ -5,11 +5,11 @@ This module provides foundation models for base implementations,
 error handling, migration progress tracking, and system-level operations.
 """
 
-from ...enums.enum_error_code import OmniMemoryErrorCode
+from ...enums.enum_error_code import EnumOmniMemoryErrorCode
 from ...enums.enum_migration_status import (
-    FileProcessingStatus,
-    MigrationPriority,
-    MigrationStatus,
+    EnumFileProcessingStatus,
+    EnumMigrationPriority,
+    EnumMigrationStatus,
 )
 from ...enums.enum_severity import EnumSeverity
 from .model_audit_metadata import (
@@ -94,7 +94,7 @@ from .model_typed_collections import (
 )
 
 __all__ = [
-    "OmniMemoryErrorCode",
+    "EnumOmniMemoryErrorCode",
     "EnumSeverity",
     "ModelErrorDetails",
     "ModelSystemHealth",
@@ -111,9 +111,9 @@ __all__ = [
     "ModelPerformanceConfig",
     "ModelObservabilityConfig",
     # Migration progress tracking
-    "MigrationStatus",
-    "MigrationPriority",
-    "FileProcessingStatus",
+    "EnumMigrationStatus",
+    "EnumMigrationPriority",
+    "EnumFileProcessingStatus",
     "BatchProcessingMetrics",
     "FileProcessingInfo",
     "MigrationProgressMetrics",

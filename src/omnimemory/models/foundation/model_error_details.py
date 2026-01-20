@@ -12,7 +12,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 # Import local omnimemory enums (always available)
-from ...enums.enum_error_code import OmniMemoryErrorCode
+from ...enums.enum_error_code import EnumOmniMemoryErrorCode
 from ...enums.enum_severity import EnumSeverity
 
 
@@ -25,7 +25,7 @@ class ModelErrorDetails(BaseModel):
     error_id: UUID = Field(
         description="Unique identifier for this error instance",
     )
-    error_code: OmniMemoryErrorCode | str = Field(
+    error_code: EnumOmniMemoryErrorCode | str = Field(
         description="Standardized error code (core or omnimemory-specific)",
     )
     error_type: str = Field(

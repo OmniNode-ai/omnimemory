@@ -6,6 +6,8 @@ Validates that Pydantic models follow ONEX conventions:
 - Use ConfigDict with proper settings
 - No bare model_config = {} assignments
 - Proper inheritance from BaseModel
+- Handles inherited model_config from parent classes
+- Detects ConfigDict imports with aliases
 
 Usage:
     python scripts/validation/validate_pydantic_patterns.py [files...]
@@ -28,24 +30,132 @@ class Violation(NamedTuple):
     message: str
 
 
+class ImportAliasCollector(ast.NodeVisitor):
+    """Collect ConfigDict import aliases from a module."""
+
+    def __init__(self) -> None:
+        self.config_dict_aliases: set[str] = {"ConfigDict"}  # Always include default
+
+    def visit_Import(self, node: ast.Import) -> None:
+        """Visit import statements."""
+        for alias in node.names:
+            # import pydantic - ConfigDict accessed via pydantic.ConfigDict
+            if alias.name == "pydantic":
+                # We handle this via attribute access, no alias needed
+                pass
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit from-import statements."""
+        if node.module and ("pydantic" in node.module):
+            for alias in node.names:
+                if alias.name == "ConfigDict":
+                    # from pydantic import ConfigDict as CD
+                    actual_name = alias.asname if alias.asname else alias.name
+                    self.config_dict_aliases.add(actual_name)
+        self.generic_visit(node)
+
+
+class ClassModelConfigCollector(ast.NodeVisitor):
+    """First pass: collect which classes have model_config defined."""
+
+    def __init__(self) -> None:
+        self.classes_with_model_config: set[str] = set()
+        self.class_bases: dict[str, list[str]] = {}  # class_name -> list of base names
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """Visit class definition to check for model_config."""
+        # Collect base class names (simple names only, not fully qualified)
+        base_names: list[str] = []
+        for base in node.bases:
+            if isinstance(base, ast.Name):
+                base_names.append(base.id)
+            elif isinstance(base, ast.Attribute):
+                base_names.append(base.attr)
+        self.class_bases[node.name] = base_names
+
+        # Check if this class has model_config defined
+        for item in node.body:
+            if isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if isinstance(target, ast.Name) and target.id == "model_config":
+                        self.classes_with_model_config.add(node.name)
+            elif isinstance(item, ast.AnnAssign):
+                if (
+                    isinstance(item.target, ast.Name)
+                    and item.target.id == "model_config"
+                ):
+                    self.classes_with_model_config.add(node.name)
+
+        self.generic_visit(node)
+
+    def has_inherited_model_config(self, class_name: str) -> bool:
+        """Check if a class inherits model_config from a parent in this file."""
+        if class_name in self.classes_with_model_config:
+            return True
+
+        bases = self.class_bases.get(class_name, [])
+        for base in bases:
+            # Recursively check parent classes defined in this file
+            if base in self.class_bases:
+                if self.has_inherited_model_config(base):
+                    return True
+        return False
+
+
 class PydanticPatternVisitor(ast.NodeVisitor):
     """AST visitor to check Pydantic patterns."""
 
-    def __init__(self, filepath: str) -> None:
+    def __init__(
+        self,
+        filepath: str,
+        config_dict_aliases: set[str],
+        model_config_collector: ClassModelConfigCollector,
+    ) -> None:
         self.filepath = filepath
         self.violations: list[Violation] = []
         self.in_class: str | None = None
         self.is_pydantic_model = False
+        self.config_dict_aliases = config_dict_aliases
+        self.model_config_collector = model_config_collector
 
     def _is_config_dict_call(self, node: ast.expr) -> bool:
-        """Check if a node is a ConfigDict() call (handles both Name and Attribute)."""
+        """Check if a node is a ConfigDict() call (handles aliases and attributes)."""
         if not isinstance(node, ast.Call):
             return False
         func = node.func
-        # Handle: ConfigDict() or pydantic.ConfigDict()
-        return (isinstance(func, ast.Name) and func.id == "ConfigDict") or (
-            isinstance(func, ast.Attribute) and func.attr == "ConfigDict"
-        )
+        # Handle: ConfigDict() or aliased name like CD()
+        if isinstance(func, ast.Name) and func.id in self.config_dict_aliases:
+            return True
+        # Handle: pydantic.ConfigDict()
+        return isinstance(func, ast.Attribute) and func.attr == "ConfigDict"
+
+    def _check_inherited_model_config(self, node: ast.ClassDef) -> bool:
+        """Check if model_config is inherited from a parent class.
+
+        Checks:
+        1. Parent classes defined in this file that have model_config
+        2. Known Pydantic base classes that have model_config (BaseModel does NOT)
+        """
+        for base in node.bases:
+            base_name: str | None = None
+            if isinstance(base, ast.Name):
+                base_name = base.id
+            elif isinstance(base, ast.Attribute):
+                base_name = base.attr
+
+            if base_name:
+                # Check if parent class in this file has model_config
+                if self.model_config_collector.has_inherited_model_config(base_name):
+                    return True
+
+                # BaseModel itself doesn't define model_config with settings,
+                # so we don't skip validation for direct BaseModel inheritance
+                # But if inheriting from another Pydantic model class defined
+                # elsewhere, we can't know - so we're conservative and only
+                # check classes in this file
+
+        return False
 
     def _is_empty_config_dict(self, node: ast.Call) -> bool:
         """Check if a ConfigDict call has no arguments."""
@@ -140,7 +250,10 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                 for item in node.body
             )
 
-            if not has_model_config and has_fields:
+            # Check if model_config is inherited from a parent class in this file
+            inherits_model_config = self._check_inherited_model_config(node)
+
+            if not has_model_config and has_fields and not inherits_model_config:
                 self.violations.append(
                     Violation(
                         self.filepath,
@@ -179,7 +292,20 @@ def validate_file(filepath: Path) -> list[Violation]:
     except Exception:
         return []
 
-    visitor = PydanticPatternVisitor(str(filepath))
+    # First pass: collect ConfigDict import aliases
+    alias_collector = ImportAliasCollector()
+    alias_collector.visit(tree)
+
+    # Second pass: collect classes and their model_config status
+    model_config_collector = ClassModelConfigCollector()
+    model_config_collector.visit(tree)
+
+    # Third pass: validate patterns with full context
+    visitor = PydanticPatternVisitor(
+        str(filepath),
+        alias_collector.config_dict_aliases,
+        model_config_collector,
+    )
     visitor.visit(tree)
     return visitor.violations
 
