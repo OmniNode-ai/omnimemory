@@ -299,7 +299,7 @@ class MigrationProgressTracker(BaseModel):
         self.files.append(file_info)
         self.metrics.total_files = len(self.files)
 
-        if file_size:
+        if file_size is not None:
             if self.metrics.total_size_bytes is None:
                 self.metrics.total_size_bytes = 0
             self.metrics.total_size_bytes += file_size
@@ -331,7 +331,7 @@ class MigrationProgressTracker(BaseModel):
             if success:
                 file_info.status = EnumFileProcessingStatus.COMPLETED
                 self.metrics.processed_files += 1
-                if file_info.file_size:
+                if file_info.file_size is not None:
                     self.metrics.processed_size_bytes += file_info.file_size
             else:
                 file_info.status = EnumFileProcessingStatus.FAILED
