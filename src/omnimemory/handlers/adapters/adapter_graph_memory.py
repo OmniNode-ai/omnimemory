@@ -42,6 +42,7 @@ Example::
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1389.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -137,6 +138,14 @@ __all__ = [
 class CypherTemplates:
     """Parameterized Cypher query templates for memory graph operations.
 
+    Direction Behavior:
+        - GET_CONNECTIONS: Bidirectional by default (matches both incoming and outgoing)
+        - GET_CONNECTIONS_BY_TYPE: Outgoing-only (for directed relationship queries)
+        - GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL: Bidirectional with type filtering
+
+        The `get_connections()` method accepts a `bidirectional` parameter to select
+        the appropriate template when filtering by relationship type.
+
     Security:
         All queries use parameters ($param) instead of string interpolation.
         NEVER construct queries by concatenating user input.
@@ -155,7 +164,7 @@ class CypherTemplates:
     LIMIT $limit
     """
 
-    # Find connections filtered by relationship type
+    # Find connections filtered by relationship type (outgoing only)
     GET_CONNECTIONS_BY_TYPE = """
     MATCH (m:Memory {memory_id: $memory_id})-[r]->(n:Memory)
     WHERE type(r) IN $relationship_types
@@ -166,6 +175,20 @@ class CypherTemplates:
         r.weight AS weight,
         r.created_at AS created_at,
         true AS is_outgoing
+    LIMIT $limit
+    """
+
+    # Find connections filtered by relationship type (bidirectional)
+    GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL = """
+    MATCH (m:Memory {memory_id: $memory_id})-[r]-(n:Memory)
+    WHERE type(r) IN $relationship_types
+    RETURN
+        m.memory_id AS source_id,
+        n.memory_id AS target_id,
+        type(r) AS relationship_type,
+        r.weight AS weight,
+        r.created_at AS created_at,
+        startNode(r) = m AS is_outgoing
     LIMIT $limit
     """
 
@@ -767,6 +790,7 @@ class AdapterGraphMemory:
         *,
         relationship_types: list[str] | None = None,
         limit: int | None = None,
+        bidirectional: bool | None = None,
     ) -> ModelConnectionsResult:
         """Get direct connections (edges) for a memory node.
 
@@ -778,6 +802,10 @@ class AdapterGraphMemory:
             relationship_types: Optional list of relationship types to include.
                 If None, all types are returned.
             limit: Maximum number of connections. Defaults to config.default_limit.
+            bidirectional: Whether to include both incoming and outgoing connections.
+                If None, defaults to config.bidirectional. When True, returns
+                connections in both directions. When False, returns only outgoing
+                connections (only applies when relationship_types is specified).
 
         Returns:
             ModelConnectionsResult with the memory's connections.
@@ -790,11 +818,18 @@ class AdapterGraphMemory:
         effective_limit = min(
             limit or self._config.default_limit, self._config.max_limit
         )
+        # Use config.bidirectional if not explicitly specified
+        effective_bidirectional = (
+            bidirectional if bidirectional is not None else self._config.bidirectional
+        )
 
         try:
-            # Choose query based on whether we're filtering by type
+            # Choose query based on whether we're filtering by type and direction
             if relationship_types:
-                query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
+                if effective_bidirectional:
+                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL
+                else:
+                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
                 parameters: dict[str, object] = {
                     "memory_id": memory_id,
                     "relationship_types": relationship_types,

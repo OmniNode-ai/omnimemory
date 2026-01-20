@@ -28,7 +28,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from omnimemory.handlers.adapters.adapter_graph_memory import (
+# Skip all tests in this module if omnibase_infra is not installed
+pytest.importorskip(
+    "omnibase_infra", reason="omnibase_infra required for adapter tests"
+)
+
+from omnimemory.handlers.adapters.adapter_graph_memory import (  # noqa: E402
     AdapterGraphMemory,
     AdapterGraphMemoryConfig,
     CypherTemplates,
@@ -255,6 +260,7 @@ class TestCypherTemplates:
         templates = [
             CypherTemplates.GET_CONNECTIONS,
             CypherTemplates.GET_CONNECTIONS_BY_TYPE,
+            CypherTemplates.GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL,
             CypherTemplates.COUNT_CONNECTIONS,
             CypherTemplates.NODE_EXISTS,
         ]
@@ -544,6 +550,85 @@ class TestGetConnections:
         # Verify the filtered query was used
         call_args = mock_handler.execute_query.call_args
         assert "relationship_types" in call_args[1]["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_get_connections_bidirectional_with_type_filter(
+        self,
+        adapter_with_mock: AdapterGraphMemory,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections uses bidirectional template with type filter."""
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "related_to",
+                    "weight": 1.0,
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_3",
+                    "relationship_type": "related_to",
+                    "weight": 0.8,
+                    "is_outgoing": False,
+                    "created_at": None,
+                },
+            ]
+        )
+
+        result = await adapter_with_mock.get_connections(
+            "mem_1",
+            relationship_types=["related_to"],
+            bidirectional=True,
+        )
+
+        assert result.status == "success"
+        assert len(result.connections) == 2
+        # Verify the bidirectional template was used (contains -[r]- not -[r]->)
+        call_args = mock_handler.execute_query.call_args
+        query = call_args[1]["query"]
+        assert "-[r]-" in query.replace(" ", "").replace("\n", "")
+        assert "-[r]->" not in query.replace(" ", "").replace("\n", "")
+
+    @pytest.mark.asyncio
+    async def test_get_connections_outgoing_only_with_type_filter(
+        self,
+        config: AdapterGraphMemoryConfig,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections with bidirectional=False uses outgoing-only template."""
+        # Create adapter with bidirectional=False in config
+        config.bidirectional = False
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "related_to",
+                    "weight": 1.0,
+                    "is_outgoing": True,
+                    "created_at": None,
+                }
+            ]
+        )
+
+        result = await adapter.get_connections(
+            "mem_1",
+            relationship_types=["related_to"],
+        )
+
+        assert result.status == "success"
+        # Verify the outgoing-only template was used (contains -[r]->)
+        call_args = mock_handler.execute_query.call_args
+        query = call_args[1]["query"]
+        assert "-[r]->" in query.replace(" ", "").replace("\n", "")
 
 
 # =============================================================================

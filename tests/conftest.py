@@ -132,3 +132,11 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "benchmark: Performance benchmark tests",
     )
+    config.addinivalue_line(
+        "markers",
+        "integration: marks tests as integration tests (may require external services)",
+    )
+    config.addinivalue_line(
+        "markers",
+        "memgraph: marks tests as requiring Memgraph database",
+    )

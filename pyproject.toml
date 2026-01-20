@@ -110,4 +110,5 @@ markers = [
     "unit: marks tests as unit tests (no external dependencies)",
     "benchmark: marks tests as performance benchmarks",
     "slow: marks tests as slow-running (excluded from quick test runs)",
+    "memgraph: marks tests as requiring Memgraph database",
 ]
