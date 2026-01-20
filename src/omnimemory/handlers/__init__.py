@@ -20,13 +20,19 @@ Example::
 from omnimemory.handlers.adapters import (
     AdapterGraphMemory,
     AdapterGraphMemoryConfig,
+    ModelConnectionsResult,
+    ModelGraphMemoryHealth,
     ModelMemoryConnection,
+    ModelRelatedMemory,
     ModelRelatedMemoryResult,
 )
 
 __all__ = [
     "AdapterGraphMemory",
     "AdapterGraphMemoryConfig",
+    "ModelConnectionsResult",
+    "ModelGraphMemoryHealth",
     "ModelMemoryConnection",
+    "ModelRelatedMemory",
     "ModelRelatedMemoryResult",
 ]

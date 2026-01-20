@@ -45,6 +45,7 @@ Example::
 from __future__ import annotations
 
 import asyncio
+import heapq
 import logging
 from collections.abc import Mapping
 from typing import Literal
@@ -118,10 +119,11 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "AdapterGraphMemory",
     "AdapterGraphMemoryConfig",
+    "ModelConnectionsResult",
     "ModelGraphMemoryHealth",
     "ModelMemoryConnection",
-    "ModelRelatedMemoryResult",
     "ModelRelatedMemory",
+    "ModelRelatedMemoryResult",
 ]
 
 
@@ -692,7 +694,10 @@ class AdapterGraphMemory:
                     # Position in path = number of edges from start (depth)
                     depth_to_node = shortest_path.index(node.element_id)
                 else:
-                    # Default to depth 1 if path info unavailable
+                    logger.warning(
+                        "Path info unavailable for node %s, defaulting to depth=1",
+                        node.element_id,
+                    )
                     depth_to_node = 1
 
                 score = 1.0 / (depth_to_node + 1)
@@ -715,9 +720,8 @@ class AdapterGraphMemory:
                     )
                 )
 
-            # Sort by score descending, limit results
-            memories.sort(key=lambda m: m.score, reverse=True)
-            memories = memories[:effective_limit]
+            # Use heapq for O(n log k) instead of O(n log n) full sort
+            memories = heapq.nlargest(effective_limit, memories, key=lambda m: m.score)
 
             if not memories:
                 return ModelRelatedMemoryResult(
@@ -834,7 +838,11 @@ class AdapterGraphMemory:
                         source_id=record["source_id"],
                         target_id=record["target_id"],
                         relationship_type=record["relationship_type"],
-                        weight=record.get("weight") or 1.0,
+                        weight=(
+                            record.get("weight")
+                            if record.get("weight") is not None
+                            else 1.0
+                        ),
                         is_outgoing=record.get("is_outgoing", True),
                         created_at=record.get("created_at"),
                     )
