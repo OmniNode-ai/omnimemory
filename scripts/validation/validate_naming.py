@@ -63,6 +63,21 @@ BASE_CLASS_TO_PREFIX = {
     "ComputeNode": "Node",
     "ReducerNode": "Node",
     "OrchestratorNode": "Node",
+    # Service base classes (ONEX service layer)
+    "BaseService": "Service",
+    "ServiceBase": "Service",
+    "AbstractService": "Service",
+    # Handler base classes (ONEX handler layer)
+    "BaseHandler": "Handler",
+    "HandlerBase": "Handler",
+    "AbstractHandler": "Handler",
+    # Mixin base classes
+    "BaseMixin": "Mixin",
+    "MixinBase": "Mixin",
+    # Validator base classes
+    "BaseValidator": "Validator",
+    "ValidatorBase": "Validator",
+    "AbstractValidator": "Validator",
 }
 
 # File naming patterns - applied when file is in a typed directory

@@ -10,7 +10,10 @@
 # CONFIGURATION FILES (shared with CI):
 # ====================================
 # - pyproject.toml: ruff settings [tool.ruff], mypy settings [tool.mypy]
-# - pyrightconfig.json: pyright settings
+#   - Ruff version: ^0.8.0 (synchronized via poetry)
+#   - Mypy version: ^1.14.0 (synchronized via poetry)
+#   - Pyright version: ^1.1.390 (synchronized via poetry)
+# - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
 #
 # PERFORMANCE OPTIMIZATION:
 # ====================================

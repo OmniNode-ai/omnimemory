@@ -37,9 +37,10 @@ jobs:
   # These validations are synchronized with .pre-commit-config.yaml
   # Pre-commit runs subset at commit time, full validation at pre-push
   #
-  # SHARED CONFIGURATION FILES:
-  # - pyproject.toml: ruff [tool.ruff], mypy [tool.mypy]
-  # - pyrightconfig.json: pyright settings
+  # SHARED CONFIGURATION FILES (synchronized with .pre-commit-config.yaml):
+  # - pyproject.toml: ruff [tool.ruff] (^0.8.0), mypy [tool.mypy] (^1.14.0), pyright (^1.1.390)
+  # - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
+  # NOTE: UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
   #
   # POETRY VERSION: Must match POETRY_VERSION env var (currently 2.2.1)
   # =============================================================================
@@ -207,8 +208,10 @@ jobs:
       - name: Validate secrets
         run: poetry run python scripts/validation/validate_secrets.py src/
 
-      # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-push stage
-      # Note: Runs at pre-push in pre-commit (slower scan), but CI runs all validations in Phase 1
+      # SYNC: Pre-commit hook 'validate-naming-conventions'
+      # Stage alignment: pre-push (local) vs Phase 1 (CI) is INTENTIONAL
+      # - Local: Runs at pre-push to avoid slowing down regular commits
+      # - CI: Runs in Phase 1 (parallel with lint/pyright) for early failure detection
       - name: Validate naming conventions
         run: poetry run python scripts/validation/validate_naming.py src/
 

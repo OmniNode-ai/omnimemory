@@ -2,7 +2,7 @@
 Service configuration model following ONEX standards.
 """
 
-from omnibase_core.enums import EnumNodeType  # type: ignore[import-untyped]
+from omnibase_core.enums import EnumNodeType
 from pydantic import BaseModel, ConfigDict, Field
 
 

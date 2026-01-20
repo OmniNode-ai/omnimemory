@@ -4,7 +4,7 @@ Service registry model following ONEX standards.
 
 from datetime import UTC, datetime
 
-from omnibase_core.enums import (  # type: ignore[import-untyped]
+from omnibase_core.enums import (
     EnumHealthStatus,
     EnumNodeType,
 )

@@ -114,7 +114,12 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint]
+# Rule sets enabled (includes UP for pyupgrade rules)
+# NOTE: UP007 (PEP 604 union syntax: X | Y instead of Union[X, Y]) is ENABLED
+# and organizationally mandated - do NOT add UP007 to the ignore list
 select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TCH", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "RUF"]
+# Technical debt rules - fix incrementally
+# IMPORTANT: UP007 must NEVER be added here (PEP 604 syntax is mandated)
 ignore = [
     "S101",      # Allow assert statements in tests
     "E501",      # Line too long (technical debt - will fix incrementally)

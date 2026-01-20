@@ -8,7 +8,7 @@ All general error codes are imported from omnibase_core.core.errors.core_errors 
 from __future__ import annotations
 
 try:
-    from omnibase_core.core.errors.core_errors import (  # type: ignore[import-untyped]
+    from omnibase_core.core.errors.core_errors import (
         OnexErrorCode,
     )
 

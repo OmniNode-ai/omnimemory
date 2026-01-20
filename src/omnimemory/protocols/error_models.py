@@ -20,7 +20,7 @@ FieldValueType = (
 
 # Use local compatibility stub until omnibase_core provides OnexError
 try:
-    from omnibase_core.core.errors.core_errors import (  # type: ignore[import-untyped]
+    from omnibase_core.core.errors.core_errors import (
         OnexError as BaseOnexError,
     )
 except (ImportError, ModuleNotFoundError):
@@ -29,6 +29,28 @@ except (ImportError, ModuleNotFoundError):
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation import ModelMetadata
+
+
+def _normalize_context_to_dict(
+    context: ModelMetadata | dict[str, object] | None,
+) -> dict[str, object]:
+    """
+    Normalize context parameter to a mutable dict for error handling.
+
+    Handles both ModelMetadata (uses to_dict()) and plain dicts.
+    Returns an empty dict if context is None.
+    """
+    if context is None:
+        return {}
+    if isinstance(context, ModelMetadata):
+        return dict(
+            context.to_dict()
+        )  # to_dict() returns dict[str, str], copy for safety
+    if isinstance(context, dict):
+        return dict(context)  # Shallow copy for mutability
+    # Fallback for any other object with dict-like behavior
+    return dict(context)
+
 
 # === ERROR CODES ===
 
@@ -224,7 +246,8 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         category_info = get_error_category(error_code)
 
         # Enhance context with category information
-        enhanced_context: dict[str, Any] = dict(context) if context else {}
+        # Normalize ModelMetadata to dict using to_dict() for proper key-value extraction
+        enhanced_context: dict[str, Any] = _normalize_context_to_dict(context)
         if category_info:
             enhanced_context.update(
                 {
@@ -323,7 +346,7 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
         # Build context with validation details - normalize to mutable dict
-        context: dict[str, Any] = dict(kwargs.get("context") or {})
+        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
         if field_name:
             context["field_name"] = field_name
         if field_value is not None:
@@ -369,7 +392,7 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.TRANSACTION_FAILED
 
         # Build context with storage details - normalize to mutable dict
-        context: dict[str, Any] = dict(kwargs.get("context") or {})
+        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
         if storage_system:
             context["storage_system"] = storage_system
         if operation:
@@ -416,7 +439,7 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.FILTER_INVALID
 
         # Build context with retrieval details - normalize to mutable dict
-        context: dict[str, Any] = dict(kwargs.get("context") or {})
+        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
         if memory_id:
             context["memory_id"] = str(memory_id)
         if query:
@@ -460,7 +483,7 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
         # Build context with processing details - normalize to mutable dict
-        context: dict[str, Any] = dict(kwargs.get("context") or {})
+        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
         if processing_stage:
             context["processing_stage"] = processing_stage
         if model_name:
@@ -504,7 +527,7 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.ORCHESTRATION_FAILED
 
         # Build context with coordination details - normalize to mutable dict
-        context: dict[str, Any] = dict(kwargs.get("context") or {})
+        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
         if workflow_id:
             context["workflow_id"] = str(workflow_id)
         if agent_ids:
@@ -547,7 +570,7 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
         # Build context with system details - normalize to mutable dict
-        context: dict[str, Any] = dict(kwargs.get("context") or {})
+        context: dict[str, Any] = _normalize_context_to_dict(kwargs.get("context"))
         if system_component:
             context["system_component"] = system_component
 

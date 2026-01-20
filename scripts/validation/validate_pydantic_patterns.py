@@ -57,14 +57,18 @@ class ImportAliasCollector(ast.NodeVisitor):
 
 
 class ClassModelConfigCollector(ast.NodeVisitor):
-    """First pass: collect which classes have model_config defined."""
+    """First pass: collect which classes have model_config defined and which are Pydantic models."""
+
+    # Known Pydantic base classes that indicate a Pydantic model
+    PYDANTIC_BASE_CLASSES = {"BaseModel", "GenericModel", "BaseSettings"}
 
     def __init__(self) -> None:
         self.classes_with_model_config: set[str] = set()
         self.class_bases: dict[str, list[str]] = {}  # class_name -> list of base names
+        self.pydantic_models: set[str] = set()  # Classes that are Pydantic models
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        """Visit class definition to check for model_config."""
+        """Visit class definition to check for model_config and Pydantic inheritance."""
         # Collect base class names (simple names only, not fully qualified)
         base_names: list[str] = []
         for base in node.bases:
@@ -72,7 +76,19 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                 base_names.append(base.id)
             elif isinstance(base, ast.Attribute):
                 base_names.append(base.attr)
+            elif isinstance(base, ast.Subscript):
+                # Handle Generic[T], etc.
+                if isinstance(base.value, ast.Name):
+                    base_names.append(base.value.id)
+                elif isinstance(base.value, ast.Attribute):
+                    base_names.append(base.value.attr)
         self.class_bases[node.name] = base_names
+
+        # Check if this class directly inherits from a Pydantic base
+        for base_name in base_names:
+            if base_name in self.PYDANTIC_BASE_CLASSES:
+                self.pydantic_models.add(node.name)
+                break
 
         # Check if this class has model_config defined
         for item in node.body:
@@ -88,6 +104,29 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                     self.classes_with_model_config.add(node.name)
 
         self.generic_visit(node)
+
+    def _resolve_pydantic_models(self) -> None:
+        """Resolve transitive Pydantic model inheritance within the file.
+
+        A class is a Pydantic model if:
+        1. It directly inherits from BaseModel/GenericModel/BaseSettings, OR
+        2. It inherits from another class in this file that is a Pydantic model
+        """
+        changed = True
+        while changed:
+            changed = False
+            for class_name, bases in self.class_bases.items():
+                if class_name in self.pydantic_models:
+                    continue
+                for base in bases:
+                    if base in self.pydantic_models:
+                        self.pydantic_models.add(class_name)
+                        changed = True
+                        break
+
+    def is_pydantic_model(self, class_name: str) -> bool:
+        """Check if a class is a Pydantic model (directly or transitively)."""
+        return class_name in self.pydantic_models
 
     def has_inherited_model_config(self, class_name: str) -> bool:
         """Check if a class inherits model_config from a parent in this file."""
@@ -199,12 +238,9 @@ class PydanticPatternVisitor(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""
-        # Check if this is a Pydantic model (inherits from BaseModel)
-        is_model = any(
-            (isinstance(base, ast.Name) and base.id == "BaseModel")
-            or (isinstance(base, ast.Attribute) and base.attr == "BaseModel")
-            for base in node.bases
-        )
+        # Check if this is a Pydantic model (directly or via transitive inheritance)
+        # Uses the pre-computed model_config_collector which tracks Pydantic models
+        is_model = self.model_config_collector.is_pydantic_model(node.name)
 
         if is_model:
             old_class = self.in_class
@@ -299,6 +335,9 @@ def validate_file(filepath: Path) -> list[Violation]:
     # Second pass: collect classes and their model_config status
     model_config_collector = ClassModelConfigCollector()
     model_config_collector.visit(tree)
+
+    # Resolve transitive Pydantic model inheritance
+    model_config_collector._resolve_pydantic_models()
 
     # Third pass: validate patterns with full context
     visitor = PydanticPatternVisitor(

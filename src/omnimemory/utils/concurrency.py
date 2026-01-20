@@ -1111,7 +1111,7 @@ class CircuitBreaker:
 
 
 class CircuitBreakerOpenError(Exception):
-    """Exception raised when circuit breaker is open."""
+    """Raised when an operation is attempted on an open circuit breaker."""
 
 
 # === SIMPLE CONNECTION POOL ===
