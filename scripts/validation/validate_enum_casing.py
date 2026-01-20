@@ -94,12 +94,23 @@ def validate_file(filepath: Path) -> list[Violation]:
     """Validate a single Python file."""
     try:
         content = filepath.read_text(encoding="utf-8")
+    except PermissionError:
+        logging.warning("Permission denied reading file: %s", filepath)
+        return []
+    except FileNotFoundError:
+        logging.warning("File not found (possibly deleted during scan): %s", filepath)
+        return []
+    except OSError as e:
+        logging.warning("OS error reading file %s: %s", filepath, e)
+        return []
+    except UnicodeDecodeError as e:
+        logging.warning("Unicode decode error in file %s: %s", filepath, e)
+        return []
+
+    try:
         tree = ast.parse(content, filename=str(filepath))
     except SyntaxError as e:
         logging.debug("Skipping file with syntax error: %s (%s)", filepath, e)
-        return []
-    except Exception as e:
-        logging.debug("Skipping unprocessable file: %s (%s)", filepath, e)
         return []
 
     visitor = EnumCasingVisitor(str(filepath))

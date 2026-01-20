@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import sys
 from pathlib import Path
@@ -67,7 +68,17 @@ def validate_file(filepath: Path) -> list[Violation]:
     """Validate a single Python file."""
     try:
         content = filepath.read_text(encoding="utf-8")
-    except Exception:
+    except PermissionError:
+        logging.warning("Permission denied reading file: %s", filepath)
+        return []
+    except FileNotFoundError:
+        # File may have been deleted during scan - this is not an error
+        return []
+    except OSError as e:
+        logging.warning("OS error reading file %s: %s", filepath, e)
+        return []
+    except UnicodeDecodeError as e:
+        logging.warning("Unicode decode error in file %s: %s", filepath, e)
         return []
 
     violations: list[Violation] = []

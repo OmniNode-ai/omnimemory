@@ -390,9 +390,17 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
 
     try:
         content = filepath.read_text(encoding="utf-8")
-    except Exception as e:
-        if verbose:
-            logger.warning("Could not read file %s: %s", filepath, e)
+    except PermissionError:
+        logger.warning("Permission denied reading file: %s", filepath)
+        return []
+    except FileNotFoundError:
+        logger.warning("File not found (possibly deleted during scan): %s", filepath)
+        return []
+    except OSError as e:
+        logger.warning("OS error reading file %s: %s", filepath, e)
+        return []
+    except UnicodeDecodeError as e:
+        logger.warning("Unicode decode error in file %s: %s", filepath, e)
         return []
 
     violations: list[Violation] = []

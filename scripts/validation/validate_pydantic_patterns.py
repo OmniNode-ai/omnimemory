@@ -134,9 +134,34 @@ class ClassModelConfigCollector(ast.NodeVisitor):
         A class is a Pydantic model if:
         1. It directly inherits from BaseModel/GenericModel/BaseSettings, OR
         2. It inherits from another class in this file that is a Pydantic model
+
+        Includes protection against circular inheritance to prevent infinite loops.
+        Maximum iterations is bounded by the number of classes (each iteration must
+        add at least one new class, or the loop terminates).
         """
+        # Safety limit: at most one class can be added per iteration,
+        # so max iterations equals the number of classes
+        max_iterations = len(self.class_bases) + 1
+        iteration_count = 0
+
         changed = True
         while changed:
+            # Check iteration limit to protect against circular inheritance
+            iteration_count += 1
+            if iteration_count > max_iterations:
+                # Detect which classes might be involved in a cycle
+                unresolved = [
+                    name
+                    for name in self.class_bases
+                    if name not in self.pydantic_models
+                ]
+                logging.warning(
+                    "Circular inheritance detected or resolution limit reached. "
+                    "Unresolved classes: %s. Stopping resolution to prevent infinite loop.",
+                    unresolved,
+                )
+                break
+
             changed = False
             for class_name, bases in self.class_bases.items():
                 if class_name in self.pydantic_models:
@@ -427,12 +452,23 @@ def validate_file(filepath: Path) -> list[Violation]:
 
     try:
         content = filepath.read_text(encoding="utf-8")
+    except PermissionError:
+        logging.warning("Permission denied reading file: %s", filepath)
+        return []
+    except FileNotFoundError:
+        logging.warning("File not found (possibly deleted during scan): %s", filepath)
+        return []
+    except OSError as e:
+        logging.warning("OS error reading file %s: %s", filepath, e)
+        return []
+    except UnicodeDecodeError as e:
+        logging.warning("Unicode decode error in file %s: %s", filepath, e)
+        return []
+
+    try:
         tree = ast.parse(content, filename=str(filepath))
     except SyntaxError as e:
         logging.debug("Skipping file with syntax error: %s (%s)", filepath, e)
-        return []
-    except Exception as e:
-        logging.debug("Skipping unprocessable file: %s (%s)", filepath, e)
         return []
 
     # First pass: collect ConfigDict import aliases
