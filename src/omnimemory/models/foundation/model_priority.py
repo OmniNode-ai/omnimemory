@@ -5,7 +5,7 @@ Priority model following ONEX foundation patterns.
 from datetime import datetime, timedelta, timezone
 
 from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelPriority(BaseModel):
@@ -48,6 +48,22 @@ class ModelPriority(BaseModel):
         default_factory=list,
         description="Tags for categorizing priority context",
     )
+
+    @field_validator("expires_at", "created_at", mode="after")
+    @classmethod
+    def _ensure_utc(cls, v: datetime | None) -> datetime | None:
+        """Ensure datetime fields are UTC-aware to prevent TypeError in comparisons.
+
+        Uses mode='after' to run after Pydantic has coerced the value to datetime,
+        ensuring we receive a proper datetime object (or None) rather than a string.
+        """
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            # Naive datetime - assume it represents UTC time and attach timezone
+            return v.replace(tzinfo=timezone.utc)
+        # Convert to UTC for consistent comparisons
+        return v.astimezone(timezone.utc)
 
     def is_expired(self) -> bool:
         """Check if priority has expired."""
