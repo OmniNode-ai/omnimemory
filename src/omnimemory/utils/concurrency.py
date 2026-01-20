@@ -1330,7 +1330,7 @@ def with_timeout(timeout: float) -> Callable[[F], F]:
         Decorated function with timeout
 
     Raises:
-        asyncio.TimeoutError: If the function execution exceeds the timeout
+        TimeoutError: If the function execution exceeds the timeout
     """
 
     def decorator(func: F) -> F:

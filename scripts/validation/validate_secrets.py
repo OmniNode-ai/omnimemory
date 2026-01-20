@@ -56,31 +56,51 @@ SECRET_PATTERNS = [
 # Lines to skip (false positives)
 # Each pattern must have a clear, documented reason for exclusion.
 # Be conservative: prefer false positives over missing real secrets.
+#
+# SECURITY NOTE: Skip patterns must be as PRECISE as possible.
+# Over-broad patterns can hide real secrets in unexpected locations.
+# Use exact path matching and word boundaries where possible.
 SKIP_PATTERNS = [
     # REASON: Environment variable lookups retrieve values at runtime, not hardcoded
+    # These patterns require the actual os module call syntax
     (re.compile(r"os\.environ\["), "Environment variable dict access"),
     (re.compile(r"os\.environ\.get\("), "Environment variable get() access"),
     (re.compile(r"os\.getenv\("), "Environment variable getenv() access"),
     # REASON: Pydantic Field() with default_factory or env= is config, not secrets
     (re.compile(r"Field\s*\([^)]*default_factory"), "Pydantic Field with factory"),
     (re.compile(r"Field\s*\([^)]*env\s*="), "Pydantic Field with env parameter"),
-    # REASON: Placeholder values that are not real secrets
-    (re.compile(r'["\']your[-_]'), "Placeholder starting with 'your-' or 'your_'"),
-    (re.compile(r'["\']<[a-zA-Z]'), "Placeholder like <your-key>"),
-    (re.compile(r'["\']xxx'), "Placeholder with xxx"),
-    (re.compile(r'["\']CHANGEME'), "Placeholder CHANGEME"),
-    (re.compile(r'["\']REPLACE'), "Placeholder REPLACE"),
+    # REASON: Placeholder values that are clearly not real secrets
+    # Use stricter patterns to avoid over-matching legitimate code
+    (
+        re.compile(r'["\']your[-_](api[-_]?key|secret|password|token)["\']', re.IGNORECASE),
+        "Placeholder 'your-*' for common secret types",
+    ),
+    (re.compile(r'["\']<[a-zA-Z_-]+>["\']'), "Placeholder like '<your-key>'"),
+    (
+        re.compile(r'["\']x{3,}["\']', re.IGNORECASE),
+        "Placeholder string of only x characters",
+    ),
+    (re.compile(r'["\']CHANGEME["\']'), "Placeholder CHANGEME (exact)"),
+    (re.compile(r'["\']REPLACE_ME["\']'), "Placeholder REPLACE_ME (exact)"),
+    (re.compile(r'["\']TODO[_-]'), "Placeholder TODO marker"),
     # REASON: Comments that explicitly mark lines as examples
     (re.compile(r"#\s*example", re.IGNORECASE), "Explicit example comment"),
     (re.compile(r"#\s*placeholder", re.IGNORECASE), "Explicit placeholder comment"),
     (re.compile(r"#\s*fake", re.IGNORECASE), "Explicit fake comment"),
+    (re.compile(r"#\s*nosec\b", re.IGNORECASE), "Explicit nosec marker"),
     # REASON: Mock/test values should only skip in test files - handled below
 ]
 
 # Additional patterns that only skip in test files
+# SECURITY NOTE: These use word boundaries (\b) to prevent over-matching.
+# E.g., "mock" should match "mock_password" but not "hammock_key".
 TEST_ONLY_SKIP_PATTERNS = [
-    (re.compile(r"mock", re.IGNORECASE), "Mock value in test file"),
-    (re.compile(r"fake", re.IGNORECASE), "Fake value in test file"),
+    (re.compile(r"\bmock[_-]", re.IGNORECASE), "Mock value prefix in test file"),
+    (re.compile(r"[_-]mock\b", re.IGNORECASE), "Mock value suffix in test file"),
+    (re.compile(r"\bfake[_-]", re.IGNORECASE), "Fake value prefix in test file"),
+    (re.compile(r"[_-]fake\b", re.IGNORECASE), "Fake value suffix in test file"),
+    (re.compile(r'=\s*["\']mock["\']', re.IGNORECASE), "Literal 'mock' assignment"),
+    (re.compile(r'=\s*["\']fake["\']', re.IGNORECASE), "Literal 'fake' assignment"),
 ]
 
 

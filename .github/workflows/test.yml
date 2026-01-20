@@ -36,6 +36,12 @@ jobs:
   # CONFIGURATION SYNC NOTE:
   # These validations are synchronized with .pre-commit-config.yaml
   # Pre-commit runs subset at commit time, full validation at pre-push
+  #
+  # SHARED CONFIGURATION FILES:
+  # - pyproject.toml: ruff [tool.ruff], mypy [tool.mypy]
+  # - pyrightconfig.json: pyright settings
+  #
+  # POETRY VERSION: Must match POETRY_VERSION env var (currently 2.2.1)
   # =============================================================================
 
   # Phase 1 - Code Quality
@@ -202,6 +208,7 @@ jobs:
         run: poetry run python scripts/validation/validate_secrets.py src/
 
       # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-push stage
+      # Note: Runs at pre-push in pre-commit (slower scan), but CI runs all validations in Phase 1
       - name: Validate naming conventions
         run: poetry run python scripts/validation/validate_naming.py src/
 

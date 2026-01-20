@@ -37,6 +37,56 @@ class PydanticPatternVisitor(ast.NodeVisitor):
         self.in_class: str | None = None
         self.is_pydantic_model = False
 
+    def _is_config_dict_call(self, node: ast.expr) -> bool:
+        """Check if a node is a ConfigDict() call (handles both Name and Attribute)."""
+        if not isinstance(node, ast.Call):
+            return False
+        func = node.func
+        # Handle: ConfigDict() or pydantic.ConfigDict()
+        return (isinstance(func, ast.Name) and func.id == "ConfigDict") or (
+            isinstance(func, ast.Attribute) and func.attr == "ConfigDict"
+        )
+
+    def _is_empty_config_dict(self, node: ast.Call) -> bool:
+        """Check if a ConfigDict call has no arguments."""
+        return not node.args and not node.keywords
+
+    def _check_model_config_value(
+        self, value: ast.expr, lineno: int, class_name: str
+    ) -> None:
+        """Check the value assigned to model_config and add violations if needed."""
+        if isinstance(value, ast.Call) and self._is_config_dict_call(value):
+            # Check if ConfigDict() with no args
+            if self._is_empty_config_dict(value):
+                self.violations.append(
+                    Violation(
+                        self.filepath,
+                        lineno,
+                        f"Empty ConfigDict() in {class_name} - "
+                        "add explicit configuration like ConfigDict(frozen=True)",
+                    )
+                )
+        elif isinstance(value, ast.Dict):
+            # Check for bare dict: model_config = {} or model_config = {...}
+            if not value.keys:
+                self.violations.append(
+                    Violation(
+                        self.filepath,
+                        lineno,
+                        f"Empty dict for model_config in {class_name} - "
+                        "use ConfigDict() with explicit settings like ConfigDict(frozen=True)",
+                    )
+                )
+            else:
+                self.violations.append(
+                    Violation(
+                        self.filepath,
+                        lineno,
+                        f"Bare dict for model_config in {class_name} - "
+                        "use ConfigDict() instead of plain dict",
+                    )
+                )
+
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""
         # Check if this is a Pydantic model (inherits from BaseModel)
@@ -55,54 +105,38 @@ class PydanticPatternVisitor(ast.NodeVisitor):
             # Track if model_config is defined
             has_model_config = False
 
-            # Check for model_config patterns
+            # Check for model_config patterns in class body
             for item in node.body:
+                # Handle: model_config = ConfigDict(...) or model_config = {}
                 if isinstance(item, ast.Assign):
                     for target in item.targets:
                         if isinstance(target, ast.Name) and target.id == "model_config":
                             has_model_config = True
-                            if isinstance(item.value, ast.Call):
-                                # Check if ConfigDict() with no args
-                                if (
-                                    isinstance(item.value.func, ast.Name)
-                                    and item.value.func.id == "ConfigDict"
-                                    and not item.value.args
-                                    and not item.value.keywords
-                                ):
-                                    self.violations.append(
-                                        Violation(
-                                            self.filepath,
-                                            item.lineno,
-                                            f"Empty ConfigDict() in {node.name} - "
-                                            "add explicit configuration or remove",
-                                        )
-                                    )
-                            elif isinstance(item.value, ast.Dict):
-                                # Check for bare dict: model_config = {}
-                                if not item.value.keys:
-                                    self.violations.append(
-                                        Violation(
-                                            self.filepath,
-                                            item.lineno,
-                                            f"Empty dict for model_config in {node.name} - "
-                                            "use ConfigDict() with explicit settings or remove",
-                                        )
-                                    )
-                                else:
-                                    self.violations.append(
-                                        Violation(
-                                            self.filepath,
-                                            item.lineno,
-                                            f"Bare dict for model_config in {node.name} - "
-                                            "use ConfigDict() instead of plain dict",
-                                        )
-                                    )
+                            self._check_model_config_value(
+                                item.value, item.lineno, node.name
+                            )
+
+                # Handle: model_config: ConfigDict = ConfigDict(...)
+                elif isinstance(item, ast.AnnAssign):
+                    if (
+                        isinstance(item.target, ast.Name)
+                        and item.target.id == "model_config"
+                    ):
+                        has_model_config = True
+                        if item.value is not None:
+                            self._check_model_config_value(
+                                item.value, item.lineno, node.name
+                            )
 
             # Check for missing model_config (only if model has fields)
+            # A field is an annotated assignment that:
+            # - Doesn't start with underscore (private)
+            # - Is not model_config itself
             has_fields = any(
                 isinstance(item, ast.AnnAssign)
                 and isinstance(item.target, ast.Name)
                 and not item.target.id.startswith("_")
+                and item.target.id != "model_config"
                 for item in node.body
             )
 

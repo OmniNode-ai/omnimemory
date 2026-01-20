@@ -119,6 +119,7 @@ class ErrorCategoryInfo(BaseModel):
         validate_default=True,
         extra="forbid",
         frozen=True,  # Category info is immutable
+        from_attributes=True,  # Enable ORM-style attribute access
     )
 
     prefix: str = Field(description="Error code prefix")
@@ -319,8 +320,8 @@ class ValidationError(OmniMemoryError):
         elif "range" in message.lower():
             error_code = OmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
-        # Build context with validation details
-        context = kwargs.get("context") or {}
+        # Build context with validation details - normalize to mutable dict
+        context: dict[str, Any] = dict(kwargs.get("context") or {})
         if field_name:
             context["field_name"] = field_name
         if field_value is not None:
@@ -365,8 +366,8 @@ class StorageError(OmniMemoryError):
         elif "transaction" in message.lower():
             error_code = OmniMemoryErrorCode.TRANSACTION_FAILED
 
-        # Build context with storage details
-        context = kwargs.get("context") or {}
+        # Build context with storage details - normalize to mutable dict
+        context: dict[str, Any] = dict(kwargs.get("context") or {})
         if storage_system:
             context["storage_system"] = storage_system
         if operation:
@@ -412,8 +413,8 @@ class RetrievalError(OmniMemoryError):
         elif "filter" in message.lower():
             error_code = OmniMemoryErrorCode.FILTER_INVALID
 
-        # Build context with retrieval details
-        context = kwargs.get("context") or {}
+        # Build context with retrieval details - normalize to mutable dict
+        context: dict[str, Any] = dict(kwargs.get("context") or {})
         if memory_id:
             context["memory_id"] = str(memory_id)
         if query:
@@ -456,8 +457,8 @@ class ProcessingError(OmniMemoryError):
         elif "timeout" in message.lower():
             error_code = OmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
-        # Build context with processing details
-        context = kwargs.get("context") or {}
+        # Build context with processing details - normalize to mutable dict
+        context: dict[str, Any] = dict(kwargs.get("context") or {})
         if processing_stage:
             context["processing_stage"] = processing_stage
         if model_name:
@@ -500,8 +501,8 @@ class CoordinationError(OmniMemoryError):
         elif "orchestration" in message.lower():
             error_code = OmniMemoryErrorCode.ORCHESTRATION_FAILED
 
-        # Build context with coordination details
-        context = kwargs.get("context") or {}
+        # Build context with coordination details - normalize to mutable dict
+        context: dict[str, Any] = dict(kwargs.get("context") or {})
         if workflow_id:
             context["workflow_id"] = str(workflow_id)
         if agent_ids:
@@ -543,8 +544,8 @@ class SystemError(OmniMemoryError):
         elif "rate limit" in message.lower():
             error_code = OmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
-        # Build context with system details
-        context = kwargs.get("context") or {}
+        # Build context with system details - normalize to mutable dict
+        context: dict[str, Any] = dict(kwargs.get("context") or {})
         if system_component:
             context["system_component"] = system_component
 

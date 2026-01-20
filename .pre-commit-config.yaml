@@ -2,6 +2,16 @@
 # OmniMemory Pre-commit Configuration
 # Aligned with ONEX ecosystem standards from omnibase_core
 #
+# REQUIREMENTS:
+# ====================================
+# Poetry version: 2.2.1 (must match .github/workflows/test.yml POETRY_VERSION)
+# Python version: 3.12 (must match .github/workflows/test.yml PYTHON_VERSION)
+#
+# CONFIGURATION FILES (shared with CI):
+# ====================================
+# - pyproject.toml: ruff settings [tool.ruff], mypy settings [tool.mypy]
+# - pyrightconfig.json: pyright settings
+#
 # PERFORMANCE OPTIMIZATION:
 # ====================================
 # Two-stage validation strategy for optimal developer experience:
@@ -50,12 +60,16 @@ repos:
       - id: debug-statements
 
   # Python code quality with ruff (replaces black, isort, flake8 - 10-100x faster)
+  # Configuration: pyproject.toml [tool.ruff] section (shared with CI)
   - repo: local
     hooks:
       # FULL CODEBASE FORMATTING: These hooks run on src/ and tests/ (not just staged files)
       # to match CI behavior and prevent "works locally, fails in CI" issues.
       - id: ruff-format
         name: ruff format (auto-format entire codebase)
+        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml lint job
+        # CI runs: poetry run ruff format --check src/ tests/
+        # Pre-commit auto-formats, CI validates (no --check here, CI uses --check)
         entry: poetry run ruff format src/ tests/
         language: system
         pass_filenames: false
@@ -64,6 +78,9 @@ repos:
 
       - id: ruff-fix
         name: ruff check (auto-fix entire codebase)
+        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml lint job
+        # CI runs: poetry run ruff check src/ tests/
+        # Pre-commit auto-fixes (--fix), CI validates (no --fix)
         entry: poetry run ruff check --fix --exit-non-zero-on-fix src/ tests/
         language: system
         pass_filenames: false

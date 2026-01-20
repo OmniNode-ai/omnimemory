@@ -54,74 +54,147 @@ FILE_PATTERNS = {
 # Files to skip (exact filename match)
 SKIP_FILES = {"__init__.py", "conftest.py", "base.py"}
 
-# Directory names to skip (exact directory name match in path parts)
-# - compat: compatibility stubs
-# - protocols: API contracts use standard Request/Response patterns, not Model prefix
-# - enums: Enum files follow enum_xxx.py naming, classes use semantic names (not EnumXxx)
-# - models: Model files follow model_xxx.py naming, classes use semantic names (not ModelXxx)
-# - utils: Utility classes are not domain models, use semantic names
-# - foundation: Foundation models are base infrastructure, use semantic names
-# - __pycache__, .git, tests: standard exclusions
-# NOTE: File naming is enforced via file patterns, class prefix naming is relaxed for
-#       readability and to avoid redundancy (e.g., model_connection_metadata.py containing
-#       ConnectionMetadata vs ModelConnectionMetadata)
+# Directories to skip entirely - no validation at all
+# These are either non-source directories or special cases
 SKIP_DIRECTORIES = {
-    "compat",
     "__pycache__",
     ".git",
-    "tests",
-    "protocols",
-    "enums",
-    "models",
-    "utils",
-    "foundation",
+    ".venv",
+    ".tox",
+    "tests",  # Test files have different naming conventions
+    "compat",  # Compatibility stubs
 }
+
+# Directories where class prefix naming is relaxed for readability
+# File naming is still enforced, but classes can use semantic names
+# (e.g., ConnectionMetadata instead of ModelConnectionMetadata)
+RELAXED_CLASS_PREFIX_DIRECTORIES = {
+    "utils",  # Utility classes are not domain models
+    "foundation",  # Foundation models are base infrastructure
+}
+
+# Directories where ONEX naming conventions are strictly enforced
+# Both file naming (e.g., model_xxx.py) and class naming (e.g., ModelXxx) are validated
+STRICT_NAMING_DIRECTORIES = {
+    "models",
+    "enums",
+    "protocols",
+    "services",
+    "handlers",
+    "mixins",
+    "nodes",
+    "validators",
+}
+
+# Exact relative paths to skip (for specific files that don't follow conventions)
+# Use forward slashes for cross-platform compatibility
+SKIP_PATHS_PATTERNS: list[re.Pattern[str]] = [
+    # Example: re.compile(r"src/omnimemory/legacy/.*"),
+]
 
 
 def get_directory_type(filepath: Path) -> str | None:
-    """Get the type based on parent directory name."""
+    """Get the type based on parent directory name.
+
+    Returns the immediate parent directory name if it's a known type directory.
+    """
     parent = filepath.parent.name
     if parent in FILE_PATTERNS:
         return parent
     return None
 
 
-def validate_file(filepath: Path) -> list[Violation]:
-    """Validate a single Python file."""
-    # Skip files by exact filename match
-    if filepath.name in SKIP_FILES:
-        return []
+def should_skip_file(filepath: Path) -> bool:
+    """Determine if a file should be skipped entirely.
 
-    # Skip files in specific directories (exact directory name match)
-    # Use path.parts to check for exact directory names, not substring matching
-    if any(skip_dir in filepath.parts for skip_dir in SKIP_DIRECTORIES):
+    Uses precise matching:
+    - Exact filename match for SKIP_FILES
+    - Immediate parent directory match for SKIP_DIRECTORIES
+    - Regex patterns for SKIP_PATHS_PATTERNS
+    """
+    # Skip by exact filename
+    if filepath.name in SKIP_FILES:
+        return True
+
+    # Skip by immediate parent directory (not arbitrary ancestor)
+    # This is more precise than checking if any path part matches
+    parent_dir = filepath.parent.name
+    if parent_dir in SKIP_DIRECTORIES:
+        return True
+
+    # Also check for nested skip directories (e.g., tests/unit/)
+    # But only match the directory itself, not files that happen to have similar names
+    for part in filepath.parts[:-1]:  # Exclude the filename
+        if part in SKIP_DIRECTORIES:
+            return True
+
+    # Check against explicit path patterns (regex)
+    filepath_str = str(filepath).replace("\\", "/")  # Normalize for cross-platform
+    for pattern in SKIP_PATHS_PATTERNS:
+        if pattern.search(filepath_str):
+            return True
+
+    return False
+
+
+def is_relaxed_naming_directory(filepath: Path) -> bool:
+    """Check if file is in a directory with relaxed class prefix naming.
+
+    Only the immediate parent directory is checked, not ancestors.
+    """
+    return filepath.parent.name in RELAXED_CLASS_PREFIX_DIRECTORIES
+
+
+def validate_file(filepath: Path) -> list[Violation]:
+    """Validate a single Python file.
+
+    Validates:
+    - File naming conventions based on directory type
+    - Class naming conventions (prefix patterns like ModelXxx, ServiceXxx)
+
+    Files in SKIP_DIRECTORIES are skipped entirely.
+    Files in RELAXED_CLASS_PREFIX_DIRECTORIES skip class prefix validation.
+    """
+    if should_skip_file(filepath):
         return []
 
     violations: list[Violation] = []
-
-    # Validate file naming based on directory
     dir_type = get_directory_type(filepath)
+    relaxed_prefix = is_relaxed_naming_directory(filepath)
+
+    # Validate file naming based on directory type
+    # This applies to all files in typed directories
     if dir_type and dir_type in FILE_PATTERNS:
         if not FILE_PATTERNS[dir_type].match(filepath.name):
-            # Don't fail, just warn - this is advisory
-            pass  # File naming is advisory, not enforced
+            violations.append(
+                Violation(
+                    str(filepath),
+                    0,
+                    f"File '{filepath.name}' in {dir_type}/ should follow naming: "
+                    f"{dir_type[:-1]}_xxx.py (e.g., {dir_type[:-1]}_example.py)",
+                )
+            )
 
     # Validate class naming
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))
-    except (SyntaxError, Exception):
+    except (SyntaxError, UnicodeDecodeError):
         return violations
 
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
             class_name = node.name
 
+            # Skip private classes (single underscore prefix)
+            if class_name.startswith("_"):
+                continue
+
             # Determine expected pattern based on parent class or directory
             expected_pattern = None
             expected_prefix = None
 
-            # Check parent classes
+            # Check parent classes to infer expected naming
             for base in node.bases:
                 base_name = None
                 if isinstance(base, ast.Name):
@@ -140,39 +213,39 @@ def validate_file(filepath: Path) -> list[Violation]:
                         expected_pattern = CLASS_PATTERNS["Protocol"]
                         expected_prefix = "Protocol"
 
-            # Also check by directory
-            if dir_type == "models" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Model"]
-                expected_prefix = "Model"
-            elif dir_type == "enums" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Enum"]
-                expected_prefix = "Enum"
-            elif dir_type == "protocols" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Protocol"]
-                expected_prefix = "Protocol"
-            elif dir_type == "services" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Service"]
-                expected_prefix = "Service"
-            elif dir_type == "handlers" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Handler"]
-                expected_prefix = "Handler"
-            elif dir_type == "mixins" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Mixin"]
-                expected_prefix = "Mixin"
-            elif dir_type == "nodes" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Node"]
-                expected_prefix = "Node"
-            elif dir_type == "validators" and expected_prefix is None:
-                expected_pattern = CLASS_PATTERNS["Validator"]
-                expected_prefix = "Validator"
+                    # Found a pattern match from parent class, stop checking
+                    if expected_prefix:
+                        break
 
+            # Check by directory type if no parent class determined the pattern
+            if expected_prefix is None and dir_type:
+                # Map directory type to class pattern
+                dir_to_pattern = {
+                    "models": ("Model", CLASS_PATTERNS["Model"]),
+                    "enums": ("Enum", CLASS_PATTERNS["Enum"]),
+                    "protocols": ("Protocol", CLASS_PATTERNS["Protocol"]),
+                    "services": ("Service", CLASS_PATTERNS["Service"]),
+                    "handlers": ("Handler", CLASS_PATTERNS["Handler"]),
+                    "mixins": ("Mixin", CLASS_PATTERNS["Mixin"]),
+                    "nodes": ("Node", CLASS_PATTERNS["Node"]),
+                    "validators": ("Validator", CLASS_PATTERNS["Validator"]),
+                }
+                if dir_type in dir_to_pattern:
+                    expected_prefix, expected_pattern = dir_to_pattern[dir_type]
+
+            # Skip class prefix validation for relaxed directories
+            # (utils, foundation - these use semantic names for readability)
+            if relaxed_prefix:
+                continue
+
+            # Validate class naming convention
             if expected_pattern and not expected_pattern.match(class_name):
                 violations.append(
                     Violation(
                         str(filepath),
                         node.lineno,
                         f"Class '{class_name}' should follow ONEX naming: "
-                        f"{expected_prefix}Xxx",
+                        f"{expected_prefix}Xxx (e.g., {expected_prefix}{class_name})",
                     )
                 )
 

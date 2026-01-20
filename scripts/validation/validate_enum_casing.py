@@ -39,9 +39,11 @@ class EnumCasingVisitor(ast.NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition to find enums."""
         # Check if this is an Enum subclass
+        # Include all standard enum types: Enum, StrEnum, IntEnum, IntFlag, Flag
+        enum_types = ("Enum", "StrEnum", "IntEnum", "IntFlag", "Flag")
         is_enum = any(
-            (isinstance(base, ast.Name) and base.id in ("Enum", "StrEnum", "IntEnum"))
-            or (isinstance(base, ast.Attribute) and base.attr in ("Enum", "StrEnum", "IntEnum"))
+            (isinstance(base, ast.Name) and base.id in enum_types)
+            or (isinstance(base, ast.Attribute) and base.attr in enum_types)
             for base in node.bases
         )
 

@@ -172,6 +172,27 @@ class SearchFilters(BaseMemoryModel):
         None, description="Filter by embedding availability"
     )
 
+    @field_validator("tags", "source_agents", mode="before")
+    @classmethod
+    def convert_collection_to_model_optional_string_list(
+        cls, v: Any
+    ) -> ModelOptionalStringList | Any:
+        """Convert list or set inputs to ModelOptionalStringList for backward compatibility.
+
+        Accepts:
+        - list[str]: Converts to ModelOptionalStringList(values=list)
+        - set[str]: Converts to ModelOptionalStringList(values=sorted list)
+        - ModelOptionalStringList: Passes through unchanged
+        - None: Passes through unchanged
+        """
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return ModelOptionalStringList(values=v)
+        if isinstance(v, set | frozenset):
+            return ModelOptionalStringList(values=sorted(v))
+        return v
+
 
 class SearchResult(BaseMemoryModel):
     """Individual search result with scoring."""
@@ -274,9 +295,11 @@ class MemoryRecord(BaseMemoryModel):
     )
     embedding: list[float] | None = Field(
         None,
-        description="Vector embedding for semantic search",
+        description="Vector embedding for semantic search. Supports all common dimensions "
+        "including: OpenAI (1536, 3072), Cohere (1024, 4096), sentence-transformers "
+        "(384, 512, 768), Google (768), and larger research models. Maximum 65536 dimensions.",
         min_length=1,
-        max_length=8192,
+        max_length=65536,
     )
     embedding_model: str | None = Field(
         None, description="Model used to generate embedding"

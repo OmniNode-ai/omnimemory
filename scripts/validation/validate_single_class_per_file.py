@@ -44,8 +44,12 @@ EXEMPT_DIRECTORIES = {
 
 
 def is_enum_class(node: ast.ClassDef) -> bool:
-    """Check if a class definition is an Enum subclass."""
-    enum_bases = {"Enum", "StrEnum", "IntEnum", "IntFlag", "Flag", "auto"}
+    """Check if a class definition is an Enum subclass.
+
+    Note: We check for actual Enum base classes only.
+    'auto' is a function used for auto-numbering, not a base class.
+    """
+    enum_bases = {"Enum", "StrEnum", "IntEnum", "IntFlag", "Flag"}
     for base in node.bases:
         if isinstance(base, ast.Name) and base.id in enum_bases:
             return True
