@@ -25,9 +25,9 @@ from omnimemory.models.config import (
 )
 from omnimemory.settings import (
     FilesystemSettings,
-    MemoryServiceSettings,
     PostgresSettings,
     QdrantSettings,
+    SettingsMemoryService,
     load_settings,
 )
 
@@ -160,7 +160,7 @@ class TestQdrantSettings:
         assert isinstance(config, ModelQdrantConfig)
 
 
-class TestMemoryServiceSettings:
+class TestSettingsMemoryService:
     """Tests for top-level service settings."""
 
     def test_load_minimal_settings(
@@ -170,7 +170,7 @@ class TestMemoryServiceSettings:
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         assert settings.postgres_enabled is False
         assert settings.qdrant_enabled is False
 
@@ -181,7 +181,7 @@ class TestMemoryServiceSettings:
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         config = settings.to_config()
 
         assert isinstance(config, ModelMemoryServiceConfig)
@@ -196,7 +196,7 @@ class TestMemoryServiceSettings:
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
         # Note: Missing OMNIMEMORY__POSTGRES__DSN and PASSWORD
 
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         assert settings.postgres_enabled is True
 
         # to_config() should fail because postgres settings are missing
@@ -215,7 +215,7 @@ class TestMemoryServiceSettings:
         )
         monkeypatch.setenv("OMNIMEMORY__POSTGRES__PASSWORD", "secret")
 
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         config = settings.to_config()
 
         assert config.postgres is not None
@@ -228,7 +228,7 @@ class TestMemoryServiceSettings:
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
         monkeypatch.setenv("OMNIMEMORY__QDRANT_ENABLED", "true")
 
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         config = settings.to_config()
 
         assert config.qdrant is not None
@@ -244,7 +244,7 @@ class TestMemoryServiceSettings:
         monkeypatch.setenv("OMNIMEMORY__ENABLE_LOGGING", "false")
         monkeypatch.setenv("OMNIMEMORY__DEBUG_MODE", "true")
 
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         assert settings.service_name == "custom-service"
         assert settings.enable_metrics is False
         assert settings.enable_logging is False
@@ -264,12 +264,12 @@ class TestLoadSettings:
     def test_load_settings_returns_settings(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test load_settings returns MemoryServiceSettings."""
+        """Test load_settings returns SettingsMemoryService."""
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
         settings = load_settings()
-        assert isinstance(settings, MemoryServiceSettings)
+        assert isinstance(settings, SettingsMemoryService)
 
     def test_missing_required_fails_fast(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test missing required settings fails immediately with ValidationError."""

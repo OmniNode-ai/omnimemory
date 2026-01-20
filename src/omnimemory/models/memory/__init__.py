@@ -10,6 +10,7 @@ from .model_memory_item import ModelMemoryItem
 from .model_memory_query import ModelMemoryQuery
 from .model_memory_search_result import ModelMemorySearchResult
 from .model_memory_storage_config import ModelMemoryStorageConfig
+from .model_similarity_result import ModelSimilarityResult
 
 __all__ = [
     "EnumMemoryStorageType",
@@ -17,4 +18,5 @@ __all__ = [
     "ModelMemoryQuery",
     "ModelMemorySearchResult",
     "ModelMemoryStorageConfig",
+    "ModelSimilarityResult",
 ]

@@ -190,7 +190,7 @@ class QdrantSettings(BaseSettings):
         URL: Qdrant server URL (default: http://localhost:6333)
         API_KEY: Qdrant API key (optional)
         COLLECTION_NAME: Default collection name (default: omnimemory)
-        VECTOR_SIZE: Vector embedding dimensions (default: 1536)
+        VECTOR_SIZE: Vector embedding dimensions (default: 1024)
         TIMEOUT_SECONDS: Request timeout (default: 30)
         GRPC_PORT: gRPC port for high-performance ops (optional)
         PREFER_GRPC: Prefer gRPC over HTTP (default: false)
@@ -218,7 +218,7 @@ class QdrantSettings(BaseSettings):
         description="Default collection name for memory vectors",
     )
     vector_size: int = Field(
-        default=1536,
+        default=1024,
         ge=1,
         le=65536,
         description="Vector embedding dimensions",
@@ -281,7 +281,49 @@ class QdrantSettings(BaseSettings):
         )
 
 
-class MemoryServiceSettings(BaseSettings):
+class EmbeddingSettings(BaseSettings):
+    """Embedding server configuration loaded from environment.
+
+    Required when using real embeddings (use_real_embeddings=True in handlers).
+
+    Environment variables (prefix: OMNIMEMORY__EMBEDDING__):
+        SERVER_URL: URL of the embedding server (REQUIRED - no default)
+        TIMEOUT_SECONDS: Request timeout (default: 5.0)
+        MAX_RETRIES: Maximum retry attempts (default: 3)
+        DIMENSION: Expected embedding vector dimension (default: 1024)
+
+    Example:
+        export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8102
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="OMNIMEMORY__EMBEDDING__",
+        extra="forbid",
+    )
+
+    server_url: str = Field(
+        ...,
+        description="URL of the embedding server (REQUIRED - no default)",
+    )
+    timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        description="Request timeout in seconds",
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Maximum retry attempts for transient failures",
+    )
+    dimension: int = Field(
+        default=1024,
+        gt=0,
+        description="Expected embedding vector dimension",
+    )
+
+
+class SettingsMemoryService(BaseSettings):
     """Top-level settings for OmniMemory service.
 
     Loads configuration from environment variables with OMNIMEMORY__ prefix.
@@ -292,6 +334,9 @@ class MemoryServiceSettings(BaseSettings):
     Optional backend enablement:
         - OMNIMEMORY__POSTGRES_ENABLED=true (then set OMNIMEMORY__POSTGRES__* vars)
         - OMNIMEMORY__QDRANT_ENABLED=true (then set OMNIMEMORY__QDRANT__* vars)
+
+    Embedding server (required when use_real_embeddings=True):
+        - OMNIMEMORY__EMBEDDING__SERVER_URL (REQUIRED - no default)
 
     Service-level settings:
         - OMNIMEMORY__SERVICE_NAME (default: omnimemory)
@@ -304,7 +349,7 @@ class MemoryServiceSettings(BaseSettings):
         export OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
 
         # Load settings
-        settings = MemoryServiceSettings()
+        settings = SettingsMemoryService()
         config = settings.to_config()
     """
 
@@ -321,6 +366,10 @@ class MemoryServiceSettings(BaseSettings):
     qdrant_enabled: bool = Field(
         default=False,
         description="Enable Qdrant backend",
+    )
+    embedding_enabled: bool = Field(
+        default=False,
+        description="Enable real embedding server (requires EMBEDDING__SERVER_URL)",
     )
 
     # Service-level settings
@@ -382,14 +431,14 @@ class MemoryServiceSettings(BaseSettings):
         )
 
 
-def load_settings() -> MemoryServiceSettings:
+def load_settings() -> SettingsMemoryService:
     """Load settings from environment variables.
 
     This is the primary entry point for loading configuration.
     Fails fast with clear error messages if required settings are missing.
 
     Returns:
-        MemoryServiceSettings with validated configuration
+        SettingsMemoryService with validated configuration
 
     Raises:
         pydantic.ValidationError: If required settings missing or invalid
@@ -402,4 +451,4 @@ def load_settings() -> MemoryServiceSettings:
         >>> config.filesystem.base_path
         PosixPath('/tmp/omnimemory')
     """
-    return MemoryServiceSettings()
+    return SettingsMemoryService()

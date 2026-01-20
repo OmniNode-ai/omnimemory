@@ -41,10 +41,10 @@ class ModelQdrantConfig(BaseModel):
         description="Default collection name for memory vectors",
     )
     vector_size: int = Field(
-        default=1536,
+        default=1024,
         ge=1,
         le=65536,
-        description="Vector embedding dimensions (default 1536 for OpenAI embeddings)",
+        description="Vector embedding dimensions (1024 for MLX Qwen3)",
     )
 
     # Performance settings

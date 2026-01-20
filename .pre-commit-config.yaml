@@ -107,11 +107,12 @@ repos:
         args: [--show-error-codes, --no-error-summary, src/omnimemory]
         pass_filenames: false
         # Include pydantic, pydantic-settings for the mypy plugin,
-        # and redis for type checking (must match CI environment)
+        # and redis, httpx for type checking (must match CI environment)
         additional_dependencies:
           - pydantic>=2.10.0
           - pydantic-settings>=2.7.0
           - redis>=6.4.0
+          - httpx>=0.28.0
         stages: [pre-push]
 
   # Type checking with pyright (using official repo for CI compatibility)

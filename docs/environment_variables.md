@@ -11,7 +11,7 @@ OmniMemory uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/py
 ## Configuration Hierarchy
 
 ```
-MemoryServiceSettings (top-level)
+SettingsMemoryService (top-level)
 |-- postgres_enabled (bool)
 |-- qdrant_enabled (bool)
 |-- service_name (str)
@@ -38,18 +38,24 @@ MemoryServiceSettings (top-level)
 |   |-- ssl_mode
 |   +-- schema_name
 |
-+-- qdrant (optional, requires qdrant_enabled=true)
-    |-- url
-    |-- api_key
-    |-- collection_name
-    |-- vector_size
+|-- qdrant (optional, requires qdrant_enabled=true)
+|   |-- url
+|   |-- api_key
+|   |-- collection_name
+|   |-- vector_size
+|   |-- timeout_seconds
+|   |-- grpc_port
+|   |-- prefer_grpc
+|   |-- default_limit
+|   |-- score_threshold
+|   |-- distance_metric
+|   +-- on_disk
+|
++-- embedding (optional, requires embedding_enabled=true)
+    |-- server_url (REQUIRED - no default)
     |-- timeout_seconds
-    |-- grpc_port
-    |-- prefer_grpc
-    |-- default_limit
-    |-- score_threshold
-    |-- distance_metric
-    +-- on_disk
+    |-- max_retries
+    +-- dimension
 ```
 
 ## Required Variables (Phase 1 Minimal)
@@ -68,6 +74,7 @@ Top-level settings that control service behavior.
 |----------|------|---------|-------------|
 | `OMNIMEMORY__POSTGRES_ENABLED` | bool | `false` | Enable PostgreSQL backend |
 | `OMNIMEMORY__QDRANT_ENABLED` | bool | `false` | Enable Qdrant vector backend |
+| `OMNIMEMORY__EMBEDDING_ENABLED` | bool | `false` | Enable real embedding server (requires `EMBEDDING__SERVER_URL`) |
 | `OMNIMEMORY__SERVICE_NAME` | str | `omnimemory` | Name of the memory service instance |
 | `OMNIMEMORY__ENABLE_METRICS` | bool | `true` | Enable performance metrics collection |
 | `OMNIMEMORY__ENABLE_LOGGING` | bool | `true` | Enable operation logging |
@@ -115,7 +122,7 @@ Set `OMNIMEMORY__QDRANT_ENABLED=true` to enable Qdrant vector backend for semant
 | `OMNIMEMORY__QDRANT__URL` | HttpUrl | `http://localhost:6333` | Valid HTTP(S) URL | Qdrant server URL |
 | `OMNIMEMORY__QDRANT__API_KEY` | SecretStr | `None` | - | Qdrant API key (optional) |
 | `OMNIMEMORY__QDRANT__COLLECTION_NAME` | str | `omnimemory` | - | Default collection name for memory vectors |
-| `OMNIMEMORY__QDRANT__VECTOR_SIZE` | int | `1536` | 1 - 65536 | Vector embedding dimensions |
+| `OMNIMEMORY__QDRANT__VECTOR_SIZE` | int | `1024` | 1 - 65536 | Vector embedding dimensions |
 | `OMNIMEMORY__QDRANT__TIMEOUT_SECONDS` | int | `30` | 1 - 300 | Request timeout in seconds |
 | `OMNIMEMORY__QDRANT__GRPC_PORT` | int | `None` | 1 - 65535 | gRPC port for high-performance operations |
 | `OMNIMEMORY__QDRANT__PREFER_GRPC` | bool | `false` | - | Prefer gRPC over HTTP for operations |
@@ -123,6 +130,28 @@ Set `OMNIMEMORY__QDRANT_ENABLED=true` to enable Qdrant vector backend for semant
 | `OMNIMEMORY__QDRANT__SCORE_THRESHOLD` | float | `0.7` | 0.0 - 1.0 | Minimum similarity score threshold |
 | `OMNIMEMORY__QDRANT__DISTANCE_METRIC` | str | `Cosine` | Cosine, Euclid, Dot | Distance metric for vector similarity |
 | `OMNIMEMORY__QDRANT__ON_DISK` | bool | `false` | - | Store vectors on disk instead of RAM |
+
+## Embedding Configuration (Optional)
+
+Set `OMNIMEMORY__EMBEDDING_ENABLED=true` to enable the real embedding server for semantic search operations. This is used by the memory retrieval handlers when `use_real_embeddings=True`.
+
+**IMPORTANT**: The `SERVER_URL` has NO default value and MUST be provided explicitly. This prevents accidental use of wrong/hardcoded URLs.
+
+| Variable | Type | Default | Constraints | Description |
+|----------|------|---------|-------------|-------------|
+| `OMNIMEMORY__EMBEDDING__SERVER_URL` | str | **REQUIRED** | Valid HTTP(S) URL | URL of the embedding server (e.g., MLX server) |
+| `OMNIMEMORY__EMBEDDING__TIMEOUT_SECONDS` | float | `5.0` | > 0 | Request timeout in seconds |
+| `OMNIMEMORY__EMBEDDING__MAX_RETRIES` | int | `3` | 0 - 10 | Maximum retry attempts for transient failures |
+| `OMNIMEMORY__EMBEDDING__DIMENSION` | int | `1024` | > 0 | Expected embedding vector dimension |
+
+**Example**:
+```bash
+# Enable real embeddings with explicit server URL
+export OMNIMEMORY__EMBEDDING_ENABLED=true
+export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8102
+```
+
+**Note**: When using `HandlerQdrantMockConfig` with `use_real_embeddings=True`, the `embedding_server_url` must be provided explicitly (typically loaded from this environment variable). The handler will fail fast with a clear error if the URL is missing or invalid.
 
 ## Example Configurations
 
@@ -156,7 +185,11 @@ OMNIMEMORY__POSTGRES__SCHEMA_NAME=omnimemory_dev
 OMNIMEMORY__QDRANT_ENABLED=true
 OMNIMEMORY__QDRANT__URL=http://localhost:6333
 OMNIMEMORY__QDRANT__COLLECTION_NAME=omnimemory_dev
-OMNIMEMORY__QDRANT__VECTOR_SIZE=1536
+OMNIMEMORY__QDRANT__VECTOR_SIZE=1024
+
+# Embedding (for real semantic search)
+OMNIMEMORY__EMBEDDING_ENABLED=true
+OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8102
 ```
 
 ### Production
@@ -191,7 +224,7 @@ OMNIMEMORY__QDRANT_ENABLED=true
 OMNIMEMORY__QDRANT__URL=https://qdrant.prod.internal:6333
 OMNIMEMORY__QDRANT__API_KEY=<from-vault>
 OMNIMEMORY__QDRANT__COLLECTION_NAME=omnimemory_prod
-OMNIMEMORY__QDRANT__VECTOR_SIZE=1536
+OMNIMEMORY__QDRANT__VECTOR_SIZE=1024
 OMNIMEMORY__QDRANT__TIMEOUT_SECONDS=60
 OMNIMEMORY__QDRANT__PREFER_GRPC=true
 OMNIMEMORY__QDRANT__GRPC_PORT=6334
@@ -369,7 +402,7 @@ export OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
 ### "extra fields not permitted" Error
 
 ```
-pydantic.ValidationError: 1 validation error for MemoryServiceSettings
+pydantic.ValidationError: 1 validation error for SettingsMemoryService
 OMNIMEMORY__TYPO_SETTING
   extra fields not permitted [type=extra_forbidden]
 ```

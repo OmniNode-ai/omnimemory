@@ -1,0 +1,171 @@
+---
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+
+# Memory Retrieval EFFECT - ONEX Contract
+# EFFECT node for memory search operations across retrieval backends.
+
+# === REQUIRED ROOT FIELDS ===
+name: "memory_retrieval_effect"
+node_version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 1, minor: 0, patch: 0}
+description: "Memory retrieval effect node for search operations. P2A: Qdrant semantic search, PostgreSQL
+  full-text search, and Graph traversal backends."
+node_type: "EFFECT"
+input_model: "ModelMemoryRetrievalRequest"
+output_model: "ModelMemoryRetrievalResponse"
+
+# === IO OPERATIONS (Required for EFFECT nodes) ===
+io_operations:
+  - operation_type: "vector_query"
+    atomic: false
+    timeout_seconds: 10
+    validation_enabled: true
+  - operation_type: "database_read"
+    atomic: false
+    timeout_seconds: 10
+    validation_enabled: true
+  - operation_type: "graph_traversal"
+    atomic: false
+    timeout_seconds: 15
+    validation_enabled: true
+
+# === NODE CONFIGURATION ===
+tool_specification:
+  tool_name: "node_memory_retrieval_effect"
+  version: {major: 0, minor: 1, patch: 0}
+  description: "Memory retrieval effect node for search operations"
+  main_tool_class: "NodeMemoryRetrievalEffect"
+  container_injection: "ONEXContainer"
+  business_logic_pattern: "effect"
+
+# === SERVICE CONFIGURATION ===
+service_configuration:
+  is_persistent_service: false
+  requires_external_dependencies: true
+
+# === INPUT/OUTPUT STATE ===
+input_state:
+  object_type: "object"
+  required: ["operation"]
+  optional: ["query_text", "query_embedding", "snapshot_id", "limit", "similarity_threshold", "traversal_depth",
+    "relationship_types", "metadata_filters", "tags"]
+
+output_state:
+  object_type: "object"
+  required: ["status"]
+  optional: ["results", "total_count", "query_embedding_used", "error_message"]
+
+# === ACTIONS ===
+actions:
+  - name: "search"
+    description: "Semantic similarity search using vector embeddings"
+    inputs: ["query_text", "query_embedding", "limit", "similarity_threshold"]
+    outputs: ["results", "total_count"]
+
+  - name: "search_text"
+    description: "Full-text search using SQL LIKE/FTS"
+    inputs: ["query_text", "limit", "tags"]
+    outputs: ["results", "total_count"]
+
+  - name: "search_graph"
+    description: "Graph traversal for relationship-based retrieval"
+    inputs: ["snapshot_id", "traversal_depth", "relationship_types"]
+    outputs: ["results", "total_count"]
+
+  - name: "health_check"
+    description: "Check node health status"
+    inputs: []
+    outputs: ["status"]
+
+# === DEPENDENCIES ===
+# P2A: Qdrant primary for semantic search, DB/Graph adapters
+dependencies:
+  # P2A Primary Backend
+  - name: qdrant
+    dependency_type: service
+    description: Qdrant vector store for semantic similarity search (P2A primary)
+    required: true
+
+  # P2A Additional Backends
+  - name: postgresql
+    dependency_type: service
+    description: PostgreSQL database for full-text search (P2A adapter)
+    required: false
+  - name: graph_db
+    dependency_type: service
+    description: Graph database (Neo4j/Memgraph) for relationship traversal (P2A adapter)
+    required: false
+
+  # Protocol Dependencies
+  - name: ProtocolVectorStoreHandler
+    dependency_type: protocol
+    description: Vector store operations protocol
+  - name: ProtocolMemoryOperations
+    dependency_type: protocol
+    description: Memory CRUD operations protocol
+
+# === PERFORMANCE ===
+performance:
+  max_response_time_ms: 100
+
+# === EVENT TYPE CONFIGURATION ===
+event_type:
+  version: {major: 1, minor: 0, patch: 0}
+  primary_events: ["memory_searched", "memory_retrieved", "graph_traversed"]
+  event_categories: ["memory", "effect", "retrieval", "search"]
+  publish_events: true
+  subscribe_events: false
+  event_routing: "memory"
+
+# === INFRASTRUCTURE ===
+infrastructure:
+  retrieval_backends:
+    - qdrant  # P2A primary - semantic search
+    - postgresql  # P2A adapter - full-text search
+    - graph_db  # P2A adapter - relationship traversal
+
+# === ENUM DEFINITIONS ===
+# These enums MUST match exactly with the Pydantic Literal types in the models
+enums:
+  operation:
+    description: "Retrieval operation to perform"
+    values:
+      - search  # Semantic similarity search using vector embeddings
+      - search_text  # Full-text search using SQL LIKE/FTS
+      - search_graph  # Graph traversal for relationship-based retrieval
+  status:
+    description: "Operation result status"
+    values:
+      - success
+      - error
+      - no_results
+
+# === VALIDATION RULES ===
+validation_rules:
+  strict_typing_enabled: true
+  input_validation_enabled: true
+  output_validation_enabled: true
+  performance_validation_enabled: true
+  constraint_definitions:
+    operation: "Literal['search', 'search_text', 'search_graph'] - must match enums.operation.values"
+    status: "Literal['success', 'error', 'no_results'] - must match enums.status.values"
+    query_text: "string type for text query (required for search/search_text unless embedding provided)"
+    query_embedding: "list[float] for pre-computed embedding vector"
+    snapshot_id: "string type for starting snapshot ID (required for search_graph)"
+    limit: "int (1-1000) - maximum number of results"
+    similarity_threshold: "float (0.0-1.0) - minimum similarity score for results"
+    traversal_depth: "int (1-10) - maximum depth for graph traversal"
+    relationship_types: "list[str] - filter graph traversal by relationship types"
+
+# === TAGS ===
+tags:
+  - memory
+  - retrieval
+  - effect
+  - search
+  - semantic
+  - vector
+  - graph
+  - qdrant
+  - postgresql
