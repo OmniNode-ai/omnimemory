@@ -62,12 +62,11 @@ import hashlib
 import logging
 import math
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
 
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
 from pydantic import BaseModel, ConfigDict, Field
-
-if TYPE_CHECKING:
-    from omnibase_core.models.omnimemory import ModelMemorySnapshot
 
 from ..clients.embedding_client import (
     EmbeddingClient,

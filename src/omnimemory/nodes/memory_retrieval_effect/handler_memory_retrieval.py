@@ -42,12 +42,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, assert_never
+from typing import assert_never
 
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
 from pydantic import BaseModel, ConfigDict, Field
-
-if TYPE_CHECKING:
-    from omnibase_core.models.omnimemory import ModelMemorySnapshot
 
 from .handlers import (
     HandlerDbMock,

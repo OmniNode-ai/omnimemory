@@ -26,12 +26,12 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
 from pydantic import BaseModel, ConfigDict, Field
-
-if TYPE_CHECKING:
-    from omnibase_core.models.omnimemory import ModelMemorySnapshot
 
 __all__ = ["ModelMemoryRetrievalResponse", "ModelSearchResult"]
 
