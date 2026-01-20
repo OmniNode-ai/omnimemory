@@ -107,17 +107,24 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                 break
 
         # Check if this class has model_config defined
+        # Use explicit flag for clarity instead of error-prone for-else-break pattern
+        model_config_found = False
         for item in node.body:
+            if model_config_found:
+                break
             if isinstance(item, ast.Assign):
                 for target in item.targets:
                     if isinstance(target, ast.Name) and target.id == "model_config":
                         self.classes_with_model_config.add(node.name)
+                        model_config_found = True
+                        break
             elif isinstance(item, ast.AnnAssign):
                 if (
                     isinstance(item.target, ast.Name)
                     and item.target.id == "model_config"
                 ):
                     self.classes_with_model_config.add(node.name)
+                    model_config_found = True
 
         self.generic_visit(node)
 
@@ -192,6 +199,52 @@ class PydanticPatternVisitor(ast.NodeVisitor):
         if isinstance(func, ast.Attribute):
             return func.attr in {"ConfigDict", "SettingsConfigDict"}
         return False
+
+    def _is_classvar_annotation(self, annotation: ast.expr | None) -> bool:
+        """Check if an annotation is a ClassVar type.
+
+        Handles:
+        - ClassVar[T]
+        - typing.ClassVar[T]
+        """
+        if annotation is None:
+            return False
+        # Handle ClassVar[T] - subscript with ClassVar as value
+        if isinstance(annotation, ast.Subscript):
+            value = annotation.value
+            if isinstance(value, ast.Name) and value.id == "ClassVar":
+                return True
+            if isinstance(value, ast.Attribute) and value.attr == "ClassVar":
+                return True
+        # Handle bare ClassVar (without subscript, though less common)
+        if isinstance(annotation, ast.Name) and annotation.id == "ClassVar":
+            return True
+        if isinstance(annotation, ast.Attribute) and annotation.attr == "ClassVar":
+            return True
+        return False
+
+    def _is_pydantic_field(self, item: ast.stmt) -> bool:
+        """Check if an AST statement is a Pydantic model field.
+
+        A field is an annotated assignment that:
+        - Is an ast.AnnAssign
+        - Has an ast.Name target (simple variable name)
+        - Doesn't start with underscore (private)
+        - Is not model_config
+        - Is not a ClassVar annotation
+        """
+        if not isinstance(item, ast.AnnAssign):
+            return False
+        if not isinstance(item.target, ast.Name):
+            return False
+        name = item.target.id
+        if name.startswith("_"):
+            return False
+        if name == "model_config":
+            return False
+        if self._is_classvar_annotation(item.annotation):
+            return False
+        return True
 
     def _check_inherited_model_config(self, node: ast.ClassDef) -> bool:
         """Check if model_config is inherited from a parent class.
@@ -332,16 +385,11 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                             )
 
             # Check for missing model_config (only if model has fields)
-            # A field is an annotated assignment that:
-            # - Doesn't start with underscore (private)
-            # - Is not model_config itself
-            has_fields = any(
-                isinstance(item, ast.AnnAssign)
-                and isinstance(item.target, ast.Name)
-                and not item.target.id.startswith("_")
-                and item.target.id != "model_config"
-                for item in node.body
-            )
+            # Uses _is_pydantic_field which properly excludes:
+            # - Private fields (starting with underscore)
+            # - model_config itself
+            # - ClassVar annotations (class variables, not instance fields)
+            has_fields = any(self._is_pydantic_field(item) for item in node.body)
 
             # Check if model_config is inherited from a parent class in this file
             inherits_model_config = self._check_inherited_model_config(node)

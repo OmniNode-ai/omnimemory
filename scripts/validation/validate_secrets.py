@@ -382,7 +382,8 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
     """
     # Skip test files entirely at the file level
     # This is more reliable than line-level pattern matching for test fixtures
-    if "tests" in filepath.parts or filepath.name.startswith("test_"):
+    # Uses is_test_file() for consistent detection of all test file patterns
+    if is_test_file(filepath):
         if verbose:
             logger.debug("SKIP FILE: %s - test file skipped at file level", filepath)
         return []
@@ -395,7 +396,6 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
         return []
 
     violations: list[Violation] = []
-    is_test = is_test_file(filepath)
 
     for line_num, line in enumerate(content.splitlines(), start=1):
         # First, check if line potentially contains a secret
@@ -429,21 +429,8 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
                 )
             continue
 
-        # Check test-only patterns if in test file
-        if is_test:
-            skipped, reason = _check_skip_patterns(
-                line, TEST_ONLY_SKIP_PATTERNS, filepath, line_num, verbose, secret_match
-            )
-            if skipped:
-                if verbose:
-                    logger.info(
-                        "SKIP (test-only): %s:%d - Would have flagged '%s' but matched: %s",
-                        filepath,
-                        line_num,
-                        potential_secret,
-                        reason,
-                    )
-                continue
+        # Note: Test files are skipped entirely at file level (line 386-389)
+        # so TEST_ONLY_SKIP_PATTERNS are no longer applied here
 
         # Line contains potential secret and wasn't skipped
         violations.append(Violation(str(filepath), line_num, potential_secret))

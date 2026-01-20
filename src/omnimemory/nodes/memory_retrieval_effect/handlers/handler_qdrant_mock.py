@@ -20,18 +20,18 @@ Example::
     import os
     from omnimemory.nodes.memory_retrieval_effect.handlers import (
         HandlerQdrantMock,
-        HandlerQdrantMockConfig,
+        ModelHandlerQdrantMockConfig,
     )
 
     async def example():
         # Use mock embeddings (default)
-        config = HandlerQdrantMockConfig()
+        config = ModelHandlerQdrantMockConfig()
         handler = HandlerQdrantMock(config)
         await handler.initialize()
 
         # Or use real MLX embeddings (URL from environment variable - REQUIRED)
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config_real = HandlerQdrantMockConfig(
+        config_real = ModelHandlerQdrantMockConfig(
             use_real_embeddings=True,
             embedding_server_url=embedding_url,
         )
@@ -71,9 +71,9 @@ if TYPE_CHECKING:
 
 from ..clients.embedding_client import (
     EmbeddingClient,
-    EmbeddingClientConfig,
     EmbeddingClientError,
     EmbeddingConnectionError,
+    ModelEmbeddingClientConfig,
 )
 from ..models import (
     ModelMemoryRetrievalRequest,
@@ -87,11 +87,11 @@ __all__ = [
     "EmbeddingClientError",
     "EmbeddingConnectionError",
     "HandlerQdrantMock",
-    "HandlerQdrantMockConfig",
+    "ModelHandlerQdrantMockConfig",
 ]
 
 
-class HandlerQdrantMockConfig(BaseModel):
+class ModelHandlerQdrantMockConfig(BaseModel):
     """Configuration for the mock Qdrant handler.
 
     Attributes:
@@ -159,7 +159,7 @@ class HandlerQdrantMock:
     Example::
 
         async def example():
-            handler = HandlerQdrantMock(HandlerQdrantMockConfig())
+            handler = HandlerQdrantMock(ModelHandlerQdrantMockConfig())
             await handler.initialize()
 
             # Seed test data
@@ -173,7 +173,7 @@ class HandlerQdrantMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: HandlerQdrantMockConfig) -> None:
+    def __init__(self, config: ModelHandlerQdrantMockConfig) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
@@ -187,7 +187,7 @@ class HandlerQdrantMock:
         self._embedding_client: EmbeddingClient | None = None
 
     @property
-    def config(self) -> HandlerQdrantMockConfig:
+    def config(self) -> ModelHandlerQdrantMockConfig:
         """Get the handler configuration."""
         return self._config
 
@@ -238,7 +238,7 @@ class HandlerQdrantMock:
                         f"got: {self._config.embedding_server_url!r}"
                     )
 
-                embedding_config = EmbeddingClientConfig(
+                embedding_config = ModelEmbeddingClientConfig(
                     base_url=self._config.embedding_server_url,
                     timeout_seconds=self._config.embedding_timeout_seconds,
                     max_retries=self._config.embedding_max_retries,
@@ -453,7 +453,7 @@ class HandlerQdrantMock:
         Example::
 
             async def search_example():
-                handler = HandlerQdrantMock(HandlerQdrantMockConfig())
+                handler = HandlerQdrantMock(ModelHandlerQdrantMockConfig())
                 await handler.initialize()
                 embedding = await handler._get_embedding("hello world")
         """

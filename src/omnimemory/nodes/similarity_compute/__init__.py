@@ -39,7 +39,7 @@ Example::
 
 from omnimemory.nodes.similarity_compute.handlers import (
     HandlerSimilarityCompute,
-    HandlerSimilarityComputeConfig,
+    ModelHandlerSimilarityComputeConfig,
 )
 from omnimemory.nodes.similarity_compute.models import (
     ModelSimilarityComputeRequest,
@@ -57,5 +57,5 @@ __all__ = [
     "ModelSimilarityComputeResponse",
     # Handler
     "HandlerSimilarityCompute",
-    "HandlerSimilarityComputeConfig",
+    "ModelHandlerSimilarityComputeConfig",
 ]

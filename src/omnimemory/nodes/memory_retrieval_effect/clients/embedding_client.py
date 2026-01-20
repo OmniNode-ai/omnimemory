@@ -15,13 +15,13 @@ Example::
     import os
     from omnimemory.nodes.memory_retrieval_effect.clients import (
         EmbeddingClient,
-        EmbeddingClientConfig,
+        ModelEmbeddingClientConfig,
     )
 
     async def example():
         # URL must be provided explicitly (from environment variable)
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
         async with client:
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "EmbeddingClient",
-    "EmbeddingClientConfig",
+    "ModelEmbeddingClientConfig",
     "EmbeddingClientError",
     "EmbeddingConnectionError",
     "EmbeddingTimeoutError",
@@ -67,7 +67,7 @@ class EmbeddingTimeoutError(EmbeddingClientError):
     """Raised when embedding request times out."""
 
 
-class EmbeddingClientConfig(BaseModel):
+class ModelEmbeddingClientConfig(BaseModel):
     """Configuration for the embedding client.
 
     Attributes:
@@ -129,7 +129,7 @@ class EmbeddingClient:
 
         import os
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
         async with client:
@@ -142,7 +142,7 @@ class EmbeddingClient:
 
         import os
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
         await client.connect()
         try:
@@ -151,7 +151,7 @@ class EmbeddingClient:
             await client.close()
     """
 
-    def __init__(self, config: EmbeddingClientConfig) -> None:
+    def __init__(self, config: ModelEmbeddingClientConfig) -> None:
         """Initialize the embedding client.
 
         Args:
@@ -162,7 +162,7 @@ class EmbeddingClient:
         self._connected = False
 
     @property
-    def config(self) -> EmbeddingClientConfig:
+    def config(self) -> ModelEmbeddingClientConfig:
         """Get the client configuration."""
         return self._config
 
@@ -248,7 +248,7 @@ class EmbeddingClient:
 
             import os
             embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-            config = EmbeddingClientConfig(base_url=embedding_url)
+            config = ModelEmbeddingClientConfig(base_url=embedding_url)
             async with EmbeddingClient(config) as client:
                 embedding = await client.get_embedding("Hello world")
                 assert len(embedding) == 1024
@@ -396,7 +396,7 @@ class EmbeddingClient:
 
             import os
             embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-            config = EmbeddingClientConfig(base_url=embedding_url)
+            config = ModelEmbeddingClientConfig(base_url=embedding_url)
             async with EmbeddingClient(config) as client:
                 texts = ["Hello", "World", "Test"]
                 embeddings = await client.get_embeddings_batch(texts)
@@ -430,7 +430,7 @@ class EmbeddingClient:
 
             import os
             embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-            config = EmbeddingClientConfig(base_url=embedding_url)
+            config = ModelEmbeddingClientConfig(base_url=embedding_url)
             client = EmbeddingClient(config)
             async with client:
                 if await client.health_check():

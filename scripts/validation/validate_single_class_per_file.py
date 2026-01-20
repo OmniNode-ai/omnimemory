@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """ONEX Single Class Per File Validation.
 
-Enforces the ONEX architectural rule: one model/enum per file.
+Enforces the ONEX architectural rule: one non-enum class per file.
+Multiple enums in a single file are explicitly allowed since enums are
+simple value types that don't create the same import/dependency issues.
+
 This promotes clean imports and reduces circular dependency issues.
 
 Usage:

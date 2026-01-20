@@ -16,7 +16,8 @@
 #
 # CI COMPATIBILITY:
 # ====================================
-# All hooks use language: python or official repos, NOT language: system.
+# All hooks use language: python or official repos, NOT language: system,
+# except clean-tmp-directory which uses language: system (bash script).
 # This ensures hooks work in CI environments where Poetry may not be installed.
 # Pre-commit manages isolated Python environments for each hook.
 #

@@ -12,10 +12,10 @@ Example::
 
     from omnimemory.nodes.similarity_compute.handlers import (
         HandlerSimilarityCompute,
-        HandlerSimilarityComputeConfig,
+        ModelHandlerSimilarityComputeConfig,
     )
 
-    config = HandlerSimilarityComputeConfig()
+    config = ModelHandlerSimilarityComputeConfig()
     handler = HandlerSimilarityCompute(config)
 
     vec_a = [0.1, 0.2, 0.3]
@@ -28,10 +28,10 @@ Example::
 
 from omnimemory.nodes.similarity_compute.handlers.handler_similarity_compute import (
     HandlerSimilarityCompute,
-    HandlerSimilarityComputeConfig,
+    ModelHandlerSimilarityComputeConfig,
 )
 
 __all__ = [
     "HandlerSimilarityCompute",
-    "HandlerSimilarityComputeConfig",
+    "ModelHandlerSimilarityComputeConfig",
 ]

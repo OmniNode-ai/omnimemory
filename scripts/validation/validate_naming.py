@@ -449,12 +449,19 @@ def validate_file(filepath: Path) -> list[Violation]:
 
             # Validate class naming convention
             if expected_pattern and not expected_pattern.match(class_name):
+                # Settings classes use suffix pattern (XxxSettings), not prefix
+                if expected_prefix == "Settings":
+                    pattern_desc = "XxxSettings"
+                    example = f"{class_name}Settings"
+                else:
+                    pattern_desc = f"{expected_prefix}Xxx"
+                    example = f"{expected_prefix}{class_name}"
                 violations.append(
                     Violation(
                         str(filepath),
                         node.lineno,
                         f"Class '{class_name}' should follow ONEX naming: "
-                        f"{expected_prefix}Xxx (e.g., {expected_prefix}{class_name})",
+                        f"{pattern_desc} (e.g., {example})",
                     )
                 )
 

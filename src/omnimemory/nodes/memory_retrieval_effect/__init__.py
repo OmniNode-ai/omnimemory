@@ -18,7 +18,7 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_retrieval_effect import (
         HandlerMemoryRetrieval,
-        HandlerMemoryRetrievalConfig,
+        ModelHandlerMemoryRetrievalConfig,
         ModelMemoryRetrievalRequest,
     )
 
@@ -51,7 +51,7 @@ Status: Implementation complete with mock adapters.
 
 from .handler_memory_retrieval import (
     HandlerMemoryRetrieval,
-    HandlerMemoryRetrievalConfig,
+    ModelHandlerMemoryRetrievalConfig,
 )
 from .models import (
     ModelMemoryRetrievalRequest,
@@ -62,7 +62,7 @@ from .models import (
 __all__: list[str] = [
     # Main handler
     "HandlerMemoryRetrieval",
-    "HandlerMemoryRetrievalConfig",
+    "ModelHandlerMemoryRetrievalConfig",
     # Models
     "ModelMemoryRetrievalRequest",
     "ModelMemoryRetrievalResponse",

@@ -79,6 +79,7 @@ from .model_success_metrics import (
     ModelSuccessRate,
 )
 from .model_system_health import ModelSystemHealth
+from .model_tags import ModelTag, ModelTagCollection, normalize_tag_name
 from .model_typed_collections import (
     ModelConfiguration,
     ModelConfigurationOption,
@@ -167,4 +168,8 @@ __all__ = [
     "ModelContractVersion",
     "ContractVersionMixin",
     "DEFAULT_CONTRACT_VERSION",
+    # Tag normalization support
+    "ModelTag",
+    "ModelTagCollection",
+    "normalize_tag_name",
 ]

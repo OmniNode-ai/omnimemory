@@ -15,11 +15,11 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_retrieval_effect.handlers import (
         HandlerDbMock,
-        HandlerDbMockConfig,
+        ModelHandlerDbMockConfig,
     )
 
     async def example():
-        config = HandlerDbMockConfig()
+        config = ModelHandlerDbMockConfig()
         handler = HandlerDbMock(config)
         await handler.initialize()
 
@@ -69,11 +69,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerDbMock",
-    "HandlerDbMockConfig",
+    "ModelHandlerDbMockConfig",
 ]
 
 
-class HandlerDbMockConfig(BaseModel):
+class ModelHandlerDbMockConfig(BaseModel):
     """Configuration for the mock database handler.
 
     Attributes:
@@ -111,7 +111,7 @@ class HandlerDbMock:
     Example::
 
         async def example():
-            handler = HandlerDbMock(HandlerDbMockConfig())
+            handler = HandlerDbMock(ModelHandlerDbMockConfig())
             await handler.initialize()
 
             # Seed test data
@@ -125,7 +125,7 @@ class HandlerDbMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: HandlerDbMockConfig) -> None:
+    def __init__(self, config: ModelHandlerDbMockConfig) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
@@ -137,7 +137,7 @@ class HandlerDbMock:
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> HandlerDbMockConfig:
+    def config(self) -> ModelHandlerDbMockConfig:
         """Get the handler configuration."""
         return self._config
 

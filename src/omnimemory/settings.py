@@ -323,7 +323,7 @@ class EmbeddingSettings(BaseSettings):
     )
 
 
-class SettingsMemoryService(BaseSettings):
+class MemoryServiceSettings(BaseSettings):
     """Top-level settings for OmniMemory service.
 
     Loads configuration from environment variables with OMNIMEMORY__ prefix.
@@ -349,7 +349,7 @@ class SettingsMemoryService(BaseSettings):
         export OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
 
         # Load settings
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         config = settings.to_config()
     """
 
@@ -431,14 +431,14 @@ class SettingsMemoryService(BaseSettings):
         )
 
 
-def load_settings() -> SettingsMemoryService:
+def load_settings() -> MemoryServiceSettings:
     """Load settings from environment variables.
 
     This is the primary entry point for loading configuration.
     Fails fast with clear error messages if required settings are missing.
 
     Returns:
-        SettingsMemoryService with validated configuration
+        MemoryServiceSettings with validated configuration
 
     Raises:
         pydantic.ValidationError: If required settings missing or invalid
@@ -451,4 +451,4 @@ def load_settings() -> SettingsMemoryService:
         >>> config.filesystem.base_path
         PosixPath('/tmp/omnimemory')
     """
-    return SettingsMemoryService()
+    return MemoryServiceSettings()

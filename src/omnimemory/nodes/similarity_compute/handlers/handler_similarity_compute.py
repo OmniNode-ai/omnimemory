@@ -20,10 +20,10 @@ Example::
 
     from omnimemory.nodes.similarity_compute.handlers import (
         HandlerSimilarityCompute,
-        HandlerSimilarityComputeConfig,
+        ModelHandlerSimilarityComputeConfig,
     )
 
-    config = HandlerSimilarityComputeConfig()
+    config = ModelHandlerSimilarityComputeConfig()
     handler = HandlerSimilarityCompute(config)
 
     # Compute cosine distance
@@ -55,11 +55,11 @@ from omnimemory.models.memory.model_similarity_result import ModelSimilarityResu
 
 __all__ = [
     "HandlerSimilarityCompute",
-    "HandlerSimilarityComputeConfig",
+    "ModelHandlerSimilarityComputeConfig",
 ]
 
 
-class HandlerSimilarityComputeConfig(BaseModel):
+class ModelHandlerSimilarityComputeConfig(BaseModel):
     """Configuration for the similarity compute handler.
 
     This is intentionally minimal as the handler performs pure computation
@@ -97,7 +97,7 @@ class HandlerSimilarityCompute:
 
     Example::
 
-        handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+        handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
         # Identical vectors have distance 0
         vec = [1.0, 2.0, 3.0]
@@ -109,7 +109,7 @@ class HandlerSimilarityCompute:
         assert handler.cosine_distance(vec_a, vec_b) == 1.0
     """
 
-    def __init__(self, config: HandlerSimilarityComputeConfig) -> None:
+    def __init__(self, config: ModelHandlerSimilarityComputeConfig) -> None:
         """Initialize the similarity compute handler.
 
         Args:
@@ -118,7 +118,7 @@ class HandlerSimilarityCompute:
         self._config = config
 
     @property
-    def config(self) -> HandlerSimilarityComputeConfig:
+    def config(self) -> ModelHandlerSimilarityComputeConfig:
         """Get the handler configuration."""
         return self._config
 
@@ -240,7 +240,7 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
             # Identical vectors: distance = 0
             vec = [1.0, 2.0, 3.0]
@@ -293,7 +293,7 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
             # Identical vectors: distance = 0
             vec = [1.0, 2.0, 3.0]
@@ -348,7 +348,7 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
             vec_a = [0.1, 0.2, 0.3]
             vec_b = [0.15, 0.25, 0.35]

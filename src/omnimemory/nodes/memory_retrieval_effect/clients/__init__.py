@@ -14,13 +14,13 @@ Example::
     import os
     from omnimemory.nodes.memory_retrieval_effect.clients import (
         EmbeddingClient,
-        EmbeddingClientConfig,
+        ModelEmbeddingClientConfig,
     )
 
     async def example():
         # URL must be provided explicitly (from environment variable)
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
         async with client:
@@ -33,9 +33,9 @@ Example::
     Initial implementation for OMN-1387.
 """
 
-from .embedding_client import EmbeddingClient, EmbeddingClientConfig
+from .embedding_client import EmbeddingClient, ModelEmbeddingClientConfig
 
 __all__ = [
     "EmbeddingClient",
-    "EmbeddingClientConfig",
+    "ModelEmbeddingClientConfig",
 ]

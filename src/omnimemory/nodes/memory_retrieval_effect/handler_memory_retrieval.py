@@ -16,11 +16,11 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_retrieval_effect import (
         HandlerMemoryRetrieval,
-        HandlerMemoryRetrievalConfig,
+        ModelHandlerMemoryRetrievalConfig,
     )
 
     async def example():
-        config = HandlerMemoryRetrievalConfig()
+        config = ModelHandlerMemoryRetrievalConfig()
         handler = HandlerMemoryRetrieval(config)
         await handler.initialize()
 
@@ -51,11 +51,11 @@ if TYPE_CHECKING:
 
 from .handlers import (
     HandlerDbMock,
-    HandlerDbMockConfig,
     HandlerGraphMock,
-    HandlerGraphMockConfig,
     HandlerQdrantMock,
-    HandlerQdrantMockConfig,
+    ModelHandlerDbMockConfig,
+    ModelHandlerGraphMockConfig,
+    ModelHandlerQdrantMockConfig,
 )
 from .models import ModelMemoryRetrievalRequest, ModelMemoryRetrievalResponse
 
@@ -63,11 +63,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerMemoryRetrieval",
-    "HandlerMemoryRetrievalConfig",
+    "ModelHandlerMemoryRetrievalConfig",
 ]
 
 
-class HandlerMemoryRetrievalConfig(BaseModel):
+class ModelHandlerMemoryRetrievalConfig(BaseModel):
     """Configuration for the memory retrieval handler.
 
     Attributes:
@@ -80,16 +80,16 @@ class HandlerMemoryRetrievalConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    qdrant_config: HandlerQdrantMockConfig = Field(
-        default_factory=HandlerQdrantMockConfig,
+    qdrant_config: ModelHandlerQdrantMockConfig = Field(
+        default_factory=ModelHandlerQdrantMockConfig,
         description="Configuration for Qdrant semantic search handler",
     )
-    db_config: HandlerDbMockConfig = Field(
-        default_factory=HandlerDbMockConfig,
+    db_config: ModelHandlerDbMockConfig = Field(
+        default_factory=ModelHandlerDbMockConfig,
         description="Configuration for Database full-text search handler",
     )
-    graph_config: HandlerGraphMockConfig = Field(
-        default_factory=HandlerGraphMockConfig,
+    graph_config: ModelHandlerGraphMockConfig = Field(
+        default_factory=ModelHandlerGraphMockConfig,
         description="Configuration for Graph traversal handler",
     )
     use_mock_handlers: bool = Field(
@@ -118,7 +118,7 @@ class HandlerMemoryRetrieval:
 
     Example::
 
-        handler = HandlerMemoryRetrieval(HandlerMemoryRetrievalConfig())
+        handler = HandlerMemoryRetrieval(ModelHandlerMemoryRetrievalConfig())
         await handler.initialize()
 
         # Seed test data (for mock handlers)
@@ -134,13 +134,13 @@ class HandlerMemoryRetrieval:
             print(f"{result.snapshot.snapshot_id}: {result.score:.2f}")
     """
 
-    def __init__(self, config: HandlerMemoryRetrievalConfig | None = None) -> None:
+    def __init__(self, config: ModelHandlerMemoryRetrievalConfig | None = None) -> None:
         """Initialize the handler with configuration.
 
         Args:
             config: The handler configuration. If None, defaults are used.
         """
-        self._config = config or HandlerMemoryRetrievalConfig()
+        self._config = config or ModelHandlerMemoryRetrievalConfig()
         self._qdrant_handler: HandlerQdrantMock | None = None
         self._db_handler: HandlerDbMock | None = None
         self._graph_handler: HandlerGraphMock | None = None
@@ -148,7 +148,7 @@ class HandlerMemoryRetrieval:
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> HandlerMemoryRetrievalConfig:
+    def config(self) -> ModelHandlerMemoryRetrievalConfig:
         """Get the handler configuration."""
         return self._config
 

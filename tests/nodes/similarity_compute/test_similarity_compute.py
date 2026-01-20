@@ -34,7 +34,7 @@ import pytest
 from omnimemory.compat import ModelOnexContainer
 from omnimemory.nodes.similarity_compute import (
     HandlerSimilarityCompute,
-    HandlerSimilarityComputeConfig,
+    ModelHandlerSimilarityComputeConfig,
     ModelSimilarityComputeRequest,
     ModelSimilarityComputeResponse,
     NodeSimilarityCompute,
@@ -46,17 +46,17 @@ from omnimemory.nodes.similarity_compute import (
 
 
 @pytest.fixture
-def config() -> HandlerSimilarityComputeConfig:
+def config() -> ModelHandlerSimilarityComputeConfig:
     """Create a default handler configuration.
 
     Returns:
-        HandlerSimilarityComputeConfig with default settings.
+        ModelHandlerSimilarityComputeConfig with default settings.
     """
-    return HandlerSimilarityComputeConfig()
+    return ModelHandlerSimilarityComputeConfig()
 
 
 @pytest.fixture
-def handler(config: HandlerSimilarityComputeConfig) -> HandlerSimilarityCompute:
+def handler(config: ModelHandlerSimilarityComputeConfig) -> HandlerSimilarityCompute:
     """Create a handler for testing.
 
     Args:
@@ -1435,16 +1435,16 @@ class TestResponseModel:
 
 
 class TestHandlerConfig:
-    """Tests for HandlerSimilarityComputeConfig."""
+    """Tests for ModelHandlerSimilarityComputeConfig."""
 
     def test_default_epsilon(self) -> None:
         """Default epsilon is 1e-10.
 
         Given: Default configuration
-        When: Creating HandlerSimilarityComputeConfig
+        When: Creating ModelHandlerSimilarityComputeConfig
         Then: Epsilon should be 1e-10
         """
-        config = HandlerSimilarityComputeConfig()
+        config = ModelHandlerSimilarityComputeConfig()
 
         assert config.epsilon == 1e-10
 
@@ -1452,10 +1452,10 @@ class TestHandlerConfig:
         """Custom epsilon can be specified.
 
         Given: Custom epsilon value
-        When: Creating HandlerSimilarityComputeConfig
+        When: Creating ModelHandlerSimilarityComputeConfig
         Then: Custom value should be used
         """
-        config = HandlerSimilarityComputeConfig(epsilon=1e-8)
+        config = ModelHandlerSimilarityComputeConfig(epsilon=1e-8)
 
         assert config.epsilon == 1e-8
 
@@ -1463,28 +1463,28 @@ class TestHandlerConfig:
         """Epsilon must be greater than 0.
 
         Given: Zero or negative epsilon
-        When: Creating HandlerSimilarityComputeConfig
+        When: Creating ModelHandlerSimilarityComputeConfig
         Then: Pydantic raises ValidationError
         """
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            HandlerSimilarityComputeConfig(epsilon=0.0)
+            ModelHandlerSimilarityComputeConfig(epsilon=0.0)
 
         with pytest.raises(ValidationError):
-            HandlerSimilarityComputeConfig(epsilon=-1e-10)
+            ModelHandlerSimilarityComputeConfig(epsilon=-1e-10)
 
     def test_config_forbids_extra_fields(self) -> None:
         """Config model forbids extra fields.
 
         Given: Attempting to create config with extra field
-        When: Constructing HandlerSimilarityComputeConfig
+        When: Constructing ModelHandlerSimilarityComputeConfig
         Then: Pydantic raises ValidationError
         """
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            HandlerSimilarityComputeConfig(
+            ModelHandlerSimilarityComputeConfig(
                 epsilon=1e-10,
                 unknown_param=True,  # type: ignore[call-arg]
             )
@@ -1497,7 +1497,7 @@ class TestHandlerConfig:
         Then: Magnitude check should use custom epsilon
         """
         # With larger epsilon, more vectors are considered "zero"
-        config = HandlerSimilarityComputeConfig(epsilon=1e-3)
+        config = ModelHandlerSimilarityComputeConfig(epsilon=1e-3)
         handler = HandlerSimilarityCompute(config)
 
         # This vector has magnitude ~1.4e-4 which is < 1e-3
