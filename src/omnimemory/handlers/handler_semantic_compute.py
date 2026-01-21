@@ -48,12 +48,14 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 from uuid import UUID, uuid4
 
+from cachetools import LRUCache  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
@@ -74,6 +76,107 @@ __all__ = [
     "HandlerSemanticComputePolicy",
     "ModelHandlerSemanticComputeConfig",
 ]
+
+# =============================================================================
+# Module-Level Constants
+# =============================================================================
+
+# Common words that start sentences but aren't named entities.
+# Used by _extract_entities_heuristic() to filter false positives.
+_SENTENCE_STARTING_STOPWORDS: frozenset[str] = frozenset(
+    {
+        # Articles and determiners
+        "The",
+        "A",
+        "An",
+        # Demonstratives
+        "This",
+        "That",
+        "These",
+        "Those",
+        # Pronouns
+        "It",
+        "He",
+        "She",
+        "We",
+        "They",
+        "I",
+        "You",
+        # Common sentence starters
+        "However",
+        "Therefore",
+        "Furthermore",
+        "Moreover",
+        "Nevertheless",
+        "Meanwhile",
+        "Additionally",
+        "Consequently",
+        "Subsequently",
+        "Otherwise",
+        "Accordingly",
+        "Similarly",
+        "Likewise",
+        "Indeed",
+        "Hence",
+        "Thus",
+        # Question words
+        "What",
+        "When",
+        "Where",
+        "Who",
+        "Why",
+        "How",
+        "Which",
+        # Other common starters
+        "There",
+        "Here",
+        "If",
+        "As",
+        "So",
+        "But",
+        "And",
+        "Or",
+        "Yet",
+        "For",
+        "Nor",
+        "After",
+        "Before",
+        "Because",
+        "Although",
+        "While",
+        "Since",
+        "Until",
+        "Unless",
+        "Once",
+        "Now",
+        "Then",
+        "Also",
+        "First",
+        "Second",
+        "Third",
+        "Finally",
+        "Next",
+        "Last",
+        "Many",
+        "Most",
+        "Some",
+        "All",
+        "Any",
+        "Each",
+        "Every",
+        "Both",
+        "Few",
+        "Several",
+        "Such",
+        "No",
+        "Not",
+        "Only",
+        "Just",
+        "Even",
+        "Still",
+        "Already",
+    }
+)
 
 
 # =============================================================================
@@ -99,7 +202,7 @@ class ModelHandlerSemanticComputeConfig(BaseModel):
         )
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     handler_name: str = Field(
         default="semantic-compute",
@@ -314,8 +417,10 @@ class HandlerSemanticCompute:
         self._llm_provider = llm_provider
         self._policy = HandlerSemanticComputePolicy(config.policy_config)
 
-        # Simple in-memory cache (LRU behavior via dict ordering)
-        self._embedding_cache: dict[str, list[float]] = {}
+        # LRU cache for embeddings with automatic eviction
+        self._embedding_cache: LRUCache[str, list[float]] = LRUCache(
+            maxsize=config.max_cache_size
+        )
 
     @property
     def config(self) -> ModelHandlerSemanticComputeConfig:
@@ -376,19 +481,21 @@ class HandlerSemanticCompute:
         # Check cache
         cache_key = self._compute_cache_key(content, model)
         if self._config.enable_caching and cache_key in self._embedding_cache:
-            return self._embedding_cache[cache_key]
+            return cast(list[float], self._embedding_cache[cache_key])
 
-        # Generate embedding via provider
-        embedding = await self._embedding_provider.generate_embedding(
-            text=content,
-            model=model or self._config.policy_config.default_embedding_model,
-            correlation_id=correlation_id,
-            timeout_seconds=self._config.policy_config.timeout_seconds,
-        )
+        # Generate embedding via provider with timeout enforcement
+        timeout = self._config.policy_config.timeout_seconds
+        async with asyncio.timeout(timeout):
+            embedding = await self._embedding_provider.generate_embedding(
+                text=content,
+                model=model or self._config.policy_config.default_embedding_model,
+                correlation_id=correlation_id,
+                timeout_seconds=timeout,
+            )
 
-        # Cache if appropriate
+        # Cache if appropriate (LRUCache handles eviction automatically)
         if self._config.enable_caching and self._policy.should_cache_embedding(content):
-            self._update_cache(cache_key, embedding)
+            self._embedding_cache[cache_key] = embedding
 
         return embedding
 
@@ -400,19 +507,79 @@ class HandlerSemanticCompute:
     ) -> ModelSemanticEntityList:
         """Extract named entities from content.
 
-        Uses heuristic extraction in deterministic mode. Uses LLM-based
-        extraction in best_effort mode (requires LLM provider to be configured).
+        The extraction strategy is determined by ``entity_extraction_mode`` in
+        the policy configuration:
+
+        **DETERMINISTIC mode** (default):
+            Uses ``_extract_entities_heuristic()`` for simple, reproducible
+            extraction. Best for testing and when external dependencies are
+            not desired.
+
+            Strengths:
+                - No external API calls (fast, offline-capable)
+                - Deterministic results (same input = same output)
+                - No LLM provider required
+
+            Limitations:
+                - Only detects single capitalized words
+                - Cannot extract multi-word entities ("New York" split)
+                - Cannot extract dates, times, or numbers
+                - Acronyms classified as MISC (not semantic type)
+                - No context awareness
+
+        **BEST_EFFORT mode**:
+            Uses LLM-backed extraction via ``_extract_entities_llm()`` for
+            higher accuracy. Requires an LLM provider to be configured.
+
+            Strengths:
+                - Multi-word entity detection ("New York City" as one entity)
+                - Date, time, and numeric extraction
+                - Context-aware classification ("Apple" as ORG vs fruit)
+                - Better acronym handling ("NYC" as LOCATION)
+
+            Limitations:
+                - Requires LLM provider (external dependency)
+                - Non-deterministic (results may vary)
+                - Higher latency (API calls)
+                - Potential cost implications
+
+        Example::
+
+            # DETERMINISTIC mode (default) - fast, limited accuracy
+            handler = HandlerSemanticCompute(
+                config=ModelHandlerSemanticComputeConfig(
+                    policy_config=ModelSemanticComputePolicyConfig(
+                        entity_extraction_mode=EnumEntityExtractionMode.DETERMINISTIC,
+                    )
+                ),
+                embedding_provider=provider,
+            )
+            # "NYC" -> MISC, "New York City" -> "New", "York", "City" separately
+
+            # BEST_EFFORT mode - higher accuracy, requires LLM
+            handler = HandlerSemanticCompute(
+                config=ModelHandlerSemanticComputeConfig(
+                    policy_config=ModelSemanticComputePolicyConfig(
+                        entity_extraction_mode=EnumEntityExtractionMode.BEST_EFFORT,
+                    )
+                ),
+                embedding_provider=provider,
+                llm_provider=llm_provider,  # Required for BEST_EFFORT
+            )
+            # "NYC" -> LOCATION, "New York City" -> single LOCATION entity
 
         Args:
             content: The text content to analyze.
             correlation_id: Optional correlation ID for tracing.
 
         Returns:
-            ModelSemanticEntityList with extracted entities.
+            ModelSemanticEntityList with extracted entities, including metadata
+            about the extraction method used (``extraction_model`` field).
 
         Raises:
             ValueError: If content is empty.
-            RuntimeError: If LLM extraction is requested but no provider configured.
+            RuntimeError: If ``entity_extraction_mode=BEST_EFFORT`` but no
+                LLM provider is configured.
         """
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
@@ -511,16 +678,16 @@ class HandlerSemanticCompute:
             result_id=correlation_id,
             analysis_type=analysis_type,
             analyzed_content=content[:1000],  # Truncate for storage
-            content_language="en",  # TODO: language detection
+            content_language=None,  # Language detection not implemented
             semantic_vector=embedding,
             key_concepts=key_concepts,
             entities=entities,
             topics=topics,
-            sentiment_score=0.0,  # TODO: sentiment analysis
+            sentiment_score=None,  # Sentiment analysis not implemented
             complexity_score=self._compute_complexity_score(content),
             readability_score=self._compute_readability_score(content),
-            coherence_score=0.8,  # TODO: coherence analysis
-            relevance_score=0.8,  # TODO: relevance analysis
+            coherence_score=None,  # Coherence analysis not implemented
+            relevance_score=None,  # Relevance analysis not implemented
             confidence_score=0.9 if embedding else 0.7,
             model_name=self._embedding_provider.model_name,
             model_version=self._config.handler_version,
@@ -540,123 +707,57 @@ class HandlerSemanticCompute:
             return hashlib.sha256(key_input.encode()).hexdigest()[:32]
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
-    def _update_cache(self, key: str, value: list[float]) -> None:
-        """Update the cache with LRU eviction."""
-        # Evict oldest entries if cache is full.
-        # Python 3.7+ dicts maintain insertion order, so first key is oldest.
-        while len(self._embedding_cache) >= self._config.max_cache_size:
-            oldest_key = next(iter(self._embedding_cache))
-            del self._embedding_cache[oldest_key]
-
-        self._embedding_cache[key] = value
-
     def _extract_entities_heuristic(self, content: str) -> list[ModelSemanticEntity]:
-        """Extract entities using simple heuristics.
+        """Extract entities using simple capitalization-based heuristics.
 
-        This is a basic implementation that identifies capitalized words
-        as potential named entities, while filtering out common sentence-starting
-        words. For production, consider using spaCy or similar NLP libraries.
+        This method provides deterministic entity extraction without external
+        dependencies. It identifies capitalized words as potential named entities
+        and filters common sentence-starting words to reduce false positives.
+
+        Capabilities:
+            - Detects single capitalized words (e.g., "John", "Google", "Paris")
+            - Filters common sentence-starting stopwords ("The", "However", etc.)
+            - Classifies entities by simple suffix/pattern matching:
+                - Organization: words ending in Inc, Corp, LLC, Ltd, etc.
+                - Location: words like Street, Avenue, City, etc.
+                - Money: words starting with $ or ending with USD/EUR/GBP
+                - Percent: words containing %
+                - MISC: other capitalized words (default for proper nouns)
+
+        Limitations:
+            - Does NOT detect multi-word entities:
+                - "New York City" -> extracts "New", "York", "City" separately
+                - "United States" -> extracts "United", "States" separately
+            - Does NOT detect dates, times, or numeric values:
+                - "January 15, 2024" -> only "January" extracted
+                - "3:30 PM" -> nothing extracted
+            - Acronyms classified as MISC, not their semantic type:
+                - "NYC" -> MISC (not LOCATION)
+                - "FBI" -> MISC (not ORGANIZATION)
+            - No context awareness:
+                - Cannot distinguish "Apple" (company) vs "Apple" (fruit)
+                - Cannot distinguish "Jordan" (person) vs "Jordan" (country)
+            - Misses lowercase named entities:
+                - "iPhone", "eBay" -> not detected (starts lowercase)
+            - Limited organization detection:
+                - "Google" -> MISC (no suffix like Inc/Corp)
+                - "Microsoft Corporation" -> only "Microsoft" as MISC, "Corporation" skipped
+
+        Use Cases:
+            - Testing and development (deterministic, reproducible results)
+            - Offline processing (no external API calls needed)
+            - Quick extraction where precision is less critical
+
+        For higher accuracy with multi-word entities, dates, numbers, and
+        context-aware classification, use ``entity_extraction_mode=BEST_EFFORT``
+        with an LLM provider configured.
 
         Args:
             content: Text to extract entities from.
 
         Returns:
-            List of extracted entities.
+            List of extracted entities with type, text, confidence (0.7), and spans.
         """
-        # Common words that start sentences but aren't entities
-        sentence_starting_stopwords = {
-            # Articles and determiners
-            "The",
-            "A",
-            "An",
-            # Demonstratives
-            "This",
-            "That",
-            "These",
-            "Those",
-            # Pronouns
-            "It",
-            "He",
-            "She",
-            "We",
-            "They",
-            "I",
-            "You",
-            # Common sentence starters
-            "However",
-            "Therefore",
-            "Furthermore",
-            "Moreover",
-            "Nevertheless",
-            "Meanwhile",
-            "Additionally",
-            "Consequently",
-            "Subsequently",
-            "Otherwise",
-            "Accordingly",
-            "Similarly",
-            "Likewise",
-            "Indeed",
-            "Hence",
-            "Thus",
-            # Question words
-            "What",
-            "When",
-            "Where",
-            "Who",
-            "Why",
-            "How",
-            "Which",
-            # Other common starters
-            "There",
-            "Here",
-            "If",
-            "As",
-            "So",
-            "But",
-            "And",
-            "Or",
-            "Yet",
-            "For",
-            "Nor",
-            "After",
-            "Before",
-            "Because",
-            "Although",
-            "While",
-            "Since",
-            "Until",
-            "Unless",
-            "Once",
-            "Now",
-            "Then",
-            "Also",
-            "First",
-            "Second",
-            "Third",
-            "Finally",
-            "Next",
-            "Last",
-            "Many",
-            "Most",
-            "Some",
-            "All",
-            "Any",
-            "Each",
-            "Every",
-            "Both",
-            "Few",
-            "Several",
-            "Such",
-            "No",
-            "Not",
-            "Only",
-            "Just",
-            "Even",
-            "Still",
-            "Already",
-        }
-
         entities: list[ModelSemanticEntity] = []
         words = content.split()
 
@@ -693,7 +794,10 @@ class HandlerSemanticCompute:
             # Simple heuristic: capitalized words
             if clean_word[0].isupper() and len(clean_word) > 1:
                 # Check if this is a sentence-starting stopword
-                if word_is_sentence_start and clean_word in sentence_starting_stopwords:
+                if (
+                    word_is_sentence_start
+                    and clean_word in _SENTENCE_STARTING_STOPWORDS
+                ):
                     # Skip common stopwords at sentence start
                     # Note: proper nouns like "The Beatles" - "The" is skipped,
                     # but "Beatles" will be captured on its next iteration
@@ -790,17 +894,19 @@ class HandlerSemanticCompute:
         temperature = float(llm_params.get("temperature", 0.0) or 0.0)
         seed_val = llm_params.get("seed")
         seed = int(seed_val) if seed_val is not None else None
+        timeout = self._config.policy_config.timeout_seconds
 
         try:
-            response = await self._llm_provider.complete_structured(
-                prompt=prompt,
-                output_schema=self._get_entity_extraction_schema(),
-                model=self._config.policy_config.default_llm_model,
-                temperature=temperature,
-                seed=seed,
-                correlation_id=correlation_id,
-                timeout_seconds=self._config.policy_config.timeout_seconds,
-            )
+            async with asyncio.timeout(timeout):
+                response = await self._llm_provider.complete_structured(
+                    prompt=prompt,
+                    output_schema=self._get_entity_extraction_schema(),
+                    model=self._config.policy_config.default_llm_model,
+                    temperature=temperature,
+                    seed=seed,
+                    correlation_id=correlation_id,
+                    timeout_seconds=timeout,
+                )
 
             return self._parse_llm_entity_response(response, content)
 
@@ -817,7 +923,7 @@ Text: {content}
 
 Return a JSON array of entities with: type, text, confidence (0-1), start, end."""
 
-    def _get_entity_extraction_schema(self) -> dict[str, Any]:
+    def _get_entity_extraction_schema(self) -> dict[str, object]:
         """Get JSON schema for entity extraction output."""
         return {
             "type": "object",
@@ -841,25 +947,52 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
         }
 
     def _parse_llm_entity_response(
-        self, response: dict[str, Any], content: str
+        self, response: dict[str, object], content: str
     ) -> list[ModelSemanticEntity]:
         """Parse LLM response into entity models."""
         entities: list[ModelSemanticEntity] = []
 
-        for entity_data in response.get("entities", []):
+        # Extract and validate entities list from response
+        raw_entities = response.get("entities", [])
+        if not isinstance(raw_entities, list):
+            return entities
+
+        for item in raw_entities:
+            if not isinstance(item, dict):
+                continue
+            entity_data: dict[str, object] = item
+
             try:
-                entity_type_str = entity_data.get("type", "misc").lower()
+                type_value = entity_data.get("type", "misc")
+                entity_type_str = str(type_value).lower() if type_value else "misc"
                 entity_type = EnumSemanticEntityType(entity_type_str)
             except ValueError:
                 entity_type = EnumSemanticEntityType.MISC
 
+            text_value = entity_data.get("text", "")
+            confidence_value = entity_data.get("confidence", 0.8)
+            start_value = entity_data.get("start", 0)
+            end_value = entity_data.get("end", 0)
+
             entities.append(
                 ModelSemanticEntity(
                     entity_type=entity_type,
-                    text=entity_data.get("text", ""),
-                    confidence=min(1.0, max(0.0, entity_data.get("confidence", 0.8))),
-                    span_start=entity_data.get("start", 0),
-                    span_end=entity_data.get("end", 0),
+                    text=str(text_value) if text_value else "",
+                    confidence=min(
+                        1.0,
+                        max(
+                            0.0,
+                            float(confidence_value)
+                            if isinstance(confidence_value, int | float)
+                            else 0.8,
+                        ),
+                    ),
+                    span_start=int(start_value)
+                    if isinstance(start_value, int | float)
+                    else 0,
+                    span_end=int(end_value)
+                    if isinstance(end_value, int | float)
+                    else 0,
                 )
             )
 

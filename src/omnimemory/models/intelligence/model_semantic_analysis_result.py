@@ -27,9 +27,9 @@ class ModelSemanticAnalysisResult(BaseModel):
     analyzed_content: str = Field(
         description="Content that was semantically analyzed",
     )
-    content_language: str = Field(
-        default="en",
-        description="Language of the analyzed content",
+    content_language: str | None = Field(
+        default=None,
+        description="Language of the analyzed content (None if not detected)",
     )
 
     # Semantic features
@@ -61,10 +61,11 @@ class ModelSemanticAnalysisResult(BaseModel):
     )
 
     # Sentiment and emotion
-    sentiment_score: float = Field(
+    sentiment_score: float | None = Field(
+        default=None,
         ge=-1.0,
         le=1.0,
-        description="Sentiment score (-1 negative, +1 positive)",
+        description="Sentiment score (-1 negative, +1 positive). None if not computed.",
     )
     emotion_scores: dict[str, float] = Field(
         default_factory=dict,
@@ -84,15 +85,17 @@ class ModelSemanticAnalysisResult(BaseModel):
     )
 
     # Quality metrics
-    coherence_score: float = Field(
+    coherence_score: float | None = Field(
+        default=None,
         ge=0.0,
         le=1.0,
-        description="Coherence score of the content",
+        description="Coherence score of the content. None if not computed.",
     )
-    relevance_score: float = Field(
+    relevance_score: float | None = Field(
+        default=None,
         ge=0.0,
         le=1.0,
-        description="Relevance score to the domain",
+        description="Relevance score to the domain. None if not computed.",
     )
     confidence_score: float = Field(
         ge=0.0,

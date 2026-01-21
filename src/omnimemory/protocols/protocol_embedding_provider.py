@@ -14,7 +14,7 @@ Implementations can be:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 
@@ -189,14 +189,14 @@ class ProtocolLLMProvider(Protocol):
     async def complete_structured(
         self,
         prompt: str,
-        output_schema: dict[str, Any],
+        output_schema: dict[str, object],
         *,
         model: str | None = None,
         temperature: float = 0.0,
         seed: int | None = None,
         correlation_id: UUID | None = None,
         timeout_seconds: float | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Generate a structured completion matching the schema.
 
         Args:
