@@ -6,12 +6,12 @@ in memory content to ensure compliance with privacy regulations.
 """
 
 __all__ = [
-    "PIIType",
-    "PIIMatch",
     "PIIDetectionResult",
-    "PIIDetectorConfig",
-    "PIIPatternConfig",
     "PIIDetector",
+    "PIIDetectorConfig",
+    "PIIMatch",
+    "PIIPatternConfig",
+    "PIIType",
 ]
 
 import re
@@ -48,7 +48,7 @@ class PIIType(str, Enum):
     IP_ADDRESS = "ip_address"
     URL = "url"  # TODO: Implement URL detection patterns
     API_KEY = "api_key"
-    PASSWORD_HASH = "password_hash"
+    PASSWORD_HASH = "password_hash"  # noqa: S105  # Not a password - PII type enum value
     PERSON_NAME = "person_name"  # TODO: Implement dictionary-based + NLP name detection
     ADDRESS = "address"  # TODO: Implement address detection with geocoding/NLP
 
@@ -413,7 +413,7 @@ class PIIDetector:
         )
 
     def _deduplicate_matches(self, matches: list[PIIMatch]) -> list[PIIMatch]:
-        """Remove overlapping/duplicate matches, keep highest confidence."""
+        """Remove overlapping or duplicate matches, keeping the highest confidence ones."""
         if not matches:
             return matches
 

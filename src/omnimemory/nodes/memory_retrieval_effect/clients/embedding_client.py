@@ -15,13 +15,13 @@ Example::
     import os
     from omnimemory.nodes.memory_retrieval_effect.clients import (
         EmbeddingClient,
-        EmbeddingClientConfig,
+        ModelEmbeddingClientConfig,
     )
 
     async def example():
         # URL must be provided explicitly (from environment variable)
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
         async with client:
@@ -39,16 +39,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from types import TracebackType
+from typing import TYPE_CHECKING
 
 import httpx
-from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from types import TracebackType
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
+# HTTP status code ranges for error classification
+HTTP_CLIENT_ERROR_MIN = 400
+HTTP_CLIENT_ERROR_MAX = 500  # Exclusive upper bound for client errors (4xx range)
+
 __all__ = [
     "EmbeddingClient",
-    "EmbeddingClientConfig",
+    "ModelEmbeddingClientConfig",
     "EmbeddingClientError",
     "EmbeddingConnectionError",
     "EmbeddingTimeoutError",
@@ -67,7 +74,7 @@ class EmbeddingTimeoutError(EmbeddingClientError):
     """Raised when embedding request times out."""
 
 
-class EmbeddingClientConfig(BaseModel):
+class ModelEmbeddingClientConfig(BaseModel):
     """Configuration for the embedding client.
 
     Attributes:
@@ -82,6 +89,8 @@ class EmbeddingClientConfig(BaseModel):
         embedding_dimension: Expected dimension of embedding vectors. Used for
             validation. MLX Qwen3-Embedding produces 1024-dimensional vectors.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     base_url: str = Field(
         ...,
@@ -127,7 +136,7 @@ class EmbeddingClient:
 
         import os
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
         async with client:
@@ -140,7 +149,7 @@ class EmbeddingClient:
 
         import os
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config = EmbeddingClientConfig(base_url=embedding_url)
+        config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
         await client.connect()
         try:
@@ -149,7 +158,7 @@ class EmbeddingClient:
             await client.close()
     """
 
-    def __init__(self, config: EmbeddingClientConfig) -> None:
+    def __init__(self, config: ModelEmbeddingClientConfig) -> None:
         """Initialize the embedding client.
 
         Args:
@@ -160,7 +169,7 @@ class EmbeddingClient:
         self._connected = False
 
     @property
-    def config(self) -> EmbeddingClientConfig:
+    def config(self) -> ModelEmbeddingClientConfig:
         """Get the client configuration."""
         return self._config
 
@@ -246,7 +255,7 @@ class EmbeddingClient:
 
             import os
             embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-            config = EmbeddingClientConfig(base_url=embedding_url)
+            config = ModelEmbeddingClientConfig(base_url=embedding_url)
             async with EmbeddingClient(config) as client:
                 embedding = await client.get_embedding("Hello world")
                 assert len(embedding) == 1024
@@ -288,7 +297,11 @@ class EmbeddingClient:
 
             except httpx.HTTPStatusError as e:
                 # Don't retry on client errors (4xx)
-                if 400 <= e.response.status_code < 500:
+                if (
+                    HTTP_CLIENT_ERROR_MIN
+                    <= e.response.status_code
+                    < HTTP_CLIENT_ERROR_MAX
+                ):
                     raise EmbeddingClientError(
                         f"Embedding server returned client error: "
                         f"{e.response.status_code} - {e.response.text}"
@@ -394,7 +407,7 @@ class EmbeddingClient:
 
             import os
             embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-            config = EmbeddingClientConfig(base_url=embedding_url)
+            config = ModelEmbeddingClientConfig(base_url=embedding_url)
             async with EmbeddingClient(config) as client:
                 texts = ["Hello", "World", "Test"]
                 embeddings = await client.get_embeddings_batch(texts)
@@ -428,7 +441,7 @@ class EmbeddingClient:
 
             import os
             embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-            config = EmbeddingClientConfig(base_url=embedding_url)
+            config = ModelEmbeddingClientConfig(base_url=embedding_url)
             client = EmbeddingClient(config)
             async with client:
                 if await client.health_check():

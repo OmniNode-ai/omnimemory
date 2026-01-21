@@ -111,13 +111,25 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Callable, Literal, Optional, TypeVar
+from typing import (
+    Literal,
+    TypeVar,
+    cast,
+)
+
+import structlog
+from pydantic import BaseModel, Field
+
+from ..models.foundation.model_typed_collections import (
+    ModelKeyValuePair,
+    ModelMetadata,
+)
 
 # Type variable for generic function types
 F = TypeVar("F", bound=Callable[..., object])
@@ -125,14 +137,6 @@ F = TypeVar("F", bound=Callable[..., object])
 # Type alias for metadata values - supports common serializable types
 # This replaces Any with explicit types for type safety
 MetadataValue = str | int | float | bool | None
-
-import structlog  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
-
-from ..models.foundation.model_typed_collections import (  # noqa: E402
-    ModelKeyValuePair,
-    ModelMetadata,
-)
 
 # === LABEL VALIDATION UTILITIES ===
 
@@ -250,25 +254,24 @@ def validate_metric_labels(
                 expected_labels=allowed_labels,
                 provided_labels=provided,
             )
-        else:
-            # Non-strict mode: log warnings but don't raise
-            _label_logger = structlog.get_logger("omnimemory.label_validation")
-            if missing:
-                _label_logger.error(
-                    "label_validation_missing_required",
-                    metric_name=metric_name,
-                    missing_labels=sorted(missing),
-                    provided_labels=sorted(provided),
-                    required_labels=sorted(required_labels),
-                )
-            if extra:
-                _label_logger.warning(
-                    "label_validation_unexpected_extra",
-                    metric_name=metric_name,
-                    extra_labels=sorted(extra),
-                    provided_labels=sorted(provided),
-                    allowed_labels=sorted(allowed_labels),
-                )
+        # Non-strict mode: log warnings but don't raise
+        _label_logger = structlog.get_logger("omnimemory.label_validation")
+        if missing:
+            _label_logger.error(
+                "label_validation_missing_required",
+                metric_name=metric_name,
+                missing_labels=sorted(missing),
+                provided_labels=sorted(provided),
+                required_labels=sorted(required_labels),
+            )
+        if extra:
+            _label_logger.warning(
+                "label_validation_unexpected_extra",
+                metric_name=metric_name,
+                extra_labels=sorted(extra),
+                provided_labels=sorted(provided),
+                allowed_labels=sorted(allowed_labels),
+            )
 
 
 # === STRUCTURED LOG SCHEMA VALIDATION ===
@@ -482,9 +485,9 @@ try:
 
     _PSUTIL_AVAILABLE = True
 except ImportError:
-    psutil = None  # type: ignore[assignment]
-from .error_sanitizer import SanitizationLevel  # noqa: E402
-from .error_sanitizer import sanitize_error as _base_sanitize_error  # noqa: E402
+    psutil = None
+from .error_sanitizer import SanitizationLevel
+from .error_sanitizer import sanitize_error as _base_sanitize_error
 
 # === SECURITY VALIDATION FUNCTIONS ===
 
@@ -527,9 +530,7 @@ def sanitize_metadata_value(value: object) -> MetadataValue:
     elif isinstance(value, bool):
         # Check bool before int since bool is a subclass of int
         return value
-    elif isinstance(value, int):
-        return value
-    elif isinstance(value, float):
+    elif isinstance(value, int | float):
         return value
     elif value is None:
         return None
@@ -668,7 +669,7 @@ class Counter:
         self.strict_labels = strict_labels
         self._label_names_set = frozenset(label_names)
         # Use OrderedDict for LRU eviction (oldest entries evicted first)
-        self._values: "OrderedDict[tuple[str, ...], CounterValue]" = OrderedDict()
+        self._values: OrderedDict[tuple[str, ...], CounterValue] = OrderedDict()
         self._lock = threading.Lock()
 
     def _validate_labels(self, labels: dict[str, str]) -> None:
@@ -752,7 +753,7 @@ class Counter:
 
     def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key))
+        return dict(zip(self.label_names, key, strict=True))
 
 
 @dataclass
@@ -872,7 +873,7 @@ class Histogram:
         self.strict_labels = strict_labels
         self._label_names_set = frozenset(label_names)
         # Use OrderedDict for LRU eviction (oldest entries evicted first)
-        self._values: "OrderedDict[tuple[str, ...], HistogramValue]" = OrderedDict()
+        self._values: OrderedDict[tuple[str, ...], HistogramValue] = OrderedDict()
         self._lock = threading.Lock()
 
     def _validate_labels(self, labels: dict[str, str]) -> None:
@@ -958,7 +959,7 @@ class Histogram:
 
     def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key))
+        return dict(zip(self.label_names, key, strict=True))
 
 
 @dataclass
@@ -1036,7 +1037,7 @@ class Gauge:
         self.strict_labels = strict_labels
         self._label_names_set = frozenset(label_names)
         # Use OrderedDict for LRU eviction (oldest entries evicted first)
-        self._values: "OrderedDict[tuple[str, ...], GaugeValue]" = OrderedDict()
+        self._values: OrderedDict[tuple[str, ...], GaugeValue] = OrderedDict()
         self._lock = threading.Lock()
 
     def _validate_labels(self, labels: dict[str, str]) -> None:
@@ -1120,7 +1121,7 @@ class Gauge:
 
     def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key))
+        return dict(zip(self.label_names, key, strict=True))
 
 
 class MetricsRegistry:
@@ -1154,7 +1155,7 @@ class MetricsRegistry:
     _instance_lock: threading.RLock  # Instance-level lock for multi-metric operations
     _initialized: bool  # Flag to track initialization state
 
-    def __new__(cls) -> "MetricsRegistry":
+    def __new__(cls) -> MetricsRegistry:
         """Singleton pattern for metrics registry with double-checked locking.
 
         Thread-safety is achieved by:
@@ -1178,21 +1179,20 @@ class MetricsRegistry:
             # Double-check after acquiring lock
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
-                cls._instance._initialized = False
+                cls._instance._initialized = False  # noqa: SLF001  # Intentional private access in singleton pattern
                 # Create instance-level RLock for multi-metric operations
                 # RLock allows reentrant access from the same thread
-                cls._instance._instance_lock = threading.RLock()
+                cls._instance._instance_lock = threading.RLock()  # noqa: SLF001  # Intentional private access in singleton pattern
 
             # Initialize inside the lock to prevent concurrent initialization
-            if not cls._instance._initialized:
-                cls._instance._do_initialize()
+            if not cls._instance._initialized:  # noqa: SLF001  # Intentional private access in singleton pattern
+                cls._instance._do_initialize()  # noqa: SLF001  # Intentional private access in singleton pattern
 
             return cls._instance
 
     def __init__(self) -> None:
         """No-op init - all initialization done in __new__ under lock."""
         # Initialization is done in __new__ to ensure thread safety
-        pass
 
     def _do_initialize(self) -> None:
         """Perform actual initialization (called under class lock from __new__).
@@ -1298,13 +1298,13 @@ class MetricsRegistry:
             )
 
         with cls._class_lock:
-            if cls._instance is not None and cls._instance._initialized:
+            if cls._instance is not None and cls._instance._initialized:  # noqa: SLF001  # Intentional private access in singleton pattern
                 # Acquire instance lock to prevent concurrent get_all_metrics()
-                with cls._instance._instance_lock:
+                with cls._instance._instance_lock:  # noqa: SLF001  # Intentional private access in singleton pattern
                     # Clear all metrics data from the existing instance
                     # This preserves references while resetting state
                     # Note: We do NOT set _instance = None to avoid orphaning references
-                    cls._instance._clear_all_metrics()
+                    cls._instance._clear_all_metrics()  # noqa: SLF001  # Intentional private access in singleton pattern
 
     @classmethod
     def _reset_instance_for_testing(cls) -> None:
@@ -1322,10 +1322,10 @@ class MetricsRegistry:
         It will invalidate any references obtained before the reset completes.
         """
         with cls._class_lock:
-            if cls._instance is not None and cls._instance._initialized:
+            if cls._instance is not None and cls._instance._initialized:  # noqa: SLF001  # Intentional private access in singleton pattern
                 # Clear metrics first to help any stale references
-                with cls._instance._instance_lock:
-                    cls._instance._clear_all_metrics()
+                with cls._instance._instance_lock:  # noqa: SLF001  # Intentional private access in singleton pattern
+                    cls._instance._clear_all_metrics()  # noqa: SLF001  # Intentional private access in singleton pattern
             # Reset the instance - next access will create a new one
             cls._instance = None
 
@@ -1339,19 +1339,19 @@ class MetricsRegistry:
         It acquires each metric's individual lock to safely clear the data,
         ensuring no metric operation is in progress during the clear.
         """
-        # Clear counter values
-        with self.memory_operation_total._lock:
-            self.memory_operation_total._values.clear()
+        # Clear counter values - intentional private access for thread-safe metric clearing
+        with self.memory_operation_total._lock:  # noqa: SLF001
+            self.memory_operation_total._values.clear()  # noqa: SLF001
 
         # Clear histogram values
-        with self.memory_storage_latency_ms._lock:
-            self.memory_storage_latency_ms._values.clear()
-        with self.memory_retrieval_latency_ms._lock:
-            self.memory_retrieval_latency_ms._values.clear()
+        with self.memory_storage_latency_ms._lock:  # noqa: SLF001
+            self.memory_storage_latency_ms._values.clear()  # noqa: SLF001
+        with self.memory_retrieval_latency_ms._lock:  # noqa: SLF001
+            self.memory_retrieval_latency_ms._values.clear()  # noqa: SLF001
 
         # Clear gauge values
-        with self.handler_health_status._lock:
-            self.handler_health_status._values.clear()
+        with self.handler_health_status._lock:  # noqa: SLF001
+            self.handler_health_status._values.clear()  # noqa: SLF001
 
 
 # Global metrics registry instance
@@ -1442,7 +1442,7 @@ class ObservabilityManager:
         """
         self.max_active_traces = max_active_traces
         # Use OrderedDict for bounded storage with LRU eviction
-        self._active_traces: "OrderedDict[str, PerformanceMetrics]" = OrderedDict()
+        self._active_traces: OrderedDict[str, PerformanceMetrics] = OrderedDict()
         self._traces_lock = threading.Lock()
         self._logger = structlog.get_logger(__name__)
 
@@ -1637,21 +1637,21 @@ class ObservabilityManager:
             raise
         finally:
             # Complete performance metrics if requested (thread-safe)
-            final_metrics: PerformanceMetrics | None = None
+            metrics_final: PerformanceMetrics | None = None
             if trace_performance:
                 # Get trace reference under lock
                 with self._traces_lock:
                     if trace_id in self._active_traces:
-                        final_metrics = self._active_traces[trace_id]
+                        metrics_final = self._active_traces[trace_id]
 
                 # Process metrics outside lock (I/O operations)
-                if final_metrics is not None:
-                    final_metrics.end_time = time.time()
-                    final_metrics.duration = (
-                        final_metrics.end_time - final_metrics.start_time
+                if metrics_final is not None:
+                    metrics_final.end_time = time.time()
+                    metrics_final.duration = (
+                        metrics_final.end_time - metrics_final.start_time
                     )
 
-                    if final_metrics.memory_usage_start is not None:
+                    if metrics_final.memory_usage_start is not None:
                         # Only track memory delta if psutil is available
                         if _PSUTIL_AVAILABLE and psutil is not None:
                             try:
@@ -1659,9 +1659,9 @@ class ObservabilityManager:
                                 end_memory = (
                                     process.memory_info().rss / 1024 / 1024
                                 )  # MB
-                                final_metrics.memory_usage_end = end_memory
-                                final_metrics.memory_delta = (
-                                    end_memory - final_metrics.memory_usage_start
+                                metrics_final.memory_usage_end = end_memory
+                                metrics_final.memory_delta = (
+                                    end_memory - metrics_final.memory_usage_start
                                 )
                             except (
                                 psutil.NoSuchProcess,
@@ -1690,10 +1690,10 @@ class ObservabilityManager:
                         correlation_id=correlation_id,
                         operation_name=operation_name,
                         operation_type=operation_type.value,
-                        duration=final_metrics.duration,
-                        memory_delta=final_metrics.memory_delta,
-                        success=final_metrics.success,
-                        error_type=final_metrics.error_type,
+                        duration=metrics_final.duration,
+                        memory_delta=metrics_final.memory_delta,
+                        success=metrics_final.success,
+                        error_type=metrics_final.error_type,
                         **additional_context,
                     )
 
@@ -1833,7 +1833,7 @@ def inject_correlation_context_async(func: F) -> F:
             kwargs_keys=list(kwargs.keys()),
         )
         try:
-            result = await func(*args, **kwargs)  # type: ignore[misc]
+            result = await cast(Awaitable[object], func(*args, **kwargs))
             logger.info(
                 f"async_function_completed_{func.__name__}", **context, success=True
             )
@@ -1951,7 +1951,7 @@ class HandlerObservabilityWrapper:
     def __init__(
         self,
         handler_name: str,
-        registry: Optional[MetricsRegistry] = None,
+        registry: MetricsRegistry | None = None,
         validate_log_schema: bool = False,
     ) -> None:
         """Initialize the wrapper.
@@ -1986,7 +1986,7 @@ class HandlerObservabilityWrapper:
             )
 
         self.handler_name = handler_name
-        self._custom_registry: Optional[MetricsRegistry] = registry
+        self._custom_registry: MetricsRegistry | None = registry
         self._validate_log_schema = validate_log_schema
         self._logger = structlog.get_logger(f"omnimemory.handler.{handler_name}")
 

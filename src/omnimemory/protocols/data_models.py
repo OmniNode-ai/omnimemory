@@ -17,7 +17,6 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..models.foundation import (
-    ModelConfidenceInterval,
     ModelConfiguration,
     ModelMetadata,
     ModelOptionalStringList,
@@ -68,7 +67,7 @@ class AccessLevel(str, Enum):
     INTERNAL = "internal"
     RESTRICTED = "restricted"
     CONFIDENTIAL = "confidential"
-    SECRET = "secret"
+    SECRET = "secret"  # noqa: S105  # Not a password - access level classification enum value
 
 
 class IndexingStatus(str, Enum):
@@ -172,6 +171,37 @@ class SearchFilters(BaseMemoryModel):
         None, description="Filter by embedding availability"
     )
 
+    @field_validator("tags", "source_agents", mode="before")
+    @classmethod
+    def convert_collection_to_model_optional_string_list(
+        cls,
+        v: str | list[str] | set[str] | frozenset[str] | ModelOptionalStringList | None,
+    ) -> ModelOptionalStringList | None:
+        """Convert string, list, or set inputs to ModelOptionalStringList for backward compatibility.
+
+        Note: Input type annotation covers all expected input types for this before-validator.
+        Pydantic before-validators receive raw input before type coercion.
+
+        Accepts:
+        - str: Converts to ModelOptionalStringList(values=[str])
+        - list[str]: Converts to ModelOptionalStringList(values=list)
+        - set[str]: Converts to ModelOptionalStringList(values=sorted list)
+        - ModelOptionalStringList: Passes through unchanged
+        - None: Passes through unchanged
+        """
+        if v is None:
+            return None
+        if isinstance(v, ModelOptionalStringList):
+            return v
+        if isinstance(v, str):
+            return ModelOptionalStringList(values=[v])
+        if isinstance(v, list):
+            return ModelOptionalStringList(values=v)
+        if isinstance(v, set | frozenset):
+            return ModelOptionalStringList(values=sorted(v))
+        # Should not reach here given type annotation, but satisfy type checker
+        return None
+
 
 class SearchResult(BaseMemoryModel):
     """Individual search result with scoring."""
@@ -183,7 +213,7 @@ class SearchResult(BaseMemoryModel):
     relevance_score: float = Field(
         ge=0.0, le=1.0, description="Relevance score (0.0 to 1.0)"
     )
-    memory_record: "MemoryRecord | None" = Field(
+    memory_record: MemoryRecord | None = Field(
         None, description="Full memory record (if requested)"
     )
     highlight_snippets: ModelStringList = Field(
@@ -192,6 +222,35 @@ class SearchResult(BaseMemoryModel):
     )
     match_metadata: ModelMetadata = Field(
         default_factory=ModelMetadata, description="Additional match information"
+    )
+
+
+class ModelConfidenceInterval(BaseMemoryModel):
+    """Confidence interval for predictions with lower and upper bounds.
+
+    This model represents a statistical confidence interval for prediction scores.
+    All values are normalized to the [0.0, 1.0] range.
+
+    Example dict structure when serialized::
+
+        {
+            "lower": 0.75,       # Lower bound of the interval
+            "upper": 0.95,       # Upper bound of the interval
+            "confidence_level": 0.95  # 95% confidence level
+        }
+
+    The interval [lower, upper] indicates the range within which the true value
+    is expected to fall with the specified confidence_level probability.
+    """
+
+    lower: float = Field(
+        ge=0.0, le=1.0, description="Lower bound of confidence interval"
+    )
+    upper: float = Field(
+        ge=0.0, le=1.0, description="Upper bound of confidence interval"
+    )
+    confidence_level: float = Field(
+        0.95, ge=0.0, le=1.0, description="Confidence level (e.g., 0.95 for 95%)"
     )
 
 
@@ -248,11 +307,22 @@ class BaseMemoryResponse(BaseMemoryModel):
 
     @field_validator("provenance", "warnings", mode="before")
     @classmethod
-    def convert_list_to_model_string_list(cls, v: object) -> ModelStringList | object:
-        """Convert plain lists to ModelStringList for easier API usage."""
+    def convert_list_to_model_string_list(
+        cls, v: list[str] | ModelStringList | None
+    ) -> ModelStringList | None:
+        """Convert plain lists to ModelStringList for easier API usage.
+
+        Note: Input type annotation covers all expected input types for this before-validator.
+        Pydantic before-validators receive raw input before type coercion.
+        """
+        if v is None:
+            return None
+        if isinstance(v, ModelStringList):
+            return v
         if isinstance(v, list):
             return ModelStringList(values=v)
-        return v
+        # Should not reach here given type annotation, but satisfy type checker
+        return None
 
 
 # === CORE DATA MODELS ===
@@ -274,9 +344,12 @@ class MemoryRecord(BaseMemoryModel):
     )
     embedding: list[float] | None = Field(
         None,
-        description="Vector embedding for semantic search",
-        min_length=768,
-        max_length=4096,
+        description="Vector embedding for semantic search. Supports all common dimensions "
+        "including: OpenAI (1536, 3072), Cohere (1024, 4096), sentence-transformers "
+        "(384, 512, 768, 1024), Google (768), Mistral (1024), and larger research models "
+        "up to 131072 dimensions for advanced multimodal embeddings.",
+        min_length=1,
+        max_length=131072,
     )
     embedding_model: str | None = Field(
         None, description="Model used to generate embedding"
@@ -322,11 +395,22 @@ class MemoryRecord(BaseMemoryModel):
 
     @field_validator("tags", "provenance", mode="before")
     @classmethod
-    def convert_list_to_model_string_list(cls, v: object) -> ModelStringList | object:
-        """Convert plain lists to ModelStringList for easier API usage."""
+    def convert_list_to_model_string_list(
+        cls, v: list[str] | ModelStringList | None
+    ) -> ModelStringList | None:
+        """Convert plain lists to ModelStringList for easier API usage.
+
+        Note: Input type annotation covers all expected input types for this before-validator.
+        Pydantic before-validators receive raw input before type coercion.
+        """
+        if v is None:
+            return None
+        if isinstance(v, ModelStringList):
+            return v
         if isinstance(v, list):
             return ModelStringList(values=v)
-        return v
+        # Should not reach here given type annotation, but satisfy type checker
+        return None
 
 
 # === MEMORY OPERATION REQUESTS/RESPONSES ===

@@ -42,7 +42,7 @@ MemoryDataValueType = (
 class ModelMemoryDataValue(BaseModel):
     """Individual memory data value following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     value: MemoryDataValueType = Field(
         default=None,
@@ -98,7 +98,7 @@ class ModelMemoryDataValue(BaseModel):
 class ModelMemoryDataContent(BaseModel):
     """Memory data content following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     content_id: UUID = Field(
         description="Unique identifier for this data content",
@@ -183,7 +183,7 @@ class ModelMemoryDataContent(BaseModel):
 class ModelMemoryRequestData(BaseModel):
     """Memory request data following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     request_data_id: UUID = Field(
         description="Unique identifier for this request data",
@@ -265,7 +265,7 @@ class ModelMemoryRequestData(BaseModel):
 class ModelMemoryResponseData(BaseModel):
     """Memory response data following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     response_data_id: UUID = Field(
         description="Unique identifier for this response data",

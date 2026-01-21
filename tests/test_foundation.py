@@ -16,15 +16,15 @@ import yaml
 from omnimemory import (  # Protocols; Data models; Error handling
     AccessLevel,
     ContentType,
+    EnumOmniMemoryErrorCode,
     MemoryPriority,
     MemoryRecord,
     MemoryStoreRequest,
     MemoryStoreResponse,
-    OmniMemoryError,
-    OmniMemoryErrorCode,
     ProtocolMemoryStorage,
-    SystemError,
-    ValidationError,
+    ProtocolOmniMemoryError,
+    ProtocolSystemError,
+    ProtocolValidationError,
 )
 
 # Use compat modules until omnibase_core components are available
@@ -56,7 +56,6 @@ class MockMemoryStorageNode:
 
     async def _apply_configuration(self, config: dict[str, str]) -> None:
         """Mock configuration application."""
-        pass
 
     async def store_memory(
         self,
@@ -88,8 +87,8 @@ class MockMemoryStorageNode:
 
         except Exception as e:
             return NodeResult.failure(
-                error=SystemError(
-                    message=f"Mock storage failed: {str(e)}",
+                error=ProtocolSystemError(
+                    message=f"Mock storage failed: {e!s}",
                     system_component="mock_storage",
                 ),
                 provenance=["mock_storage.store_memory.failed"],
@@ -171,20 +170,20 @@ class TestFoundationArchitecture:
 
     def test_error_handling_creation(self) -> None:
         """Test ONEX error handling patterns."""
-        # Test basic OmniMemoryError
-        error = OmniMemoryError(
-            error_code=OmniMemoryErrorCode.INVALID_INPUT,
+        # Test basic ProtocolOmniMemoryError
+        error = ProtocolOmniMemoryError(
+            error_code=EnumOmniMemoryErrorCode.INVALID_INPUT,
             message="Test error message",
             context={"test_key": "test_value"},
         )
 
-        assert error.omnimemory_error_code == OmniMemoryErrorCode.INVALID_INPUT
+        assert error.omnimemory_error_code == EnumOmniMemoryErrorCode.INVALID_INPUT
         assert error.message == "Test error message"
         assert error.context["test_key"] == "test_value"
         assert error.is_recoverable() is False  # Validation errors are not recoverable
 
-        # Test ValidationError
-        validation_error = ValidationError(
+        # Test ProtocolValidationError
+        validation_error = ProtocolValidationError(
             message="Invalid field value",
             field_name="test_field",
             field_value="invalid_value",
@@ -199,13 +198,15 @@ class TestFoundationArchitecture:
         from omnimemory.protocols.error_models import get_error_category
 
         # Test validation error category
-        validation_category = get_error_category(OmniMemoryErrorCode.INVALID_INPUT)
+        validation_category = get_error_category(EnumOmniMemoryErrorCode.INVALID_INPUT)
         assert validation_category is not None
         assert validation_category.recoverable is False
         assert validation_category.default_retry_count == 0
 
         # Test storage error category
-        storage_category = get_error_category(OmniMemoryErrorCode.STORAGE_UNAVAILABLE)
+        storage_category = get_error_category(
+            EnumOmniMemoryErrorCode.STORAGE_UNAVAILABLE
+        )
         assert storage_category is not None
         assert storage_category.recoverable is True
         assert storage_category.default_retry_count > 0
@@ -226,7 +227,7 @@ class TestFoundationArchitecture:
         assert success_result.trust_score == 1.0
 
         # Test failure NodeResult
-        error = SystemError(
+        error = ProtocolSystemError(
             message="Test failure",
             system_component="test_component",
         )
@@ -253,7 +254,7 @@ class TestFoundationArchitecture:
         if not contract_path.exists():
             pytest.skip(f"contract.yaml not found at {contract_path}")
 
-        with open(contract_path, "r") as f:
+        with open(contract_path) as f:
             contract_data = yaml.safe_load(f)
 
         # Verify contract structure

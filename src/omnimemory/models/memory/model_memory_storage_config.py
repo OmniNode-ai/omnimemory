@@ -6,13 +6,19 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
-from ...enums.enum_memory_storage_type import EnumMemoryStorageType
+from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC001
+
+# Validation limits for storage configuration
+MAX_CONNECTIONS_LIMIT = 1000
+MIN_TIMEOUT_MS = 100
+MAX_TIMEOUT_MS = 300000  # 5 minutes
+MAX_BATCH_SIZE = 10000
 
 
 class ModelMemoryStorageConfig(BaseModel):
     """Configuration for memory storage systems following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False)
 
     # Storage identification
     storage_id: str = Field(
@@ -103,18 +109,20 @@ class ModelMemoryStorageConfig(BaseModel):
         """Validate max_connections is within reasonable bounds."""
         if v < 1:
             raise ValueError("max_connections must be at least 1")
-        if v > 1000:
-            raise ValueError("max_connections cannot exceed 1000")
+        if v > MAX_CONNECTIONS_LIMIT:
+            raise ValueError(f"max_connections cannot exceed {MAX_CONNECTIONS_LIMIT}")
         return v
 
     @field_validator("connection_timeout_ms", "idle_timeout_ms")
     @classmethod
     def validate_timeout_values(cls, v: int) -> int:
         """Validate timeout values are positive and reasonable."""
-        if v < 100:
-            raise ValueError("Timeout values must be at least 100ms")
-        if v > 300000:  # 5 minutes
-            raise ValueError("Timeout values cannot exceed 300,000ms (5 minutes)")
+        if v < MIN_TIMEOUT_MS:
+            raise ValueError(f"Timeout values must be at least {MIN_TIMEOUT_MS}ms")
+        if v > MAX_TIMEOUT_MS:
+            raise ValueError(
+                f"Timeout values cannot exceed {MAX_TIMEOUT_MS:,}ms (5 minutes)"
+            )
         return v
 
     @field_validator("batch_size")
@@ -123,6 +131,6 @@ class ModelMemoryStorageConfig(BaseModel):
         """Validate batch size is within reasonable bounds."""
         if v < 1:
             raise ValueError("batch_size must be at least 1")
-        if v > 10000:
-            raise ValueError("batch_size cannot exceed 10,000")
+        if v > MAX_BATCH_SIZE:
+            raise ValueError(f"batch_size cannot exceed {MAX_BATCH_SIZE:,}")
         return v

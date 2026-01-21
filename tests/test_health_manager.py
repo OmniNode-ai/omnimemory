@@ -13,7 +13,11 @@ from omnimemory.models.foundation.model_health_response import (
     ModelRateLimitedHealthCheckResponse,
 )
 from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerState
-from omnimemory.utils.health_manager import HealthManager, HealthStatus, SystemHealth
+from omnimemory.utils.health_manager import (
+    HealthManager,
+    HealthStatus,
+    SystemHealth,
+)
 
 
 class TestHealthManager:

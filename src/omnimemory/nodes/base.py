@@ -17,6 +17,7 @@ Container Support:
 - Will seamlessly support omnibase_core containers when available
 - Auto-injection supported via container.resolve()
 """
+
 from __future__ import annotations
 
 from abc import ABC
@@ -82,8 +83,6 @@ class BaseEffectNode(BaseNode):
     - Message queue operations
     """
 
-    pass
-
 
 class BaseComputeNode(BaseNode):
     """Base class for COMPUTE nodes - pure transformations.
@@ -94,8 +93,6 @@ class BaseComputeNode(BaseNode):
     - Semantic analysis
     - Vector calculations
     """
-
-    pass
 
 
 class BaseReducerNode(BaseNode):
@@ -108,8 +105,6 @@ class BaseReducerNode(BaseNode):
     - Memory merging
     """
 
-    pass
-
 
 class BaseOrchestratorNode(BaseNode):
     """Base class for ORCHESTRATOR nodes - workflow coordination.
@@ -121,14 +116,12 @@ class BaseOrchestratorNode(BaseNode):
     - Lifecycle management
     """
 
-    pass
-
 
 __all__ = [
-    "BaseNode",
-    "BaseEffectNode",
     "BaseComputeNode",
-    "BaseReducerNode",
+    "BaseEffectNode",
+    "BaseNode",
     "BaseOrchestratorNode",
+    "BaseReducerNode",
     "ContainerType",
 ]

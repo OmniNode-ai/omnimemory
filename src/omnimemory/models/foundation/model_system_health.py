@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelSystemHealth(BaseModel):
     """System health information following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # System identification
     system_id: str = Field(

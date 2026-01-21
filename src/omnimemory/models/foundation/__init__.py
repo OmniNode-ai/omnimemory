@@ -5,7 +5,12 @@ This module provides foundation models for base implementations,
 error handling, migration progress tracking, and system-level operations.
 """
 
-from ...enums.enum_error_code import OmniMemoryErrorCode
+from ...enums.enum_error_code import EnumOmniMemoryErrorCode
+from ...enums.enum_migration_status import (
+    EnumFileProcessingStatus,
+    EnumMigrationPriority,
+    EnumMigrationStatus,
+)
 from ...enums.enum_severity import EnumSeverity
 from .model_audit_metadata import (
     AuditEventDetails,
@@ -58,11 +63,8 @@ from .model_metrics_response import (
 from .model_migration_progress import (
     BatchProcessingMetrics,
     FileProcessingInfo,
-    FileProcessingStatus,
-    MigrationPriority,
     MigrationProgressMetrics,
     MigrationProgressTracker,
-    MigrationStatus,
 )
 from .model_notes import ModelNote, ModelNotesCollection
 from .model_progress_summary import (
@@ -77,6 +79,7 @@ from .model_success_metrics import (
     ModelSuccessRate,
 )
 from .model_system_health import ModelSystemHealth
+from .model_tags import ModelTag, ModelTagCollection, normalize_tag_name
 from .model_typed_collections import (
     ModelConfiguration,
     ModelConfigurationOption,
@@ -95,11 +98,8 @@ from .model_typed_collections import (
     convert_list_to_string_list,
 )
 
-# Backward compatibility alias
-EnumErrorCode = OmniMemoryErrorCode
-
 __all__ = [
-    "EnumErrorCode",
+    "EnumOmniMemoryErrorCode",
     "EnumSeverity",
     "ModelErrorDetails",
     "ModelSystemHealth",
@@ -116,9 +116,9 @@ __all__ = [
     "ModelPerformanceConfig",
     "ModelObservabilityConfig",
     # Migration progress tracking
-    "MigrationStatus",
-    "MigrationPriority",
-    "FileProcessingStatus",
+    "EnumMigrationStatus",
+    "EnumMigrationPriority",
+    "EnumFileProcessingStatus",
     "BatchProcessingMetrics",
     "FileProcessingInfo",
     "MigrationProgressMetrics",
@@ -168,4 +168,8 @@ __all__ = [
     "ModelContractVersion",
     "ContractVersionMixin",
     "DEFAULT_CONTRACT_VERSION",
+    # Tag normalization support
+    "ModelTag",
+    "ModelTagCollection",
+    "normalize_tag_name",
 ]

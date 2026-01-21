@@ -12,7 +12,7 @@ from ..foundation.model_typed_collections import ModelConfiguration, ModelMetada
 class ModelOperationMetadata(BaseModel):
     """Operation metadata for tracking operation-specific information."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Operation identification
     operation_type: str = Field(

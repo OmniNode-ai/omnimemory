@@ -13,7 +13,10 @@ Technical Debt Notes:
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 T = TypeVar("T")
 

@@ -23,12 +23,15 @@ Example:
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
-from omnibase_core.models.omnimemory import ModelMemorySnapshot
-from pydantic import BaseModel, Field
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = ["ModelMemoryRetrievalResponse", "ModelSearchResult"]
 
@@ -46,6 +49,8 @@ class ModelSearchResult(BaseModel):
         path: Optional traversal path for graph search results (list of
             snapshot IDs from start to this result).
     """
+
+    model_config = ConfigDict(frozen=True, from_attributes=True)
 
     snapshot: ModelMemorySnapshot = Field(
         ...,
@@ -107,6 +112,8 @@ class ModelMemoryRetrievalResponse(BaseModel):
         ...     error_message="Connection to vector store failed",
         ... )
     """
+
+    model_config = ConfigDict(frozen=True, from_attributes=True)
 
     status: Literal["success", "error", "no_results"] = Field(
         ...,

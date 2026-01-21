@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_node_type import EnumNodeType
 from ..foundation.model_priority import ModelPriority
-from ..foundation.model_tags import ModelTagCollection
+from ..foundation.model_tags import ModelTagCollection, normalize_tag_name
 from ..foundation.model_trust_score import ModelTrustScore
 from ..foundation.model_user import ModelUser
 
@@ -17,7 +17,7 @@ from ..foundation.model_user import ModelUser
 class ModelMemoryContext(BaseModel):
     """Context for memory operations following ONEX standards with typed models."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     correlation_id: UUID = Field(
         description="Unique correlation identifier for tracing operations across nodes",
@@ -103,14 +103,21 @@ class ModelMemoryContext(BaseModel):
         return self.trust_score.current_score
 
     def add_context_tag(self, tag_name: str, category: str | None = None) -> None:
-        """Add a tag to the context."""
+        """Add a tag to the context.
+
+        Tag names are normalized by the underlying ModelTagCollection.add_tag
+        using the canonical normalize_tag_name function.
+        """
         self.tags.add_tag(tag_name, category=category)
 
     def has_context_tag(self, tag_name: str) -> bool:
-        """Check if context has a specific tag."""
-        # Normalize tag name the same way ModelTag.validate_tag_name does
-        normalized = tag_name.strip().lower().replace(" ", "_").replace("-", "_")
-        return normalized in self.tags.get_tag_names()
+        """Check if context has a specific tag.
+
+        Tag names are normalized using the canonical normalize_tag_name
+        function to ensure consistency with how tags are stored.
+        """
+        normalized_name = normalize_tag_name(tag_name)
+        return normalized_name in self.tags.get_tag_names()
 
     def get_tag_names(self) -> list[str]:
         """Get list of all tag names."""

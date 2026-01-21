@@ -15,6 +15,9 @@ from pydantic import (
     field_validator,
 )
 
+# PostgreSQL identifier maximum length per SQL standard
+POSTGRES_IDENTIFIER_MAX_LENGTH = 63
+
 
 class ModelPostgresConfig(BaseModel):
     """Configuration for PostgreSQL memory storage.
@@ -115,8 +118,10 @@ class ModelPostgresConfig(BaseModel):
         """
         if not v:
             raise ValueError("schema_name cannot be empty")
-        if len(v) > 63:
-            raise ValueError("schema_name cannot exceed 63 characters")
+        if len(v) > POSTGRES_IDENTIFIER_MAX_LENGTH:
+            raise ValueError(
+                f"schema_name cannot exceed {POSTGRES_IDENTIFIER_MAX_LENGTH} characters"
+            )
         # PostgreSQL identifier rules: start with letter/underscore
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", v):
             raise ValueError(

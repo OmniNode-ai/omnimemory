@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelServiceConfig(BaseModel):
     """Configuration for ONEX memory services following standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Service identification
     service_id: str = Field(

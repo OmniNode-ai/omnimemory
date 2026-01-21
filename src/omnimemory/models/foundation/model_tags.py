@@ -7,11 +7,32 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# Maximum number of tags allowed in a collection
+MAX_TAGS_ALLOWED = 100
+
+
+def normalize_tag_name(name: str) -> str:
+    """Normalize a tag name consistently.
+
+    This is the canonical normalization function for all tag operations.
+    Normalization includes:
+    - Stripping whitespace
+    - Converting to lowercase
+    - Replacing spaces and hyphens with underscores
+
+    Args:
+        name: The tag name to normalize.
+
+    Returns:
+        The normalized tag name.
+    """
+    return name.strip().lower().replace(" ", "_").replace("-", "_")
+
 
 class ModelTag(BaseModel):
     """Individual tag model with metadata."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     name: str = Field(
         description="Tag name",
@@ -42,16 +63,13 @@ class ModelTag(BaseModel):
     @classmethod
     def validate_tag_name(cls, v: str) -> str:
         """Validate tag name format."""
-        # Remove whitespace and convert to lowercase
-        v = v.strip().lower()
+        # Normalize using the canonical function
+        v = normalize_tag_name(v)
 
         # Check for invalid characters
         invalid_chars = set("!@#$%^&*()+={}[]|\\:\";'<>?,/`~")
         if any(char in v for char in invalid_chars):
             raise ValueError(f"Tag name contains invalid characters: {v}")
-
-        # Replace spaces with underscores
-        v = v.replace(" ", "_").replace("-", "_")
 
         return v
 
@@ -59,7 +77,7 @@ class ModelTag(BaseModel):
 class ModelTagCollection(BaseModel):
     """Collection of tags with validation and management."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     tags: list[ModelTag] = Field(
         default_factory=list,
@@ -93,18 +111,18 @@ class ModelTagCollection(BaseModel):
     ) -> None:
         """Add a new tag to the collection."""
         # Enforce maximum tag limit
-        if len(self.tags) >= 100:
-            raise ValueError("Maximum of 100 tags allowed")
+        if len(self.tags) >= MAX_TAGS_ALLOWED:
+            raise ValueError(f"Maximum of {MAX_TAGS_ALLOWED} tags allowed")
+
+        # Normalize the tag name using the canonical function
+        normalized_name = normalize_tag_name(name)
 
         # Check if tag already exists
-        if any(
-            tag.name == name.strip().lower().replace(" ", "_").replace("-", "_")
-            for tag in self.tags
-        ):
+        if any(tag.name == normalized_name for tag in self.tags):
             return  # Tag already exists, skip
 
         new_tag = ModelTag(
-            name=name,
+            name=normalized_name,
             category=category,
             weight=weight,
             created_by=created_by,
@@ -114,7 +132,7 @@ class ModelTagCollection(BaseModel):
 
     def remove_tag(self, name: str) -> bool:
         """Remove a tag by name."""
-        normalized_name = name.strip().lower().replace(" ", "_").replace("-", "_")
+        normalized_name = normalize_tag_name(name)
         for i, tag in enumerate(self.tags):
             if tag.name == normalized_name:
                 self.tags.pop(i)

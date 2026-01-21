@@ -84,5 +84,3 @@ class OnexError(Exception):
 
 class BaseOnexError(OnexError):
     """Alias for OnexError for backward compatibility."""
-
-    pass

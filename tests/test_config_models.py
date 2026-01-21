@@ -8,6 +8,7 @@ These tests validate that all configuration models:
 - Validate input correctly with fail-fast behavior
 - Follow ONEX composable config pattern
 """
+
 from __future__ import annotations
 
 from pathlib import Path

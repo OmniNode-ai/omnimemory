@@ -244,7 +244,7 @@ class TestRetryDecorator:
                 raise ValueError("Not yet")
             return "success"
 
-        _start_time = asyncio.get_event_loop().time()  # noqa: F841
+        _start_time = asyncio.get_event_loop().time()
         await timing_operation()
 
         # Check that delays increased exponentially

@@ -12,6 +12,7 @@ This is a fully declarative ONEX node:
 
 Node Type: EFFECT
 """
+
 from .adapters import HandlerFileSystemAdapter, HandlerFileSystemAdapterConfig
 from .models import ModelMemoryStorageRequest, ModelMemoryStorageResponse
 

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelUser(BaseModel):
     """User model with comprehensive identity and authorization information."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     user_id: UUID = Field(
         description="Unique user identifier",

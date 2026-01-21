@@ -8,11 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from ..foundation.model_typed_collections import ModelMetadata
 
+# Percentage calculation constants
+PERCENTAGE_TOTAL = 100.0
+
 
 class ModelProcessingMetrics(BaseModel):
     """Processing metrics for tracking operation timing and performance."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Core timing metrics
     processing_time_ms: float = Field(
@@ -101,7 +104,7 @@ class ModelProcessingMetrics(BaseModel):
                 "computation": 0.0,
                 "storage": 0.0,
                 "serialization": 0.0,
-                "other": 100.0,
+                "other": PERCENTAGE_TOTAL,
             }
 
         # Use total processing time as the denominator when available
@@ -120,10 +123,10 @@ class ModelProcessingMetrics(BaseModel):
         # Handle two scenarios:
         # 1. Overlap (components exceed total): Normalize proportionally to 100%
         # 2. No overlap (components < total): "other" captures untracked time
-        if known_total > 100.0:
+        if known_total > PERCENTAGE_TOTAL:
             # Normalize proportionally - components overlap due to parallel execution
             # or measurement imprecision, so scale them to fit within 100%
-            scale = 100.0 / known_total
+            scale = PERCENTAGE_TOTAL / known_total
             return {
                 "validation": validation_pct * scale,
                 "computation": computation_pct * scale,
@@ -138,5 +141,5 @@ class ModelProcessingMetrics(BaseModel):
                 "computation": computation_pct,
                 "storage": storage_pct,
                 "serialization": serialization_pct,
-                "other": 100.0 - known_total,
+                "other": PERCENTAGE_TOTAL - known_total,
             }

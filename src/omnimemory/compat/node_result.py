@@ -15,7 +15,10 @@ These are documented exceptions to the zero-Any policy for compat modules.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -149,11 +152,8 @@ class NodeResult(Generic[T]):
             )
 
         try:
-            # Note: self.value may be None if T is Optional[X] and
-            # success(None) was called. This is valid - we pass whatever
-            # value was stored to the function.
-            # The function signature Callable[[T], U] handles this.
-            new_value = func(self.value)  # type: ignore[arg-type]
+            # Safe to cast: is_success=True implies value is not None
+            new_value = func(cast(T, self.value))
             return NodeResult[U].success(
                 new_value,
                 provenance=self.provenance,
@@ -192,10 +192,8 @@ class NodeResult(Generic[T]):
             )
 
         try:
-            # Note: self.value may be None if T is Optional[X] and
-            # success(None) was called. This is valid - we pass whatever
-            # value was stored to the function.
-            inner_result = func(self.value)  # type: ignore[arg-type]
+            # Safe to cast: is_success=True implies value is not None
+            inner_result = func(cast(T, self.value))
             # Combine provenance chains (outer first, then inner)
             combined_provenance = self.provenance + inner_result.provenance
             # Multiply trust scores for cumulative trust degradation
@@ -204,10 +202,9 @@ class NodeResult(Generic[T]):
             combined_metadata = {**self.metadata, **inner_result.metadata}
 
             if inner_result.is_success:
-                # Note: inner_result.value may be None if U is Optional[X].
-                # We preserve whatever value the inner result contains.
+                # Safe to cast: is_success=True implies value is not None
                 return NodeResult[U].success(
-                    inner_result.value,  # type: ignore[arg-type]
+                    cast(U, inner_result.value),
                     provenance=combined_provenance,
                     trust_score=combined_trust,
                     metadata=combined_metadata,
@@ -245,9 +242,8 @@ class NodeResult(Generic[T]):
             if self.error:
                 raise self.error
             raise ValueError(self.error_message or "Unknown error")
-        # Note: self.value may be None if T is Optional[X] and success(None) was called.
-        # This is valid - we return whatever value was stored.
-        return self.value  # type: ignore[return-value]
+        # Safe to cast: is_success=True implies value is not None
+        return cast(T, self.value)
 
     def unwrap_or(self, default: T) -> T:
         """
@@ -265,10 +261,8 @@ class NodeResult(Generic[T]):
         """
         if not self.is_success:
             return default
-        # Note: self.value may be None if T is Optional[X] and
-        # success(None) was called. This is valid and intentional -
-        # we return the stored success value, not the default.
-        return self.value  # type: ignore[return-value]
+        # Safe to cast: is_success=True implies value is not None
+        return cast(T, self.value)
 
     def __bool__(self) -> bool:
         """Return True if this is a success result."""

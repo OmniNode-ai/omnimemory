@@ -32,6 +32,7 @@ Example::
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1384.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +41,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 # omnibase_infra is a dev dependency - make imports conditional
 # to allow test collection and provide clear error messages
@@ -59,8 +60,6 @@ except ImportError as e:
     class InfraConnectionError(Exception):  # type: ignore[no-redef]
         """Stub for InfraConnectionError when omnibase_infra is not installed."""
 
-        pass
-
     class HandlerFileSystem:  # type: ignore[no-redef]
         """Stub for HandlerFileSystem when omnibase_infra is not installed."""
 
@@ -72,7 +71,7 @@ except ImportError as e:
             )
 
 
-from ..models import ModelMemoryStorageRequest, ModelMemoryStorageResponse  # noqa: E402
+from ..models import ModelMemoryStorageRequest, ModelMemoryStorageResponse
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +196,8 @@ class HandlerFileSystemAdapterConfig(BaseModel):
         max_file_size: Maximum file size in bytes for read/write operations.
             Defaults to 10MB.
     """
+
+    model_config = ConfigDict(strict=True, arbitrary_types_allowed=True)
 
     base_path: Path = Field(
         ...,
@@ -390,6 +391,14 @@ class HandlerFileSystemAdapter:
                     e,
                 )
                 raise
+            except TimeoutError as e:
+                # TimeoutError must be caught before OSError (it's a subclass)
+                logger.error(
+                    "Timeout during initialization at %s: %s",
+                    self._snapshots_path,
+                    e,
+                )
+                raise RuntimeError(f"Initialization timed out: {e}") from e
             except OSError as e:
                 logger.error(
                     "OS error initializing adapter at %s: %s",
@@ -407,13 +416,6 @@ class HandlerFileSystemAdapter:
                     e,
                 )
                 raise RuntimeError(f"Initialization failed: {e}") from e
-            except TimeoutError as e:
-                logger.error(
-                    "Timeout during initialization at %s: %s",
-                    self._snapshots_path,
-                    e,
-                )
-                raise RuntimeError(f"Initialization timed out: {e}") from e
             except Exception as e:
                 # Safety net for truly unexpected errors - log at ERROR level
                 logger.error(
@@ -541,7 +543,14 @@ class HandlerFileSystemAdapter:
                 status="permission_denied",
                 error_message=f"Permission denied writing to {file_path}: {e}",
             )
-        except (OSError, IOError) as e:
+        except TimeoutError as e:
+            # TimeoutError must be caught before OSError (it's a subclass)
+            logger.warning("Timeout storing snapshot %s: %s", snapshot_id, e)
+            return ModelMemoryStorageResponse(
+                status="error",
+                error_message=f"Store operation timed out: {e}",
+            )
+        except OSError as e:
             logger.warning("I/O error storing snapshot %s: %s", snapshot_id, e)
             return ModelMemoryStorageResponse(
                 status="error",
@@ -568,12 +577,6 @@ class HandlerFileSystemAdapter:
             return ModelMemoryStorageResponse(
                 status="error",
                 error_message=f"Store failed: {e}",
-            )
-        except TimeoutError as e:
-            logger.warning("Timeout storing snapshot %s: %s", snapshot_id, e)
-            return ModelMemoryStorageResponse(
-                status="error",
-                error_message=f"Store operation timed out: {e}",
             )
         except UnicodeEncodeError as e:
             logger.warning(
@@ -688,7 +691,18 @@ class HandlerFileSystemAdapter:
                 status="error",
                 error_message=f"Invalid snapshot data format: {e}",
             )
-        except (OSError, IOError) as e:
+        except TimeoutError as e:
+            # TimeoutError must be caught before OSError (it's a subclass)
+            logger.warning(
+                "Timeout retrieving snapshot %s: %s",
+                request.snapshot_id,
+                e,
+            )
+            return ModelMemoryStorageResponse(
+                status="error",
+                error_message=f"Retrieve operation timed out: {e}",
+            )
+        except OSError as e:
             logger.warning(
                 "I/O error retrieving snapshot %s: %s",
                 request.snapshot_id,
@@ -746,16 +760,6 @@ class HandlerFileSystemAdapter:
             return ModelMemoryStorageResponse(
                 status="error",
                 error_message=f"Snapshot file contains invalid encoding: {e}",
-            )
-        except TimeoutError as e:
-            logger.warning(
-                "Timeout retrieving snapshot %s: %s",
-                request.snapshot_id,
-                e,
-            )
-            return ModelMemoryStorageResponse(
-                status="error",
-                error_message=f"Retrieve operation timed out: {e}",
             )
         except Exception as e:
             # Safety net for truly unexpected errors - log at ERROR level
@@ -864,7 +868,18 @@ class HandlerFileSystemAdapter:
                 status="error",
                 error_message=f"Cannot delete: {file_path} is a directory",
             )
-        except (OSError, IOError) as e:
+        except TimeoutError as e:
+            # TimeoutError must be caught before OSError (it's a subclass)
+            logger.warning(
+                "Timeout deleting snapshot %s: %s",
+                request.snapshot_id,
+                e,
+            )
+            return ModelMemoryStorageResponse(
+                status="error",
+                error_message=f"Delete operation timed out: {e}",
+            )
+        except OSError as e:
             logger.warning(
                 "I/O error deleting snapshot %s: %s",
                 request.snapshot_id,
@@ -900,16 +915,6 @@ class HandlerFileSystemAdapter:
             return ModelMemoryStorageResponse(
                 status="error",
                 error_message=f"Delete failed: {e}",
-            )
-        except TimeoutError as e:
-            logger.warning(
-                "Timeout deleting snapshot %s: %s",
-                request.snapshot_id,
-                e,
-            )
-            return ModelMemoryStorageResponse(
-                status="error",
-                error_message=f"Delete operation timed out: {e}",
             )
         except Exception as e:
             # Safety net for truly unexpected errors - log at ERROR level
@@ -1037,7 +1042,18 @@ class HandlerFileSystemAdapter:
                 status="error",
                 error_message=f"Cannot list: {self._snapshots_path} is not a directory",
             )
-        except (OSError, IOError) as e:
+        except TimeoutError as e:
+            # TimeoutError must be caught before OSError (it's a subclass)
+            logger.warning(
+                "Timeout listing snapshots in %s: %s",
+                self._snapshots_path,
+                e,
+            )
+            return ModelMemoryStorageResponse(
+                status="error",
+                error_message=f"List operation timed out: {e}",
+            )
+        except OSError as e:
             logger.warning(
                 "I/O error listing snapshots directory %s: %s",
                 self._snapshots_path,
@@ -1066,16 +1082,6 @@ class HandlerFileSystemAdapter:
             return ModelMemoryStorageResponse(
                 status="error",
                 error_message=f"List failed: {e}",
-            )
-        except TimeoutError as e:
-            logger.warning(
-                "Timeout listing snapshots in %s: %s",
-                self._snapshots_path,
-                e,
-            )
-            return ModelMemoryStorageResponse(
-                status="error",
-                error_message=f"List operation timed out: {e}",
             )
         except Exception as e:
             # Safety net for truly unexpected errors - log at ERROR level

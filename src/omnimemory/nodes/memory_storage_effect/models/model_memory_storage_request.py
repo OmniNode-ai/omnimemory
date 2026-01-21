@@ -23,7 +23,7 @@ Example:
 from typing import Literal, Self
 
 from omnibase_core.models.omnimemory import ModelMemorySnapshot
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = ["ModelMemoryStorageRequest"]
 
@@ -82,6 +82,8 @@ class ModelMemoryStorageRequest(BaseModel):
     Raises:
         ValueError: If required fields for the operation are missing.
     """
+
+    model_config = ConfigDict(strict=True)
 
     operation: Literal["store", "retrieve", "delete", "update", "list"] = Field(
         ...,

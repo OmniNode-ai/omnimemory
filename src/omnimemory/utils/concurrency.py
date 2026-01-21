@@ -21,31 +21,33 @@ throughout the codebase.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import concurrent.futures
 import functools
 import threading
+import time
 from collections import deque
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, TypeVar
 
 # Type variable for generic function return types
 F = TypeVar("F", bound=Callable[..., Any])
 
-from uuid import uuid4  # noqa: E402
+from uuid import uuid4
 
-import structlog  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
+import structlog
+from pydantic import BaseModel, Field
 
-from ..models.foundation.model_connection_metadata import (  # noqa: E402
+from ..models.foundation.model_connection_metadata import (
     ConnectionMetadata,
 )
-from .error_sanitizer import SanitizationLevel  # noqa: E402
-from .error_sanitizer import sanitize_error as _base_sanitize_error  # noqa: E402
-from .observability import (  # noqa: E402
+from .error_sanitizer import SanitizationLevel
+from .error_sanitizer import sanitize_error as _base_sanitize_error
+from .observability import (
     OperationType,
     correlation_context,
     trace_operation,
@@ -89,6 +91,11 @@ class PoolStatus(Enum):
     FAILED = "failed"
 
 
+def _create_default_connection_metadata() -> ConnectionMetadata:
+    """Create a default ConnectionMetadata with a generated connection_id."""
+    return ConnectionMetadata(connection_id=str(uuid4()))
+
+
 @dataclass
 class LockRequest:
     """Request for lock acquisition with priority and metadata."""
@@ -96,9 +103,13 @@ class LockRequest:
     request_id: str = field(default_factory=lambda: str(uuid4()))
     priority: LockPriority = LockPriority.NORMAL
     requested_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    correlation_id: Optional[str] = None
-    timeout: Optional[float] = None
-    metadata: ConnectionMetadata = field(default_factory=lambda: ConnectionMetadata())
+    # Monotonic timestamp for timeout tracking - immune to wall clock adjustments
+    requested_at_monotonic: float = field(default_factory=time.monotonic)
+    correlation_id: str | None = None
+    timeout: float | None = None
+    metadata: ConnectionMetadata = field(
+        default_factory=_create_default_connection_metadata
+    )
 
 
 @dataclass
@@ -151,7 +162,7 @@ class PoolMetrics:
     total_destroyed: int = 0
     pool_exhaustions: int = 0
     average_wait_time: float = 0.0
-    last_exhaustion: Optional[datetime] = None
+    last_exhaustion: datetime | None = None
 
 
 class PriorityLock:
@@ -166,7 +177,7 @@ class PriorityLock:
         self.name = name
         self._lock = asyncio.Lock()
         self._queue: list[LockRequest] = []
-        self._current_holder: Optional[LockRequest] = None
+        self._current_holder: LockRequest | None = None
         self._stats = {
             "total_acquisitions": 0,
             "total_releases": 0,
@@ -179,8 +190,8 @@ class PriorityLock:
     async def acquire(
         self,
         priority: LockPriority = LockPriority.NORMAL,
-        timeout: Optional[float] = None,
-        correlation_id: Optional[str] = None,
+        timeout: float | None = None,
+        correlation_id: str | None = None,
         **metadata: Any,
     ) -> AsyncGenerator[None, None]:
         """
@@ -192,16 +203,23 @@ class PriorityLock:
             correlation_id: Correlation ID for tracing
             **metadata: Additional metadata for the lock request
         """
-        # Note: **metadata kwargs are logged for observability but not stored
-        # in ConnectionMetadata since it has strict field validation (extra="forbid")
+        # Create metadata with a unique connection_id, merging any additional metadata
+        connection_metadata = (
+            ConnectionMetadata(
+                connection_id=str(uuid4()),
+                **metadata,
+            )
+            if metadata
+            else _create_default_connection_metadata()
+        )
         request = LockRequest(
             priority=priority,
             timeout=timeout,
             correlation_id=correlation_id,
-            metadata=ConnectionMetadata(),
+            metadata=connection_metadata,
         )
 
-        acquired_at: Optional[datetime] = None
+        acquired_at: datetime | None = None
 
         async with correlation_context(correlation_id=correlation_id):
             async with trace_operation(
@@ -231,7 +249,7 @@ class PriorityLock:
 
                     yield
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     self._stats["total_timeouts"] += 1
                     logger.warning(
                         "priority_lock_timeout",
@@ -270,13 +288,12 @@ class PriorityLock:
                         self._queue.pop(0)
                         return
 
-            # Apply timeout if specified
+            # Apply timeout if specified using monotonic clock
+            # (immune to system clock adjustments like NTP, daylight saving, etc.)
             if request.timeout:
-                elapsed = (
-                    datetime.now(timezone.utc) - request.requested_at
-                ).total_seconds()
+                elapsed = time.monotonic() - request.requested_at_monotonic
                 if elapsed >= request.timeout:
-                    raise asyncio.TimeoutError(
+                    raise TimeoutError(
                         f"Lock acquisition timeout after {request.timeout}s"
                     )
 
@@ -284,7 +301,7 @@ class PriorityLock:
             await asyncio.sleep(0.001)  # 1ms
 
     async def _cleanup_request(
-        self, request: LockRequest, acquired_at: Optional[datetime]
+        self, request: LockRequest, acquired_at: datetime | None
     ) -> None:
         """Clean up after lock release."""
         async with self._lock:
@@ -328,7 +345,7 @@ class FairSemaphore:
         self.name = name
         self._semaphore = asyncio.Semaphore(value)
         self._total_permits = value
-        self._waiting_queue: deque = deque()
+        self._waiting_queue: deque[LockRequest] = deque()
         self._active_holders: dict[str, datetime] = {}
         self._stats = SemaphoreStats(
             total_permits=value, available_permits=value, waiting_count=0
@@ -337,7 +354,7 @@ class FairSemaphore:
 
     @asynccontextmanager
     async def acquire(
-        self, timeout: Optional[float] = None, correlation_id: Optional[str] = None
+        self, timeout: float | None = None, correlation_id: str | None = None
     ) -> AsyncGenerator[None, None]:
         """
         Acquire semaphore permit with timeout and tracking.
@@ -347,7 +364,7 @@ class FairSemaphore:
             correlation_id: Correlation ID for tracing
         """
         holder_id = str(uuid4())
-        acquired_at: Optional[datetime] = None
+        acquired_at: datetime | None = None
 
         async with correlation_context(correlation_id=correlation_id):
             async with trace_operation(
@@ -387,7 +404,7 @@ class FairSemaphore:
 
                     yield
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     async with self._lock:
                         self._stats.waiting_count -= 1
                         self._stats.total_timeouts += 1
@@ -422,9 +439,8 @@ class FairSemaphore:
                                     0.1, 2.0 / (releases + 1)
                                 )  # Adaptive smoothing factor
                                 self._stats.average_hold_time = (
-                                    (1 - alpha) * self._stats.average_hold_time
-                                    + alpha * hold_time
-                                )
+                                    1 - alpha
+                                ) * self._stats.average_hold_time + alpha * hold_time
                             self._stats.max_hold_time = max(
                                 self._stats.max_hold_time, hold_time
                             )
@@ -462,22 +478,29 @@ class AsyncConnectionPool:
         self,
         config: ConnectionPoolConfig,
         create_connection: Callable[[], Any],
-        validate_connection: Optional[Callable[[Any], bool]] = None,
-        close_connection: Optional[Callable[[Any], None]] = None,
+        validate_connection: Callable[[Any], bool] | None = None,
+        close_connection: Callable[[Any], None] | None = None,
     ):
         self.config = config
         self._create_connection = create_connection
         self._validate_connection = validate_connection or (lambda conn: True)
         self._close_connection = close_connection or (lambda conn: None)
 
+        # Connection availability queue with built-in synchronization.
+        # asyncio.Queue provides thread-safe put/get operations with internal
+        # event signaling - no explicit _available_event needed. When a connection
+        # is returned via put_nowait(), any coroutines awaiting get() are
+        # automatically woken up by the queue's internal notification mechanism.
         self._available: asyncio.Queue[Any] = asyncio.Queue(
             maxsize=config.max_connections
         )
+        # Maps connection_id (str) -> connection object (Any for generic pool support).
+        # See module docstring for rationale on Any type usage.
         self._active: dict[str, Any] = {}
         self._metrics = PoolMetrics()
         self._status = PoolStatus.HEALTHY
         self._lock = asyncio.Lock()
-        self._health_check_task: Optional[asyncio.Task] = None
+        self._health_check_task: asyncio.Task[None] | None = None
 
         # Start health check task
         self._start_health_check()
@@ -485,8 +508,8 @@ class AsyncConnectionPool:
     @asynccontextmanager
     async def acquire(
         self,
-        timeout: Optional[float] = None,
-        correlation_id: Optional[str] = None,
+        timeout: float | None = None,
+        correlation_id: str | None = None,
         _retry_count: int = 0,
     ) -> AsyncGenerator[Any, None]:
         """
@@ -621,7 +644,7 @@ class AsyncConnectionPool:
 
                     yield connection
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.error(
                         "connection_acquisition_timeout",
                         pool_name=self.config.name,
@@ -809,6 +832,19 @@ _shared_executor = concurrent.futures.ThreadPoolExecutor(
 )
 
 
+def _cleanup_shared_executor() -> None:
+    """Clean up the shared executor on module unload.
+
+    Registered via atexit to ensure proper resource cleanup when the
+    Python interpreter exits.
+    """
+    _shared_executor.shutdown(wait=False)
+
+
+# Register cleanup handler for the shared executor
+atexit.register(_cleanup_shared_executor)
+
+
 async def get_priority_lock(name: str) -> PriorityLock:
     """Get or create a priority lock by name."""
     async with _manager_lock:
@@ -829,8 +865,8 @@ async def register_connection_pool(
     name: str,
     config: ConnectionPoolConfig,
     create_connection: Callable[[], Any],
-    validate_connection: Optional[Callable[[Any], bool]] = None,
-    close_connection: Optional[Callable[[Any], None]] = None,
+    validate_connection: Callable[[Any], bool] | None = None,
+    close_connection: Callable[[Any], None] | None = None,
 ) -> AsyncConnectionPool:
     """Register a new connection pool."""
     async with _manager_lock:
@@ -847,7 +883,7 @@ async def register_connection_pool(
         return pool
 
 
-async def get_connection_pool(name: str) -> Optional[AsyncConnectionPool]:
+async def get_connection_pool(name: str) -> AsyncConnectionPool | None:
     """Get a connection pool by name."""
     return _pools.get(name)
 
@@ -857,7 +893,7 @@ async def get_connection_pool(name: str) -> Optional[AsyncConnectionPool]:
 async def with_priority_lock(
     name: str,
     priority: LockPriority = LockPriority.NORMAL,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
 ) -> AsyncGenerator[None, None]:
     """Context manager for priority lock acquisition."""
     lock = await get_priority_lock(name)
@@ -867,7 +903,7 @@ async def with_priority_lock(
 
 @asynccontextmanager
 async def with_fair_semaphore(
-    name: str, permits: int, timeout: Optional[float] = None
+    name: str, permits: int, timeout: float | None = None
 ) -> AsyncGenerator[None, None]:
     """Context manager for fair semaphore acquisition."""
     semaphore = await get_fair_semaphore(name, permits)
@@ -877,7 +913,7 @@ async def with_fair_semaphore(
 
 @asynccontextmanager
 async def with_connection_pool(
-    name: str, timeout: Optional[float] = None
+    name: str, timeout: float | None = None
 ) -> AsyncGenerator[Any, None]:
     """Context manager for connection pool usage."""
     pool = await get_connection_pool(name)
@@ -934,7 +970,7 @@ class CircuitBreaker:
         self.success_count = 0
         self.total_calls = 0
         self.total_timeouts = 0
-        self.last_failure_time: Optional[datetime] = None
+        self.last_failure_time: datetime | None = None
         self.state_changed_at: datetime = datetime.now(timezone.utc)
         # Thread-safe lock for synchronous record methods
         # Note: We use threading.Lock (not asyncio.Lock) because record_*
@@ -1050,7 +1086,7 @@ class CircuitBreaker:
         self,
         func: Callable[..., Any],
         *args: Any,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         **kwargs: Any,
     ) -> Any:
         """
@@ -1092,7 +1128,7 @@ class CircuitBreaker:
                             loop.run_in_executor(_shared_executor, bound_func),
                             timeout=timeout,
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Re-raise as TimeoutError for consistent handling
                         raise
                 else:
@@ -1102,7 +1138,7 @@ class CircuitBreaker:
             self.record_success()
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.record_timeout()
             raise
 
@@ -1112,9 +1148,11 @@ class CircuitBreaker:
 
 
 class CircuitBreakerOpenError(Exception):
-    """Exception raised when circuit breaker is open."""
+    """Raised when an operation is attempted on an open circuit breaker.
 
-    pass
+    This exception signals that the circuit breaker is in OPEN state and
+    refusing requests to allow the downstream service to recover.
+    """
 
 
 # === SIMPLE CONNECTION POOL ===
@@ -1139,11 +1177,9 @@ class ConnectionPool:
         """
         self.max_size = max_size
         self.timeout = timeout
-        self._connections: list[object] = []
-        # NOTE: Values are typed as Optional[object] because connection starts as None
-        # and is assigned within the acquire() method before being stored here.
-        # In practice, only non-None object instances are ever stored.
-        self._active: dict[str, object | None] = {}
+        self._connections: list[Any] = []
+        # Maps connection_id -> actual connection object (Any type for generic pool)
+        self._active: dict[str, Any] = {}
         self._lock = asyncio.Lock()
         self._connection_counter = 0
         # Thread-safe lock for synchronous accessor methods
@@ -1176,7 +1212,7 @@ class ConnectionPool:
         with self._sync_lock:
             return len(self._active) + len(self._connections)
 
-    def _create_connection(self) -> object:
+    def _create_connection(self) -> Any:
         """
         Create a new connection.
 
@@ -1197,8 +1233,8 @@ class ConnectionPool:
 
     @asynccontextmanager
     async def acquire(
-        self, timeout: Optional[float] = None, max_retries: int = 3
-    ) -> AsyncGenerator[object, None]:
+        self, timeout: float | None = None, max_retries: int = 3
+    ) -> AsyncGenerator[Any, None]:
         """
         Acquire a connection from the pool.
 
@@ -1213,9 +1249,7 @@ class ConnectionPool:
             Connection object
         """
         connection_id = str(uuid4())
-        connection: object | None = None
-        # NOTE: Use explicit None check to allow timeout=0 to be respected.
-        # Using `timeout or self.timeout` would treat 0 as falsy and use self.timeout.
+        connection = None
         effective_timeout = timeout if timeout is not None else self.timeout
         start_time = datetime.now(timezone.utc)
 
@@ -1226,7 +1260,7 @@ class ConnectionPool:
                     # Check if timeout has elapsed before attempting
                     elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
                     if elapsed >= effective_timeout:
-                        raise asyncio.TimeoutError(
+                        raise TimeoutError(
                             f"Connection pool timeout after {elapsed:.2f}s"
                         )
 
@@ -1236,9 +1270,9 @@ class ConnectionPool:
                         await asyncio.wait_for(
                             self._lock.acquire(), timeout=remaining_timeout
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError as lock_timeout:
                         msg = f"Pool lock timeout after {effective_timeout:.2f}s"
-                        raise asyncio.TimeoutError(msg)
+                        raise TimeoutError(msg) from lock_timeout
 
                     try:
                         # Thread-safe state access within async lock context
@@ -1252,7 +1286,7 @@ class ConnectionPool:
                             else:
                                 # Pool exhausted - would need to wait
                                 msg = f"Pool exhausted (max={self.max_size})"
-                                raise asyncio.TimeoutError(msg)
+                                raise TimeoutError(msg)
 
                             self._active[connection_id] = connection
                     finally:
@@ -1318,7 +1352,7 @@ def with_retry(
     max_attempts: int = 3,
     delay: float = 1.0,
     backoff_multiplier: float = 2.0,
-    exceptions: tuple = (Exception,),
+    exceptions: tuple[type[BaseException], ...] = (Exception,),
 ) -> Callable[[F], F]:
     """
     Decorator for retrying async functions with exponential backoff.
@@ -1337,28 +1371,33 @@ def with_retry(
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             current_delay = delay
-            last_exception: Optional[Exception] = None
+            last_exception: Exception | None = None
 
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except exceptions as e:
-                    last_exception = e
+                except exceptions as exc:
+                    last_exception = (
+                        exc if isinstance(exc, Exception) else Exception(str(exc))
+                    )
                     if attempt < max_attempts - 1:
+                        error_to_sanitize = (
+                            exc if isinstance(exc, Exception) else Exception(str(exc))
+                        )
                         logger.warning(
                             "retry_attempt",
                             function=func.__name__,
                             attempt=attempt + 1,
                             max_attempts=max_attempts,
                             delay=current_delay,
-                            error=_sanitize_error(e),
+                            error=_sanitize_error(error_to_sanitize),
                         )
                         await asyncio.sleep(current_delay)
                         current_delay *= backoff_multiplier
 
             if last_exception is not None:
                 raise last_exception
-            raise RuntimeError("Unexpected retry loop exit without exception")
+            raise RuntimeError("Unexpected retry loop exit without exception") from None
 
         return wrapper  # type: ignore[return-value]
 
@@ -1379,7 +1418,7 @@ def with_timeout(timeout: float) -> Callable[[F], F]:
         Decorated function with timeout
 
     Raises:
-        asyncio.TimeoutError: If the function execution exceeds the timeout
+        TimeoutError: If the function execution exceeds the timeout
     """
 
     def decorator(func: F) -> F:
@@ -1403,7 +1442,7 @@ def with_timeout(timeout: float) -> Callable[[F], F]:
                         ),
                         timeout=timeout,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(
                         "sync_function_timeout", function=func.__name__, timeout=timeout
                     )

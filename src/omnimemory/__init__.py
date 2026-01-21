@@ -37,12 +37,11 @@ from .protocols import (
     BaseMemoryRequest,
     BaseMemoryResponse,
     ContentType,
+    EnumOmniMemoryErrorCode,
     MemoryPriority,
     MemoryRecord,
     MemoryStoreRequest,
     MemoryStoreResponse,
-    OmniMemoryError,
-    OmniMemoryErrorCode,
     OperationStatus,
     ProtocolAgentCoordinator,
     ProtocolIntelligenceProcessor,
@@ -55,11 +54,12 @@ from .protocols import (
     ProtocolMemoryPersistence,
     ProtocolMemoryRetrieval,
     ProtocolMemoryStorage,
+    ProtocolOmniMemoryError,
     ProtocolPatternRecognition,
     ProtocolSemanticAnalyzer,
+    ProtocolSystemError,
+    ProtocolValidationError,
     ProtocolWorkflowCoordinator,
-    SystemError,
-    ValidationError,
 )
 
 __all__ = [
@@ -104,8 +104,8 @@ __all__ = [
     "MemoryPriority",
     "AccessLevel",
     # Error handling
-    "OmniMemoryError",
-    "OmniMemoryErrorCode",
-    "ValidationError",
-    "SystemError",
+    "ProtocolOmniMemoryError",
+    "EnumOmniMemoryErrorCode",
+    "ProtocolValidationError",
+    "ProtocolSystemError",
 ]

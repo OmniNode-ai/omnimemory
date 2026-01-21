@@ -24,9 +24,9 @@ from .node_result import NodeResult
 from .onex_error import BaseOnexError, OnexError
 
 __all__ = [
+    "BaseOnexError",
+    "ModelONEXContainer",  # Alias for upstream compatibility
+    "ModelOnexContainer",
     "NodeResult",
     "OnexError",
-    "BaseOnexError",
-    "ModelOnexContainer",
-    "ModelONEXContainer",  # Alias for upstream compatibility
 ]

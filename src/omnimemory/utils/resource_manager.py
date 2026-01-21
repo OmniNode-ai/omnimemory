@@ -27,7 +27,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncGenerator, Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Callable
 
 import structlog
 from pydantic import BaseModel, Field
@@ -148,7 +151,7 @@ class AsyncCircuitBreaker:
             await self._on_success()
             return result
 
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             self.stats.total_timeouts += 1
             await self._on_failure(e)
             raise
@@ -209,9 +212,7 @@ class AsyncCircuitBreaker:
             if (
                 self.state == CircuitState.CLOSED
                 and self.stats.failure_count >= self.config.failure_threshold
-            ):
-                self._transition_to_open()
-            elif self.state == CircuitState.HALF_OPEN:
+            ) or self.state == CircuitState.HALF_OPEN:
                 self._transition_to_open()
 
     def _transition_to_closed(self) -> None:
@@ -413,7 +414,7 @@ async def with_timeout(timeout: float) -> AsyncGenerator[None, None]:
     try:
         async with asyncio.timeout(timeout):
             yield
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("operation_timeout", timeout=timeout)
         raise
 
@@ -445,13 +446,9 @@ class ResourceStatus(Enum):
 class ResourceAllocationError(Exception):
     """Exception raised when resource allocation fails."""
 
-    pass
-
 
 class ResourceTimeoutError(Exception):
     """Exception raised when resource acquisition times out."""
-
-    pass
 
 
 @dataclass
@@ -601,7 +598,8 @@ class ResourcePool:
             ResourceTimeoutError: If acquisition times out
             ResourceAllocationError: If resource creation fails
         """
-        timeout = timeout or self._timeout
+        # Resolve effective timeout upfront for type safety in arithmetic operations
+        effective_timeout: float = timeout if timeout is not None else self._timeout
         start_time = time.time()
 
         while True:
@@ -645,15 +643,15 @@ class ResourcePool:
 
             # Check timeout
             elapsed = time.time() - start_time
-            if elapsed >= timeout:
+            if elapsed >= effective_timeout:
                 raise ResourceTimeoutError(
                     f"Timeout acquiring {self.resource_type.value} resource"
                 )
             try:
                 await asyncio.wait_for(
-                    self._available_event.wait(), timeout=timeout - elapsed
+                    self._available_event.wait(), timeout=effective_timeout - elapsed
                 )
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 raise ResourceTimeoutError(
                     f"Timeout acquiring {self.resource_type.value} resource"
                 ) from e
@@ -745,7 +743,7 @@ class ResourceManager:
         pool = self.resource_pools[resource_type]
 
         # Ensure pool is initialized
-        if not pool._initialized:
+        if not pool._initialized:  # noqa: SLF001  # Intentional - manager needs pool internals
             await pool.initialize()
 
         self._metrics["total_operations"] += 1
@@ -897,9 +895,9 @@ class ResourceManager:
         pool = self.resource_pools[resource_type]
         expired_resources: list[Any] = []
 
-        async with pool._lock:
+        async with pool._lock:  # noqa: SLF001  # Intentional - manager needs pool internals
             # If no TTL configured, all resources are valid
-            if pool._ttl is None:
+            if pool._ttl is None:  # noqa: SLF001
                 return
 
             current_time = time.time()
@@ -907,7 +905,7 @@ class ResourceManager:
 
             for resource, added_time in pool.available_resources:
                 elapsed = current_time - added_time
-                if elapsed < pool._ttl:
+                if elapsed < pool._ttl:  # noqa: SLF001
                     valid_resources.append((resource, added_time))
                 else:
                     expired_resources.append(resource)
@@ -936,7 +934,7 @@ class ResourceManager:
         for resource_type, pool in self.resource_pools.items():
             resources_to_close: list[Any] = []
 
-            async with pool._lock:
+            async with pool._lock:  # noqa: SLF001  # Intentional - shutdown needs pool internals
                 # Collect active resources for closing
                 for handle in list(pool.active_resources.values()):
                     handle.status = ResourceStatus.RELEASED

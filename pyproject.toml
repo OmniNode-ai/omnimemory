@@ -70,13 +70,30 @@ omnibase-infra = "^0.2.1"
 # Testing framework
 pytest = "^8.3.4"
 pytest-asyncio = "^0.25.0"
-black = "^24.10.0"
-isort = "^5.13.2"
-mypy = "^1.14.0"
-flake8 = "^7.1.1"
-pre-commit = "^4.0.1"
 pytest-cov = "^6.0.0"
+pytest-timeout = "^2.3.1"
+pytest-split = "^0.10.0"
+pytest-xdist = "^3.5.0"
+
+# Code formatting and linting (ruff replaces black, isort, flake8 - 10-100x faster)
+# VERSION SYNC: Poetry uses ^0.8.0 (allows updates), pre-commit pins v0.8.6
+# UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
+ruff = "^0.8.0"
+
+# Type checking (dual checker: mypy strict + pyright basic)
+# VERSION SYNC: Poetry uses caret versions, pre-commit pins exact versions
+# mypy: ^1.14.0 in Poetry, v1.14.1 in pre-commit
+# pyright: ^1.1.390 in Poetry, v1.1.391 in pre-commit
+mypy = "^1.14.0"
+pyright = "^1.1.390"
+
+# Pre-commit hooks
+pre-commit = "^4.0.1"
+
+# Security
 detect-secrets = "^1.5.0"
+
+# Development utilities
 memory-profiler = "^0.61.0"
 docker = "^7.1.0"
 
@@ -84,19 +101,174 @@ docker = "^7.1.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.black]
+[tool.ruff]
+target-version = "py312"
 line-length = 88
-target-version = ['py312']
+extend-exclude = [
+    "**/archived/**",
+    "**/archive/**",
+    "**/site-packages/**",
+]
 
-[tool.isort]
-profile = "black"
-line_length = 88
+[tool.ruff.format]
+# Use black-compatible formatting (ruff format is a drop-in replacement for black)
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint]
+# Rule sets enabled (includes UP for pyupgrade rules)
+# NOTE: UP007 (PEP 604 union syntax: X | Y instead of Union[X, Y]) is ENABLED
+# and organizationally mandated - do NOT add UP007 to the ignore list
+# NOTE: TCH rules have been remapped to TC in ruff 0.8+
+select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TC", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "RUF"]
+# IMPORTANT: UP007 must NEVER be added here (PEP 604 syntax is mandated)
+ignore = [
+    # ==========================================================================
+    # DESIGN CHOICES (intentionally ignored - not technical debt)
+    # ==========================================================================
+    "S101",      # Allow assert statements in tests
+    "PLR0206",   # Properties with parameters (design choice for descriptors)
+    "UP017",     # Use datetime.UTC (prefer timezone.utc for codebase consistency - 100+ existing usages)
+    "A002",      # Function argument shadowing builtin (id, type, etc. are common)
+    "B024",      # Abstract class without abstract methods (base class patterns)
+    "ARG005",    # Unused lambda argument (callback signatures require it)
+    "S110",      # try-except-pass (intentional in cleanup/shutdown code)
+    "ISC001",    # Implicit string concatenation (conflicts with ruff formatter)
+
+    # ==========================================================================
+    # COMPLEXITY RULES (architectural - requires refactoring)
+    # ==========================================================================
+    "C901",      # Function complexity (>10) - requires architectural changes
+    "PLR0911",   # Too many return statements (>6)
+    "PLR0912",   # Too many branches (>12)
+    "PLR0913",   # Too many arguments (>5)
+    "PLR0915",   # Too many statements (>50)
+
+    # ==========================================================================
+    # EXCEPTION HANDLING (technical debt - fix incrementally)
+    # ==========================================================================
+    "BLE001",    # Blind exception catching (Exception)
+    "EM101",     # Exception must not use string literal
+    "EM102",     # Exception must not use f-string literal
+    "TRY003",    # Long exception messages outside exception class
+    "TRY004",    # Prefer TypeError for invalid type
+    "TRY203",    # Redundant exception handler (useless re-raise)
+    "TRY300",    # Consider moving to else block
+    "TRY301",    # Abstract raise to inner function
+    "TRY400",    # Use logging.exception instead of logging.error
+    "B904",      # raise ... from err/None in except blocks
+
+    # ==========================================================================
+    # BOOLEAN PARAMETERS (technical debt - fix incrementally)
+    # ==========================================================================
+    "FBT001",    # Boolean positional argument in function definition
+    "FBT002",    # Boolean default positional argument
+    "FBT003",    # Boolean positional value in function call
+
+    # ==========================================================================
+    # UNUSED ARGUMENTS (technical debt - interface compliance)
+    # ==========================================================================
+    "ARG001",    # Unused function argument (callback signatures)
+    "ARG002",    # Unused method argument (interface compliance)
+
+    # ==========================================================================
+    # SIMPLIFICATION RULES (technical debt - fix incrementally)
+    # ==========================================================================
+    "SIM102",    # Nested if statements (use single if with and)
+    "SIM105",    # Use contextlib.suppress instead of try-except-pass
+    "SIM110",    # Use any() instead of for loop
+    "SIM117",    # Nested with statements (use single with)
+    "SIM118",    # Use key in dict instead of key in dict.keys()
+    "SIM101",    # Multiple isinstance calls (merge into single call)
+    "RET504",    # Unnecessary assignment before return
+    "RET505",    # Unnecessary elif after return
+
+    # ==========================================================================
+    # CODE STYLE (technical debt - fix incrementally)
+    # ==========================================================================
+    "PLR2004",   # Magic values in comparisons (acceptable in tests and config)
+    "E501",      # Line too long (>88 characters)
+    "E402",      # Module level import not at top of file
+    "TC003",     # Move stdlib import into TYPE_CHECKING block
+    "COM812",    # Trailing comma missing
+    "N806",      # Variable in function should be lowercase
+    "PTH123",    # Use Path.open() instead of open()
+    "TID252",    # Prefer absolute imports over relative from parent
+    "T201",      # print() found (use logging instead)
+    "S311",      # Random not suitable for crypto (acceptable for non-crypto)
+    "RUF022",    # __all__ is not sorted
+    "RUF012",    # Mutable class attrs should be ClassVar
+    "RUF005",    # Consider unpacking instead of concatenation
+    "G004",      # Logging statement uses f-string
+    "B007",      # Unused loop control variable
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["omnimemory"]
+
+[tool.ruff.lint.per-file-ignores]
+# Validation scripts need special rules for security, naming, and documentation
+"scripts/validation/*" = [
+    "S602",  # subprocess call with shell=True
+    "S603",  # subprocess without shell
+    "S604",  # function call with shell=True
+    "S605",  # start process with shell
+    "S606",  # start process without shell
+    "S607",  # start process with partial path
+    "N802",  # AST visitor methods must use CamelCase names (visit_Import, visit_ClassDef)
+    "ERA001",  # Commented-out code (validation scripts document code patterns in comments)
+]
+# Test-only rules - acceptable in test files
+"tests/**/*" = [
+    "SLF001",  # Private member accessed (tests need to verify internals)
+    "S105",    # Hardcoded password (test fixtures use fake credentials)
+    "S608",    # SQL injection (test code with controlled input)
+    "B017",    # pytest.raises(Exception) (acceptable for broad exception tests)
+    "PT011",   # pytest.raises too broad (will add match= incrementally)
+    "ERA001",  # Commented-out code (section headers for test organization)
+    "S603",    # subprocess call (test code with controlled input)
+    "S607",    # Partial executable path (test code uses 'python')
+]
 
 [tool.mypy]
+# Strict mode enables: warn_return_any, warn_unused_configs, disallow_untyped_defs,
+# disallow_incomplete_defs, check_untyped_defs, disallow_untyped_decorators,
+# no_implicit_optional, warn_redundant_casts, warn_unused_ignores, strict_equality, and more
+strict = true
+plugins = ["pydantic.mypy"]
 python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+
+# Third-party libraries without type stubs
+[[tool.mypy.overrides]]
+module = [
+    "redis.*",
+    "pinecone.*",
+    "supabase.*",
+    "asyncpg.*",
+    "structlog.*",
+    "omnibase_core",
+    "omnibase_core.*",
+    "omnibase_infra",
+    "omnibase_infra.*",
+    "pkg_resources",
+]
+ignore_missing_imports = true
+
+# Redis module has incomplete type stubs - allow untyped calls
+[[tool.mypy.overrides]]
+module = ["redis.*"]
+disallow_untyped_calls = false
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = false
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -104,7 +276,12 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --strict-markers"
+# Filter deprecation warnings from third-party libraries we can't fix
+filterwarnings = [
+    # Google protobuf PyType_Spec metaclass warning - upstream issue, can't fix
+    "ignore:Type google._upb._message.*:DeprecationWarning",
+]
 markers = [
     "integration: marks tests as integration tests (may require external services)",
     "unit: marks tests as unit tests (no external dependencies)",

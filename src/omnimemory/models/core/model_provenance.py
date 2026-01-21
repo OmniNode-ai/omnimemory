@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelProvenanceEntry(BaseModel):
     """Single provenance entry following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Operation identification
     operation_id: UUID = Field(
@@ -69,7 +69,7 @@ class ModelProvenanceEntry(BaseModel):
 class ModelProvenanceChain(BaseModel):
     """Complete provenance chain for memory data following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Chain metadata
     chain_id: UUID = Field(

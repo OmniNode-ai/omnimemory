@@ -9,21 +9,21 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ...enums.enum_operation_status import EnumOperationStatus
+from ...enums.enum_operation_status import EnumOperationStatus  # noqa: TC001
 from ..foundation.model_contract_version import DEFAULT_CONTRACT_VERSION
-from ..foundation.model_error_details import ModelErrorDetails
-from ..foundation.model_memory_data import ModelMemoryResponseData
-from ..foundation.model_trust_score import ModelTrustScore
-from .model_memory_metadata import ModelMemoryMetadata
-from .model_operation_metadata import ModelOperationMetadata
-from .model_processing_metrics import ModelProcessingMetrics
-from .model_provenance import ModelProvenanceChain
+from ..foundation.model_error_details import ModelErrorDetails  # noqa: TC001
+from ..foundation.model_memory_data import ModelMemoryResponseData  # noqa: TC001
+from ..foundation.model_trust_score import ModelTrustScore  # noqa: TC001
+from .model_memory_metadata import ModelMemoryMetadata  # noqa: TC001
+from .model_operation_metadata import ModelOperationMetadata  # noqa: TC001
+from .model_processing_metrics import ModelProcessingMetrics  # noqa: TC001
+from .model_provenance import ModelProvenanceChain  # noqa: TC001
 
 
 class ModelMemoryResponse(BaseModel):
     """Base memory response model following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Contract version for schema tracking
     contract_version: str = Field(

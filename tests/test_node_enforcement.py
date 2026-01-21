@@ -21,6 +21,7 @@ Skip Behavior:
 Path Resolution:
     Uses Path(__file__) for CWD-independent path resolution via conftest.py.
 """
+
 from __future__ import annotations
 
 import ast
@@ -255,9 +256,7 @@ class TestContractEnforcement:
             pytest.skip(f"node.py not present (expected): {node_py_path}")
 
         result: SuperInitValidationResult = validate_super_init_pattern(node_py_path)
-        assert (
-            result.valid
-        ), f"node.py for {node_name} failed super().__init__ check: {result.error}"
+        assert result.valid, f"node.py for {node_name} failed super().__init__(container) check: {result.error}"
 
     def test_validate_contract_accepts_flat_format(self, tmp_path: Path) -> None:
         """Test that validator accepts flat format (no 'onex' wrapper)."""

@@ -15,11 +15,11 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_retrieval_effect.handlers import (
         HandlerGraphMock,
-        HandlerGraphMockConfig,
+        ModelHandlerGraphMockConfig,
     )
 
     async def example():
-        config = HandlerGraphMockConfig()
+        config = ModelHandlerGraphMockConfig()
         handler = HandlerGraphMock(config)
         await handler.initialize()
 
@@ -41,16 +41,22 @@ Example::
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from collections import deque
-from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from omnibase_core.models.omnimemory import ModelMemorySnapshot
-from pydantic import BaseModel, Field
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
+from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from ..models import (
     ModelMemoryRetrievalRequest,
@@ -62,13 +68,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerGraphMock",
-    "HandlerGraphMockConfig",
-    "GraphRelationship",
+    "ModelHandlerGraphMockConfig",
+    "HandlerGraphRelationship",
 ]
 
 
 @dataclass
-class GraphRelationship:
+class HandlerGraphRelationship:
     """Represents a relationship between two snapshots.
 
     Attributes:
@@ -84,7 +90,7 @@ class GraphRelationship:
     weight: float = 1.0
 
 
-class HandlerGraphMockConfig(BaseModel):
+class ModelHandlerGraphMockConfig(BaseModel):
     """Configuration for the mock graph handler.
 
     Attributes:
@@ -94,6 +100,8 @@ class HandlerGraphMockConfig(BaseModel):
         bidirectional: Whether relationships are traversed bidirectionally.
             Defaults to True.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     simulate_latency_ms: int = Field(
         default=0,
@@ -127,7 +135,7 @@ class HandlerGraphMock:
     Example::
 
         async def example():
-            handler = HandlerGraphMock(HandlerGraphMockConfig())
+            handler = HandlerGraphMock(ModelHandlerGraphMockConfig())
             await handler.initialize()
 
             # Seed test data
@@ -143,7 +151,7 @@ class HandlerGraphMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: HandlerGraphMockConfig) -> None:
+    def __init__(self, config: ModelHandlerGraphMockConfig) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
@@ -151,15 +159,15 @@ class HandlerGraphMock:
         """
         self._config = config
         self._snapshots: dict[str, ModelMemorySnapshot] = {}
-        self._relationships: list[GraphRelationship] = []
-        self._adjacency: dict[str, list[tuple[str, str, float]]] = (
-            {}
-        )  # id -> [(target, type, weight)]
+        self._relationships: list[HandlerGraphRelationship] = []
+        self._adjacency: dict[
+            str, list[tuple[str, str, float]]
+        ] = {}  # id -> [(target, type, weight)]
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> HandlerGraphMockConfig:
+    def config(self) -> ModelHandlerGraphMockConfig:
         """Get the handler configuration."""
         return self._config
 
@@ -235,7 +243,7 @@ class HandlerGraphMock:
             relationship_type: The type of relationship.
             weight: Optional weight (0.0-1.0). Defaults to 1.0.
         """
-        relationship = GraphRelationship(
+        relationship = HandlerGraphRelationship(
             source_id=source_id,
             target_id=target_id,
             relationship_type=relationship_type,
@@ -367,7 +375,7 @@ class HandlerGraphMock:
         results: list[ModelSearchResult] = []
         visited: set[str] = {start_id}
 
-        # Queue: (node_id, depth, path, cumulative_weight)
+        # Queue entries are tuples of node_id, depth, path, cumulative_weight
         queue: deque[tuple[str, int, list[str], float]] = deque()
         queue.append((start_id, 0, [start_id], 1.0))
 

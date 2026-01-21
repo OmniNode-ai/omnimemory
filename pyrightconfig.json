@@ -1,0 +1,44 @@
+{
+  "include": ["src/omnimemory"],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    "tmp",
+    "**/tests/**"
+  ],
+
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Linux",
+
+  "reportUnusedVariable": "warning",
+  "reportPossiblyUnboundVariable": "warning",
+  "reportIncompatibleMethodOverride": "warning",
+
+  "reportReturnType": "error",
+  "reportArgumentType": "error",
+  "reportAssignmentType": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportCallIssue": "warning",
+  "reportIndexIssue": "warning",
+  "reportOperatorIssue": "warning",
+  "reportRedeclaration": "warning",
+  "reportInvalidTypeForm": "warning",
+  "reportUnknownParameterType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownLambdaType": false,
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "reportUnusedImport": "warning",
+  "reportUnsupportedDunderAll": false,
+  "reportAttributeAccessIssue": "warning",
+  "reportUnnecessaryComparison": "warning",
+  "reportUnnecessaryIsInstance": "warning",
+  "reportConstantRedefinition": "warning",
+  "reportUntypedFunctionDecorator": false,
+  "reportPrivateUsage": false,
+  "reportTypedDictNotRequiredAccess": false
+}

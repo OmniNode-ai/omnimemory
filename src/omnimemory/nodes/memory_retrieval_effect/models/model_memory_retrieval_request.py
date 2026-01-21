@@ -30,7 +30,7 @@ Example:
 
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = ["ModelMemoryRetrievalRequest"]
 
@@ -89,6 +89,8 @@ class ModelMemoryRetrievalRequest(BaseModel):
     Raises:
         ValueError: If required fields for the operation are missing.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     operation: Literal["search", "search_text", "search_graph"] = Field(
         ...,

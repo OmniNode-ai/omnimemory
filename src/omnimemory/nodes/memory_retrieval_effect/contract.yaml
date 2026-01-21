@@ -1,3 +1,4 @@
+---
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 OmniNode Team
 
@@ -6,14 +7,15 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "memory_retrieval_effect"
-node_version: {major: 0, minor: 1, patch: 0}
-contract_version: {major: 1, minor: 0, patch: 0}
-description: "Memory retrieval effect node for search operations. P2A: Qdrant semantic search, PostgreSQL full-text search, and Graph traversal backends."
+version: {major: 0, minor: 1, patch: 0}
+description: "Memory retrieval effect node for search operations. P2A: Qdrant semantic search, PostgreSQL
+  full-text search, and Graph traversal backends."
 node_type: "EFFECT"
 input_model: "ModelMemoryRetrievalRequest"
 output_model: "ModelMemoryRetrievalResponse"
 
 # === IO OPERATIONS (Required for EFFECT nodes) ===
+# All operations are read-only searches - no atomicity required
 io_operations:
   - operation_type: "vector_query"
     atomic: false
@@ -27,6 +29,11 @@ io_operations:
     atomic: false
     timeout_seconds: 15
     validation_enabled: true
+
+# === TRANSACTION MANAGEMENT ===
+# Disabled: All operations are read-only searches, no transactions needed
+transaction_management:
+  enabled: false
 
 # === NODE CONFIGURATION ===
 tool_specification:
@@ -46,7 +53,8 @@ service_configuration:
 input_state:
   object_type: "object"
   required: ["operation"]
-  optional: ["query_text", "query_embedding", "snapshot_id", "limit", "similarity_threshold", "traversal_depth", "relationship_types", "metadata_filters", "tags"]
+  optional: ["query_text", "query_embedding", "snapshot_id", "limit", "similarity_threshold", "traversal_depth",
+    "relationship_types", "metadata_filters", "tags"]
 
 output_state:
   object_type: "object"
@@ -118,25 +126,9 @@ event_type:
 # === INFRASTRUCTURE ===
 infrastructure:
   retrieval_backends:
-    - qdrant      # P2A primary - semantic search
+    - qdrant  # P2A primary - semantic search
     - postgresql  # P2A adapter - full-text search
-    - graph_db    # P2A adapter - relationship traversal
-
-# === ENUM DEFINITIONS ===
-# These enums MUST match exactly with the Pydantic Literal types in the models
-enums:
-  operation:
-    description: "Retrieval operation to perform"
-    values:
-      - search        # Semantic similarity search using vector embeddings
-      - search_text   # Full-text search using SQL LIKE/FTS
-      - search_graph  # Graph traversal for relationship-based retrieval
-  status:
-    description: "Operation result status"
-    values:
-      - success
-      - error
-      - no_results
+    - graph_db  # P2A adapter - relationship traversal
 
 # === VALIDATION RULES ===
 validation_rules:

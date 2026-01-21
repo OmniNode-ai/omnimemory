@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelMemoryParameters(BaseModel):
     """Structured parameters for memory operations following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Memory operation parameters (string values for type safety)
     memory_type: str | None = Field(
@@ -64,7 +64,7 @@ class ModelMemoryParameters(BaseModel):
 class ModelMemoryOptions(BaseModel):
     """Boolean options for memory operations following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Validation options
     validate_input: bool = Field(

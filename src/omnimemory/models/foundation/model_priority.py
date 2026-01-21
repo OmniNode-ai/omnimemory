@@ -5,13 +5,13 @@ Priority model following ONEX foundation patterns.
 from datetime import datetime, timedelta, timezone
 
 from omnibase_core.enums.enum_priority_level import EnumPriorityLevel
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelPriority(BaseModel):
     """Priority model with level, context, and metadata."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     level: EnumPriorityLevel = Field(
         description="Priority level using ONEX standard enum",
@@ -49,6 +49,22 @@ class ModelPriority(BaseModel):
         description="Tags for categorizing priority context",
     )
 
+    @field_validator("expires_at", "created_at", mode="after")
+    @classmethod
+    def _ensure_utc(cls, v: datetime | None) -> datetime | None:
+        """Ensure datetime fields are UTC-aware to prevent TypeError in comparisons.
+
+        Uses mode='after' to run after Pydantic has coerced the value to datetime,
+        ensuring we receive a proper datetime object (or None) rather than a string.
+        """
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            # Naive datetime - assume it represents UTC time and attach timezone
+            return v.replace(tzinfo=timezone.utc)
+        # Convert to UTC for consistent comparisons
+        return v.astimezone(timezone.utc)
+
     def is_expired(self) -> bool:
         """Check if priority has expired."""
         if self.expires_at is None:
@@ -59,7 +75,7 @@ class ModelPriority(BaseModel):
         """Get effective priority value considering boost and expiration."""
         if self.is_expired():
             # If expired, fallback to normal priority
-            base_priority = float(EnumPriorityLevel.NORMAL.get_numeric_value())
+            base_priority: float = float(EnumPriorityLevel.NORMAL.get_numeric_value())
         else:
             base_priority = float(self.level.get_numeric_value())
 

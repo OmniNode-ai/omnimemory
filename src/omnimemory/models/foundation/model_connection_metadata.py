@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ConnectionMetadata(BaseModel):
     """Strongly typed metadata for connection objects."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     connection_id: str = Field(
         default_factory=lambda: str(uuid4()),
@@ -64,7 +64,7 @@ class ConnectionMetadata(BaseModel):
 class ConnectionPoolStats(BaseModel):
     """Strongly typed connection pool statistics."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     pool_name: str = Field(description="Name of the connection pool")
 
@@ -106,7 +106,7 @@ class ConnectionPoolStats(BaseModel):
 class SemaphoreMetrics(BaseModel):
     """Strongly typed semaphore performance metrics."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     name: str = Field(description="Name of the semaphore")
 

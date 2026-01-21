@@ -13,7 +13,7 @@ from ...enums.enum_intelligence_operation_type import EnumIntelligenceOperationT
 class ModelIntelligenceAnalysis(BaseModel):
     """Intelligence analysis result following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False)
 
     # Analysis identification
     analysis_id: UUID = Field(

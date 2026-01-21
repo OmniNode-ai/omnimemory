@@ -15,11 +15,11 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_retrieval_effect.handlers import (
         HandlerDbMock,
-        HandlerDbMockConfig,
+        ModelHandlerDbMockConfig,
     )
 
     async def example():
-        config = HandlerDbMockConfig()
+        config = ModelHandlerDbMockConfig()
         handler = HandlerDbMock(config)
         await handler.initialize()
 
@@ -45,15 +45,21 @@ Security:
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import re
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from omnibase_core.models.omnimemory import ModelMemorySnapshot
-from pydantic import BaseModel, Field
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
+from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from ..models import (
     ModelMemoryRetrievalRequest,
@@ -63,13 +69,16 @@ from ..models import (
 
 logger = logging.getLogger(__name__)
 
+# Minimum token length for text tokenization (filters out short words)
+MIN_TOKEN_LENGTH = 2
+
 __all__ = [
     "HandlerDbMock",
-    "HandlerDbMockConfig",
+    "ModelHandlerDbMockConfig",
 ]
 
 
-class HandlerDbMockConfig(BaseModel):
+class ModelHandlerDbMockConfig(BaseModel):
     """Configuration for the mock database handler.
 
     Attributes:
@@ -77,6 +86,8 @@ class HandlerDbMockConfig(BaseModel):
             Set to 0 for instant responses.
         case_sensitive: Whether text search is case-sensitive. Defaults to False.
     """
+
+    model_config = ConfigDict(frozen=True, from_attributes=True)
 
     simulate_latency_ms: int = Field(
         default=0,
@@ -105,7 +116,7 @@ class HandlerDbMock:
     Example::
 
         async def example():
-            handler = HandlerDbMock(HandlerDbMockConfig())
+            handler = HandlerDbMock(ModelHandlerDbMockConfig())
             await handler.initialize()
 
             # Seed test data
@@ -119,7 +130,7 @@ class HandlerDbMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: HandlerDbMockConfig) -> None:
+    def __init__(self, config: ModelHandlerDbMockConfig) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
@@ -131,7 +142,7 @@ class HandlerDbMock:
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> HandlerDbMockConfig:
+    def config(self) -> ModelHandlerDbMockConfig:
         """Get the handler configuration."""
         return self._config
 
@@ -290,7 +301,7 @@ class HandlerDbMock:
         # Split on non-alphanumeric characters
         tokens = re.split(r"[^\w]+", text)
         # Filter empty tokens and short words
-        return [t for t in tokens if len(t) >= 2]
+        return [t for t in tokens if len(t) >= MIN_TOKEN_LENGTH]
 
     def _get_snapshot_text(self, snapshot: ModelMemorySnapshot) -> str:
         """Extract searchable text from a snapshot.

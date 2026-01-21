@@ -32,7 +32,7 @@ class ModelContractVersion(BaseModel):
         print(request.contract_version)  # "1.0.0"
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     contract_version: str = Field(
         default=DEFAULT_CONTRACT_VERSION,

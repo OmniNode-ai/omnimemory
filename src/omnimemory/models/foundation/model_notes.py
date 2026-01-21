@@ -13,7 +13,7 @@ from ...enums.enum_severity import EnumSeverity
 class ModelNote(BaseModel):
     """Individual note entry following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     note_id: UUID = Field(
         default_factory=uuid4,
@@ -89,7 +89,7 @@ class ModelNote(BaseModel):
 class ModelNotesCollection(BaseModel):
     """Collection of notes following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     collection_id: UUID = Field(
         default_factory=uuid4,

@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.enums import EnumPriorityLevel, MigrationStatus
+from omnimemory.enums import EnumMigrationStatus, EnumPriorityLevel
 
 
 class ModelProgressPerformanceMetrics(BaseModel):
@@ -37,13 +37,13 @@ class ModelProgressPerformanceMetrics(BaseModel):
 class ProgressSummaryResponse(BaseModel):
     """Strongly typed progress summary response."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     migration_id: str = Field(description="Unique identifier for the migration")
 
     name: str = Field(description="Human-readable name of the migration")
 
-    status: MigrationStatus = Field(description="Current migration status")
+    status: EnumMigrationStatus = Field(description="Current migration status")
 
     priority: EnumPriorityLevel = Field(description="Migration priority level")
 

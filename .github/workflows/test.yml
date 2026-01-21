@@ -1,0 +1,377 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# Cancel previous runs when new commits are pushed to save CI resources
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  POETRY_VERSION: "2.2.1"
+  PYTHON_VERSION: "3.12"
+  CACHE_VERSION: "0.1.0"
+
+jobs:
+  # =============================================================================
+  # JOB ORDERING RATIONALE (Fail-Fast Optimization)
+  # =============================================================================
+  #
+  # Phase 1 - Quick Validation (parallel, ~2-5 min):
+  #   - lint: Code quality (ruff format, ruff check, mypy strict)
+  #   - pyright: Type checking (complementary to mypy)
+  #   - onex-validation: ONEX pattern validation (pydantic, naming, enums, etc.)
+  #
+  # Phase 2 - Full Test Suite (after Phase 1 completes):
+  #   - test: Run all tests (depends on lint, pyright, onex-validation)
+  #
+  # Phase 3 - Aggregation:
+  #   - test-summary: Aggregates all job results
+  #
+  # CONFIGURATION SYNC NOTE:
+  # These validations are synchronized with .pre-commit-config.yaml
+  # Pre-commit runs subset at commit time, full validation at pre-push
+  #
+  # SHARED CONFIGURATION FILES (synchronized with .pre-commit-config.yaml):
+  # - pyproject.toml: ruff [tool.ruff] (^0.8.0), mypy [tool.mypy] (^1.14.0), pyright (^1.1.390)
+  # - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
+  # VERSION SYNC: Poetry uses caret versions (allows updates), pre-commit pins exact versions
+  # (ruff v0.8.6, mypy v1.14.1, pyright v1.1.391) - both are within compatible ranges
+  # NOTE: UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
+  #
+  # CI-TO-HOOK SYNCHRONIZATION MAP:
+  # CI Job          | Pre-commit Hook                   | Command
+  # ----------------|-----------------------------------|----------------------------------
+  # lint            | ruff-format (pre-commit)          | ruff format --check src/ tests/
+  # lint            | ruff (pre-commit)                 | ruff check src/ tests/
+  # lint            | mypy (pre-push)                   | mypy --show-error-codes --no-error-summary src/omnimemory
+  # pyright         | pyright (pre-push)                | pyright src/omnimemory
+  # onex-validation | validate-pydantic-patterns        | python scripts/validation/validate_pydantic_patterns.py src/
+  # onex-validation | validate-single-class-per-file    | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
+  # onex-validation | validate-enum-casing              | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
+  # onex-validation | validate-no-backward-compatibility| python scripts/validation/validate_no_backward_compatibility.py -d src/
+  # onex-validation | validate-secrets                  | python scripts/validation/validate_secrets.py src/
+  # onex-validation | validate-naming-conventions       | python scripts/validation/validate_naming.py src/
+  #
+  # IMPORTANT: When modifying any CI step, update the corresponding hook in .pre-commit-config.yaml
+  #
+  # POETRY VERSION: Must match POETRY_VERSION env var (currently 2.2.1)
+  # =============================================================================
+
+  # Phase 1 - Code Quality
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            ${{ hashFiles('**/poetry.lock') }}-
+            ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
+      # Both pre-commit and CI use --check for consistent validation
+      - name: Check ruff formatting
+        run: poetry run ruff format --check src/ tests/
+
+      # SYNC: Pre-commit hook 'ruff-check' at pre-commit stage
+      # Both pre-commit and CI use check-only mode (no --fix)
+      - name: Check ruff linting (includes import sorting)
+        run: poetry run ruff check src/ tests/
+
+      # SYNC: Pre-commit hook 'mypy' at pre-push stage
+      # Both pre-commit and CI use same flags for consistent output
+      - name: Run mypy type checking (strict)
+        run: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
+
+  # Phase 1 - Pyright Type Checking
+  pyright:
+    name: Pyright Type Checking
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            ${{ hashFiles('**/poetry.lock') }}-
+            ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      # SYNC: Pre-commit hook 'pyright' at pre-push stage
+      # Uses pyrightconfig.json for project-level settings
+      - name: Run pyright type checking
+        run: poetry run pyright src/omnimemory
+
+  # Phase 1 - ONEX Validation
+  onex-validation:
+    name: ONEX Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            ${{ hashFiles('**/poetry.lock') }}-
+            ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
+      - name: Validate Pydantic patterns
+        run: poetry run python scripts/validation/validate_pydantic_patterns.py src/
+
+      # SYNC: Pre-commit hook 'validate-single-class-per-file' at pre-commit stage
+      - name: Validate single class per file
+        run: poetry run python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
+
+      # SYNC: Pre-commit hook 'validate-enum-casing' at pre-commit stage
+      - name: Validate enum casing
+        run: poetry run python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
+
+      # SYNC: Pre-commit hook 'validate-no-backward-compatibility' at pre-commit stage
+      - name: Validate no backward compatibility
+        run: poetry run python scripts/validation/validate_no_backward_compatibility.py -d src/
+
+      # SYNC: Pre-commit hook 'validate-secrets' at pre-commit stage
+      - name: Validate secrets
+        run: poetry run python scripts/validation/validate_secrets.py src/
+
+      # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-commit stage
+      # Both local and CI run naming validation at the same stage for consistency
+      - name: Validate naming conventions
+        run: poetry run python scripts/validation/validate_naming.py src/
+
+      - name: ONEX validation summary
+        if: always()
+        run: |
+          echo "## ONEX Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Validated the following ONEX patterns:" >> $GITHUB_STEP_SUMMARY
+          echo "- Pydantic patterns" >> $GITHUB_STEP_SUMMARY
+          echo "- Single class per file" >> $GITHUB_STEP_SUMMARY
+          echo "- Enum member casing (UPPER_SNAKE_CASE)" >> $GITHUB_STEP_SUMMARY
+          echo "- No backward compatibility anti-patterns" >> $GITHUB_STEP_SUMMARY
+          echo "- Secret detection" >> $GITHUB_STEP_SUMMARY
+          echo "- Naming conventions" >> $GITHUB_STEP_SUMMARY
+
+  # Phase 2 - Test Suite
+  test:
+    name: Tests
+    needs: [lint, pyright, onex-validation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Performance test threshold (relaxed for CI variance)
+      # Local dev uses 50ms default, CI uses 100ms for tolerance
+      PERF_THRESHOLD_MS: "100"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            ${{ hashFiles('**/poetry.lock') }}-
+            ${{ env.CACHE_VERSION }}
+          # Restore-keys use prefix matching for better fallback:
+          # - First tries exact OS + Python + lock hash
+          # - Falls back to OS + Python (different lock hash)
+          # - Falls back to OS only (different Python version)
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      - name: Run tests
+        run: |
+          poetry run pytest tests/ \
+            -n auto \
+            --timeout=60 \
+            --timeout-method=thread \
+            --tb=short \
+            --junitxml=junit.xml \
+            --cov=src/omnimemory \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: junit.xml
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
+
+  # Phase 3 - Aggregation
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint, pyright, onex-validation, test]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          lint="${{ needs.lint.result }}"
+          pyright="${{ needs.pyright.result }}"
+          onex="${{ needs.onex-validation.result }}"
+          test="${{ needs.test.result }}"
+
+          if [[ "$lint" == "success" ]] && \
+             [[ "$pyright" == "success" ]] && \
+             [[ "$onex" == "success" ]] && \
+             [[ "$test" == "success" ]]; then
+            echo "All tests passed successfully"
+            echo "Code Quality: Passed"
+            echo "Pyright Type Checking: Passed"
+            echo "ONEX Validation: Passed"
+            echo "Tests: Passed"
+            exit 0
+          else
+            echo "Tests failed"
+            echo "Lint: $lint"
+            echo "Pyright: $pyright"
+            echo "ONEX Validation: $onex"
+            echo "Tests: $test"
+            exit 1
+          fi

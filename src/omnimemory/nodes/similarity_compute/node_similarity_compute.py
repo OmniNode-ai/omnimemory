@@ -39,7 +39,7 @@ from __future__ import annotations
 from typing import assert_never
 
 from ..base import BaseComputeNode, ContainerType
-from .handlers import HandlerSimilarityCompute, HandlerSimilarityComputeConfig
+from .handlers import HandlerSimilarityCompute, ModelHandlerSimilarityComputeConfig
 from .models import ModelSimilarityComputeRequest, ModelSimilarityComputeResponse
 
 __all__ = [
@@ -102,7 +102,7 @@ class NodeSimilarityCompute(BaseComputeNode):
         """
         super().__init__(container)
         self._handler = HandlerSimilarityCompute(
-            config=HandlerSimilarityComputeConfig()
+            config=ModelHandlerSimilarityComputeConfig()
         )
 
     def execute(

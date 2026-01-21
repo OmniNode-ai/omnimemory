@@ -5,8 +5,10 @@ Provides comprehensive audit logging for security-sensitive operations
 including memory access, configuration changes, and PII detection events.
 """
 
+import atexit
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -64,7 +66,8 @@ class AuditEvent(BaseModel):
     # Event details
     message: str = Field(description="Human-readable event description")
     details: AuditEventDetails = Field(
-        default_factory=AuditEventDetails, description="Additional event details"
+        default_factory=lambda: AuditEventDetails(),
+        description="Additional event details",
     )
 
     # Security context
@@ -145,7 +148,7 @@ class AuditLogger:
 
         class JSONFormatter(logging.Formatter):
             def format(self, record: logging.LogRecord) -> str:
-                log_data = {
+                log_data: dict[str, object] = {
                     "timestamp": datetime.fromtimestamp(
                         record.created, tz=timezone.utc
                     ).isoformat(),
@@ -243,7 +246,7 @@ class AuditLogger:
 
     def log_pii_detection(
         self,
-        pii_types: list,
+        pii_types: list[str],
         content_length: int,
         sanitized: bool = False,
         details: AuditEventDetails | None = None,
@@ -276,9 +279,7 @@ class AuditLogger:
             severity=severity,
             operation="pii_scan",
             component="pii_detector",
-            message=(
-                f"PII scan found {len(pii_types)} types in {content_length} chars"
-            ),
+            message=f"PII detection scan found {len(pii_types)} PII types in {content_length} chars",
             details=pii_details,
             pii_detected=bool(pii_types),
             sanitized=sanitized,
@@ -371,20 +372,50 @@ class AuditLogger:
         return str(uuid.uuid4())
 
 
-# Global audit logger instance
-_audit_logger: AuditLogger | None = None
+class _AuditLoggerState:
+    """Singleton state manager for the audit logger.
+
+    Manages the global audit logger instance using class-level attributes
+    to avoid global statements. Uses a lock for thread-safe initialization.
+    """
+
+    _instance: AuditLogger | None = None
+    _lock: threading.Lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls) -> AuditLogger | None:
+        """Get the current audit logger instance."""
+        return cls._instance
+
+    @classmethod
+    def set_instance(cls, logger: AuditLogger | None) -> None:
+        """Set the audit logger instance."""
+        cls._instance = logger
+
+    @classmethod
+    def get_lock(cls) -> threading.Lock:
+        """Get the singleton initialization lock."""
+        return cls._lock
 
 
 def get_audit_logger() -> AuditLogger:
-    """Get the global audit logger instance."""
-    global _audit_logger
-    if _audit_logger is None:
-        # Initialize with default settings
-        log_file = Path("logs/audit.log")
-        _audit_logger = AuditLogger(
-            log_file=log_file, console_output=True, json_format=True
-        )
-    return _audit_logger
+    """Get the global audit logger instance.
+
+    Uses double-checked locking pattern for thread-safe lazy initialization.
+    """
+    instance = _AuditLoggerState.get_instance()
+    if instance is None:
+        with _AuditLoggerState.get_lock():
+            # Double-check after acquiring lock
+            instance = _AuditLoggerState.get_instance()
+            if instance is None:
+                # Initialize with default settings
+                log_file = Path("logs/audit.log")
+                instance = AuditLogger(
+                    log_file=log_file, console_output=True, json_format=True
+                )
+                _AuditLoggerState.set_instance(instance)
+    return instance
 
 
 def configure_audit_logger(
@@ -392,8 +423,36 @@ def configure_audit_logger(
     console_output: bool = True,
     json_format: bool = True,
 ) -> None:
-    """Configure the global audit logger."""
-    global _audit_logger
-    _audit_logger = AuditLogger(
-        log_file=log_file, console_output=console_output, json_format=json_format
-    )
+    """Configure the global audit logger.
+
+    Thread-safe configuration that replaces the existing logger instance.
+    """
+    with _AuditLoggerState.get_lock():
+        _AuditLoggerState.set_instance(
+            AuditLogger(
+                log_file=log_file,
+                console_output=console_output,
+                json_format=json_format,
+            )
+        )
+
+
+def _cleanup_audit_logger() -> None:
+    """Clean up the audit logger on module unload.
+
+    Properly closes all handlers to ensure log files are flushed
+    and file handles are released.
+    """
+    instance = _AuditLoggerState.get_instance()
+    if instance is not None and instance.logger is not None:
+        for handler in instance.logger.handlers[:]:
+            try:
+                handler.flush()
+                handler.close()
+            except Exception:
+                pass  # Ignore cleanup errors during shutdown
+        instance.logger.handlers.clear()
+
+
+# Register cleanup handler for the audit logger
+atexit.register(_cleanup_audit_logger)

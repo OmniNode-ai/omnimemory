@@ -34,13 +34,13 @@ from omnibase_core.models.omnimemory import (
 
 from omnimemory.nodes.memory_retrieval_effect import (
     HandlerMemoryRetrieval,
-    HandlerMemoryRetrievalConfig,
+    ModelHandlerMemoryRetrievalConfig,
     ModelMemoryRetrievalRequest,
 )
 from omnimemory.nodes.memory_retrieval_effect.handlers import (
-    HandlerDbMockConfig,
-    HandlerGraphMockConfig,
-    HandlerQdrantMockConfig,
+    ModelHandlerDbMockConfig,
+    ModelHandlerGraphMockConfig,
+    ModelHandlerQdrantMockConfig,
 )
 
 # =============================================================================
@@ -55,11 +55,11 @@ def handler() -> HandlerMemoryRetrieval:
     Returns:
         Configured HandlerMemoryRetrieval instance with mock handlers.
     """
-    config = HandlerMemoryRetrievalConfig(
+    config = ModelHandlerMemoryRetrievalConfig(
         use_mock_handlers=True,
-        qdrant_config=HandlerQdrantMockConfig(embedding_dimension=1024),
-        db_config=HandlerDbMockConfig(case_sensitive=False),
-        graph_config=HandlerGraphMockConfig(bidirectional=True),
+        qdrant_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
+        db_config=ModelHandlerDbMockConfig(case_sensitive=False),
+        graph_config=ModelHandlerGraphMockConfig(bidirectional=True),
     )
     return HandlerMemoryRetrieval(config)
 

@@ -11,10 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class AuditEventDetails(BaseModel):
     """Strongly typed details for audit events."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     operation_type: str = Field(
-        default="unspecified", description="Type of operation being audited"
+        default="unknown", description="Type of operation being audited"
     )
 
     resource_id: str | None = Field(
@@ -55,7 +55,7 @@ class AuditEventDetails(BaseModel):
 class ResourceUsageMetadata(BaseModel):
     """Strongly typed resource usage metrics."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     cpu_usage_percent: float | None = Field(
         default=None,
@@ -96,7 +96,7 @@ class ResourceUsageMetadata(BaseModel):
 class SecurityAuditDetails(BaseModel):
     """Strongly typed security audit information."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     authentication_method: str | None = Field(
         default=None, description="Authentication method used"
@@ -137,7 +137,7 @@ class SecurityAuditDetails(BaseModel):
 class PerformanceAuditDetails(BaseModel):
     """Strongly typed performance audit information."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     operation_latency_ms: float = Field(
         ge=0.0, description="Operation latency in milliseconds"

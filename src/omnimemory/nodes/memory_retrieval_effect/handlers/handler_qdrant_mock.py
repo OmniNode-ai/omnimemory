@@ -20,18 +20,18 @@ Example::
     import os
     from omnimemory.nodes.memory_retrieval_effect.handlers import (
         HandlerQdrantMock,
-        HandlerQdrantMockConfig,
+        ModelHandlerQdrantMockConfig,
     )
 
     async def example():
         # Use mock embeddings (default)
-        config = HandlerQdrantMockConfig()
+        config = ModelHandlerQdrantMockConfig()
         handler = HandlerQdrantMock(config)
         await handler.initialize()
 
         # Or use real MLX embeddings (URL from environment variable - REQUIRED)
         embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
-        config_real = HandlerQdrantMockConfig(
+        config_real = ModelHandlerQdrantMockConfig(
             use_real_embeddings=True,
             embedding_server_url=embedding_url,
         )
@@ -54,22 +54,28 @@ Example::
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
 """
+
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import logging
 import math
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from omnibase_core.models.omnimemory import ModelMemorySnapshot
-from pydantic import BaseModel, Field
+from omnibase_core.models.omnimemory import (
+    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+)
+from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from ..clients.embedding_client import (
     EmbeddingClient,
-    EmbeddingClientConfig,
     EmbeddingClientError,
     EmbeddingConnectionError,
+    ModelEmbeddingClientConfig,
 )
 from ..models import (
     ModelMemoryRetrievalRequest,
@@ -83,11 +89,11 @@ __all__ = [
     "EmbeddingClientError",
     "EmbeddingConnectionError",
     "HandlerQdrantMock",
-    "HandlerQdrantMockConfig",
+    "ModelHandlerQdrantMockConfig",
 ]
 
 
-class HandlerQdrantMockConfig(BaseModel):
+class ModelHandlerQdrantMockConfig(BaseModel):
     """Configuration for the mock Qdrant handler.
 
     Attributes:
@@ -104,6 +110,8 @@ class HandlerQdrantMockConfig(BaseModel):
         embedding_timeout_seconds: Timeout for embedding requests in seconds.
         embedding_max_retries: Maximum retries for embedding requests.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     embedding_dimension: int = Field(
         default=1024,
@@ -153,7 +161,7 @@ class HandlerQdrantMock:
     Example::
 
         async def example():
-            handler = HandlerQdrantMock(HandlerQdrantMockConfig())
+            handler = HandlerQdrantMock(ModelHandlerQdrantMockConfig())
             await handler.initialize()
 
             # Seed test data
@@ -167,7 +175,7 @@ class HandlerQdrantMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: HandlerQdrantMockConfig) -> None:
+    def __init__(self, config: ModelHandlerQdrantMockConfig) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
@@ -181,7 +189,7 @@ class HandlerQdrantMock:
         self._embedding_client: EmbeddingClient | None = None
 
     @property
-    def config(self) -> HandlerQdrantMockConfig:
+    def config(self) -> ModelHandlerQdrantMockConfig:
         """Get the handler configuration."""
         return self._config
 
@@ -232,7 +240,7 @@ class HandlerQdrantMock:
                         f"got: {self._config.embedding_server_url!r}"
                     )
 
-                embedding_config = EmbeddingClientConfig(
+                embedding_config = ModelEmbeddingClientConfig(
                     base_url=self._config.embedding_server_url,
                     timeout_seconds=self._config.embedding_timeout_seconds,
                     max_retries=self._config.embedding_max_retries,
@@ -411,8 +419,8 @@ class HandlerQdrantMock:
         Returns:
             A normalized mock embedding vector.
         """
-        # Use deterministic hash
-        text_hash = hashlib.md5(text.encode()).digest()
+        # Use deterministic hash (md5 is intentional for reproducible mock data, not security)
+        text_hash = hashlib.md5(text.encode()).digest()  # noqa: S324
         dim = self._config.embedding_dimension
         # Convert to reproducible embedding
         embedding = [
@@ -447,7 +455,7 @@ class HandlerQdrantMock:
         Example::
 
             async def search_example():
-                handler = HandlerQdrantMock(HandlerQdrantMockConfig())
+                handler = HandlerQdrantMock(ModelHandlerQdrantMockConfig())
                 await handler.initialize()
                 embedding = await handler._get_embedding("hello world")
         """
@@ -480,7 +488,7 @@ class HandlerQdrantMock:
             a = a[:min_len]
             b = b[:min_len]
 
-        dot_product = sum(x * y for x, y in zip(a, b))
+        dot_product = sum(x * y for x, y in zip(a, b, strict=False))
         magnitude_a = math.sqrt(sum(x * x for x in a))
         magnitude_b = math.sqrt(sum(x * x for x in b))
 

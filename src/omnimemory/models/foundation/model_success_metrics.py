@@ -6,11 +6,20 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
+# Confidence level thresholds for human-readable categorization
+CONFIDENCE_VERY_HIGH_THRESHOLD = 0.9
+CONFIDENCE_HIGH_THRESHOLD = 0.75
+CONFIDENCE_MEDIUM_THRESHOLD = 0.5
+CONFIDENCE_LOW_THRESHOLD = 0.25
+
+# Reliability threshold for high quality determination
+HIGH_QUALITY_RELIABILITY_THRESHOLD = 0.8
+
 
 class ModelSuccessRate(BaseModel):
     """Success rate metric following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     rate: float = Field(
         ge=0.0,
@@ -39,7 +48,7 @@ class ModelSuccessRate(BaseModel):
     @classmethod
     def validate_successful_operations(cls, v: int, info: ValidationInfo) -> int:
         """Validate successful operations doesn't exceed total."""
-        if hasattr(info, "data") and "total_operations" in info.data:
+        if hasattr(info, "data") and "total_operations" in getattr(info, "data", {}):
             total = info.data["total_operations"]
             if v > total:
                 raise ValueError("Successful operations cannot exceed total operations")
@@ -102,7 +111,7 @@ class ModelConfidenceInterval(BaseModel):
 class ModelConfidenceScore(BaseModel):
     """Confidence score metric following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     score: float = Field(
         ge=0.0,
@@ -136,13 +145,13 @@ class ModelConfidenceScore(BaseModel):
     @property
     def confidence_level(self) -> str:
         """Get human-readable confidence level."""
-        if self.score >= 0.9:
+        if self.score >= CONFIDENCE_VERY_HIGH_THRESHOLD:
             return "Very High"
-        elif self.score >= 0.75:
+        elif self.score >= CONFIDENCE_HIGH_THRESHOLD:
             return "High"
-        elif self.score >= 0.5:
+        elif self.score >= CONFIDENCE_MEDIUM_THRESHOLD:
             return "Medium"
-        elif self.score >= 0.25:
+        elif self.score >= CONFIDENCE_LOW_THRESHOLD:
             return "Low"
         else:
             return "Very Low"
@@ -159,7 +168,7 @@ class ModelConfidenceScore(BaseModel):
 class ModelQualityMetrics(BaseModel):
     """Combined quality metrics following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     success_rate: ModelSuccessRate = Field(
         description="Success rate metrics",
@@ -192,4 +201,7 @@ class ModelQualityMetrics(BaseModel):
     @property
     def is_high_quality(self) -> bool:
         """Check if metrics indicate high quality."""
-        return self.quality_grade in {"A+", "A", "B+"} and self.reliability_index >= 0.8
+        return (
+            self.quality_grade in {"A+", "A", "B+"}
+            and self.reliability_index >= HIGH_QUALITY_RELIABILITY_THRESHOLD
+        )

@@ -34,15 +34,18 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from omnimemory.models.config import (
-    ModelFilesystemConfig,
-    ModelMemoryServiceConfig,
-    ModelPostgresConfig,
-    ModelQdrantConfig,
-)
-from omnimemory.protocols import ProtocolSecretsProvider
 from omnimemory.secrets import EnvSecretsProvider
+
+if TYPE_CHECKING:
+    from omnimemory.models.config import (
+        ModelFilesystemConfig,
+        ModelMemoryServiceConfig,
+        ModelPostgresConfig,
+        ModelQdrantConfig,
+    )
+    from omnimemory.protocols import ProtocolSecretsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -91,56 +94,88 @@ class BootstrapResult:
     secrets_provider: ProtocolSecretsProvider | None = None
 
 
-# Global state for idempotency
-_bootstrap_completed: bool = False
-_bootstrap_result: BootstrapResult | None = None
-# Lock to serialize bootstrap/shutdown operations and prevent race conditions
-_bootstrap_lock: asyncio.Lock | None = None
-# Track which event loop the lock was created for (to detect cross-loop reuse)
-_bootstrap_lock_loop: asyncio.AbstractEventLoop | None = None
+class _BootstrapState:
+    """Singleton state manager for bootstrap operations.
 
-
-def _get_bootstrap_lock() -> asyncio.Lock:
-    """Get or create the bootstrap lock.
-
-    Creates the lock lazily to avoid issues with event loop not being available
-    at module import time. Also handles cross-event-loop reuse by detecting when
-    the current event loop differs from the one the lock was created in, and
-    recreating the lock in that case.
-
-    This is important because asyncio.Lock is bound to an event loop - using a
-    lock from a different loop will raise RuntimeError. This commonly occurs
-    in test environments where each test may create a new event loop.
-
-    Returns:
-        The asyncio.Lock for serializing bootstrap/shutdown operations.
+    Manages all bootstrap state including completion status, cached results,
+    and the asyncio lock for serializing operations. Uses class-level attributes
+    to avoid global statements.
     """
-    global _bootstrap_lock, _bootstrap_lock_loop
 
-    try:
-        current_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        # No running loop - create lock anyway, it will be bound when first used
-        if _bootstrap_lock is None:
-            _bootstrap_lock = asyncio.Lock()
-            _bootstrap_lock_loop = None
-        return _bootstrap_lock
+    # State for idempotency
+    _completed: bool = False
+    _result: BootstrapResult | None = None
+    # Lock to serialize bootstrap/shutdown operations and prevent race conditions
+    _lock: asyncio.Lock | None = None
+    # Track which event loop the lock was created for (to detect cross-loop reuse)
+    _lock_loop: asyncio.AbstractEventLoop | None = None
 
-    # Check if lock exists and was created in a different event loop
-    if _bootstrap_lock is not None and _bootstrap_lock_loop is not current_loop:
-        # Lock was created in a different event loop - recreate it
-        logger.debug(
-            "Detected event loop change, recreating bootstrap lock "
-            f"(old loop: {id(_bootstrap_lock_loop)}, new loop: {id(current_loop)})"
-        )
-        _bootstrap_lock = None
-        _bootstrap_lock_loop = None
+    @classmethod
+    def is_completed(cls) -> bool:
+        """Check if bootstrap has completed."""
+        return cls._completed
 
-    if _bootstrap_lock is None:
-        _bootstrap_lock = asyncio.Lock()
-        _bootstrap_lock_loop = current_loop
+    @classmethod
+    def set_completed(cls, value: bool) -> None:
+        """Set bootstrap completion status."""
+        cls._completed = value
 
-    return _bootstrap_lock
+    @classmethod
+    def get_result(cls) -> BootstrapResult | None:
+        """Get cached bootstrap result."""
+        return cls._result
+
+    @classmethod
+    def set_result(cls, value: BootstrapResult | None) -> None:
+        """Set bootstrap result."""
+        cls._result = value
+
+    @classmethod
+    def get_lock(cls) -> asyncio.Lock:
+        """Get or create the bootstrap lock.
+
+        Creates the lock lazily to avoid issues with event loop not being available
+        at module import time. Also handles cross-event-loop reuse by detecting when
+        the current event loop differs from the one the lock was created in, and
+        recreating the lock in that case.
+
+        This is important because asyncio.Lock is bound to an event loop - using a
+        lock from a different loop will raise RuntimeError. This commonly occurs
+        in test environments where each test may create a new event loop.
+
+        Returns:
+            The asyncio.Lock for serializing bootstrap/shutdown operations.
+        """
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop - create lock anyway, it will be bound when first used
+            if cls._lock is None:
+                cls._lock = asyncio.Lock()
+                cls._lock_loop = None
+            return cls._lock
+
+        # Check if lock exists and was created in a different event loop
+        if cls._lock is not None and cls._lock_loop is not current_loop:
+            # Lock was created in a different event loop - recreate it
+            logger.debug(
+                "Detected event loop change, recreating bootstrap lock "
+                f"(old loop: {id(cls._lock_loop)}, new loop: {id(current_loop)})"
+            )
+            cls._lock = None
+            cls._lock_loop = None
+
+        if cls._lock is None:
+            cls._lock = asyncio.Lock()
+            cls._lock_loop = current_loop
+
+        return cls._lock
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset all bootstrap state (used during shutdown)."""
+        cls._completed = False
+        cls._result = None
 
 
 async def _validate_filesystem_config(config: ModelFilesystemConfig) -> list[str]:
@@ -304,15 +339,14 @@ async def bootstrap(
                 else:
                     print(f"Initialized: {result.initialized_backends}")
     """
-    global _bootstrap_completed, _bootstrap_result
-
     # Serialize bootstrap operations to avoid race conditions
-    async with _get_bootstrap_lock():
+    async with _BootstrapState.get_lock():
         # Idempotency check (inside lock to ensure thread-safety)
-        if _bootstrap_completed and not force:
+        if _BootstrapState.is_completed() and not force:
             logger.debug("Bootstrap already completed, returning cached result")
-            assert _bootstrap_result is not None  # noqa: S101
-            return _bootstrap_result
+            cached_result = _BootstrapState.get_result()
+            assert cached_result is not None
+            return cached_result
 
         logger.info("Starting OmniMemory bootstrap...")
 
@@ -352,8 +386,8 @@ async def bootstrap(
         )
 
         # Cache for idempotency
-        _bootstrap_completed = True
-        _bootstrap_result = result
+        _BootstrapState.set_completed(True)
+        _BootstrapState.set_result(result)
 
         logger.info(f"Bootstrap complete. Backends: {initialized_backends}")
         if all_warnings:
@@ -370,15 +404,12 @@ async def shutdown() -> None:
     resources acquired during bootstrap. Resets the bootstrap
     state so bootstrap() can be called again.
     """
-    global _bootstrap_completed, _bootstrap_result
-
     # Serialize shutdown operations to avoid race conditions with bootstrap
-    async with _get_bootstrap_lock():
+    async with _BootstrapState.get_lock():
         logger.info("Shutting down OmniMemory...")
 
         # Reset bootstrap state
-        _bootstrap_completed = False
-        _bootstrap_result = None
+        _BootstrapState.reset()
 
         logger.info("Shutdown complete")
 
@@ -392,8 +423,8 @@ async def is_bootstrapped() -> bool:
     Returns:
         True if bootstrap() has been called successfully.
     """
-    async with _get_bootstrap_lock():
-        return _bootstrap_completed
+    async with _BootstrapState.get_lock():
+        return _BootstrapState.is_completed()
 
 
 async def get_bootstrap_result() -> BootstrapResult | None:
@@ -405,5 +436,5 @@ async def get_bootstrap_result() -> BootstrapResult | None:
     Returns:
         BootstrapResult if bootstrap completed, None otherwise.
     """
-    async with _get_bootstrap_lock():
-        return _bootstrap_result
+    async with _BootstrapState.get_lock():
+        return _BootstrapState.get_result()

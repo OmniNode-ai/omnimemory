@@ -4,25 +4,27 @@ Error details model following ONEX standards.
 Uses the standard ONEX error patterns from omnibase_core when available.
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Import standard ONEX error types from omnibase_core
-from ..._compat_imports import ErrorCodeType, SeverityType
+from ...enums.enum_error_code import EnumOmniMemoryErrorCode  # noqa: TC001
+from ...enums.enum_severity import EnumSeverity  # noqa: TC001
 
 
 class ModelErrorDetails(BaseModel):
     """Error details model following ONEX standards with omnibase_core integration."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     # Error identification
     error_id: UUID = Field(
         description="Unique identifier for this error instance",
     )
-    error_code: ErrorCodeType = Field(
+    error_code: EnumOmniMemoryErrorCode | str = Field(
         description="Standardized error code (core or omnimemory-specific)",
     )
     error_type: str = Field(
@@ -37,7 +39,7 @@ class ModelErrorDetails(BaseModel):
         default=None,
         description="Detailed technical error message",
     )
-    severity: SeverityType = Field(
+    severity: EnumSeverity = Field(
         description="Severity level of the error (using core severity levels)",
     )
 

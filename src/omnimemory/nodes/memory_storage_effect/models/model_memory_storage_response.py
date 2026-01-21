@@ -18,12 +18,13 @@ Example:
     ...     snapshot=retrieved_snapshot
     ... )
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
-from omnibase_core.models.omnimemory import ModelMemorySnapshot
-from pydantic import BaseModel, Field
+from omnibase_core.models.omnimemory import ModelMemorySnapshot  # noqa: TC002
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = ["ModelMemoryStorageResponse"]
 
@@ -41,6 +42,8 @@ class ModelMemoryStorageResponse(BaseModel):
         snapshot_ids: List of snapshot identifiers (for list operations).
         error_message: Detailed error information when status is "error".
     """
+
+    model_config = ConfigDict(strict=True)
 
     status: Literal["success", "error", "not_found", "permission_denied"] = Field(
         ...,

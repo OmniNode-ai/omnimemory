@@ -9,13 +9,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ...enums.enum_memory_storage_type import EnumMemoryStorageType
+from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC001
 
 
 class ModelMemoryItem(BaseModel):
     """A single memory item in the ONEX memory system."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False)
 
     # Item identification
     item_id: UUID = Field(

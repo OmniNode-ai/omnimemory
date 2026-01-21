@@ -32,7 +32,11 @@ Example::
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1384.
 """
-from .adapter_filesystem import HandlerFileSystemAdapter, HandlerFileSystemAdapterConfig
+
+from .adapter_filesystem import (
+    HandlerFileSystemAdapter,
+    HandlerFileSystemAdapterConfig,
+)
 
 __all__ = [
     "HandlerFileSystemAdapter",

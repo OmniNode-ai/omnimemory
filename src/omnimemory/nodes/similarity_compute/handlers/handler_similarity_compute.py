@@ -20,10 +20,10 @@ Example::
 
     from omnimemory.nodes.similarity_compute.handlers import (
         HandlerSimilarityCompute,
-        HandlerSimilarityComputeConfig,
+        ModelHandlerSimilarityComputeConfig,
     )
 
-    config = HandlerSimilarityComputeConfig()
+    config = ModelHandlerSimilarityComputeConfig()
     handler = HandlerSimilarityCompute(config)
 
     # Compute cosine distance
@@ -46,20 +46,22 @@ Performance:
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from omnimemory.models.memory.model_similarity_result import ModelSimilarityResult
 
 __all__ = [
     "HandlerSimilarityCompute",
-    "HandlerSimilarityComputeConfig",
+    "ModelHandlerSimilarityComputeConfig",
 ]
 
 
-class HandlerSimilarityComputeConfig(BaseModel):
+class ModelHandlerSimilarityComputeConfig(BaseModel):
     """Configuration for the similarity compute handler.
 
     This is intentionally minimal as the handler performs pure computation
@@ -97,7 +99,7 @@ class HandlerSimilarityCompute:
 
     Example::
 
-        handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+        handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
         # Identical vectors have distance 0
         vec = [1.0, 2.0, 3.0]
@@ -109,7 +111,7 @@ class HandlerSimilarityCompute:
         assert handler.cosine_distance(vec_a, vec_b) == 1.0
     """
 
-    def __init__(self, config: HandlerSimilarityComputeConfig) -> None:
+    def __init__(self, config: ModelHandlerSimilarityComputeConfig) -> None:
         """Initialize the similarity compute handler.
 
         Args:
@@ -118,7 +120,7 @@ class HandlerSimilarityCompute:
         self._config = config
 
     @property
-    def config(self) -> HandlerSimilarityComputeConfig:
+    def config(self) -> ModelHandlerSimilarityComputeConfig:
         """Get the handler configuration."""
         return self._config
 
@@ -170,7 +172,7 @@ class HandlerSimilarityCompute:
         sum_sq_a = 0.0
         sum_sq_b = 0.0
 
-        for i, (a, b) in enumerate(zip(vec_a, vec_b)):
+        for i, (a, b) in enumerate(zip(vec_a, vec_b, strict=False)):
             # Validate vec_a element
             if math.isnan(a):
                 raise ValueError(f"vec_a contains NaN at index {i}")
@@ -240,7 +242,7 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
             # Identical vectors: distance = 0
             vec = [1.0, 2.0, 3.0]
@@ -256,7 +258,7 @@ class HandlerSimilarityCompute:
 
         # Compute dot product using math.fsum for numerical stability
         # Single pass through vectors
-        dot_products = [a * b for a, b in zip(vec_a, vec_b)]
+        dot_products = [a * b for a, b in zip(vec_a, vec_b, strict=False)]
         dot_product = math.fsum(dot_products)
 
         # Compute cosine similarity
@@ -293,7 +295,7 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
             # Identical vectors: distance = 0
             vec = [1.0, 2.0, 3.0]
@@ -308,7 +310,7 @@ class HandlerSimilarityCompute:
         self._validate_vectors(vec_a, vec_b, check_zero_magnitude=False)
 
         # Compute squared differences using math.fsum for stability
-        squared_diffs = [(a - b) ** 2 for a, b in zip(vec_a, vec_b)]
+        squared_diffs = [(a - b) ** 2 for a, b in zip(vec_a, vec_b, strict=False)]
         sum_squared = math.fsum(squared_diffs)
 
         return math.sqrt(sum_squared)
@@ -348,7 +350,7 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(HandlerSimilarityComputeConfig())
+            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
 
             vec_a = [0.1, 0.2, 0.3]
             vec_b = [0.15, 0.25, 0.35]

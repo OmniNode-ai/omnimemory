@@ -1,3 +1,4 @@
+---
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 OmniNode Team
 
@@ -6,9 +7,9 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "similarity_compute"
-node_version: {major: 0, minor: 1, patch: 0}
-contract_version: {major: 1, minor: 0, patch: 0}
-description: "Pure compute node for vector similarity calculations. Supports cosine and euclidean distance metrics with optional threshold matching. No I/O operations."
+version: {major: 0, minor: 1, patch: 0}
+description: "Pure compute node for vector similarity calculations. Supports cosine and euclidean distance
+  metrics with optional threshold matching. No I/O operations."
 node_type: "COMPUTE"
 input_model: "ModelSimilarityComputeRequest"
 output_model: "ModelSimilarityComputeResponse"
@@ -16,47 +17,19 @@ output_model: "ModelSimilarityComputeResponse"
 # NOTE: No io_operations section - this is a COMPUTE node, not an EFFECT node.
 # All operations are pure in-memory calculations with no external I/O.
 
-# === NODE CONFIGURATION ===
-tool_specification:
-  tool_name: "node_similarity_compute"
-  version: {major: 0, minor: 1, patch: 0}
-  description: "Vector similarity calculations using cosine and euclidean metrics"
-  main_tool_class: "NodeSimilarityCompute"
-  container_injection: "ONEXContainer"
-  business_logic_pattern: "compute"
-
-# === SERVICE CONFIGURATION ===
-service_configuration:
-  is_persistent_service: false
-  requires_external_dependencies: false
-
-# === INPUT/OUTPUT STATE ===
-input_state:
-  object_type: "object"
-  required: ["operation", "vector_a", "vector_b"]
-  optional: ["metric", "threshold"]
-
-output_state:
-  object_type: "object"
-  required: ["status"]
-  optional: ["distance", "similarity", "is_match", "dimensions", "notes", "error_message"]
-
-# === ACTIONS ===
-actions:
-  - name: "cosine_distance"
-    description: "Compute cosine distance (1 - cosine_similarity) between two vectors"
-    inputs: ["vector_a", "vector_b"]
-    outputs: ["distance", "similarity"]
-
-  - name: "euclidean_distance"
-    description: "Compute Euclidean (L2) distance between two vectors"
-    inputs: ["vector_a", "vector_b"]
-    outputs: ["distance"]
-
-  - name: "compare"
-    description: "Full vector comparison with metric choice and optional threshold matching"
-    inputs: ["vector_a", "vector_b", "metric", "threshold"]
-    outputs: ["similarity", "distance", "is_match", "dimensions", "notes"]
+# === ALGORITHM CONFIGURATION (Required for COMPUTE nodes) ===
+# Defines the computational algorithm with factors and weights
+algorithm:
+  algorithm_type: "vector_similarity"
+  factors:
+    cosine_distance:
+      weight: 0.5
+      calculation_method: "cosine_similarity"
+    euclidean_distance:
+      weight: 0.5
+      calculation_method: "euclidean_norm"
+  normalization_method: "min_max"
+  precision_digits: 6
 
 # === DEPENDENCIES ===
 # COMPUTE nodes have no external service dependencies - pure computation only
@@ -70,29 +43,7 @@ dependencies:
 # === PERFORMANCE ===
 # Sub-millisecond target for pure computation
 performance:
-  max_response_time_ms: 1
-
-# === ENUM DEFINITIONS ===
-# These enums MUST match exactly with the Pydantic Literal types in the models
-enums:
-  operation:
-    description: "The computation operation to perform"
-    values:
-      - cosine_distance    # Compute cosine distance between two vectors
-      - euclidean_distance # Compute Euclidean (L2) distance between two vectors
-      - compare            # Full comparison with metric choice and threshold
-
-  metric:
-    description: "Distance metric to use for compare operation"
-    values:
-      - cosine    # Cosine distance/similarity
-      - euclidean # Euclidean (L2) distance
-
-  status:
-    description: "Operation result status"
-    values:
-      - success
-      - error
+  single_operation_max_ms: 1
 
 # === VALIDATION RULES ===
 validation_rules:
@@ -101,9 +52,10 @@ validation_rules:
   output_validation_enabled: true
   performance_validation_enabled: true
   constraint_definitions:
-    operation: "Literal['cosine_distance', 'euclidean_distance', 'compare'] - must match enums.operation.values"
-    metric: "Literal['cosine', 'euclidean'] - must match enums.metric.values"
-    status: "Literal['success', 'error'] - must match enums.status.values"
+    operation: "Literal['cosine_distance', 'euclidean_distance', 'compare'] - computation operation to
+      perform"
+    metric: "Literal['cosine', 'euclidean'] - distance metric for compare operation"
+    status: "Literal['success', 'error'] - operation result status"
     vector_a: "list[float] - first vector for comparison (required)"
     vector_b: "list[float] - second vector for comparison (required, must match vector_a dimensions)"
     threshold: "float (0.0-1.0) - optional similarity threshold for is_match determination"

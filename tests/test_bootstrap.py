@@ -10,6 +10,7 @@ These tests validate that bootstrap:
 - Can be re-run with force=True
 - Properly tracks initialized backends
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator

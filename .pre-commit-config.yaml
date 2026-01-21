@@ -1,55 +1,278 @@
+---
+# OmniMemory Pre-commit Configuration
+# Aligned with ONEX ecosystem standards from omnibase_core
+#
+# REQUIREMENTS:
+# ====================================
+# Python version: 3.12 (must match .github/workflows/test.yml PYTHON_VERSION)
+#
+# CONFIGURATION FILES (shared with CI):
+# ====================================
+# - pyproject.toml: ruff settings [tool.ruff], mypy settings [tool.mypy]
+#   - Ruff version: 0.8.6 (synchronized with pre-commit repo)
+#   - Mypy version: 1.14.1 (synchronized with pre-commit mirror)
+#   - Pyright version: 1.1.391 (synchronized with pre-commit repo)
+# - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
+#
+# CI COMPATIBILITY:
+# ====================================
+# Python hooks use language: python or official repos (NOT language: system).
+# This ensures hooks work in CI environments where Poetry may not be installed.
+# Pre-commit manages isolated Python environments for each hook.
+#
+# Exception: clean-tmp-directory uses language: system (bash script only,
+# no Python dependencies, safe for CI).
+#
+# HOOK-TO-CI SYNCHRONIZATION MAP:
+# ====================================
+# Pre-commit Hook                   | CI Workflow Job          | Command
+# ----------------------------------|--------------------------|----------------------------------
+# ruff-format (pre-commit)          | lint                     | ruff format --check src/ tests/
+# ruff (pre-commit)                 | lint                     | ruff check src/ tests/
+# mypy (pre-push)                   | lint                     | mypy --show-error-codes --no-error-summary src/omnimemory
+# pyright (pre-push)                | pyright                  | pyright src/omnimemory
+# validate-pydantic-patterns        | onex-validation          | python scripts/validation/validate_pydantic_patterns.py src/
+# validate-single-class-per-file    | onex-validation          | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
+# validate-enum-casing              | onex-validation          | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
+# validate-no-backward-compatibility| onex-validation          | python scripts/validation/validate_no_backward_compatibility.py -d src/
+# validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
+# validate-naming-conventions       | onex-validation          | python scripts/validation/validate_naming.py src/
+#
+# IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
+#
+# PERFORMANCE OPTIMIZATION:
+# ====================================
+# Two-stage validation strategy for optimal developer experience:
+#
+# PRE-COMMIT:
+#   - Formatting checks (ruff format --check, yamlfmt)
+#   - Linting checks (ruff check)
+#   - Basic file checks (whitespace, large files, merge conflicts)
+#   - Security checks (secrets)
+#   - ONEX pattern validations (pydantic, single-class, enums, naming)
+#   NOTE: Run `ruff format src/ tests/` and
+#         `ruff check --fix src/ tests/` manually to auto-fix
+#
+# PRE-PUSH (quick validation before sharing):
+#   - mypy type checking (full src/omnimemory - synced with CI)
+#   - pyright type checking (full src/omnimemory - synced with CI)
+#
+# USAGE:
+#   pre-commit install                    # Install pre-commit hooks
+#   pre-commit install --hook-type pre-push  # Install pre-push hooks
+#   pre-commit run --all-files            # Run all pre-commit hooks
+#   pre-commit run --all-files --hook-stage pre-push  # Run pre-push hooks
+
 repos:
+  # YAML formatting (standard across ecosystem)
+  # Configuration in .yamlfmt file (ecosystem-aligned settings)
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.17.2
+    hooks:
+      - id: yamlfmt
+        exclude: ^\.github/
+
+  # Essential file formatting (standard across ecosystem)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^\.github/
+        args: [--markdown-linebreak-ext=md]
+        exclude: ^\.github/workflows/
       - id: end-of-file-fixer
-        exclude: ^\.github/
-      - id: check-yaml
-        exclude: ^\.github/
-      - id: check-added-large-files
-        args: ['--maxkb=1000']
+        exclude: ^(\.github/workflows/|\.mcp\.json$)
       - id: check-merge-conflict
-      - id: debug-statements
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-yaml
+        args: [--unsafe]
       - id: check-toml
+      - id: debug-statements
 
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
+  # Python code quality with ruff (replaces black, isort, flake8 - 10-100x faster)
+  # Configuration: pyproject.toml [tool.ruff] section (shared with CI)
+  # Using official ruff-pre-commit repo for CI compatibility (no Poetry dependency)
+  #
+  # VERSION UPGRADE PROCEDURE:
+  # ==========================
+  # Ruff has breaking rule changes between minor versions (e.g., rules renamed,
+  # removed, or behavior changed). When upgrading:
+  #
+  # 1. Run: pre-commit autoupdate --repo https://github.com/astral-sh/ruff-pre-commit
+  # 2. Run: pre-commit run --all-files  (check for new violations)
+  # 3. Review ruff changelog: https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md
+  # 4. Update pyproject.toml [tool.ruff] version comment to match new rev
+  # 5. Fix any new violations or update rule selections in pyproject.toml
+  #
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
     hooks:
-      - id: black
-        language_version: python3.12
-        exclude: ^\.github/
+      # FULL CODEBASE VALIDATION: These hooks run on src/ and tests/ (not just staged files)
+      # to match CI behavior and prevent "works locally, fails in CI" issues.
+      # NOTE: Both pre-commit and CI use check-only mode. Run `ruff format src/ tests/`
+      # and `ruff check --fix src/ tests/` manually to auto-fix issues.
+      - id: ruff-format
+        name: ruff format (check entire codebase)
+        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
+        # Both pre-commit and CI use --check for consistent validation
+        args: [--check, src/, tests/]
+        pass_filenames: false
+        stages: [pre-commit]
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
-        exclude: ^\.github/
+      - id: ruff
+        name: ruff check (lint entire codebase)
+        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
+        # Both pre-commit and CI use check-only mode (no --fix)
+        # Note: The ruff hook already runs "ruff check", so we only pass paths
+        args: [src/, tests/]
+        pass_filenames: false
+        stages: [pre-commit]
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
-    hooks:
-      - id: flake8
-        args: ["--max-line-length=88", "--extend-ignore=E203,W503,E402"]
-        additional_dependencies: []
-        exclude: ^\.github/
-
+  # Type checking with mypy (using official mirror for CI compatibility)
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.0
+    rev: v1.14.1
     hooks:
       - id: mypy
+        name: mypy (type checking - strict)
+        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
+        # Both pre-commit and CI use same flags for consistent output
+        args: [--show-error-codes, --no-error-summary, src/omnimemory]
+        pass_filenames: false
+        # Include pydantic, pydantic-settings for the mypy plugin,
+        # and redis, httpx for type checking (must match CI environment)
         additional_dependencies:
           - pydantic>=2.10.0
-          - pydantic-settings>=2.10.1
-        args: ["--ignore-missing-imports"]
-        pass_filenames: false
-        entry: mypy src/
+          - pydantic-settings>=2.7.0
+          - redis>=6.4.0
+          - httpx>=0.28.0
+        stages: [pre-push]
 
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
+  # Type checking with pyright (using official repo for CI compatibility)
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.391
     hooks:
-      - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: (package.lock.json|^tmp/)
+      - id: pyright
+        name: pyright (type checking - basic)
+        # SYNCHRONIZED WITH CI: Must match .github/workflows/test.yml pyright job
+        # Uses pyrightconfig.json for project-level settings
+        args: [src/omnimemory]
+        pass_filenames: false
+        stages: [pre-push]
+
+  # Local hooks for cleanup and ONEX validation
+  # These use language: python or language: system with no Poetry dependency
+  - repo: local
+    hooks:
+      # Cleanup: Clear tmp/ directory before commits
+      - id: clean-tmp-directory
+        name: Clean tmp directory
+        entry: bash -c "rm -rf tmp/* 2>/dev/null || true"
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+
+      # ONEX Pydantic Pattern Validation
+      # Validates Pydantic models follow ONEX conventions
+      # Uses language: python so pre-commit manages the environment (no Poetry needed)
+      - id: validate-pydantic-patterns
+        name: ONEX Pydantic Pattern Validation
+        entry: python scripts/validation/validate_pydantic_patterns.py
+        language: python
+        pass_filenames: true
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # ONEX Single Class Per File (enforces model-per-file pattern)
+      - id: validate-single-class-per-file
+        name: ONEX Single Class Per File
+        entry: python scripts/validation/validate_single_class_per_file.py
+        language: python
+        pass_filenames: true
+        files: ^src/omnimemory/models/.*\.py$
+        exclude: ^(tests/|src/omnimemory/protocols/).*\.py$
+        stages: [pre-commit]
+
+      # ONEX No Backward Compatibility Anti-Pattern Detection
+      - id: validate-no-backward-compatibility
+        name: ONEX Backward Compatibility Anti-Pattern Detection
+        entry: python scripts/validation/validate_no_backward_compatibility.py
+        args: ['-d', 'src/']
+        language: python
+        pass_filenames: false
+        files: ^.*\.py$
+        stages: [pre-commit]
+
+      # ONEX Enum Member Casing Validation
+      # Enforces UPPER_SNAKE_CASE for all enum member names
+      - id: validate-enum-casing
+        name: ONEX Enum Member Casing Validation
+        entry: python scripts/validation/validate_enum_casing.py
+        language: python
+        pass_filenames: true
+        files: ^src/omnimemory/enums/.*\.py$
+        stages: [pre-commit]
+
+      # Secret Detection (prevents hardcoded secrets)
+      - id: validate-secrets
+        name: ONEX Secret Detection
+        entry: python scripts/validation/validate_secrets.py
+        language: python
+        pass_filenames: true
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # Naming Convention Validation
+      # SYNCHRONIZED WITH CI: Runs at pre-commit stage to match CI Phase 1
+      # Both local and CI validate naming conventions at the same point
+      - id: validate-naming-conventions
+        name: ONEX Naming Convention Validation
+        entry: python scripts/validation/validate_naming.py
+        args: ['src/']
+        language: python
+        pass_filenames: false
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+# Configuration
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+fail_fast: false
+
+# pre-commit.ci configuration
+#
+# AUTOFIX BEHAVIOR EXPLAINED:
+# ===========================
+# autofix_prs: true means pre-commit.ci will automatically commit fixes and create
+# a PR when hooks modify files. However, not all hooks can auto-fix.
+#
+# HOOKS THAT WILL AUTO-FIX (pre-commit.ci will commit these changes):
+#   - yamlfmt: Reformats YAML files to match .yamlfmt settings
+#   - trailing-whitespace: Removes trailing whitespace from lines
+#   - end-of-file-fixer: Ensures files end with a single newline
+#
+# HOOKS THAT WILL NOT AUTO-FIX (check-only mode, will fail but not modify files):
+#   - ruff-format: Uses --check flag (validates formatting, doesn't reformat)
+#   - ruff check: No --fix flag (reports lint issues, doesn't fix them)
+#   - mypy/pyright: Type checkers (report errors, cannot auto-fix code)
+#   - validate-* hooks: ONEX validators (report violations, cannot auto-fix)
+#   - check-* hooks: Detectors only (check-yaml, check-toml, etc.)
+#   - debug-statements: Detector only (reports but doesn't remove)
+#
+# WHY autofix_prs: true?
+#   The formatting hooks (yamlfmt, trailing-whitespace, end-of-file-fixer) provide
+#   value by auto-fixing minor formatting issues. For ruff issues, run manually:
+#     ruff format src/ tests/        # Fix formatting
+#     ruff check --fix src/ tests/   # Fix lint issues
+#
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes for omnimemory
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_schedule: weekly
+  submodules: false

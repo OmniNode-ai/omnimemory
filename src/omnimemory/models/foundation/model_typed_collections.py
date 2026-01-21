@@ -13,9 +13,12 @@ All models follow ONEX standards with:
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # === STRING COLLECTIONS ===
 
@@ -56,12 +59,8 @@ class ModelStringList(BaseModel):
         """Support 'in' operator for checking membership."""
         return item in self.values
 
-    def iterate(self) -> Iterator[str]:
-        """Iterate over values.
-
-        Note: We use iterate() instead of __iter__ to avoid conflict with
-        Pydantic's BaseModel.__iter__ which returns field-value pairs.
-        """
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
+        """Support iteration over values."""
         return iter(self.values)
 
     def __len__(self) -> int:
@@ -121,8 +120,8 @@ class ModelOptionalStringList(BaseModel):
             return False
         return item in self.values
 
-    def iterate(self) -> Iterator[str]:
-        """Iterate over values.
+    def __iter__(self) -> Iterator[str]:  # type: ignore[override]
+        """Support iteration over values.
 
         Returns empty iterator if values is None.
 
@@ -341,7 +340,7 @@ class ModelConfiguration(BaseModel):
         key: str,
         value: str,
         description: str | None = None,
-        is_sensitive: bool | None = None,
+        is_sensitive: bool = False,
     ) -> None:
         """Set configuration option with metadata.
 
@@ -358,8 +357,7 @@ class ModelConfiguration(BaseModel):
                 option.value = value
                 if description is not None:
                     option.description = description
-                if is_sensitive is not None:
-                    option.is_sensitive = is_sensitive
+                option.is_sensitive = is_sensitive
                 return
 
         # For new options, default is_sensitive to False if not specified
@@ -368,7 +366,7 @@ class ModelConfiguration(BaseModel):
                 key=key,
                 value=value,
                 description=description,
-                is_sensitive=is_sensitive if is_sensitive is not None else False,
+                is_sensitive=is_sensitive,
             )
         )
 
@@ -550,10 +548,7 @@ def convert_list_of_dicts_to_structured_data(
 
         # Use status from item if present, otherwise use default_status
         item_status = item.get("status")
-        if isinstance(item_status, str):
-            status = item_status
-        else:
-            status = default_status
+        status = item_status if isinstance(item_status, str) else default_status
 
         collection.add_result(
             id=str(i),

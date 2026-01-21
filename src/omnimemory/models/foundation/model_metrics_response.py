@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelOperationCounts(BaseModel):
     """Count of operations by type."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     storage_operations: int = Field(
         default=0, description="Number of storage operations"
@@ -28,7 +28,7 @@ class ModelOperationCounts(BaseModel):
 class ModelPerformanceMetrics(BaseModel):
     """Performance metrics for operations."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     average_latency_ms: float = Field(
         ge=0.0, description="Average operation latency in milliseconds"
@@ -53,7 +53,7 @@ class ModelPerformanceMetrics(BaseModel):
 class ModelResourceMetricsDetailed(BaseModel):
     """Detailed resource utilization metrics."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     memory_allocated_mb: float = Field(
         ge=0.0, description="Memory allocated in megabytes"
@@ -76,7 +76,7 @@ class ModelResourceMetricsDetailed(BaseModel):
 class ModelMetricsResponse(BaseModel):
     """Comprehensive metrics response following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

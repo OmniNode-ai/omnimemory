@@ -16,7 +16,7 @@ from .model_memory_parameters import ModelMemoryOptions, ModelMemoryParameters
 class ModelMemoryRequest(BaseModel):
     """Base memory request model following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Contract version for schema tracking
     contract_version: str = Field(

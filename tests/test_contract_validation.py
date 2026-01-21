@@ -16,6 +16,7 @@ Skip Behavior:
 Path Resolution:
     Uses Path(__file__) for CWD-independent path resolution.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -191,21 +192,17 @@ class TestContractHandlerMapping:
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
     def test_contract_actions_have_handlers(self, node_name: str) -> None:
         """Verify all contract actions have corresponding handlers."""
-        pass
 
     @pytest.mark.skip(reason="Requires container implementation")
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
     def test_container_provides_required_dependencies(self, node_name: str) -> None:
         """Verify container provides all dependencies declared in contract."""
-        pass
 
     @pytest.mark.skip(reason="Requires error handling implementation")
     def test_contract_validation_failure_handling(self) -> None:
         """Verify graceful handling of invalid contracts."""
-        pass
 
     @pytest.mark.skip(reason="Requires integration test infrastructure")
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
     def test_node_integration_with_storage_backend(self, node_name: str) -> None:
         """Verify node interaction with actual storage backends."""
-        pass

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelServiceHealth(BaseModel):
     """Service health information following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Service identification
     service_id: str = Field(

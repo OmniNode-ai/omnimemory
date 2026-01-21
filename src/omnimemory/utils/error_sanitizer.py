@@ -5,16 +5,19 @@ This module provides comprehensive error sanitization to prevent information
 disclosure while maintaining useful debugging information for developers.
 """
 
+from __future__ import annotations
+
 __all__ = [
-    "SanitizationLevel",
     "ErrorSanitizer",
-    "sanitize_error",
+    "SanitizationLevel",
     "sanitize_dict",
+    "sanitize_error",
 ]
 
 import re
 from enum import Enum
-from typing import Any, Pattern
+from re import Pattern
+from typing import Any
 
 
 class SanitizationLevel(Enum):
@@ -194,8 +197,8 @@ class ErrorSanitizer:
             return "Exception: Operation failed - details suppressed for audit"
 
     def sanitize_dict(
-        self, data: dict, keys_to_sanitize: set[str] | None = None
-    ) -> dict:
+        self, data: dict[str, Any], keys_to_sanitize: set[str] | None = None
+    ) -> dict[str, Any]:
         """
         Sanitize sensitive keys in dictionary data.
 
@@ -225,7 +228,9 @@ class ErrorSanitizer:
             if any(sensitive in key.lower() for sensitive in keys_to_sanitize):
                 sanitized[key] = "[REDACTED]"
             elif isinstance(value, dict):
-                sanitized[key] = self.sanitize_dict(value, keys_to_sanitize)
+                # Recursive call for nested dicts
+                nested_dict: dict[str, Any] = value
+                sanitized[key] = self.sanitize_dict(nested_dict, keys_to_sanitize)
             elif isinstance(value, str):
                 sanitized[key] = self._apply_patterns(value)
             else:
@@ -291,10 +296,10 @@ def sanitize_error(
 
 
 def sanitize_dict(
-    data: dict,
+    data: dict[str, Any],
     keys_to_sanitize: set[str] | None = None,
     level: SanitizationLevel = SanitizationLevel.STANDARD,
-) -> dict:
+) -> dict[str, Any]:
     """
     Convenient function for dictionary sanitization.
 

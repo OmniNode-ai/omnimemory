@@ -11,9 +11,10 @@ logs, traces, or error messages.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from pydantic import SecretStr
+if TYPE_CHECKING:
+    from pydantic import SecretStr
 
 
 @runtime_checkable

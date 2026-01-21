@@ -8,6 +8,7 @@ These tests validate that settings:
 - Fail fast with clear error messages when required settings are missing
 - Convert to proper config models via to_config()
 """
+
 from __future__ import annotations
 
 import os
@@ -24,9 +25,9 @@ from omnimemory.models.config import (
 )
 from omnimemory.settings import (
     FilesystemSettings,
+    MemoryServiceSettings,
     PostgresSettings,
     QdrantSettings,
-    SettingsMemoryService,
     load_settings,
 )
 
@@ -159,7 +160,7 @@ class TestQdrantSettings:
         assert isinstance(config, ModelQdrantConfig)
 
 
-class TestSettingsMemoryService:
+class TestMemoryServiceSettings:
     """Tests for top-level service settings."""
 
     def test_load_minimal_settings(
@@ -169,7 +170,7 @@ class TestSettingsMemoryService:
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         assert settings.postgres_enabled is False
         assert settings.qdrant_enabled is False
 
@@ -180,7 +181,7 @@ class TestSettingsMemoryService:
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         config = settings.to_config()
 
         assert isinstance(config, ModelMemoryServiceConfig)
@@ -195,7 +196,7 @@ class TestSettingsMemoryService:
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
         # Note: Missing OMNIMEMORY__POSTGRES__DSN and PASSWORD
 
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         assert settings.postgres_enabled is True
 
         # to_config() should fail because postgres settings are missing
@@ -214,7 +215,7 @@ class TestSettingsMemoryService:
         )
         monkeypatch.setenv("OMNIMEMORY__POSTGRES__PASSWORD", "secret")
 
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         config = settings.to_config()
 
         assert config.postgres is not None
@@ -227,7 +228,7 @@ class TestSettingsMemoryService:
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
         monkeypatch.setenv("OMNIMEMORY__QDRANT_ENABLED", "true")
 
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         config = settings.to_config()
 
         assert config.qdrant is not None
@@ -243,7 +244,7 @@ class TestSettingsMemoryService:
         monkeypatch.setenv("OMNIMEMORY__ENABLE_LOGGING", "false")
         monkeypatch.setenv("OMNIMEMORY__DEBUG_MODE", "true")
 
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         assert settings.service_name == "custom-service"
         assert settings.enable_metrics is False
         assert settings.enable_logging is False
@@ -263,12 +264,12 @@ class TestLoadSettings:
     def test_load_settings_returns_settings(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test load_settings returns SettingsMemoryService."""
+        """Test load_settings returns MemoryServiceSettings."""
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
         settings = load_settings()
-        assert isinstance(settings, SettingsMemoryService)
+        assert isinstance(settings, MemoryServiceSettings)
 
     def test_missing_required_fails_fast(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test missing required settings fails immediately with ValidationError."""
@@ -315,10 +316,10 @@ class TestLoadSettings:
         """Test loading a full configuration from environment."""
         _clear_omnimemory_env_vars(monkeypatch)
 
-        # Filesystem (required)
+        # Filesystem - required
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        # Postgres (optional but enabled)
+        # Postgres - optional but enabled
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
         monkeypatch.setenv(
             "OMNIMEMORY__POSTGRES__DSN", "postgresql://user@localhost/db"

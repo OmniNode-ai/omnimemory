@@ -16,32 +16,31 @@ import sys
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Awaitable, Callable, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
-# Type checking imports
 if TYPE_CHECKING:
-    import psutil as psutil_type  # type: ignore[import-untyped]
+    from collections.abc import Awaitable, Callable
 
 # Optional psutil import for resource metrics - gracefully degrade if unavailable
 _PSUTIL_AVAILABLE = False
-psutil: psutil_type | None = None  # type: ignore[valid-type, name-defined]
+psutil = None
 try:
-    import psutil  # type: ignore[no-redef, import-untyped]
+    import psutil  # type: ignore[import-untyped,no-redef]
 
     _PSUTIL_AVAILABLE = True
 except ImportError:
     pass
 
-import structlog  # noqa: E402
-from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
+import structlog
+from pydantic import BaseModel, ConfigDict, Field
 
-from ..models.foundation.model_health_metadata import HealthCheckMetadata  # noqa: E402
-from ..models.foundation.model_health_response import (  # noqa: E402
+from ..models.foundation.model_health_metadata import HealthCheckMetadata
+from ..models.foundation.model_health_response import (
     ModelCircuitBreakerStats,
     ModelCircuitBreakerStatsCollection,
     ModelRateLimitedHealthCheckResponse,
 )
-from .error_sanitizer import SanitizationLevel, sanitize_error  # noqa: E402
+from .error_sanitizer import SanitizationLevel, sanitize_error
 
 # === RATE LIMITING ===
 
@@ -138,19 +137,36 @@ def _get_environment() -> str:
         return "development"
 
 
-from ..models.foundation.model_health_response import (  # noqa: E402
+from ..models.foundation.model_health_response import (
     ModelDependencyStatus,
     ModelHealthResponse,
     ModelResourceMetrics,
 )
-from .observability import (  # noqa: E402
-    OperationType,
-    correlation_context,
-    trace_operation,
-)
-from .resource_manager import AsyncCircuitBreaker, CircuitBreakerConfig  # noqa: E402
+from .concurrency import CircuitBreaker, CircuitBreakerOpenError
+from .observability import OperationType, correlation_context, trace_operation
+from .resource_manager import AsyncCircuitBreaker, CircuitBreakerConfig
 
 logger = structlog.get_logger(__name__)
+
+# Re-export circuit breaker classes for convenient imports from health_manager
+__all__ = [
+    "CircuitBreaker",
+    "CircuitBreakerOpenError",
+    "DependencyType",
+    "HealthCheckConfig",
+    "HealthCheckDetails",
+    "HealthCheckManager",
+    "HealthCheckResult",
+    "HealthManager",
+    "HealthStatus",
+    "RateLimiter",
+    "ResourceHealthCheck",
+    "SystemHealth",
+    "create_pinecone_health_check",
+    "create_postgresql_health_check",
+    "create_redis_health_check",
+    "health_manager",
+]
 
 
 class HealthStatus(Enum):
@@ -308,13 +324,9 @@ class HealthCheckManager:
                     result: HealthCheckResult
                     if name in self._circuit_breakers:
                         circuit_breaker = self._circuit_breakers[name]
-                        cb_result = await circuit_breaker.call(check_func)
-                        # circuit_breaker.call returns the result of check_func
-                        if not isinstance(cb_result, HealthCheckResult):
-                            raise TypeError(
-                                f"Expected HealthCheckResult, got {type(cb_result)}"
-                            )
-                        result = cb_result
+                        result = cast(
+                            HealthCheckResult, await circuit_breaker.call(check_func)
+                        )
                     else:
                         # Apply timeout directly
                         result = await asyncio.wait_for(
@@ -337,11 +349,11 @@ class HealthCheckManager:
 
                     return result
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     latency_ms = (time.time() - start_time) * 1000
                     result = HealthCheckResult(
                         config=config,
-                        status=HealthStatus.UNHEALTHY,
+                        status=HealthStatus.TIMEOUT,
                         latency_ms=latency_ms,
                         error_message=f"Health check timeout after {config.timeout}s",
                     )
@@ -750,7 +762,7 @@ async def create_postgresql_health_check(
     """Create a PostgreSQL health check function."""
 
     async def check_postgresql() -> HealthCheckResult:
-        import asyncpg  # type: ignore[import-untyped]
+        import asyncpg
 
         config = HealthCheckConfig(
             name="postgresql", dependency_type=DependencyType.DATABASE
@@ -783,12 +795,12 @@ async def create_redis_health_check(
     """Create a Redis health check function."""
 
     async def check_redis() -> HealthCheckResult:
-        import redis.asyncio as redis  # type: ignore[import-untyped]
+        import redis.asyncio as redis
 
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 
         try:
-            client = redis.from_url(redis_url)
+            client = redis.from_url(redis_url)  # type: ignore[no-untyped-call]
             await client.ping()
             await client.close()
 
@@ -843,14 +855,14 @@ async def create_pinecone_health_check(
         # Attempt to import Pinecone client - try async first, then sync
         pinecone_async_available = False
         try:
-            from pinecone import PineconeAsyncio  # type: ignore[import-untyped]
+            from pinecone import PineconeAsyncio
 
             pinecone_async_available = True
         except ImportError:
-            PineconeAsyncio = None  # noqa: N806
+            PineconeAsyncio = None
 
         try:
-            from pinecone import Pinecone  # type: ignore[import-untyped]
+            from pinecone import Pinecone
         except ImportError:
             return HealthCheckResult(
                 config=config,
@@ -920,8 +932,6 @@ HealthCheckResultDict = dict[str, HealthCheckResultValue]
 
 class HealthCheckDetails(BaseModel):
     """Strongly typed health check details with rate-limit and circuit tracking."""
-
-    model_config = ConfigDict(extra="forbid")
 
     message: str | None = Field(
         default=None, description="Human-readable status message"
@@ -1083,27 +1093,26 @@ class HealthManager:
         # Check circuit breaker
         if name in self.circuit_breakers:
             cb = self.circuit_breakers[name]
-            # Import here to avoid circular dependency
-            from .concurrency import CircuitBreakerState
-
-            if hasattr(cb, "state") and cb.state == CircuitBreakerState.OPEN:
-                failure_count = getattr(cb, "failure_count", None)
-                return ResourceHealthCheck(
-                    status=HealthStatus.CIRCUIT_OPEN,
-                    response_time=0.0,
-                    details=HealthCheckDetails(
-                        message="Circuit breaker is open",
-                        circuit_open=True,
-                        circuit_state=(
-                            cb.state.value
-                            if hasattr(cb.state, "value")
-                            else str(cb.state)
+            # Check if circuit is open by comparing state value (string)
+            # This supports both CircuitState (resource_manager) and
+            # CircuitBreakerState (concurrency) enums since both use
+            # the same string values ("open", "closed", "half_open")
+            if hasattr(cb, "state"):
+                state_value = getattr(cb.state, "value", str(cb.state))
+                if state_value == "open":
+                    failure_count = getattr(cb, "failure_count", None)
+                    return ResourceHealthCheck(
+                        status=HealthStatus.CIRCUIT_OPEN,
+                        response_time=0.0,
+                        details=HealthCheckDetails(
+                            message="Circuit breaker is open",
+                            circuit_open=True,
+                            circuit_state=state_value,
+                            circuit_failure_count=failure_count,
+                            result_type="circuit_open",
                         ),
-                        circuit_failure_count=failure_count,
-                        result_type="circuit_open",
-                    ),
-                    correlation_id=correlation_id,
-                )
+                        correlation_id=correlation_id,
+                    )
 
         if name not in self.health_checks:
             return ResourceHealthCheck(
@@ -1163,7 +1172,7 @@ class HealthManager:
                 correlation_id=correlation_id,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             response_time = time.time() - start_time
             return ResourceHealthCheck(
                 status=HealthStatus.TIMEOUT,
@@ -1227,7 +1236,7 @@ class HealthManager:
                     ),
                 )
             )
-            for name, result in zip(names, results)
+            for name, result in zip(names, results, strict=True)
         }
 
     async def get_system_health(self) -> SystemHealth:

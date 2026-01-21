@@ -323,7 +323,7 @@ class EmbeddingSettings(BaseSettings):
     )
 
 
-class SettingsMemoryService(BaseSettings):
+class MemoryServiceSettings(BaseSettings):
     """Top-level settings for OmniMemory service.
 
     Loads configuration from environment variables with OMNIMEMORY__ prefix.
@@ -349,7 +349,7 @@ class SettingsMemoryService(BaseSettings):
         export OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
 
         # Load settings
-        settings = SettingsMemoryService()
+        settings = MemoryServiceSettings()
         config = settings.to_config()
     """
 
@@ -404,7 +404,7 @@ class SettingsMemoryService(BaseSettings):
         """
         # Filesystem is always required
         # BaseSettings loads required fields from environment variables
-        filesystem_settings = FilesystemSettings()  # type: ignore[call-arg]
+        filesystem_settings = FilesystemSettings()
         filesystem_config = filesystem_settings.to_config()
 
         # Load optional backends based on enablement flags
@@ -413,7 +413,7 @@ class SettingsMemoryService(BaseSettings):
 
         if self.postgres_enabled:
             # BaseSettings loads required fields from environment variables
-            postgres_settings = PostgresSettings()  # type: ignore[call-arg]
+            postgres_settings = PostgresSettings()
             postgres_config = postgres_settings.to_config()
 
         if self.qdrant_enabled:
@@ -431,14 +431,14 @@ class SettingsMemoryService(BaseSettings):
         )
 
 
-def load_settings() -> SettingsMemoryService:
+def load_settings() -> MemoryServiceSettings:
     """Load settings from environment variables.
 
     This is the primary entry point for loading configuration.
     Fails fast with clear error messages if required settings are missing.
 
     Returns:
-        SettingsMemoryService with validated configuration
+        MemoryServiceSettings with validated configuration
 
     Raises:
         pydantic.ValidationError: If required settings missing or invalid
@@ -451,4 +451,4 @@ def load_settings() -> SettingsMemoryService:
         >>> config.filesystem.base_path
         PosixPath('/tmp/omnimemory')
     """
-    return SettingsMemoryService()
+    return MemoryServiceSettings()

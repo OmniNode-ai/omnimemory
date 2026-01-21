@@ -10,6 +10,7 @@ These tests validate that the secrets provider:
 - Provides has_secret() for existence checking
 - Provides get_secret_or_default() for optional secrets
 """
+
 from __future__ import annotations
 
 import pytest

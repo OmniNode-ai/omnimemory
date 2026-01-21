@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class HealthCheckMetadata(BaseModel):
     """Strongly typed metadata for health check operations."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     connection_url: str | None = Field(
         default=None, description="Connection URL for dependency checks"
@@ -47,7 +47,7 @@ class HealthCheckMetadata(BaseModel):
 class AggregateHealthMetadata(BaseModel):
     """Strongly typed metadata for aggregate health status."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     total_dependencies: int = Field(description="Total number of dependencies checked")
 
@@ -79,7 +79,7 @@ class AggregateHealthMetadata(BaseModel):
 class ConfigurationChangeMetadata(BaseModel):
     """Strongly typed metadata for configuration changes."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     changed_keys: list[str] = Field(
         description="List of configuration keys that were modified"

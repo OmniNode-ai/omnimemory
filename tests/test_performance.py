@@ -18,6 +18,7 @@ issues with external dependencies like omnibase_core.
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import re
 import time
@@ -25,11 +26,15 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import BaseModel, Field, field_validator
+
+# Performance threshold in milliseconds
+# Default: 50ms for local development (stricter)
+# CI can override via PERF_THRESHOLD_MS=100 for variance tolerance
+PERF_THRESHOLD_MS = int(os.getenv("PERF_THRESHOLD_MS", "50"))
 
 # =============================================================================
 # Self-Contained Implementations for Testing
@@ -101,7 +106,7 @@ class PIIDetectorConfig(BaseModel):
 class PIIDetector:
     """PII detection for benchmarking - simplified version."""
 
-    def __init__(self, config: Optional[PIIDetectorConfig] = None):
+    def __init__(self, config: PIIDetectorConfig | None = None):
         self.config = config or PIIDetectorConfig()
         self._patterns = self._initialize_patterns()
 
@@ -285,11 +290,11 @@ class FairSemaphore:
 
     @asynccontextmanager
     async def acquire(
-        self, timeout: Optional[float] = None, correlation_id: Optional[str] = None
+        self, timeout: float | None = None, correlation_id: str | None = None
     ) -> AsyncGenerator[None, None]:
         """Acquire semaphore permit with timeout and tracking."""
         holder_id = str(uuid4())
-        acquired_at: Optional[datetime] = None
+        acquired_at: datetime | None = None
 
         try:
             async with self._lock:
@@ -310,7 +315,7 @@ class FairSemaphore:
 
             yield
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             async with self._lock:
                 self._stats.waiting_count -= 1
                 self._stats.total_timeouts += 1
@@ -350,13 +355,13 @@ class PriorityLock:
         self.name = name
         self._lock = asyncio.Lock()
         self._queue: list[str] = []  # Stores request IDs
-        self._current_holder: Optional[str] = None
+        self._current_holder: str | None = None
 
     @asynccontextmanager
     async def acquire(
         self,
         priority: LockPriority = LockPriority.NORMAL,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ) -> AsyncGenerator[None, None]:
         """Acquire the lock with priority."""
         acquired_at = None
@@ -370,7 +375,7 @@ class PriorityLock:
             acquired_at = datetime.now(timezone.utc)
             yield
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         finally:
             if acquired_at:
@@ -915,7 +920,7 @@ class TestConcurrencyPerformance:
         for _ in range(num_iterations):
             async with semaphore.acquire():
                 pass
-        _elapsed_ms = (time.perf_counter() - start_time) * 1000  # noqa: F841
+        _elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         stats_start = time.perf_counter()
         stats = semaphore.get_stats()
@@ -1248,7 +1253,7 @@ class TestSLAVerification:
             )
 
         print("\nBulk Operations SLA Report:")
-        print(f"  Batch sizes {batch_sizes} exceeded 10K/sec: PASS")
+        print(f"  All batch sizes ({batch_sizes}) exceeded 10K records/second: PASS")
 
 
 # =============================================================================
@@ -1295,7 +1300,7 @@ class TestPIIDetectionOverhead:
                 pii_times.append((time.perf_counter() - start) * 1000)
 
             pii_avg = sum(pii_times) / len(pii_times)
-            _overhead_ms = pii_avg - baseline_avg  # noqa: F841
+            _overhead_ms = pii_avg - baseline_avg
 
             # PII detection itself should be under 10ms
             assert pii_avg < 10, (
@@ -1523,7 +1528,7 @@ class TestVectorSearchPerformance:
 
             def cosine_similarity(v1: list[float], v2: list[float]) -> float:
                 """Compute cosine similarity between two vectors."""
-                dot_product = sum(a * b for a, b in zip(v1, v2))
+                dot_product = sum(a * b for a, b in zip(v1, v2, strict=False))
                 norm1 = math.sqrt(sum(a * a for a in v1))
                 norm2 = math.sqrt(sum(b * b for b in v2))
                 return dot_product / (norm1 * norm2) if norm1 > 0 and norm2 > 0 else 0.0
@@ -1534,17 +1539,18 @@ class TestVectorSearchPerformance:
             sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:10]
             elapsed_ms = (time.perf_counter() - start) * 1000
 
-            # Target: <50ms for similarity search (100 vectors, pure Python)
+            # Target: configurable threshold for similarity search (100 vectors, pure Python)
+            # Default 50ms for local dev, CI can set PERF_THRESHOLD_MS=100 for variance
             # Production with numpy should handle 1000+ vectors in <50ms
-            assert elapsed_ms < 50, (
+            assert elapsed_ms < PERF_THRESHOLD_MS, (
                 f"Vector similarity for dim={dim} took {elapsed_ms:.2f}ms, "
-                f"exceeds 50ms target"
+                f"exceeds {PERF_THRESHOLD_MS}ms target"
             )
 
         print("\nVector Search Simulation Report:")
         print(f"  Dimensions tested: {dimensions}")
         print(f"  Candidate pool: {num_vectors} vectors (pure Python)")
-        print("  All under 50ms target: PASS")
+        print(f"  All under {PERF_THRESHOLD_MS}ms target: PASS")
         print("  Note: Production with numpy should handle 10x more vectors")
 
     @pytest.mark.benchmark
@@ -1568,13 +1574,15 @@ class TestVectorSearchPerformance:
 
         # Measure normalization time
         start = time.perf_counter()
-        _normalized = [normalize_vector(v) for v in vectors]  # noqa: F841
+        _normalized = [normalize_vector(v) for v in vectors]
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        # Target: preprocessing should be fast (<5ms per 100 vectors)
-        assert (
-            elapsed_ms < 50
-        ), f"Vector preprocessing took {elapsed_ms:.2f}ms, exceeds 50ms target"
+        # Target: preprocessing should be fast (<10ms per 100 vectors)
+        # Default 50ms for local dev, CI can set PERF_THRESHOLD_MS=100 for variance
+        assert elapsed_ms < PERF_THRESHOLD_MS, (
+            f"Vector preprocessing took {elapsed_ms:.2f}ms, "
+            f"exceeds {PERF_THRESHOLD_MS}ms target"
+        )
 
         print("\nVector Preprocessing Report:")
         print(f"  Vectors processed: {num_vectors}")
@@ -1618,7 +1626,7 @@ class TestEndToEndPerformance:
             json_str = item.model_dump_json()
 
             # 4. Deserialize
-            _restored = ModelMemoryItem.model_validate_json(json_str)  # noqa: F841
+            _restored = ModelMemoryItem.model_validate_json(json_str)
 
             elapsed_ms = (time.perf_counter() - start) * 1000
             measurements.append(elapsed_ms)

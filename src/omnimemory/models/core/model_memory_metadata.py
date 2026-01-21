@@ -16,7 +16,7 @@ from ..foundation.model_success_metrics import ModelConfidenceScore, ModelSucces
 class ModelMemoryMetadata(BaseModel):
     """Metadata for memory operations following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Operation identification
     operation_type: EnumMemoryOperationType = Field(

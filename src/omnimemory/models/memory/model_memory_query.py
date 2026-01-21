@@ -12,7 +12,7 @@ from ...enums.enum_memory_storage_type import EnumMemoryStorageType
 class ModelMemoryQuery(BaseModel):
     """Query model for memory search and retrieval following ONEX standards."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=False)
 
     # Query identification
     query_id: UUID = Field(
