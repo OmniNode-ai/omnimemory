@@ -25,8 +25,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+# Project root directory (for subprocess cwd in tests)
+PROJECT_ROOT = Path(__file__).parent.parent
+
 # Add scripts/validation to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts" / "validation"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "validation"))
 
 from validate_enum_casing import validate_file as validate_enum_casing
 from validate_naming import validate_file as validate_naming
@@ -1975,7 +1978,7 @@ class C:
                     "scripts/validation/validate_single_class_per_file.py",
                     str(path),
                 ],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2001,7 +2004,7 @@ class C:
                     "scripts/validation/validate_single_class_per_file.py",
                     tmpdir,
                 ],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2026,7 +2029,7 @@ class Status(Enum):
         try:
             result = subprocess.run(
                 ["python", "scripts/validation/validate_enum_casing.py", str(path)],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2050,7 +2053,7 @@ class Status(Enum):
             test_file.write_text(code)
             result = subprocess.run(
                 ["python", "scripts/validation/validate_enum_casing.py", tmpdir],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2077,7 +2080,7 @@ class User(BaseModel):
             model_file.write_text(code)
             result = subprocess.run(
                 ["python", "scripts/validation/validate_naming.py", tmpdir],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2106,7 +2109,7 @@ class User(BaseModel):
                     "scripts/validation/validate_pydantic_patterns.py",
                     str(path),
                 ],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2134,7 +2137,7 @@ class ModelUser(BaseModel):
             test_file.write_text(code)
             result = subprocess.run(
                 ["python", "scripts/validation/validate_pydantic_patterns.py", tmpdir],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2156,7 +2159,7 @@ class TestValidateSecretsMain:
 
         result = subprocess.run(
             ["python", "scripts/validation/validate_secrets.py"],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2173,7 +2176,7 @@ class TestValidateSecretsMain:
         try:
             result = subprocess.run(
                 ["python", "scripts/validation/validate_secrets.py", str(path)],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2191,7 +2194,7 @@ class TestValidateSecretsMain:
         try:
             result = subprocess.run(
                 ["python", "scripts/validation/validate_secrets.py", str(path)],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2215,7 +2218,7 @@ class TestValidateSecretsMain:
                     "--verbose",
                     str(path),
                 ],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2234,7 +2237,7 @@ class TestValidatePydanticPatternsMain:
 
         result = subprocess.run(
             ["python", "scripts/validation/validate_pydantic_patterns.py"],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2260,7 +2263,7 @@ class ModelUser(BaseModel):
                     "scripts/validation/validate_pydantic_patterns.py",
                     str(path),
                 ],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2279,7 +2282,7 @@ class TestValidateNamingMain:
 
         result = subprocess.run(
             ["python", "scripts/validation/validate_naming.py"],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2293,7 +2296,7 @@ class TestValidateNamingMain:
 
         result = subprocess.run(
             ["python", "scripts/validation/validate_naming.py", "/nonexistent/dir"],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2314,7 +2317,7 @@ class TestValidateEnumCasingMain:
 
         result = subprocess.run(
             ["python", "scripts/validation/validate_enum_casing.py"],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2336,7 +2339,7 @@ class Status(Enum):
         try:
             result = subprocess.run(
                 ["python", "scripts/validation/validate_enum_casing.py", str(path)],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2355,7 +2358,7 @@ class TestValidateSingleClassMain:
 
         result = subprocess.run(
             ["python", "scripts/validation/validate_single_class_per_file.py"],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2378,7 +2381,7 @@ class TestValidateNoBackwardCompatMain:
                 "-d",
                 "/nonexistent",
             ],
-            cwd="/Volumes/PRO-G40/Code/omnimemory3",
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             check=False,
@@ -2406,7 +2409,7 @@ class TestValidateNoBackwardCompatMain:
                     "-d",
                     tmpdir,
                 ],
-                cwd="/Volumes/PRO-G40/Code/omnimemory3",
+                cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,
