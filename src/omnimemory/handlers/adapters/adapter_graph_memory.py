@@ -1185,36 +1185,36 @@ class AdapterGraphMemory:
         try:
             # Choose query based on bidirectional flag and relationship_types
             node_label = self._config.memory_node_label
-            if effective_bidirectional:
-                # Bidirectional queries (both incoming and outgoing)
-                if relationship_types:
-                    query = CypherTemplates.get_connections_by_type(node_label)
-                    parameters: dict[str, object] = {
-                        "memory_id": memory_id,
-                        "relationship_types": relationship_types,
-                        "limit": effective_limit,
-                    }
-                else:
-                    query = CypherTemplates.get_connections(node_label)
-                    parameters = {
-                        "memory_id": memory_id,
-                        "limit": effective_limit,
-                    }
+            if effective_bidirectional and relationship_types:
+                # Bidirectional with type filter
+                query = CypherTemplates.get_connections_by_type(node_label)
+                parameters: dict[str, object] = {
+                    "memory_id": memory_id,
+                    "relationship_types": relationship_types,
+                    "limit": effective_limit,
+                }
+            elif effective_bidirectional:
+                # Bidirectional without type filter
+                query = CypherTemplates.get_connections(node_label)
+                parameters = {
+                    "memory_id": memory_id,
+                    "limit": effective_limit,
+                }
+            elif relationship_types:
+                # Outgoing-only with type filter
+                query = CypherTemplates.get_connections_by_type_outgoing(node_label)
+                parameters = {
+                    "memory_id": memory_id,
+                    "relationship_types": relationship_types,
+                    "limit": effective_limit,
+                }
             else:
-                # Outgoing-only queries
-                if relationship_types:
-                    query = CypherTemplates.get_connections_by_type_outgoing(node_label)
-                    parameters = {
-                        "memory_id": memory_id,
-                        "relationship_types": relationship_types,
-                        "limit": effective_limit,
-                    }
-                else:
-                    query = CypherTemplates.get_connections_outgoing(node_label)
-                    parameters = {
-                        "memory_id": memory_id,
-                        "limit": effective_limit,
-                    }
+                # Outgoing-only without type filter
+                query = CypherTemplates.get_connections_outgoing(node_label)
+                parameters = {
+                    "memory_id": memory_id,
+                    "limit": effective_limit,
+                }
 
             result = await handler.execute_query(
                 query=query,

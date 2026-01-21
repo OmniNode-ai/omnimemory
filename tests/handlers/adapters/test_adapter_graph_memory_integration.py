@@ -38,7 +38,8 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import TYPE_CHECKING, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -570,7 +571,7 @@ class TestRealConnections:
 
         # Check connection structure
         for conn in result.connections:
-            assert conn.source_id == mem_a or conn.target_id == mem_a
+            assert mem_a in {conn.source_id, conn.target_id}
             assert conn.relationship_type in ("related_to", "caused_by")
             assert 0.0 <= conn.weight <= 1.0
 

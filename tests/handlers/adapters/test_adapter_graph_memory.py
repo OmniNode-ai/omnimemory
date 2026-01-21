@@ -32,7 +32,7 @@ pytest.importorskip(
     "omnibase_infra", reason="omnibase_infra required for adapter tests"
 )
 
-from omnimemory.handlers.adapters.adapter_graph_memory import (  # noqa: E402
+from omnimemory.handlers.adapters.adapter_graph_memory import (
     AdapterGraphMemory,
     AdapterGraphMemoryConfig,
     CypherTemplates,
@@ -442,8 +442,12 @@ class TestCypherTemplates:
                 f"got: {template[:100]}..."
             )
             # Ensure default "Memory" label is NOT present
-            assert ":Memory " not in template and ":Memory{" not in template, (
-                f"Template should NOT contain ':Memory' when custom label is used, "
+            assert ":Memory " not in template, (
+                f"Template should NOT contain ':Memory ' when custom label is used, "
+                f"got: {template[:100]}..."
+            )
+            assert ":Memory{" not in template, (
+                f"Template should NOT contain ':Memory{{' when custom label is used, "
                 f"got: {template[:100]}..."
             )
 
