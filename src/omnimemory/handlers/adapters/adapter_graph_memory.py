@@ -8,7 +8,7 @@ queries via graph traversal, translating between memory domain concepts and
 graph database operations.
 
 The adapter transforms memory operations into graph operations:
-    - find_related(memory_id) -> traverse(start_node, depth)
+    - find_related(memory_id) -> execute_query() with BFS traversal
     - get_connections(memory_id) -> execute_query() with edge retrieval
 
 Example::
@@ -220,11 +220,68 @@ class CypherTemplates:
     """
 
     # Check if a memory node exists
+    # Note: Using id(m) instead of elementId(m) for Memgraph compatibility
+    # (Neo4j 5.x prefers elementId() but id() still works)
     NODE_EXISTS = """
     MATCH (m:Memory {memory_id: $memory_id})
-    RETURN m.memory_id AS memory_id, elementId(m) AS element_id
+    RETURN m.memory_id AS memory_id, id(m) AS element_id
     LIMIT 1
     """
+
+    # Template functions for find_related queries
+    # NOTE: Memgraph does NOT support parameterized depth in variable-length paths
+    # (e.g., `[*1..$max_depth]` fails), so we must embed the depth value directly.
+    # This is safe because depth is bounded by config validation (1-10 integer).
+    @staticmethod
+    def find_related_query(max_depth: int, bidirectional: bool = True) -> str:
+        """Generate FIND_RELATED query with embedded depth value.
+
+        Args:
+            max_depth: Maximum traversal depth (must be a bounded integer, 1-10).
+            bidirectional: Whether to traverse in both directions.
+
+        Returns:
+            Cypher query string with depth embedded.
+        """
+        direction = "-" if bidirectional else "->"
+        return f"""
+        MATCH (start:Memory {{memory_id: $memory_id}})-[r*1..{max_depth}]{direction}
+              (related:Memory)
+        WHERE related.memory_id <> $memory_id
+        RETURN DISTINCT
+            related.memory_id AS memory_id,
+            labels(related) AS labels,
+            properties(related) AS properties,
+            size(r) AS depth
+        ORDER BY depth ASC
+        LIMIT $limit
+        """
+
+    @staticmethod
+    def find_related_by_type_query(max_depth: int, bidirectional: bool = True) -> str:
+        """Generate FIND_RELATED_BY_TYPE query with embedded depth value.
+
+        Args:
+            max_depth: Maximum traversal depth (must be a bounded integer, 1-10).
+            bidirectional: Whether to traverse in both directions.
+
+        Returns:
+            Cypher query string with depth embedded.
+        """
+        direction = "-" if bidirectional else "->"
+        return f"""
+        MATCH (start:Memory {{memory_id: $memory_id}})-[r*1..{max_depth}]{direction}
+              (related:Memory)
+        WHERE related.memory_id <> $memory_id
+          AND ALL(rel IN r WHERE type(rel) IN $relationship_types)
+        RETURN DISTINCT
+            related.memory_id AS memory_id,
+            labels(related) AS labels,
+            properties(related) AS properties,
+            size(r) AS depth
+        ORDER BY depth ASC
+        LIMIT $limit
+        """
 
 
 # =============================================================================
@@ -689,6 +746,8 @@ class AdapterGraphMemory:
         Raises:
             RuntimeError: If adapter is not initialized.
         """
+        import time
+
         handler = self._ensure_initialized()
 
         # Apply bounds
@@ -699,18 +758,13 @@ class AdapterGraphMemory:
             limit or self._config.default_limit, self._config.max_limit
         )
 
-        # Determine traversal direction
-        direction = "both" if self._config.bidirectional else "outgoing"
-
-        # Build traversal filters
-        filters: ModelGraphTraversalFilters | None = None
-        if self._config.memory_node_label:
-            filters = ModelGraphTraversalFilters(
-                node_labels=[self._config.memory_node_label],
-            )
+        # Determine traversal direction (bidirectional or outgoing-only)
+        is_bidirectional = self._config.bidirectional
 
         try:
-            # First, find the graph node for this memory_id
+            start_time = time.perf_counter()
+
+            # First, check if the memory node exists
             node_result = await handler.execute_query(
                 query=CypherTemplates.NODE_EXISTS,
                 parameters={"memory_id": memory_id},
@@ -722,60 +776,82 @@ class AdapterGraphMemory:
                     error_message=f"Memory '{memory_id}' not found in graph",
                 )
 
-            element_id = node_result.records[0]["element_id"]
+            # Select appropriate query template based on direction and filters
+            # Request more results than needed to account for min_score filtering
+            query_limit = min(effective_limit * 3, self._config.max_limit)
 
-            # Perform traversal from the memory node
-            traversal_result: ModelGraphTraversalResult = await handler.traverse(
-                start_node_id=element_id,
-                relationship_types=relationship_types,
-                direction=direction,
-                max_depth=effective_depth,
-                filters=filters,
+            # Generate query with embedded depth (required for Memgraph compatibility)
+            # Memgraph does NOT support parameterized depth in variable-length paths
+            if relationship_types:
+                query = CypherTemplates.find_related_by_type_query(
+                    max_depth=effective_depth,
+                    bidirectional=is_bidirectional,
+                )
+                parameters: dict[str, object] = {
+                    "memory_id": memory_id,
+                    "relationship_types": relationship_types,
+                    "limit": query_limit,
+                }
+            else:
+                query = CypherTemplates.find_related_query(
+                    max_depth=effective_depth,
+                    bidirectional=is_bidirectional,
+                )
+                parameters = {
+                    "memory_id": memory_id,
+                    "limit": query_limit,
+                }
+
+            # Execute the traversal query
+            result = await handler.execute_query(
+                query=query,
+                parameters=parameters,
             )
 
-            # Convert graph nodes to related memories
-            memories: list[ModelRelatedMemory] = []
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
 
-            for node in traversal_result.nodes:
-                # Extract memory_id from properties with explicit type check
-                node_memory_id = node.properties.get("memory_id")
-                if not isinstance(node_memory_id, str) or node_memory_id == memory_id:
+            # Convert query results to related memories
+            memories: list[ModelRelatedMemory] = []
+            max_depth_reached = 0
+
+            for record in result.records:
+                node_memory_id = record.get("memory_id")
+                if not isinstance(node_memory_id, str):
                     continue
 
-                # Calculate relevance score based on traversal depth (edge count).
-                # In path array, index 0 is start node, so node at index N is N
-                # edges away. Score: 1/(depth+1) gives closer nodes higher scores.
-                # E.g.: depth=1 -> 0.5, depth=2 -> 0.33, depth=3 -> 0.25
-                node_paths = [p for p in traversal_result.paths if node.element_id in p]
-                if node_paths:
-                    shortest_path = min(node_paths, key=len)
-                    # Position in path = number of edges from start (depth)
-                    depth_to_node = shortest_path.index(node.element_id)
-                else:
-                    logger.warning(
-                        "Path info unavailable for node %s, defaulting to max depth=%d",
-                        node.element_id,
-                        effective_depth,
-                    )
-                    depth_to_node = effective_depth
+                # Get depth from query result (path length)
+                depth_to_node = int(record.get("depth", 1))
+                max_depth_reached = max(max_depth_reached, depth_to_node)
 
+                # Calculate relevance score based on traversal depth (edge count).
+                # Score: 1/(depth+1) gives closer nodes higher scores.
+                # E.g.: depth=1 -> 0.5, depth=2 -> 0.33, depth=3 -> 0.25
                 score = 1.0 / (depth_to_node + 1)
 
                 if score < min_score:
                     continue
 
-                # Build path as memory IDs
-                path_memory_ids = [memory_id]
-                # Note: Full path reconstruction would require additional queries
+                # Extract labels and properties from result
+                labels = record.get("labels", [])
+                if not isinstance(labels, list):
+                    labels = []
+
+                properties = record.get("properties", {})
+                if not isinstance(properties, dict):
+                    properties = {}
+
+                # Build path as memory IDs (start and end nodes)
+                path_memory_ids = [memory_id, str(node_memory_id)]
 
                 memories.append(
                     ModelRelatedMemory(
                         memory_id=str(node_memory_id),
                         score=score,
-                        path=path_memory_ids + [str(node_memory_id)],
+                        path=path_memory_ids,
                         depth=depth_to_node,
-                        labels=list(node.labels),
-                        properties=dict(node.properties),
+                        labels=list(labels),
+                        properties=dict(properties),
                     )
                 )
 
@@ -787,16 +863,16 @@ class AdapterGraphMemory:
                     status="no_results",
                     memories=[],
                     total_count=0,
-                    max_depth_reached=traversal_result.depth_reached,
-                    execution_time_ms=traversal_result.execution_time_ms,
+                    max_depth_reached=max_depth_reached,
+                    execution_time_ms=execution_time_ms,
                 )
 
             return ModelRelatedMemoryResult(
                 status="success",
                 memories=memories,
                 total_count=len(memories),
-                max_depth_reached=traversal_result.depth_reached,
-                execution_time_ms=traversal_result.execution_time_ms,
+                max_depth_reached=max_depth_reached,
+                execution_time_ms=execution_time_ms,
             )
 
         except InfraConnectionError as e:

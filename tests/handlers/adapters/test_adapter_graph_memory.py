@@ -371,30 +371,30 @@ class TestFindRelated:
         mock_handler: MagicMock,
     ) -> None:
         """Test successful find_related operation."""
-        # Mock the node exists check
-        mock_handler.execute_query.return_value = MagicMock(
-            records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]
-        )
-
-        # Mock the traverse result
-        mock_node = MagicMock()
-        mock_node.element_id = "4:abc:456"
-        mock_node.labels = ["Memory"]
-        mock_node.properties = {"memory_id": "mem_related"}
-
-        mock_handler.traverse.return_value = MagicMock(
-            nodes=[mock_node],
-            relationships=[],
-            paths=[["4:abc:123", "4:abc:456"]],
-            depth_reached=1,
-            execution_time_ms=25.0,
-        )
+        # Mock execute_query with side_effect for multiple calls:
+        # 1. NODE_EXISTS check
+        # 2. FIND_RELATED query
+        mock_handler.execute_query.side_effect = [
+            MagicMock(records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]),
+            MagicMock(
+                records=[
+                    {
+                        "memory_id": "mem_related",
+                        "labels": ["Memory"],
+                        "properties": {"memory_id": "mem_related", "content": "test"},
+                        "depth": 1,
+                    }
+                ]
+            ),
+        ]
 
         result = await adapter_with_mock.find_related("mem_start", depth=2)
 
         assert result.status == "success"
         assert len(result.memories) == 1
         assert result.memories[0].memory_id == "mem_related"
+        assert result.memories[0].depth == 1
+        assert result.memories[0].score == 0.5  # 1/(1+1)
 
     @pytest.mark.asyncio
     async def test_find_related_not_found(
@@ -417,16 +417,15 @@ class TestFindRelated:
         mock_handler: MagicMock,
     ) -> None:
         """Test find_related when no related memories exist."""
-        mock_handler.execute_query.return_value = MagicMock(
-            records=[{"memory_id": "mem_isolated", "element_id": "4:abc:123"}]
-        )
-        mock_handler.traverse.return_value = MagicMock(
-            nodes=[],
-            relationships=[],
-            paths=[],
-            depth_reached=0,
-            execution_time_ms=10.0,
-        )
+        # Mock execute_query with side_effect for multiple calls:
+        # 1. NODE_EXISTS check (node exists)
+        # 2. FIND_RELATED query (no results)
+        mock_handler.execute_query.side_effect = [
+            MagicMock(
+                records=[{"memory_id": "mem_isolated", "element_id": "4:abc:123"}]
+            ),
+            MagicMock(records=[]),  # No related memories
+        ]
 
         result = await adapter_with_mock.find_related("mem_isolated")
 
@@ -445,20 +444,26 @@ class TestFindRelated:
         adapter._handler = mock_handler
         adapter._initialized = True
 
-        mock_handler.execute_query.return_value = MagicMock(
-            records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]
-        )
-        mock_handler.traverse.return_value = MagicMock(
-            nodes=[], relationships=[], paths=[], depth_reached=0, execution_time_ms=5.0
-        )
+        # Mock execute_query with side_effect for multiple calls:
+        # 1. NODE_EXISTS check
+        # 2. FIND_RELATED query
+        mock_handler.execute_query.side_effect = [
+            MagicMock(records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]),
+            MagicMock(records=[]),  # No related memories
+        ]
 
         # Request depth=10, should be capped to max_depth=3
         await adapter.find_related("mem_start", depth=10)
 
-        # Verify traverse was called with bounded depth
-        mock_handler.traverse.assert_called_once()
-        call_kwargs = mock_handler.traverse.call_args[1]
-        assert call_kwargs["max_depth"] == 3
+        # Verify execute_query was called twice (node exists + find_related)
+        assert mock_handler.execute_query.call_count == 2
+
+        # Check second call (FIND_RELATED) has bounded max_depth embedded in query
+        # Note: max_depth embedded in query string (not param) for Memgraph compat
+        find_related_call = mock_handler.execute_query.call_args_list[1]
+        query = find_related_call[1]["query"]
+        # The query should contain "[r*1..3]" (bounded depth of 3)
+        assert "*1..3]" in query, f"Expected depth 3 in query, got: {query}"
 
     @pytest.mark.asyncio
     async def test_find_related_with_relationship_filter(
@@ -467,20 +472,26 @@ class TestFindRelated:
         mock_handler: MagicMock,
     ) -> None:
         """Test find_related with relationship type filter."""
-        mock_handler.execute_query.return_value = MagicMock(
-            records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]
-        )
-        mock_handler.traverse.return_value = MagicMock(
-            nodes=[], relationships=[], paths=[], depth_reached=0, execution_time_ms=5.0
-        )
+        # Mock execute_query with side_effect for multiple calls:
+        # 1. NODE_EXISTS check
+        # 2. FIND_RELATED_BY_TYPE query
+        mock_handler.execute_query.side_effect = [
+            MagicMock(records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]),
+            MagicMock(records=[]),  # No related memories
+        ]
 
         await adapter_with_mock.find_related(
             "mem_start",
             relationship_types=["related_to", "caused_by"],
         )
 
-        call_kwargs = mock_handler.traverse.call_args[1]
-        assert call_kwargs["relationship_types"] == ["related_to", "caused_by"]
+        # Verify execute_query was called twice (node exists + find_related_by_type)
+        assert mock_handler.execute_query.call_count == 2
+
+        # Check the second call has the relationship_types parameter
+        find_related_call = mock_handler.execute_query.call_args_list[1]
+        parameters = find_related_call[1]["parameters"]
+        assert parameters["relationship_types"] == ["related_to", "caused_by"]
 
     @pytest.mark.asyncio
     async def test_find_related_not_initialized(
