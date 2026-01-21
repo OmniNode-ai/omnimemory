@@ -54,9 +54,8 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 from omnibase_core.types.type_json import JsonType
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
