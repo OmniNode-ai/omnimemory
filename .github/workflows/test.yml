@@ -40,6 +40,8 @@ jobs:
   # SHARED CONFIGURATION FILES (synchronized with .pre-commit-config.yaml):
   # - pyproject.toml: ruff [tool.ruff] (^0.8.0), mypy [tool.mypy] (^1.14.0), pyright (^1.1.390)
   # - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
+  # VERSION SYNC: Poetry uses caret versions (allows updates), pre-commit pins exact versions
+  # (ruff v0.8.6, mypy v1.14.1, pyright v1.1.391) - both are within compatible ranges
   # NOTE: UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
   #
   # CI-TO-HOOK SYNCHRONIZATION MAP:
@@ -118,7 +120,7 @@ jobs:
       - name: Check ruff linting (includes import sorting)
         run: poetry run ruff check src/ tests/
 
-      # SYNC: Pre-commit hook 'mypy-type-check' at pre-push stage
+      # SYNC: Pre-commit hook 'mypy' at pre-push stage
       # Both pre-commit and CI use same flags for consistent output
       - name: Run mypy type checking (strict)
         run: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
@@ -170,7 +172,7 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
-      # SYNC: Pre-commit hook 'pyright-type-check' at pre-push stage
+      # SYNC: Pre-commit hook 'pyright' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
       - name: Run pyright type checking
         run: poetry run pyright src/omnimemory

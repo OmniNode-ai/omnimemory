@@ -30,29 +30,48 @@ class Violation(NamedTuple):
 
 
 # Patterns that suggest backward compatibility hacks
+# IMPORTANT: Use word boundaries (\b) to prevent false positives from
+# substring matching. For example, @deprecated\b matches "@deprecated"
+# but not "@deprecated_feature" or "@my_deprecated"
 PATTERNS = [
     (
-        re.compile(r"@deprecated", re.IGNORECASE),
+        # @deprecated decorator - followed by word boundary (end of word, paren)
+        # Matches: @deprecated, @Deprecated, @deprecated(...)
+        # Does NOT match: @deprecated_feature, @my_deprecated_decorator
+        re.compile(r"@deprecated\b", re.IGNORECASE),
         "Deprecated decorator found - remove deprecated code instead",
     ),
     (
-        re.compile(r"#\s*(backwards?|backward)\s*compat", re.IGNORECASE),
+        # Backward compatibility comment - requires "compat" word
+        # Matches: # backward compat, # backwards compatibility
+        # Does NOT match: # backward_compat_layer (variable name)
+        re.compile(r"#\s*(backwards?|backward)\s+compat(ibility)?\b", re.IGNORECASE),
         "Backward compatibility comment found - remove old code instead",
     ),
     (
-        re.compile(r"#\s*deprecated", re.IGNORECASE),
+        # Deprecated comment - must be standalone word after #
+        # Matches: # deprecated, # DEPRECATED, # deprecated:
+        # Does NOT match: # deprecated_field, # not_deprecated, # undeprecated
+        re.compile(r"#\s*deprecated\b(?!\s*[_a-z])", re.IGNORECASE),
         "Deprecated comment found - remove deprecated code instead",
     ),
     (
-        re.compile(r"#\s*legacy", re.IGNORECASE),
+        # Legacy comment - must be standalone word after #
+        # Matches: # legacy, # LEGACY, # legacy:, # legacy code
+        # Does NOT match: # legacy_helper, # non_legacy, # mylegacy
+        re.compile(r"#\s*legacy\b(?!\s*[_a-z])", re.IGNORECASE),
         "Legacy comment found - migrate to new patterns",
     ),
     (
-        re.compile(r"#\s*TODO:\s*(remove|delete).*deprecated", re.IGNORECASE),
+        # TODO to remove deprecated code
+        re.compile(r"#\s*TODO:\s*(remove|delete).*\bdeprecated\b", re.IGNORECASE),
         "TODO to remove deprecated code - do it now",
     ),
     (
-        re.compile(r"=\s*\w+\s*#\s*alias", re.IGNORECASE),
+        # Alias assignment with explicit comment
+        # Matches: old_name = new_name  # alias
+        # Does NOT match: alias_manager = ... or aliased = ...
+        re.compile(r"=\s*\w+\s*#\s*alias\b", re.IGNORECASE),
         "Alias assignment found - avoid maintaining old names",
     ),
 ]
@@ -112,8 +131,8 @@ def main() -> int:
     args = parser.parse_args()
 
     directory = Path(args.directory)
-    if not directory.exists():
-        print(f"Directory not found: {directory}")
+    if not directory.is_dir():
+        print(f"Directory not found or not a directory: {directory}")
         return 1
 
     files_to_check = list(directory.rglob("*.py"))

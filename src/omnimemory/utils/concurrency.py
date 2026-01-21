@@ -21,6 +21,7 @@ throughout the codebase.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import concurrent.futures
 import functools
 import threading
@@ -831,6 +832,19 @@ _shared_executor = concurrent.futures.ThreadPoolExecutor(
 )
 
 
+def _cleanup_shared_executor() -> None:
+    """Clean up the shared executor on module unload.
+
+    Registered via atexit to ensure proper resource cleanup when the
+    Python interpreter exits.
+    """
+    _shared_executor.shutdown(wait=False)
+
+
+# Register cleanup handler for the shared executor
+atexit.register(_cleanup_shared_executor)
+
+
 async def get_priority_lock(name: str) -> PriorityLock:
     """Get or create a priority lock by name."""
     async with _manager_lock:
@@ -1134,7 +1148,11 @@ class CircuitBreaker:
 
 
 class CircuitBreakerOpenError(Exception):
-    """Raised when an operation is attempted on an open circuit breaker."""
+    """Raised when an operation is attempted on an open circuit breaker.
+
+    This exception signals that the circuit breaker is in OPEN state and
+    refusing requests to allow the downstream service to recover.
+    """
 
 
 # === SIMPLE CONNECTION POOL ===
@@ -1252,9 +1270,9 @@ class ConnectionPool:
                         await asyncio.wait_for(
                             self._lock.acquire(), timeout=remaining_timeout
                         )
-                    except TimeoutError:
+                    except TimeoutError as lock_timeout:
                         msg = f"Pool lock timeout after {effective_timeout:.2f}s"
-                        raise TimeoutError(msg)
+                        raise TimeoutError(msg) from lock_timeout
 
                     try:
                         # Thread-safe state access within async lock context
@@ -1379,7 +1397,7 @@ def with_retry(
 
             if last_exception is not None:
                 raise last_exception
-            raise RuntimeError("Unexpected retry loop exit without exception")
+            raise RuntimeError("Unexpected retry loop exit without exception") from None
 
         return wrapper  # type: ignore[return-value]
 

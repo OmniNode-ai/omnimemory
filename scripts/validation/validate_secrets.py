@@ -213,11 +213,17 @@ SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r'["\']TODO[-_][A-Z_-]+["\']', re.IGNORECASE),
         "Explicit placeholder: 'TODO_...' or 'TODO-...'",
     ),
-    # -------------------------------------------------------------------------
-    # CATEGORY: Inline security annotations
-    # SAFE BECAUSE: Developer explicitly marked as non-secret
-    # PATTERN PRECISION: Requires specific security annotation syntax
-    # -------------------------------------------------------------------------
+]
+
+# -------------------------------------------------------------------------
+# LINE-LEVEL SKIP PATTERNS - These suppress the ENTIRE line regardless of position
+# -------------------------------------------------------------------------
+# These patterns are checked separately and don't require overlap with the secret match.
+# Use these for inline annotations that apply to the whole line (like # nosec).
+#
+# SECURITY NOTE: Be conservative with these patterns. They suppress ALL detections
+# on a line, so they should only be used for explicit security annotations.
+LINE_LEVEL_SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         # Standard security tool annotation (bandit, semgrep, etc.)
         # Requires: # nosec at word boundary (not "nosecret" or similar)
@@ -261,6 +267,40 @@ def is_test_file(filepath: Path) -> bool:
         or "/test/" in path_str
         or "\\test\\" in path_str
     )
+
+
+def _check_line_level_skip_patterns(
+    line: str,
+    filepath: Path,
+    line_num: int,
+    verbose: bool,
+) -> tuple[bool, str | None]:
+    """Check if a line matches any line-level skip pattern (no overlap required).
+
+    These patterns suppress the ENTIRE line regardless of where on the line they match.
+    Used for explicit security annotations like # nosec that apply to the whole line.
+
+    Args:
+        line: The line of code to check.
+        filepath: Path to the file (for logging).
+        line_num: Line number (for logging).
+        verbose: Whether to log skip decisions.
+
+    Returns:
+        Tuple of (should_skip, reason) where reason is None if not skipped.
+    """
+    for pattern, reason in LINE_LEVEL_SKIP_PATTERNS:
+        if pattern.search(line):
+            if verbose:
+                logger.debug(
+                    "SKIP (line-level): %s:%d matched pattern '%s' - %s",
+                    filepath,
+                    line_num,
+                    pattern.pattern[:50],
+                    reason,
+                )
+            return True, reason
+    return False, None
 
 
 def _check_skip_patterns(
@@ -379,7 +419,23 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
         if potential_secret is None:
             continue
 
-        # Check if line matches general skip patterns
+        # First, check line-level skip patterns (no overlap required)
+        # These are explicit security annotations like # nosec
+        skipped, reason = _check_line_level_skip_patterns(
+            line, filepath, line_num, verbose
+        )
+        if skipped:
+            if verbose:
+                logger.info(
+                    "SKIP (line-level): %s:%d - Flagged '%s' but matched: %s",
+                    filepath,
+                    line_num,
+                    potential_secret,
+                    reason,
+                )
+            continue
+
+        # Check if line matches general skip patterns (overlap required)
         # SECURITY: Pass the secret_match to ensure skip patterns only apply
         # if they overlap with the detected secret, not just anywhere on the line
         skipped, reason = _check_skip_patterns(
@@ -447,7 +503,11 @@ def main() -> int:
 
     if verbose:
         print(f"Scanning {len(files_to_check)} Python file(s)...")
-        print(f"Skip patterns: {len(SKIP_PATTERNS)} (test files skipped at file level)")
+        print(
+            f"Skip patterns: {len(SKIP_PATTERNS)} overlap-based, "
+            f"{len(LINE_LEVEL_SKIP_PATTERNS)} line-level "
+            "(test files skipped at file level)"
+        )
         print()
 
     all_violations: list[Violation] = []

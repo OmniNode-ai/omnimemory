@@ -7,6 +7,8 @@ General error codes come from omnibase_core.core.errors.core_errors when availab
 
 from __future__ import annotations
 
+import re
+
 try:
     from omnibase_core.core.errors.core_errors import (
         OnexErrorCode,
@@ -80,8 +82,6 @@ class EnumOmniMemoryErrorCode(_BASE_CLASS):  # type: ignore[valid-type,misc]
 
     def get_number(self) -> int:
         """Get the numeric identifier for this error code."""
-        import re
-
         match = re.search(r"ONEX_OMNIMEMORY_(\d+)_", self.value)
         return int(match.group(1)) if match else 0
 

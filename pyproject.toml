@@ -76,9 +76,14 @@ pytest-split = "^0.10.0"
 pytest-xdist = "^3.5.0"
 
 # Code formatting and linting (ruff replaces black, isort, flake8 - 10-100x faster)
+# VERSION SYNC: Poetry uses ^0.8.0 (allows updates), pre-commit pins v0.8.6
+# UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
 ruff = "^0.8.0"
 
 # Type checking (dual checker: mypy strict + pyright basic)
+# VERSION SYNC: Poetry uses caret versions, pre-commit pins exact versions
+# mypy: ^1.14.0 in Poetry, v1.14.1 in pre-commit
+# pyright: ^1.1.390 in Poetry, v1.1.391 in pre-commit
 mypy = "^1.14.0"
 pyright = "^1.1.390"
 
@@ -268,7 +273,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --strict-markers"
 # Filter deprecation warnings from third-party libraries we can't fix
 filterwarnings = [
     # Google protobuf PyType_Spec metaclass warning - upstream issue, can't fix

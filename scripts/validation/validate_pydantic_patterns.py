@@ -67,7 +67,7 @@ class ImportAliasCollector(ast.NodeVisitor):
 
 
 class ClassModelConfigCollector(ast.NodeVisitor):
-    """First pass: collect which classes have model_config defined and which are Pydantic models."""
+    """Collect which classes have model_config and are Pydantic models."""
 
     # Known Pydantic base classes that indicate a Pydantic model
     PYDANTIC_BASE_CLASSES = {"BaseModel", "GenericModel", "BaseSettings"}
@@ -117,9 +117,12 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                     isinstance(item.target, ast.Name)
                     and item.target.id == "model_config"
                 ):
-                    self.classes_with_model_config.add(node.name)
-                    model_config_found = True
-                    break
+                    # Only count as having model_config if there's an actual value
+                    # Annotation-only (e.g., model_config: ConfigDict) is incomplete
+                    if item.value is not None:
+                        self.classes_with_model_config.add(node.name)
+                        model_config_found = True
+                        break
 
         self.generic_visit(node)
 
@@ -152,7 +155,7 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                 ]
                 logging.warning(
                     "Circular inheritance detected or resolution limit reached. "
-                    "Unresolved classes: %s. Stopping resolution to prevent infinite loop.",
+                    "Unresolved classes: %s. Stopping to prevent infinite loop.",
                     unresolved,
                 )
                 break
@@ -207,7 +210,7 @@ class PydanticPatternVisitor(ast.NodeVisitor):
         Handles:
         - Direct calls: ConfigDict(), SettingsConfigDict()
         - Aliased calls: CD(), SCD() (if imported with alias)
-        - Attribute access: pydantic.ConfigDict(), pydantic_settings.SettingsConfigDict()
+        - Attribute access: pydantic.ConfigDict(), pydantic_settings...
         """
         if not isinstance(node, ast.Call):
             return False
@@ -317,7 +320,7 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                         )
                     )
             else:
-                # Non-ConfigDict callable - extract function name for better error message
+                # Non-ConfigDict callable - extract name for better error message
                 func_name = "unknown"
                 if isinstance(value.func, ast.Name):
                     func_name = value.func.id
@@ -327,8 +330,8 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                     Violation(
                         self.filepath,
                         lineno,
-                        f"model_config uses non-ConfigDict callable '{func_name}' in {class_name} - "
-                        "use ConfigDict() from pydantic",
+                        f"model_config uses '{func_name}' in {class_name} - "
+                        "use ConfigDict() from pydantic instead",
                     )
                 )
         elif isinstance(value, ast.Dict):
@@ -339,7 +342,7 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                         self.filepath,
                         lineno,
                         f"Empty dict for model_config in {class_name} - "
-                        "use ConfigDict() with explicit settings like ConfigDict(frozen=True)",
+                        "use ConfigDict() with explicit settings",
                     )
                 )
             else:
@@ -394,23 +397,37 @@ class PydanticPatternVisitor(ast.NodeVisitor):
                         isinstance(item.target, ast.Name)
                         and item.target.id == "model_config"
                     ):
-                        has_model_config = True
                         if item.value is not None:
+                            # Has annotation AND value assignment
+                            has_model_config = True
                             self._check_model_config_value(
                                 item.value, item.lineno, node.name
                             )
+                        else:
+                            # Annotation-only (model_config: ConfigDict) without value
+                            # Must have an actual ConfigDict assignment
+                            self.violations.append(
+                                Violation(
+                                    self.filepath,
+                                    item.lineno,
+                                    f"Annotation-only model_config in {node.name} - "
+                                    "add assignment: model_config = ConfigDict(...)",
+                                )
+                            )
 
-            # Check for missing model_config (only if model has fields)
-            # Uses _is_pydantic_field which properly excludes:
-            # - Private fields (starting with underscore)
-            # - model_config itself
-            # - ClassVar annotations (class variables, not instance fields)
-            has_fields = any(self._is_pydantic_field(item) for item in node.body)
+            # Check for missing model_config on ALL Pydantic models
+            # ONEX requires explicit model_config even on empty models to ensure
+            # configuration is intentional and documented, not just defaulted.
+            #
+            # Note: We previously had a has_fields gate here, but removed it because:
+            # 1. Empty Pydantic models should still have explicit config
+            # 2. Consistency - all models follow the same pattern
+            # 3. Prevents accidental defaults when fields are added later
 
             # Check if model_config is inherited from a parent class in this file
             inherits_model_config = self._check_inherited_model_config(node)
 
-            if not has_model_config and has_fields and not inherits_model_config:
+            if not has_model_config and not inherits_model_config:
                 self.violations.append(
                     Violation(
                         self.filepath,

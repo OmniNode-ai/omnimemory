@@ -142,10 +142,31 @@ from ..models.foundation.model_health_response import (
     ModelHealthResponse,
     ModelResourceMetrics,
 )
+from .concurrency import CircuitBreaker, CircuitBreakerOpenError
 from .observability import OperationType, correlation_context, trace_operation
 from .resource_manager import AsyncCircuitBreaker, CircuitBreakerConfig
 
 logger = structlog.get_logger(__name__)
+
+# Re-export circuit breaker classes for convenient imports from health_manager
+__all__ = [
+    "CircuitBreaker",
+    "CircuitBreakerOpenError",
+    "DependencyType",
+    "HealthCheckConfig",
+    "HealthCheckDetails",
+    "HealthCheckManager",
+    "HealthCheckResult",
+    "HealthManager",
+    "HealthStatus",
+    "RateLimiter",
+    "ResourceHealthCheck",
+    "SystemHealth",
+    "create_pinecone_health_check",
+    "create_postgresql_health_check",
+    "create_redis_health_check",
+    "health_manager",
+]
 
 
 class HealthStatus(Enum):
@@ -332,7 +353,7 @@ class HealthCheckManager:
                     latency_ms = (time.time() - start_time) * 1000
                     result = HealthCheckResult(
                         config=config,
-                        status=HealthStatus.UNHEALTHY,
+                        status=HealthStatus.TIMEOUT,
                         latency_ms=latency_ms,
                         error_message=f"Health check timeout after {config.timeout}s",
                     )
@@ -1215,7 +1236,7 @@ class HealthManager:
                     ),
                 )
             )
-            for name, result in zip(names, results, strict=False)
+            for name, result in zip(names, results, strict=True)
         }
 
     async def get_system_health(self) -> SystemHealth:

@@ -123,13 +123,6 @@ from typing import (
     cast,
 )
 
-# Type variable for generic function types
-F = TypeVar("F", bound=Callable[..., object])
-
-# Type alias for metadata values - supports common serializable types
-# This replaces Any with explicit types for type safety
-MetadataValue = str | int | float | bool | None
-
 import structlog
 from pydantic import BaseModel, Field
 
@@ -137,6 +130,13 @@ from ..models.foundation.model_typed_collections import (
     ModelKeyValuePair,
     ModelMetadata,
 )
+
+# Type variable for generic function types
+F = TypeVar("F", bound=Callable[..., object])
+
+# Type alias for metadata values - supports common serializable types
+# This replaces Any with explicit types for type safety
+MetadataValue = str | int | float | bool | None
 
 # === LABEL VALIDATION UTILITIES ===
 
@@ -530,7 +530,7 @@ def sanitize_metadata_value(value: object) -> MetadataValue:
     elif isinstance(value, bool):
         # Check bool before int since bool is a subclass of int
         return value
-    elif isinstance(value, int) or isinstance(value, float):
+    elif isinstance(value, int | float):
         return value
     elif value is None:
         return None
@@ -753,7 +753,7 @@ class Counter:
 
     def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key, strict=False))
+        return dict(zip(self.label_names, key, strict=True))
 
 
 @dataclass
@@ -959,7 +959,7 @@ class Histogram:
 
     def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key, strict=False))
+        return dict(zip(self.label_names, key, strict=True))
 
 
 @dataclass
@@ -1121,7 +1121,7 @@ class Gauge:
 
     def labels_from_key(self, key: tuple[str, ...]) -> dict[str, str]:
         """Convert key tuple back to labels dict."""
-        return dict(zip(self.label_names, key, strict=False))
+        return dict(zip(self.label_names, key, strict=True))
 
 
 class MetricsRegistry:

@@ -16,10 +16,12 @@
 #
 # CI COMPATIBILITY:
 # ====================================
-# All hooks use language: python or official repos, NOT language: system,
-# except clean-tmp-directory which uses language: system (bash script).
+# Python hooks use language: python or official repos (NOT language: system).
 # This ensures hooks work in CI environments where Poetry may not be installed.
 # Pre-commit manages isolated Python environments for each hook.
+#
+# Exception: clean-tmp-directory uses language: system (bash script only,
+# no Python dependencies, safe for CI).
 #
 # HOOK-TO-CI SYNCHRONIZATION MAP:
 # ====================================
@@ -68,7 +70,7 @@ repos:
     rev: v0.17.2
     hooks:
       - id: yamlfmt
-        exclude: ^(.github/workflows/)
+        exclude: ^\.github/
 
   # Essential file formatting (standard across ecosystem)
   - repo: https://github.com/pre-commit/pre-commit-hooks

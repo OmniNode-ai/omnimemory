@@ -178,12 +178,10 @@ class ModelTrustScore(BaseModel):
             validated_as_of = datetime.now(timezone.utc)
         else:
             # Ensure provided datetime is timezone-aware to prevent TypeError
-            result = ensure_timezone_aware(as_of, "as_of")
-            # ensure_timezone_aware only returns None if input is None, which we checked
-            assert (
-                result is not None
-            ), "as_of was not None but ensure_timezone_aware returned None"
-            validated_as_of = result
+            # ensure_timezone_aware handles naive datetimes by assuming UTC
+            validated_as_of = ensure_timezone_aware(as_of, "as_of") or datetime.now(
+                timezone.utc
+            )
 
         # Check cache validity if not forcing recalculation
         if (
@@ -230,10 +228,8 @@ class ModelTrustScore(BaseModel):
             return False
 
         # Ensure as_of is timezone-aware for safe comparison
-        # Note: ensure_timezone_aware only returns None if input is None,
-        # but as_of is required, so we assert the result is not None
-        validated_as_of = ensure_timezone_aware(as_of, "as_of")
-        assert validated_as_of is not None, "as_of is required and cannot be None"
+        # ensure_timezone_aware handles naive datetimes by assuming UTC
+        validated_as_of = ensure_timezone_aware(as_of, "as_of") or as_of
 
         cache_age = (validated_as_of - self._cache_timestamp).total_seconds()
         return cache_age < self._cache_ttl_seconds

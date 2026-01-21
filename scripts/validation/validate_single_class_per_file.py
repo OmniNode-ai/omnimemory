@@ -149,13 +149,16 @@ def validate_file(filepath: Path) -> list[Violation]:
     # Only enforce single-class rule for non-enum classes
     # Multiple enums in one file are explicitly allowed
     if non_enum_count > 1:
+        enum_note = ""
+        if enum_count > 0:
+            enum_list = ", ".join(enum_names)
+            enum_note = f" (Also {enum_count} enum(s): {enum_list}, allowed)"
         return [
             Violation(
                 str(filepath),
                 1,
-                f"Multiple non-enum classes in file ({non_enum_count}): "
-                f"{', '.join(non_enum_names)}. ONEX requires one model per file. "
-                f"(Note: {enum_count} enum(s) also present, which are allowed)",
+                f"Multiple non-enum classes ({non_enum_count}): "
+                f"{', '.join(non_enum_names)}. ONEX requires one per file.{enum_note}",
             )
         ]
 

@@ -226,7 +226,22 @@ class SearchResult(BaseMemoryModel):
 
 
 class ModelConfidenceInterval(BaseMemoryModel):
-    """Confidence interval for predictions with lower and upper bounds."""
+    """Confidence interval for predictions with lower and upper bounds.
+
+    This model represents a statistical confidence interval for prediction scores.
+    All values are normalized to the [0.0, 1.0] range.
+
+    Example dict structure when serialized::
+
+        {
+            "lower": 0.75,       # Lower bound of the interval
+            "upper": 0.95,       # Upper bound of the interval
+            "confidence_level": 0.95  # 95% confidence level
+        }
+
+    The interval [lower, upper] indicates the range within which the true value
+    is expected to fall with the specified confidence_level probability.
+    """
 
     lower: float = Field(
         ge=0.0, le=1.0, description="Lower bound of confidence interval"
@@ -331,9 +346,10 @@ class MemoryRecord(BaseMemoryModel):
         None,
         description="Vector embedding for semantic search. Supports all common dimensions "
         "including: OpenAI (1536, 3072), Cohere (1024, 4096), sentence-transformers "
-        "(384, 512, 768), Google (768), and larger research models. Maximum 65536 dimensions.",
+        "(384, 512, 768, 1024), Google (768), Mistral (1024), and larger research models "
+        "up to 131072 dimensions for advanced multimodal embeddings.",
         min_length=1,
-        max_length=65536,
+        max_length=131072,
     )
     embedding_model: str | None = Field(
         None, description="Model used to generate embedding"

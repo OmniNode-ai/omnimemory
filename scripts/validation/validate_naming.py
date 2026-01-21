@@ -421,13 +421,13 @@ def validate_file(filepath: Path) -> list[Violation]:
             if relaxed_prefix:
                 continue
 
-            # For files deeply nested within a typed directory (e.g., nodes/xxx/internal/),
-            # only skip validation if we couldn't determine the expected prefix from parent class.
-            # If parent class detection found a known base (e.g., BaseModel, Enum, Protocol),
-            # we should still enforce naming even in nested directories.
+            # For files nested within a typed directory (e.g., nodes/xxx/internal/),
+            # only skip validation if we couldn't determine expected prefix from parent.
+            # If parent class detection found a known base (BaseModel, Enum, Protocol),
+            # we should still enforce naming in nested directories.
             if expected_prefix is None and ancestor_typed_dir and dir_type is None:
-                # No parent class detected AND file is nested within a typed directory
-                # Skip class naming enforcement - these are typically implementation details
+                # No parent class detected AND nested within typed directory
+                # Skip naming enforcement - these are typically implementation details
                 continue
 
             # Validate class naming convention

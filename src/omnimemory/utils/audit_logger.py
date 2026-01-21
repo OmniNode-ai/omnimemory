@@ -5,6 +5,7 @@ Provides comprehensive audit logging for security-sensitive operations
 including memory access, configuration changes, and PII detection events.
 """
 
+import atexit
 import json
 import logging
 import threading
@@ -434,3 +435,24 @@ def configure_audit_logger(
                 json_format=json_format,
             )
         )
+
+
+def _cleanup_audit_logger() -> None:
+    """Clean up the audit logger on module unload.
+
+    Properly closes all handlers to ensure log files are flushed
+    and file handles are released.
+    """
+    instance = _AuditLoggerState.get_instance()
+    if instance is not None and instance.logger is not None:
+        for handler in instance.logger.handlers[:]:
+            try:
+                handler.flush()
+                handler.close()
+            except Exception:
+                pass  # Ignore cleanup errors during shutdown
+        instance.logger.handlers.clear()
+
+
+# Register cleanup handler for the audit logger
+atexit.register(_cleanup_audit_logger)
