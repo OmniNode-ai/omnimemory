@@ -58,12 +58,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 # omnibase_core is always available (regular dependency)
 from omnibase_core.container import ModelONEXContainer
-from omnibase_core.models.graph import (
-    ModelGraphDatabaseNode,
-    ModelGraphRelationship,
-    ModelGraphTraversalFilters,
-    ModelGraphTraversalResult,
-)
 from omnibase_core.types.type_json import JsonType
 
 # omnibase_infra is a dev dependency - make imports conditional
