@@ -417,7 +417,18 @@ class ModelRelatedMemory(BaseModel):
             "Relevance score based on graph distance. Calculated as 1/(depth+1). "
             "Minimum depth is 1 (starting node excluded), "
             "so range is 0.5 (depth=1) to ~0.09 (depth=10). "
-            "Score never reaches 1.0 since depth is always >= 1."
+            "Score never reaches 1.0 since depth is always >= 1. "
+            "Depth-to-score mapping: "
+            "depth=1 -> 0.50, "
+            "depth=2 -> 0.33, "
+            "depth=3 -> 0.25, "
+            "depth=4 -> 0.20, "
+            "depth=5 -> 0.17, "
+            "depth=6 -> 0.14, "
+            "depth=7 -> 0.125, "
+            "depth=8 -> 0.11, "
+            "depth=9 -> 0.10, "
+            "depth=10 -> 0.09."
         ),
     )
     path: list[str] = Field(
@@ -888,7 +899,12 @@ class AdapterGraphMemory:
         except TimeoutError as e:
             raise RuntimeError(
                 f"Initialization timed out after {self._config.timeout_seconds}s. "
-                "The database connection or lock acquisition may be unresponsive."
+                "Possible causes: (1) Lock contention - another coroutine may be "
+                "holding the initialization lock (e.g., a concurrent initialize() "
+                "call is still in progress); (2) Database connection issue - the "
+                "graph database may be slow or unresponsive. Suggestions: Check if "
+                "another initialization is in progress, verify the database is "
+                "reachable, or increase timeout_seconds in AdapterGraphMemoryConfig."
             ) from e
 
     def _ensure_initialized(self) -> HandlerGraph:
@@ -931,6 +947,16 @@ class AdapterGraphMemory:
                 Defaults to config.default_limit.
             min_score: Minimum score threshold (0.0-1.0). Results below
                 this score are filtered out. Defaults to 0.0.
+
+                **Practical min_score guidance** (score = 1/(depth+1)):
+
+                - ``min_score=0.5`` includes only depth=1 (direct neighbors)
+                - ``min_score=0.3`` filters out depth > 2 (keeps depth 1-2)
+                - ``min_score=0.25`` filters out depth > 3 (keeps depth 1-3)
+                - ``min_score=0.2`` filters out depth > 4 (keeps depth 1-4)
+                - ``min_score=0.15`` filters out depth > 5 (keeps depth 1-5)
+                - ``min_score=0.1`` keeps most results up to depth 9
+                - ``min_score=0.0`` keeps all results (no filtering)
 
         Returns:
             ModelRelatedMemoryResult with related memories ordered by score.
