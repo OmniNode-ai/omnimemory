@@ -1,5 +1,5 @@
 """
-Configuration models for OmniMemory storage backends.
+Configuration models for OmniMemory storage backends and policies.
 
 This module provides composable configuration models for each storage backend,
 following the ONEX pattern of focused, single-responsibility config objects.
@@ -12,6 +12,10 @@ Backend Configs:
 
 Service Config:
 - ModelMemoryServiceConfig: Top-level config composing all backends
+
+Policy Configs:
+- ModelSemanticComputePolicyConfig: Semantic analysis policy configuration
+- ModelRateLimiterConfig: Rate limiting configuration
 """
 
 from omnimemory.models.config.model_embedding_config import (
@@ -28,6 +32,9 @@ from omnimemory.models.config.model_rate_limiter_config import (
     DEFAULT_REQUESTS_PER_MINUTE,
     ModelRateLimiterConfig,
 )
+from omnimemory.models.config.model_semantic_compute_policy_config import (
+    ModelSemanticComputePolicyConfig,
+)
 
 __all__ = [
     "DEFAULT_REQUESTS_PER_MINUTE",
@@ -38,4 +45,5 @@ __all__ = [
     "ModelPostgresConfig",
     "ModelQdrantConfig",
     "ModelRateLimiterConfig",
+    "ModelSemanticComputePolicyConfig",
 ]

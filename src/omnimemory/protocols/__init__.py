@@ -58,6 +58,7 @@ from .error_models import (  # Error handling; Error codes
     ProtocolValidationError,
 )
 from .protocol_embedding import ProtocolEmbeddingClient, ProtocolRateLimiter
+from .protocol_embedding_provider import ProtocolEmbeddingProvider, ProtocolLLMProvider
 from .protocol_secrets_provider import ProtocolSecretsProvider
 
 __all__ = [
@@ -116,4 +117,7 @@ __all__ = [
     # Embedding and rate limiting protocols (contract boundary)
     "ProtocolEmbeddingClient",
     "ProtocolRateLimiter",
+    # Provider protocols (for handler dependencies)
+    "ProtocolEmbeddingProvider",
+    "ProtocolLLMProvider",
 ]

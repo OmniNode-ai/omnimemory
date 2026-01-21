@@ -8,6 +8,7 @@ while adapters translate between memory-domain concepts and handler-level operat
 
 Available Handlers:
     - HandlerSubscription: Agent subscription and notification delivery management
+    - HandlerSemanticCompute: Semantic analysis with policy hooks
 
 Subpackages:
     - adapters: Adapter layers wrapping omnibase_infra handlers
@@ -17,6 +18,8 @@ Example::
     from omnimemory.handlers import (
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,
+        HandlerSemanticCompute,
+        ModelHandlerSemanticComputeConfig,
     )
     from omnimemory.handlers.adapters import (
         AdapterGraphMemory,
@@ -25,6 +28,7 @@ Example::
 
 .. versionadded:: 0.1.0
     HandlerSubscription added for OMN-1393.
+    HandlerSemanticCompute added for OMN-1390.
 """
 
 from omnimemory.handlers.adapters import (
@@ -39,6 +43,11 @@ from omnimemory.handlers.adapters import (
     ModelRelatedMemoryResult,
     ModelValkeyHealth,
 )
+from omnimemory.handlers.handler_semantic_compute import (
+    HandlerSemanticCompute,
+    HandlerSemanticComputePolicy,
+    ModelHandlerSemanticComputeConfig,
+)
 from omnimemory.handlers.handler_subscription import (
     HandlerSubscription,
     ModelHandlerSubscriptionConfig,
@@ -47,6 +56,10 @@ from omnimemory.handlers.handler_subscription import (
 )
 
 __all__ = [
+    # Semantic Compute Handler
+    "HandlerSemanticCompute",
+    "HandlerSemanticComputePolicy",
+    "ModelHandlerSemanticComputeConfig",
     # Subscription Handler
     "HandlerSubscription",
     "ModelHandlerSubscriptionConfig",
