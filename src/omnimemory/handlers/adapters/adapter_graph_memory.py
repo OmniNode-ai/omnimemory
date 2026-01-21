@@ -785,9 +785,6 @@ class AdapterGraphMemory:
             RuntimeError: If initialization fails.
             InfraConnectionError: If connection to graph database fails.
         """
-        if self._initialized:
-            return
-
         try:
             async with asyncio.timeout(self._config.timeout_seconds):
                 async with self._init_lock:
@@ -843,7 +840,21 @@ class AdapterGraphMemory:
                                 )
                             except Exception as e:
                                 # Index may already exist - log but don't fail
-                                logger.debug("Index creation note: %s", e)
+                                error_msg = str(e).lower()
+                                if (
+                                    "already exists" in error_msg
+                                    or "duplicate" in error_msg
+                                ):
+                                    logger.debug(
+                                        "Index already exists on %s(memory_id)",
+                                        self._config.memory_node_label,
+                                    )
+                                else:
+                                    logger.warning(
+                                        "Index creation failed for %s(memory_id): %s",
+                                        self._config.memory_node_label,
+                                        e,
+                                    )
 
                     except InfraConnectionError:
                         raise
@@ -1003,7 +1014,8 @@ class AdapterGraphMemory:
                     continue
 
                 # Get depth from query result (path length)
-                depth_to_node = int(record.get("depth", 1))
+                raw_depth = record.get("depth")
+                depth_to_node = int(raw_depth) if raw_depth is not None else 1
                 max_depth_reached = max(max_depth_reached, depth_to_node)
 
                 # Calculate relevance score based on traversal depth (edge count).
@@ -1030,7 +1042,7 @@ class AdapterGraphMemory:
 
                 memories.append(
                     ModelRelatedMemory(
-                        memory_id=str(node_memory_id),
+                        memory_id=node_memory_id,  # Verified as str above
                         score=score,
                         path=path_memory_ids,
                         depth=depth_to_node,
