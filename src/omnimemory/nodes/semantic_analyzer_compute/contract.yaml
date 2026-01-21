@@ -17,73 +17,6 @@ node_type: "COMPUTE"
 input_model: "ModelSemanticAnalyzerComputeInput"
 output_model: "ModelSemanticAnalyzerComputeOutput"
 
-# === OPERATIONS ===
-# Defines the three core operations supported by this compute node
-operations:
-  analyze:
-    description: "Full semantic analysis combining embedding, entity extraction, and topics"
-    nondeterministic: false
-    input_fields:
-      - name: content
-        type: "str"
-        required: true
-        description: "Text content to analyze"
-      - name: analysis_type
-        type: "Literal['full', 'embedding_only', 'entities_only']"
-        required: false
-        default: "full"
-        description: "Type of analysis to perform"
-    output_fields:
-      - name: result_id
-        type: "UUID"
-        description: "Unique identifier for the analysis result"
-      - name: semantic_vector
-        type: "list[float]"
-        description: "Embedding vector for the content"
-      - name: entities
-        type: "list[str]"
-        description: "Extracted entity texts"
-      - name: topics
-        type: "list[str]"
-        description: "Extracted topic keywords"
-      - name: confidence_score
-        type: "float"
-        description: "Overall confidence in the analysis (0.0-1.0)"
-
-  embed:
-    description: "Generate embedding vector for content"
-    nondeterministic: false
-    input_fields:
-      - name: content
-        type: "str"
-        required: true
-        description: "Text content to embed"
-      - name: model
-        type: "str"
-        required: false
-        description: "Optional embedding model override"
-    output_fields:
-      - name: embedding
-        type: "list[float]"
-        description: "Embedding vector"
-    latency_target_ms: 100
-
-  extract_entities:
-    description: "Extract named entities from content"
-    nondeterministic: true  # May be non-deterministic if using LLM in best_effort mode
-    input_fields:
-      - name: content
-        type: "str"
-        required: true
-        description: "Text content to analyze"
-    output_fields:
-      - name: entities
-        type: "ModelSemanticEntityList"
-        description: "List of extracted entities with types and spans"
-      - name: is_deterministic
-        type: "bool"
-        description: "Whether extraction used deterministic mode"
-
 # === ALGORITHM CONFIGURATION ===
 algorithm:
   algorithm_type: "semantic_analysis"
@@ -119,18 +52,6 @@ dependencies:
 performance:
   single_operation_max_ms: 100  # For embed operation with local/cached
   batch_operation_max_ms: 5000  # For full analysis with external providers
-
-# === POLICY CONFIGURATION ===
-# Default policy settings for the handler
-policy_defaults:
-  entity_extraction_mode: "deterministic"
-  cache_embeddings: true
-  cache_ttl_seconds: 3600
-  max_tokens_per_request: 4000
-  timeout_seconds: 30.0
-  max_retries: 3
-  fallback_on_timeout: true
-  entity_confidence_threshold: 0.7
 
 # === VALIDATION RULES ===
 validation_rules:

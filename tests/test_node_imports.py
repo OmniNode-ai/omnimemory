@@ -92,6 +92,9 @@ class TestNodeStructure:
         # COMPUTE node: Pure math computation handler for vector similarity.
         # Not an infrastructure handler - performs no I/O operations.
         "similarity_compute",
+        # COMPUTE node: Pure semantic analysis computation handler.
+        # Delegates I/O to provider protocols, handler contains only pure logic.
+        "semantic_analyzer_compute",
         # EFFECT node with MOCK handlers: Temporary mock implementations for
         # development/testing. Will be removed when omnibase_infra is integrated.
         # TODO: Remove from exclusion list when migrating to real handlers.
