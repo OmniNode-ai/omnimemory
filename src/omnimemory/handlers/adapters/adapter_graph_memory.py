@@ -990,6 +990,8 @@ class AdapterGraphMemory:
             limit if limit is not None else self._config.default_limit,
             self._config.max_limit,
         )
+        # Clamp min_score to valid range [0.0, 1.0]
+        effective_min_score = max(0.0, min(min_score, 1.0))
 
         # Determine traversal direction (bidirectional or outgoing-only)
         is_bidirectional = self._config.bidirectional
@@ -1077,7 +1079,7 @@ class AdapterGraphMemory:
                 # Examples: depth=1 -> 0.5, depth=2 -> 0.33, depth=3 -> 0.25
                 score = 1.0 / (depth_to_node + 1)
 
-                if score < min_score:
+                if score < effective_min_score:
                     continue
 
                 # Extract labels and properties from result

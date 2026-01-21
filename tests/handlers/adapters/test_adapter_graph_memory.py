@@ -23,6 +23,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -323,7 +324,6 @@ class TestCypherTemplates:
             # Note: Cypher uses {key: $value} for property matching, which is safe
             # We check for patterns like {0}, {name} (without $) that indicate
             # Python string formatting
-            import re
 
             # Match Python format patterns but not Cypher property patterns
             unsafe_patterns = [
