@@ -1186,8 +1186,8 @@ class TestLifecycle:
         prevents indefinite hangs if another initialization is in progress or
         the database is unresponsive.
         """
-        # Use a very short timeout to make the test fast
-        config = AdapterGraphMemoryConfig(timeout_seconds=0.1)
+        # Use a short timeout (0.5s is more reliable than 0.1s in CI)
+        config = AdapterGraphMemoryConfig(timeout_seconds=0.5)
         adapter = AdapterGraphMemory(config)
 
         # Acquire the lock to simulate another initialization in progress
@@ -1198,7 +1198,7 @@ class TestLifecycle:
 
             # Verify the error message mentions timeout
             assert "timed out" in str(exc_info.value).lower()
-            assert "0.1" in str(exc_info.value)
+            assert "0.5" in str(exc_info.value)
 
         # Adapter should not be initialized after timeout
         assert not adapter.is_initialized
