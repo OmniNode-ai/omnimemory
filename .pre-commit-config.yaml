@@ -37,6 +37,7 @@
 # validate-no-backward-compatibility| onex-validation          | python scripts/validation/validate_no_backward_compatibility.py -d src/
 # validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
 # validate-naming-conventions       | onex-validation          | python scripts/validation/validate_naming.py src/
+# validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
 #
 # IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
 #
@@ -230,6 +231,19 @@ repos:
       - id: validate-naming-conventions
         name: ONEX Naming Convention Validation
         entry: python scripts/validation/validate_naming.py
+        args: ['src/']
+        language: python
+        pass_filenames: false
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # HTTP Import Boundary Enforcement (OMN-1391)
+      # Ensures direct HTTP client imports (httpx, requests) are only in adapter layer
+      # This enforces the contract boundary principle for external HTTP calls
+      - id: validate-http-imports
+        name: ONEX HTTP Import Boundary Enforcement
+        entry: python scripts/validation/validate_http_imports.py
         args: ['src/']
         language: python
         pass_filenames: false
