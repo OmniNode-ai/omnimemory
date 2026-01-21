@@ -2,12 +2,16 @@
 Semantic analysis result model following ONEX standards.
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.models.foundation.model_semver import ModelSemVer
+
+from .model_semantic_entity_list import ModelSemanticEntityList  # noqa: TC001
 
 
 class ModelSemanticAnalysisResult(BaseModel):
@@ -44,6 +48,11 @@ class ModelSemanticAnalysisResult(BaseModel):
     entities: list[str] = Field(
         default_factory=list,
         description="Named entities found in the content",
+    )
+    entity_list: ModelSemanticEntityList | None = Field(
+        default=None,
+        description="Full entity list with types, spans, and confidence scores. "
+        "Populated when analysis_type includes entity extraction.",
     )
     topics: list[str] = Field(
         default_factory=list,

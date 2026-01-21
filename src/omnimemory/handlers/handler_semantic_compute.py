@@ -53,10 +53,10 @@ import hashlib
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
-from cachetools import LRUCache  # type: ignore[import-untyped]
+from cachetools import LRUCache
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
@@ -80,6 +80,11 @@ __all__ = [
 
 # TypeVar for generic retry helper
 _T = TypeVar("_T")
+
+# Confidence threshold for extracting key concepts from entities.
+# Higher than general entity filtering to ensure only high-confidence
+# entities are promoted to key concepts.
+_KEY_CONCEPT_CONFIDENCE_THRESHOLD: float = 0.8
 
 # =============================================================================
 # Module-Level Constants
@@ -578,7 +583,7 @@ class HandlerSemanticCompute:
         # Check cache
         cache_key = self._compute_cache_key(content, model)
         if self._config.enable_caching and cache_key in self._embedding_cache:
-            return cast(list[float], self._embedding_cache[cache_key])
+            return self._embedding_cache[cache_key]
 
         # Generate embedding via provider with retry logic for transient failures
         timeout = self._config.policy_config.timeout_seconds
@@ -768,6 +773,7 @@ class HandlerSemanticCompute:
         # Initialize result components
         embedding: list[float] = []
         entities: list[str] = []
+        entity_list: ModelSemanticEntityList | None = None
         topics: list[str] = []
         key_concepts: list[str] = []
 
@@ -775,15 +781,15 @@ class HandlerSemanticCompute:
         if analysis_type in {"full", "embedding_only"}:
             embedding = await self.embed(content, correlation_id=correlation_id)
 
-        # Extract entities
+        # Extract entities - store full list for the result
         if analysis_type in {"full", "entities_only"}:
-            entity_result = await self.extract_entities(
+            entity_list = await self.extract_entities(
                 content, correlation_id=correlation_id
             )
-            entities = [e.text for e in entity_result.entities]
+            entities = [e.text for e in entity_list.entities]
 
             # Extract key concepts from entities
-            key_concepts = self._extract_key_concepts(entity_result.entities)
+            key_concepts = self._extract_key_concepts(entity_list.entities)
 
         # Extract topics (simple heuristic for now)
         if analysis_type == "full":
@@ -799,6 +805,7 @@ class HandlerSemanticCompute:
             semantic_vector=embedding,
             key_concepts=key_concepts,
             entities=entities,
+            entity_list=entity_list,
             topics=topics,
             sentiment_score=None,  # Sentiment analysis not implemented
             complexity_score=self._compute_complexity_score(content),
@@ -884,7 +891,7 @@ class HandlerSemanticCompute:
         i = 0
         is_sentence_start = True  # First word is always a sentence start
 
-        for word_idx, word in enumerate(words):
+        for word in words:
             # Find position in original content
             try:
                 span_start = content.index(word, i)
@@ -1128,7 +1135,7 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
         concepts = [
             e.text
             for e in entities
-            if e.confidence >= 0.8
+            if e.confidence >= _KEY_CONCEPT_CONFIDENCE_THRESHOLD
             and e.entity_type
             in {
                 EnumSemanticEntityType.ORGANIZATION,
