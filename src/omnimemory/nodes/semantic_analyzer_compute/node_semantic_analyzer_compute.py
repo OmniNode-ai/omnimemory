@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, assert_never
 
+from ...models.intelligence import ModelSemanticEntityList  # noqa: TC001
 from ..base import BaseComputeNode, ContainerType
 from .handlers import HandlerSemanticCompute, ModelHandlerSemanticComputeConfig
 from .models import (
@@ -173,6 +174,18 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
                         analysis_type=request.analysis_type,
                         correlation_id=request.correlation_id,
                     )
+
+                    # Get full entity list for response when entities are extracted.
+                    # The handler's analyze() only stores entity names as strings,
+                    # so we call extract_entities() to get the full ModelSemanticEntityList
+                    # with entity types, spans, and confidence scores.
+                    full_entity_list: ModelSemanticEntityList | None = None
+                    if request.analysis_type in {"full", "entities_only"}:
+                        full_entity_list = await self._handler.extract_entities(
+                            content=request.content,
+                            correlation_id=request.correlation_id,
+                        )
+
                     return ModelSemanticAnalyzerComputeResponse(
                         status="success",
                         operation="analyze",
@@ -182,6 +195,7 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
                         embedding_dimension=len(result.semantic_vector)
                         if result.semantic_vector
                         else None,
+                        entities=full_entity_list,
                         topics=result.topics,
                         key_concepts=result.key_concepts,
                         confidence_score=result.confidence_score,

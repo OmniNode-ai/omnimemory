@@ -1213,3 +1213,352 @@ class TestSentenceStartingWordFiltering:
             assert (
                 stopword not in entity_texts
             ), f"'{stopword}' should not be extracted as entity"
+
+
+# =============================================================================
+# Retry Behavior Tests
+# =============================================================================
+
+
+class TransientFailingEmbeddingProvider:
+    """Embedding provider that fails with transient errors then succeeds.
+
+    Used to test retry behavior with TimeoutError (a transient error).
+    """
+
+    def __init__(
+        self,
+        *,
+        dimension: int = 1024,
+        fail_times: int = 2,
+        error_type: type[Exception] = TimeoutError,
+    ) -> None:
+        self._dimension = dimension
+        self._fail_times = fail_times
+        self._error_type = error_type
+        self._call_count = 0
+
+    @property
+    def provider_name(self) -> str:
+        return "transient-failing-embedding"
+
+    @property
+    def model_name(self) -> str:
+        return "fake-model-v1"
+
+    @property
+    def embedding_dimension(self) -> int:
+        return self._dimension
+
+    @property
+    def is_available(self) -> bool:
+        return True
+
+    @property
+    def call_count(self) -> int:
+        return self._call_count
+
+    async def generate_embedding(
+        self,
+        text: str,
+        *,
+        model: str | None = None,
+        correlation_id: UUID | None = None,
+        timeout_seconds: float | None = None,
+    ) -> list[float]:
+        self._call_count += 1
+
+        if self._call_count <= self._fail_times:
+            raise self._error_type(f"Simulated transient failure #{self._call_count}")
+
+        # Generate deterministic embedding based on content
+        hash_val = hash(text)
+        return [((hash_val + i) % 1000) / 1000.0 for i in range(self._dimension)]
+
+    async def generate_embeddings_batch(
+        self,
+        texts: list[str],
+        *,
+        model: str | None = None,
+        correlation_id: UUID | None = None,
+        timeout_seconds: float | None = None,
+    ) -> list[list[float]]:
+        return [
+            await self.generate_embedding(
+                text, model=model, correlation_id=correlation_id
+            )
+            for text in texts
+        ]
+
+    async def health_check(self) -> bool:
+        return True
+
+
+class TransientFailingLLMProvider:
+    """LLM provider that fails with transient errors then succeeds.
+
+    Used to test retry behavior with ConnectionError (a transient error).
+    """
+
+    def __init__(
+        self,
+        *,
+        fail_times: int = 2,
+        error_type: type[Exception] = ConnectionError,
+        entities_response: dict | None = None,
+    ) -> None:
+        self._fail_times = fail_times
+        self._error_type = error_type
+        self._entities_response = entities_response or {"entities": []}
+        self._call_count = 0
+
+    @property
+    def provider_name(self) -> str:
+        return "transient-failing-llm"
+
+    @property
+    def model_name(self) -> str:
+        return "fake-llm-v1"
+
+    @property
+    def is_available(self) -> bool:
+        return True
+
+    @property
+    def call_count(self) -> int:
+        return self._call_count
+
+    async def complete(
+        self,
+        prompt: str,
+        *,
+        model: str | None = None,
+        temperature: float = 0.0,
+        max_tokens: int = 4000,
+        seed: int | None = None,
+        correlation_id: UUID | None = None,
+        timeout_seconds: float | None = None,
+    ) -> str:
+        self._call_count += 1
+        if self._call_count <= self._fail_times:
+            raise self._error_type(f"Simulated transient failure #{self._call_count}")
+        return "{}"
+
+    async def complete_structured(
+        self,
+        prompt: str,
+        output_schema: dict,
+        *,
+        model: str | None = None,
+        temperature: float = 0.0,
+        seed: int | None = None,
+        correlation_id: UUID | None = None,
+        timeout_seconds: float | None = None,
+    ) -> dict:
+        self._call_count += 1
+        if self._call_count <= self._fail_times:
+            raise self._error_type(f"Simulated transient failure #{self._call_count}")
+        return self._entities_response
+
+    async def health_check(self) -> bool:
+        return True
+
+
+class TestRetryBehavior:
+    """Tests for retry behavior with transient failures."""
+
+    @pytest.mark.asyncio
+    async def test_embed_retries_on_timeout_error(self) -> None:
+        """Embed should retry on TimeoutError and succeed after retries."""
+        # Provider fails 2 times then succeeds
+        provider = TransientFailingEmbeddingProvider(fail_times=2)
+
+        # Configure handler with up to 3 retries
+        policy_config = ModelSemanticComputePolicyConfig(
+            max_retries=3,
+            retry_base_delay_ms=10,  # Fast for testing
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(
+            policy_config=policy_config,
+            enable_caching=False,
+        )
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=provider,
+        )
+
+        # Should succeed after retries
+        embedding = await handler.embed("Test content for retry")
+
+        assert embedding is not None
+        assert len(embedding) == 1024
+        # Provider should have been called 3 times (2 failures + 1 success)
+        assert provider.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_embed_retries_on_connection_error(self) -> None:
+        """Embed should retry on ConnectionError and succeed after retries."""
+        # Provider fails 1 time then succeeds
+        provider = TransientFailingEmbeddingProvider(
+            fail_times=1, error_type=ConnectionError
+        )
+
+        policy_config = ModelSemanticComputePolicyConfig(
+            max_retries=3,
+            retry_base_delay_ms=10,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(
+            policy_config=policy_config,
+            enable_caching=False,
+        )
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=provider,
+        )
+
+        embedding = await handler.embed("Test content")
+
+        assert embedding is not None
+        assert provider.call_count == 2  # 1 failure + 1 success
+
+    @pytest.mark.asyncio
+    async def test_embed_fails_when_retries_exhausted(self) -> None:
+        """Embed should fail when all retries are exhausted."""
+        # Provider fails more times than retries allow
+        provider = TransientFailingEmbeddingProvider(fail_times=10)
+
+        policy_config = ModelSemanticComputePolicyConfig(
+            max_retries=2,  # Only 2 retries allowed
+            retry_base_delay_ms=10,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(
+            policy_config=policy_config,
+            enable_caching=False,
+        )
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=provider,
+        )
+
+        with pytest.raises(TimeoutError):
+            await handler.embed("Test content")
+
+        # Should have tried: 1 initial + 2 retries = 3 attempts
+        assert provider.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_embed_does_not_retry_non_transient_error(self) -> None:
+        """Embed should not retry on non-transient errors like ValueError."""
+        # Using ValueError which is not in transient indicators
+        provider = TransientFailingEmbeddingProvider(
+            fail_times=10, error_type=ValueError
+        )
+
+        policy_config = ModelSemanticComputePolicyConfig(
+            max_retries=3,
+            retry_base_delay_ms=10,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(
+            policy_config=policy_config,
+            enable_caching=False,
+        )
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=provider,
+        )
+
+        with pytest.raises(ValueError):
+            await handler.embed("Test content")
+
+        # Should have only tried once (no retries for non-transient errors)
+        assert provider.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_llm_extraction_retries_on_connection_error(self) -> None:
+        """LLM entity extraction should retry on ConnectionError."""
+        embedding_provider = FakeEmbeddingProvider()
+        llm_provider = TransientFailingLLMProvider(
+            fail_times=2,
+            error_type=ConnectionError,
+            entities_response={
+                "entities": [
+                    {
+                        "type": "person",
+                        "text": "John",
+                        "confidence": 0.9,
+                        "start": 0,
+                        "end": 4,
+                    }
+                ]
+            },
+        )
+
+        policy_config = ModelSemanticComputePolicyConfig(
+            entity_extraction_mode=EnumEntityExtractionMode.BEST_EFFORT,
+            max_retries=3,
+            retry_base_delay_ms=10,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(policy_config=policy_config)
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=embedding_provider,
+            llm_provider=llm_provider,
+        )
+
+        result = await handler.extract_entities("John works at Google.")
+
+        assert result is not None
+        assert len(result.entities) >= 1
+        # LLM should have been called 3 times (2 failures + 1 success)
+        assert llm_provider.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_llm_extraction_fails_when_retries_exhausted(self) -> None:
+        """LLM entity extraction should fail when retries exhausted."""
+        embedding_provider = FakeEmbeddingProvider()
+        llm_provider = TransientFailingLLMProvider(
+            fail_times=10,
+            error_type=TimeoutError,
+        )
+
+        policy_config = ModelSemanticComputePolicyConfig(
+            entity_extraction_mode=EnumEntityExtractionMode.BEST_EFFORT,
+            max_retries=2,
+            retry_base_delay_ms=10,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(policy_config=policy_config)
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=embedding_provider,
+            llm_provider=llm_provider,
+        )
+
+        with pytest.raises(TimeoutError):
+            await handler.extract_entities("John works at Google.")
+
+        # Should have tried: 1 initial + 2 retries = 3 attempts
+        assert llm_provider.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_retry_with_zero_retries_fails_immediately(self) -> None:
+        """With max_retries=0, should fail on first transient error."""
+        provider = TransientFailingEmbeddingProvider(fail_times=1)
+
+        policy_config = ModelSemanticComputePolicyConfig(
+            max_retries=0,  # No retries
+            retry_base_delay_ms=10,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(
+            policy_config=policy_config,
+            enable_caching=False,
+        )
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=provider,
+        )
+
+        with pytest.raises(TimeoutError):
+            await handler.embed("Test content")
+
+        # Should have only tried once
+        assert provider.call_count == 1

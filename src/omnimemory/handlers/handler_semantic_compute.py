@@ -52,7 +52,8 @@ import asyncio
 import hashlib
 import logging
 import time
-from typing import TYPE_CHECKING, cast
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, TypeVar, cast
 from uuid import UUID, uuid4
 
 from cachetools import LRUCache  # type: ignore[import-untyped]
@@ -76,6 +77,9 @@ __all__ = [
     "HandlerSemanticComputePolicy",
     "ModelHandlerSemanticComputeConfig",
 ]
+
+# TypeVar for generic retry helper
+_T = TypeVar("_T")
 
 # =============================================================================
 # Module-Level Constants
@@ -119,6 +123,9 @@ _SENTENCE_STARTING_STOPWORDS: frozenset[str] = frozenset(
         "Indeed",
         "Hence",
         "Thus",
+        "Regardless",
+        "Nonetheless",
+        "Notwithstanding",
         # Question words
         "What",
         "When",
@@ -175,6 +182,25 @@ _SENTENCE_STARTING_STOPWORDS: frozenset[str] = frozenset(
         "Even",
         "Still",
         "Already",
+        # Adverbial starters
+        "Recently",
+        "Currently",
+        "Actually",
+        "Basically",
+        "Essentially",
+        "Generally",
+        "Usually",
+        "Obviously",
+        "Clearly",
+        "Certainly",
+        "Probably",
+        "Perhaps",
+        "Maybe",
+        "Possibly",
+        # Temporal starters (common in sentence-start context, not entity names)
+        "Today",
+        "Tomorrow",
+        "Yesterday",
     }
 )
 
@@ -443,6 +469,77 @@ class HandlerSemanticCompute:
         return self._llm_provider
 
     # =========================================================================
+    # Retry Logic
+    # =========================================================================
+
+    async def _execute_with_retry(
+        self,
+        operation: Callable[[], Awaitable[_T]],
+        operation_name: str,
+    ) -> _T:
+        """Execute an operation with retry logic based on policy.
+
+        Uses the policy's should_retry() and get_retry_delay_ms() methods
+        to determine retry behavior. Retries are only attempted for transient
+        errors (timeout, connection issues).
+
+        Args:
+            operation: Async callable to execute (no arguments).
+            operation_name: Name for logging purposes.
+
+        Returns:
+            The operation result.
+
+        Raises:
+            The last exception if all retries are exhausted, or immediately
+            for non-transient errors.
+        """
+        last_error: Exception | None = None
+        max_attempts = self._config.policy_config.max_retries + 1  # initial + retries
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return await operation()
+            except Exception as e:
+                last_error = e
+
+                # Check if we should retry
+                if not self._policy.should_retry(attempt, e):
+                    logger.debug(
+                        "Not retrying %s after attempt %d: %s (non-transient error)",
+                        operation_name,
+                        attempt,
+                        type(e).__name__,
+                    )
+                    raise
+
+                # Check if we have more attempts left
+                if attempt >= max_attempts:
+                    logger.warning(
+                        "All %d retry attempts exhausted for %s: %s",
+                        max_attempts,
+                        operation_name,
+                        str(e),
+                    )
+                    raise
+
+                delay_ms = self._policy.get_retry_delay_ms(attempt)
+                logger.warning(
+                    "Retry %d/%d for %s after %dms: %s",
+                    attempt,
+                    self._config.policy_config.max_retries,
+                    operation_name,
+                    delay_ms,
+                    str(e),
+                )
+                await asyncio.sleep(delay_ms / 1000.0)
+
+        # Should not reach here, but satisfy type checker
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"Unexpected state in retry logic for {operation_name}")
+
+    # =========================================================================
     # Core Operations
     # =========================================================================
 
@@ -483,15 +580,20 @@ class HandlerSemanticCompute:
         if self._config.enable_caching and cache_key in self._embedding_cache:
             return cast(list[float], self._embedding_cache[cache_key])
 
-        # Generate embedding via provider with timeout enforcement
+        # Generate embedding via provider with retry logic for transient failures
         timeout = self._config.policy_config.timeout_seconds
-        async with asyncio.timeout(timeout):
-            embedding = await self._embedding_provider.generate_embedding(
-                text=content,
-                model=model or self._config.policy_config.default_embedding_model,
-                correlation_id=correlation_id,
-                timeout_seconds=timeout,
-            )
+        effective_model = model or self._config.policy_config.default_embedding_model
+
+        async def _do_embed() -> list[float]:
+            async with asyncio.timeout(timeout):
+                return await self._embedding_provider.generate_embedding(
+                    text=content,
+                    model=effective_model,
+                    correlation_id=correlation_id,
+                    timeout_seconds=timeout,
+                )
+
+        embedding = await self._execute_with_retry(_do_embed, "embed")
 
         # Cache if appropriate (LRUCache handles eviction automatically)
         if self._config.enable_caching and self._policy.should_cache_embedding(content):
@@ -596,7 +698,22 @@ class HandlerSemanticCompute:
                 )
             entities = await self._extract_entities_llm(content, correlation_id)
         else:
+            logger.debug(
+                "Using heuristic entity extraction (deterministic mode). "
+                "Note: Limited to single capitalized words. For multi-word entities, "
+                "dates, and context-aware classification, use entity_extraction_mode=BEST_EFFORT."
+            )
+            start_time = time.perf_counter()
             entities = self._extract_entities_heuristic(content)
+            elapsed = time.perf_counter() - start_time
+
+            # Warn if heuristic took unexpectedly long (shouldn't happen)
+            if elapsed > self._config.policy_config.timeout_seconds:
+                logger.warning(
+                    "Heuristic entity extraction took %.2fs, exceeding timeout of %.2fs",
+                    elapsed,
+                    self._config.policy_config.timeout_seconds,
+                )
 
         # Filter by confidence
         filtered_entities = self._policy.filter_entities_by_confidence(entities)
@@ -896,9 +1013,12 @@ class HandlerSemanticCompute:
         seed = int(seed_val) if seed_val is not None else None
         timeout = self._config.policy_config.timeout_seconds
 
-        try:
+        # Define the LLM call to be retried
+        async def _do_llm_extract() -> dict[str, object]:
+            # self._llm_provider is checked at method entry, assert for type checker
+            assert self._llm_provider is not None
             async with asyncio.timeout(timeout):
-                response = await self._llm_provider.complete_structured(
+                return await self._llm_provider.complete_structured(
                     prompt=prompt,
                     output_schema=self._get_entity_extraction_schema(),
                     model=self._config.policy_config.default_llm_model,
@@ -908,10 +1028,14 @@ class HandlerSemanticCompute:
                     timeout_seconds=timeout,
                 )
 
+        try:
+            response = await self._execute_with_retry(
+                _do_llm_extract, "llm_entity_extraction"
+            )
             return self._parse_llm_entity_response(response, content)
 
         except Exception:
-            logger.exception("LLM entity extraction failed")
+            logger.exception("LLM entity extraction failed after retries")
             raise
 
     def _build_entity_extraction_prompt(self, content: str) -> str:

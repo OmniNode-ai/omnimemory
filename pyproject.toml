@@ -83,6 +83,7 @@ ruff = "^0.8.0"
 # pyright: ^1.1.390 in Poetry, v1.1.391 in pre-commit
 mypy = "^1.14.0"
 pyright = "^1.1.390"
+types-cachetools = "^6.2.0"
 
 # Pre-commit hooks
 pre-commit = "^4.0.1"
