@@ -42,6 +42,22 @@ jobs:
   # - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
   # NOTE: UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
   #
+  # CI-TO-HOOK SYNCHRONIZATION MAP:
+  # CI Job          | Pre-commit Hook                   | Command
+  # ----------------|-----------------------------------|----------------------------------
+  # lint            | ruff-format (pre-commit)          | ruff format --check src/ tests/
+  # lint            | ruff (pre-commit)                 | ruff check src/ tests/
+  # lint            | mypy (pre-push)                   | mypy --show-error-codes --no-error-summary src/omnimemory
+  # pyright         | pyright (pre-push)                | pyright src/omnimemory
+  # onex-validation | validate-pydantic-patterns        | python scripts/validation/validate_pydantic_patterns.py src/
+  # onex-validation | validate-single-class-per-file    | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
+  # onex-validation | validate-enum-casing              | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
+  # onex-validation | validate-no-backward-compatibility| python scripts/validation/validate_no_backward_compatibility.py -d src/
+  # onex-validation | validate-secrets                  | python scripts/validation/validate_secrets.py src/
+  # onex-validation | validate-naming-conventions       | python scripts/validation/validate_naming.py src/
+  #
+  # IMPORTANT: When modifying any CI step, update the corresponding hook in .pre-commit-config.yaml
+  #
   # POETRY VERSION: Must match POETRY_VERSION env var (currently 2.2.1)
   # =============================================================================
 

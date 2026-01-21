@@ -21,6 +21,23 @@
 # This ensures hooks work in CI environments where Poetry may not be installed.
 # Pre-commit manages isolated Python environments for each hook.
 #
+# HOOK-TO-CI SYNCHRONIZATION MAP:
+# ====================================
+# Pre-commit Hook                   | CI Workflow Job          | Command
+# ----------------------------------|--------------------------|----------------------------------
+# ruff-format (pre-commit)          | lint                     | ruff format --check src/ tests/
+# ruff (pre-commit)                 | lint                     | ruff check src/ tests/
+# mypy (pre-push)                   | lint                     | mypy --show-error-codes --no-error-summary src/omnimemory
+# pyright (pre-push)                | pyright                  | pyright src/omnimemory
+# validate-pydantic-patterns        | onex-validation          | python scripts/validation/validate_pydantic_patterns.py src/
+# validate-single-class-per-file    | onex-validation          | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
+# validate-enum-casing              | onex-validation          | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
+# validate-no-backward-compatibility| onex-validation          | python scripts/validation/validate_no_backward_compatibility.py -d src/
+# validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
+# validate-naming-conventions       | onex-validation          | python scripts/validation/validate_naming.py src/
+#
+# IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
+#
 # PERFORMANCE OPTIMIZATION:
 # ====================================
 # Two-stage validation strategy for optimal developer experience:
@@ -224,14 +241,14 @@ default_stages: [pre-commit]
 fail_fast: false
 
 # pre-commit.ci configuration
-# Note: autofix_prs is disabled because all hooks use --check mode (no auto-fixing).
-# This is intentional to ensure CI and local validation are identical.
-# Run `ruff format src/ tests/` and `ruff check --fix src/ tests/` manually to fix issues.
+# autofix_prs enabled: pre-commit.ci will create auto-fix PRs when possible.
+# Note: Hooks using --check mode (ruff format, ruff check) validate but don't auto-fix.
+# For formatting fixes, run: `ruff format src/ tests/` and `ruff check --fix src/ tests/`
 ci:
   autofix_commit_msg: |
     [pre-commit.ci] auto fixes for omnimemory
 
     for more information, see https://pre-commit.ci
-  autofix_prs: false
+  autofix_prs: true
   autoupdate_schedule: weekly
   submodules: false

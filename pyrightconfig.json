@@ -24,7 +24,7 @@
   "reportIndexIssue": "warning",
   "reportOperatorIssue": "warning",
   "reportRedeclaration": "warning",
-  "reportInvalidTypeForm": false,
+  "reportInvalidTypeForm": "warning",
   "reportUnknownParameterType": false,
   "reportUnknownArgumentType": false,
   "reportUnknownMemberType": false,

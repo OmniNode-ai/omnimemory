@@ -30,20 +30,42 @@ class Violation(NamedTuple):
     message: str
 
 
-# Class naming patterns
+# =============================================================================
+# NAMING CONVENTIONS - Single Source of Truth
+# =============================================================================
+# All naming prefixes are defined here. CLASS_PATTERNS, DIR_PREFIXES, and
+# STRICT_NAMING_DIRECTORIES are derived from this list to avoid duplication.
+
+# List of naming prefixes for ONEX conventions
+# All use standard PrefixXxx pattern except Settings which uses XxxSettings suffix
+NAMING_PREFIXES = [
+    "Model",
+    "Enum",
+    "Protocol",
+    "Service",
+    "Handler",
+    "Mixin",
+    "Node",
+    "Validator",
+    "Settings",  # Special case: uses suffix pattern, has no typed directory
+]
+
+# Class naming patterns - derived from NAMING_PREFIXES
+# Settings uses suffix pattern (XxxSettings), all others use prefix pattern (PrefixXxx)
 CLASS_PATTERNS = {
-    "Model": re.compile(r"^Model[A-Z][a-zA-Z0-9]*$"),
-    "Enum": re.compile(r"^Enum[A-Z][a-zA-Z0-9]*$"),
-    "Protocol": re.compile(r"^Protocol[A-Z][a-zA-Z0-9]*$"),
-    "Service": re.compile(r"^Service[A-Z][a-zA-Z0-9]*$"),
-    "Handler": re.compile(r"^Handler[A-Z][a-zA-Z0-9]*$"),
-    "Mixin": re.compile(r"^Mixin[A-Z][a-zA-Z0-9]*$"),
-    "Node": re.compile(r"^Node[A-Z][a-zA-Z0-9]*$"),
-    "Validator": re.compile(r"^Validator[A-Z][a-zA-Z0-9]*$"),
-    # Settings classes use suffix pattern (XxxSettings) not prefix pattern
-    # This applies to pydantic_settings.BaseSettings subclasses which are
-    # configuration classes, NOT data models
-    "Settings": re.compile(r"^[A-Z][a-zA-Z0-9]*Settings$"),
+    prefix: (
+        re.compile(r"^[A-Z][a-zA-Z0-9]*Settings$")
+        if prefix == "Settings"
+        else re.compile(rf"^{prefix}[A-Z][a-zA-Z0-9]*$")
+    )
+    for prefix in NAMING_PREFIXES
+}
+
+# Directory name to class prefix mapping - derived from NAMING_PREFIXES
+# Convention: directory is lowercase plural of prefix (e.g., Model -> models)
+# Settings has no typed directory (configuration classes live alongside their domain)
+DIR_PREFIXES: dict[str, str] = {
+    f"{prefix.lower()}s": prefix for prefix in NAMING_PREFIXES if prefix != "Settings"
 }
 
 # Base class names that indicate expected naming prefix
@@ -152,16 +174,8 @@ RELAXED_CLASS_PREFIX_DIRECTORIES = {
 # Directories where ONEX naming conventions are strictly enforced
 # Both file naming (e.g., model_xxx.py) and class naming (e.g., ModelXxx) are validated
 # Note: These apply only to IMMEDIATE parent directory, not ancestors
-STRICT_NAMING_DIRECTORIES = {
-    "models",
-    "enums",
-    "protocols",
-    "services",
-    "handlers",
-    "mixins",
-    "nodes",
-    "validators",
-}
+# Derived from DIR_PREFIXES to maintain single source of truth
+STRICT_NAMING_DIRECTORIES = set(DIR_PREFIXES.keys())
 
 # Exact relative paths to skip (for specific files that don't follow conventions)
 # Use forward slashes for cross-platform compatibility
@@ -169,20 +183,6 @@ SKIP_PATHS_PATTERNS: list[re.Pattern[str]] = [
     # Skip data_models.py and error_models.py in protocols/ - they contain data types
     re.compile(r".*/protocols/(data_models|error_models)\.py$"),
 ]
-
-# Directory name to class prefix mapping
-# Used to enforce ONEX naming conventions for classes in typed directories
-# Maps: directory name -> expected class name prefix
-DIR_PREFIXES: dict[str, str] = {
-    "models": "Model",
-    "enums": "Enum",
-    "protocols": "Protocol",
-    "services": "Service",
-    "handlers": "Handler",
-    "mixins": "Mixin",
-    "nodes": "Node",
-    "validators": "Validator",
-}
 
 
 def get_directory_type(filepath: Path) -> str | None:
