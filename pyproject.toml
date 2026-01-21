@@ -130,7 +130,7 @@ ignore = [
     # ==========================================================================
     "S101",      # Allow assert statements in tests
     "PLR0206",   # Properties with parameters (design choice for descriptors)
-    "UP017",     # Use datetime.UTC (prefer timezone.utc for Python 3.10 compat)
+    "UP017",     # Use datetime.UTC (prefer timezone.utc for codebase consistency - 100+ existing usages)
     "A002",      # Function argument shadowing builtin (id, type, etc. are common)
     "B024",      # Abstract class without abstract methods (base class patterns)
     "ARG005",    # Unused lambda argument (callback signatures require it)
@@ -145,7 +145,6 @@ ignore = [
     "PLR0912",   # Too many branches (>12)
     "PLR0913",   # Too many arguments (>5)
     "PLR0915",   # Too many statements (>50)
-    "PLR2004",   # Magic values in comparisons
 
     # ==========================================================================
     # EXCEPTION HANDLING (technical debt - fix incrementally)
@@ -189,6 +188,7 @@ ignore = [
     # ==========================================================================
     # CODE STYLE (technical debt - fix incrementally)
     # ==========================================================================
+    "PLR2004",   # Magic values in comparisons (acceptable in tests and config)
     "E501",      # Line too long (>88 characters)
     "E402",      # Module level import not at top of file
     "TC003",     # Move stdlib import into TYPE_CHECKING block
@@ -227,6 +227,9 @@ known-first-party = ["omnimemory"]
     "S608",    # SQL injection (test code with controlled input)
     "B017",    # pytest.raises(Exception) (acceptable for broad exception tests)
     "PT011",   # pytest.raises too broad (will add match= incrementally)
+    "ERA001",  # Commented-out code (section headers for test organization)
+    "S603",    # subprocess call (test code with controlled input)
+    "S607",    # Partial executable path (test code uses 'python')
 ]
 
 [tool.mypy]

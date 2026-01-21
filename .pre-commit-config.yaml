@@ -243,9 +243,31 @@ default_stages: [pre-commit]
 fail_fast: false
 
 # pre-commit.ci configuration
-# autofix_prs enabled: pre-commit.ci will create auto-fix PRs when possible.
-# Note: Hooks using --check mode (ruff format, ruff check) validate but don't auto-fix.
-# For formatting fixes, run: `ruff format src/ tests/` and `ruff check --fix src/ tests/`
+#
+# AUTOFIX BEHAVIOR EXPLAINED:
+# ===========================
+# autofix_prs: true means pre-commit.ci will automatically commit fixes and create
+# a PR when hooks modify files. However, not all hooks can auto-fix.
+#
+# HOOKS THAT WILL AUTO-FIX (pre-commit.ci will commit these changes):
+#   - yamlfmt: Reformats YAML files to match .yamlfmt settings
+#   - trailing-whitespace: Removes trailing whitespace from lines
+#   - end-of-file-fixer: Ensures files end with a single newline
+#
+# HOOKS THAT WILL NOT AUTO-FIX (check-only mode, will fail but not modify files):
+#   - ruff-format: Uses --check flag (validates formatting, doesn't reformat)
+#   - ruff check: No --fix flag (reports lint issues, doesn't fix them)
+#   - mypy/pyright: Type checkers (report errors, cannot auto-fix code)
+#   - validate-* hooks: ONEX validators (report violations, cannot auto-fix)
+#   - check-* hooks: Detectors only (check-yaml, check-toml, etc.)
+#   - debug-statements: Detector only (reports but doesn't remove)
+#
+# WHY autofix_prs: true?
+#   The formatting hooks (yamlfmt, trailing-whitespace, end-of-file-fixer) provide
+#   value by auto-fixing minor formatting issues. For ruff issues, run manually:
+#     ruff format src/ tests/        # Fix formatting
+#     ruff check --fix src/ tests/   # Fix lint issues
+#
 ci:
   autofix_commit_msg: |
     [pre-commit.ci] auto fixes for omnimemory

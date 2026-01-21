@@ -126,6 +126,86 @@ class ClassModelConfigCollector(ast.NodeVisitor):
 
         self.generic_visit(node)
 
+    def _trace_inheritance_chain(
+        self, class_name: str, visited: set[str] | None = None
+    ) -> tuple[list[str], bool]:
+        """Trace the inheritance chain for a class.
+
+        Args:
+            class_name: The class to trace inheritance for.
+            visited: Set of already visited classes (for cycle detection).
+
+        Returns:
+            A tuple of (chain, is_cycle) where:
+            - chain: List of class names in the inheritance path
+            - is_cycle: True if a cycle was detected
+        """
+        if visited is None:
+            visited = set()
+
+        chain = [class_name]
+
+        if class_name in visited:
+            return chain, True
+
+        visited.add(class_name)
+
+        bases = self.class_bases.get(class_name, [])
+        for base in bases:
+            if base in self.class_bases:
+                # Base is defined in this file, trace it
+                sub_chain, is_cycle = self._trace_inheritance_chain(base, visited.copy())
+                if is_cycle:
+                    return chain + sub_chain, True
+            # If base not in class_bases, it's external (not traceable in this file)
+
+        return chain, False
+
+    def _format_inheritance_chains(self, unresolved: list[str]) -> str:
+        """Format inheritance chain information for unresolved classes.
+
+        Args:
+            unresolved: List of unresolved class names.
+
+        Returns:
+            Formatted string showing inheritance chains for debugging.
+        """
+        lines = ["Unresolved classes with inheritance chains:"]
+
+        for class_name in unresolved:
+            bases = self.class_bases.get(class_name, [])
+            chain, is_cycle = self._trace_inheritance_chain(class_name)
+
+            if is_cycle:
+                # Format: ClassA -> ClassB -> ClassA (cycle detected)
+                cycle_str = " -> ".join(chain)
+                lines.append(f"  - {cycle_str} (cycle detected)")
+            elif bases:
+                # Check which bases are missing (not in this file)
+                missing_bases = [b for b in bases if b not in self.class_bases]
+                known_bases = [b for b in bases if b in self.class_bases]
+
+                if missing_bases:
+                    # Format: ClassD -> [ClassE] (base ClassE not found in file)
+                    missing_str = ", ".join(missing_bases)
+                    lines.append(
+                        f"  - {class_name} -> [{missing_str}] "
+                        f"(base(s) not found in file)"
+                    )
+                elif known_bases:
+                    # Bases exist but aren't Pydantic models
+                    known_str = ", ".join(known_bases)
+                    lines.append(
+                        f"  - {class_name} -> [{known_str}] "
+                        f"(base(s) not resolved as Pydantic models)"
+                    )
+                else:
+                    lines.append(f"  - {class_name} (no traceable bases)")
+            else:
+                lines.append(f"  - {class_name} (no base classes)")
+
+        return "\n".join(lines)
+
     def resolve_pydantic_models(self) -> None:
         """Resolve transitive Pydantic model inheritance within the file.
 
@@ -153,10 +233,12 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                     for name in self.class_bases
                     if name not in self.pydantic_models
                 ]
+                # Format detailed inheritance chain information
+                chain_info = self._format_inheritance_chains(unresolved)
                 logging.warning(
-                    "Circular inheritance detected or resolution limit reached. "
-                    "Unresolved classes: %s. Stopping to prevent infinite loop.",
-                    unresolved,
+                    "Circular inheritance detected or resolution limit reached.\n%s\n"
+                    "Stopping to prevent infinite loop.",
+                    chain_info,
                 )
                 break
 

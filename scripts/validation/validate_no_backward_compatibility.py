@@ -20,6 +20,9 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
+# Configure logging - default to WARNING so scripts are quiet unless debugging
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
+
 
 class Violation(NamedTuple):
     """A validation violation."""
@@ -93,7 +96,7 @@ def validate_file(filepath: Path) -> list[Violation]:
         logging.warning("Permission denied reading file: %s", filepath)
         return []
     except FileNotFoundError:
-        # File may have been deleted during scan - this is not an error
+        logging.warning("File not found (possibly deleted during scan): %s", filepath)
         return []
     except OSError as e:
         logging.warning("OS error reading file %s: %s", filepath, e)
