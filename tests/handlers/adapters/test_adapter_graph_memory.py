@@ -32,7 +32,7 @@ pytest.importorskip(
     "omnibase_infra", reason="omnibase_infra required for adapter tests"
 )
 
-from omnimemory.handlers.adapters.adapter_graph_memory import (  # noqa: E402
+from omnimemory.handlers.adapters.adapter_graph_memory import (
     AdapterGraphMemory,
     AdapterGraphMemoryConfig,
     CypherTemplates,
