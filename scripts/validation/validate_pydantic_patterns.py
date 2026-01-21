@@ -128,7 +128,7 @@ class ClassModelConfigCollector(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def _resolve_pydantic_models(self) -> None:
+    def resolve_pydantic_models(self) -> None:
         """Resolve transitive Pydantic model inheritance within the file.
 
         A class is a Pydantic model if:
@@ -480,7 +480,7 @@ def validate_file(filepath: Path) -> list[Violation]:
     model_config_collector.visit(tree)
 
     # Resolve transitive Pydantic model inheritance
-    model_config_collector._resolve_pydantic_models()
+    model_config_collector.resolve_pydantic_models()
 
     # Third pass: validate patterns with full context
     visitor = PydanticPatternVisitor(

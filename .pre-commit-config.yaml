@@ -73,6 +73,18 @@ repos:
   # Python code quality with ruff (replaces black, isort, flake8 - 10-100x faster)
   # Configuration: pyproject.toml [tool.ruff] section (shared with CI)
   # Using official ruff-pre-commit repo for CI compatibility (no Poetry dependency)
+  #
+  # VERSION UPGRADE PROCEDURE:
+  # ==========================
+  # Ruff has breaking rule changes between minor versions (e.g., rules renamed,
+  # removed, or behavior changed). When upgrading:
+  #
+  # 1. Run: pre-commit autoupdate --repo https://github.com/astral-sh/ruff-pre-commit
+  # 2. Run: pre-commit run --all-files  (check for new violations)
+  # 3. Review ruff changelog: https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md
+  # 4. Update pyproject.toml [tool.ruff] version comment to match new rev
+  # 5. Fix any new violations or update rule selections in pyproject.toml
+  #
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.6
     hooks:
@@ -211,12 +223,15 @@ default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
 fail_fast: false
 
-# Performance optimization: Enable parallel execution
+# pre-commit.ci configuration
+# Note: autofix_prs is disabled because all hooks use --check mode (no auto-fixing).
+# This is intentional to ensure CI and local validation are identical.
+# Run `ruff format src/ tests/` and `ruff check --fix src/ tests/` manually to fix issues.
 ci:
   autofix_commit_msg: |
     [pre-commit.ci] auto fixes for omnimemory
 
     for more information, see https://pre-commit.ci
-  autofix_prs: true
+  autofix_prs: false
   autoupdate_schedule: weekly
   submodules: false

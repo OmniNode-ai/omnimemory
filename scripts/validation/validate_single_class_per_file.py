@@ -15,10 +15,13 @@ Usage:
 from __future__ import annotations
 
 import ast
+import logging
 import sys
-import warnings
 from pathlib import Path
 from typing import NamedTuple
+
+# Configure logging - default to WARNING so scripts are quiet unless debugging
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 
 class Violation(NamedTuple):
@@ -74,42 +77,22 @@ def count_classes(filepath: Path) -> tuple[int, list[str], int, list[str]]:
     try:
         content = filepath.read_text(encoding="utf-8")
     except PermissionError:
-        warnings.warn(
-            f"Permission denied reading file: {filepath}",
-            UserWarning,
-            stacklevel=2,
-        )
+        logging.warning("Permission denied reading file: %s", filepath)
         return 0, [], 0, []
     except FileNotFoundError:
-        warnings.warn(
-            f"File not found (possibly deleted during scan): {filepath}",
-            UserWarning,
-            stacklevel=2,
-        )
+        logging.warning("File not found (possibly deleted during scan): %s", filepath)
         return 0, [], 0, []
     except OSError as e:
-        warnings.warn(
-            f"OS error reading file {filepath}: {e}",
-            UserWarning,
-            stacklevel=2,
-        )
+        logging.warning("OS error reading file %s: %s", filepath, e)
         return 0, [], 0, []
     except UnicodeDecodeError as e:
-        warnings.warn(
-            f"Unicode decode error in file {filepath}: {e}",
-            UserWarning,
-            stacklevel=2,
-        )
+        logging.warning("Unicode decode error in file %s: %s", filepath, e)
         return 0, [], 0, []
 
     try:
         tree = ast.parse(content, filename=str(filepath))
     except SyntaxError as e:
-        warnings.warn(
-            f"Syntax error parsing file {filepath}: {e}",
-            UserWarning,
-            stacklevel=2,
-        )
+        logging.warning("Syntax error parsing file %s: %s", filepath, e)
         return 0, [], 0, []
 
     non_enum_names: list[str] = []
