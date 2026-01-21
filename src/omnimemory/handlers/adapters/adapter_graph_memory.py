@@ -125,7 +125,13 @@ __all__ = [
     "ModelMemoryConnection",
     "ModelRelatedMemory",
     "ModelRelatedMemoryResult",
+    "PropertyValue",
 ]
+
+# Type alias for graph property values (flat JSON-compatible types)
+# Note: Recursive types (nested list/dict) cause Pydantic schema recursion errors,
+# so we use a flat union. For nested properties, values are stored as-is at runtime.
+PropertyValue = str | int | float | bool | None
 
 
 # =============================================================================
@@ -141,8 +147,6 @@ class CypherTemplates:
     Direction Behavior:
         - GET_CONNECTIONS: Bidirectional (matches both incoming and outgoing)
         - GET_CONNECTIONS_BY_TYPE: Bidirectional with type filtering
-        - GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL: Bidirectional with type filtering
-          (alias for GET_CONNECTIONS_BY_TYPE)
 
         All templates use `startNode(r) = m AS is_outgoing` to dynamically determine
         edge direction.
@@ -178,9 +182,6 @@ class CypherTemplates:
         startNode(r) = m AS is_outgoing
     LIMIT $limit
     """
-
-    # Alias for GET_CONNECTIONS_BY_TYPE - both are bidirectional
-    GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL = GET_CONNECTIONS_BY_TYPE
 
     # Count connections for a memory
     COUNT_CONNECTIONS = """
@@ -281,7 +282,7 @@ class ModelRelatedMemory(BaseModel):
         default_factory=list,
         description="Graph labels on the memory node",
     )
-    properties: dict[str, object] = Field(
+    properties: dict[str, PropertyValue] = Field(
         default_factory=dict,
         description="Additional node properties",
     )
@@ -714,10 +715,11 @@ class AdapterGraphMemory:
                     depth_to_node = shortest_path.index(node.element_id)
                 else:
                     logger.warning(
-                        "Path info unavailable for node %s, defaulting to depth=1",
+                        "Path info unavailable for node %s, defaulting to max depth=%d",
                         node.element_id,
+                        effective_depth,
                     )
-                    depth_to_node = 1
+                    depth_to_node = effective_depth
 
                 score = 1.0 / (depth_to_node + 1)
 
@@ -814,18 +816,11 @@ class AdapterGraphMemory:
         effective_limit = min(
             limit or self._config.default_limit, self._config.max_limit
         )
-        # Use config.bidirectional if not explicitly specified
-        effective_bidirectional = (
-            bidirectional if bidirectional is not None else self._config.bidirectional
-        )
 
         try:
-            # Choose query based on whether we're filtering by type and direction
+            # Choose query based on whether we're filtering by type
             if relationship_types:
-                if effective_bidirectional:
-                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL
-                else:
-                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
+                query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
                 parameters: dict[str, object] = {
                     "memory_id": memory_id,
                     "relationship_types": relationship_types,
@@ -869,11 +864,7 @@ class AdapterGraphMemory:
                         source_id=record["source_id"],
                         target_id=record["target_id"],
                         relationship_type=record["relationship_type"],
-                        weight=(
-                            record.get("weight")
-                            if record.get("weight") is not None
-                            else 1.0
-                        ),
+                        weight=w if (w := record.get("weight")) is not None else 1.0,
                         is_outgoing=record.get("is_outgoing", True),
                         created_at=record.get("created_at"),
                     )

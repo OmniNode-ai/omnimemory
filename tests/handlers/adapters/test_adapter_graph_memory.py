@@ -269,7 +269,6 @@ class TestCypherTemplates:
         templates = [
             CypherTemplates.GET_CONNECTIONS,
             CypherTemplates.GET_CONNECTIONS_BY_TYPE,
-            CypherTemplates.GET_CONNECTIONS_BY_TYPE_BIDIRECTIONAL,
             CypherTemplates.COUNT_CONNECTIONS,
             CypherTemplates.NODE_EXISTS,
         ]
