@@ -8,7 +8,9 @@ and entity extraction operations. Used by SemanticComputePolicy for decision log
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...enums.enum_entity_extraction_mode import EnumEntityExtractionMode
 
@@ -213,32 +215,45 @@ class ModelSemanticComputePolicyConfig(BaseModel):
     # Validators
     # =========================================================================
 
-    @field_validator("chunk_overlap")
-    @classmethod
-    def validate_chunk_overlap(cls, v: int) -> int:
-        """Ensure chunk overlap is less than chunk size."""
-        # Note: In Pydantic v2, we can't easily access other fields in field_validator
-        # Full validation happens in model_validator if needed
-        return v
+    @model_validator(mode="after")
+    def validate_cross_field_constraints(self) -> Self:
+        """Validate constraints that depend on multiple fields.
 
-    @field_validator("retry_max_delay_ms")
-    @classmethod
-    def validate_retry_max_delay(cls, v: int) -> int:
-        """Ensure max delay is greater than base delay."""
-        return v
+        Validates:
+        - chunk_overlap must be less than chunk_size
+        - retry_max_delay_ms must be >= retry_base_delay_ms
+        - default_embedding_model must be in allowed_embedding_models
+        - default_llm_model must be in allowed_llm_models
+        """
+        # Validate chunk_overlap < chunk_size
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                f"chunk_overlap ({self.chunk_overlap}) must be less than "
+                f"chunk_size ({self.chunk_size})"
+            )
 
-    @field_validator("default_embedding_model")
-    @classmethod
-    def validate_default_embedding_model(cls, v: str) -> str:
-        """Validate default model is in allowed list."""
-        # Note: Cross-field validation would require model_validator
-        return v
+        # Validate retry_max_delay_ms >= retry_base_delay_ms
+        if self.retry_max_delay_ms < self.retry_base_delay_ms:
+            raise ValueError(
+                f"retry_max_delay_ms ({self.retry_max_delay_ms}) must be >= "
+                f"retry_base_delay_ms ({self.retry_base_delay_ms})"
+            )
 
-    @field_validator("default_llm_model")
-    @classmethod
-    def validate_default_llm_model(cls, v: str) -> str:
-        """Validate default LLM model."""
-        return v
+        # Validate default_embedding_model in allowed_embedding_models
+        if self.default_embedding_model not in self.allowed_embedding_models:
+            raise ValueError(
+                f"default_embedding_model '{self.default_embedding_model}' is not in "
+                f"allowed_embedding_models: {self.allowed_embedding_models}"
+            )
+
+        # Validate default_llm_model in allowed_llm_models
+        if self.default_llm_model not in self.allowed_llm_models:
+            raise ValueError(
+                f"default_llm_model '{self.default_llm_model}' is not in "
+                f"allowed_llm_models: {self.allowed_llm_models}"
+            )
+
+        return self
 
     # =========================================================================
     # Computed Properties

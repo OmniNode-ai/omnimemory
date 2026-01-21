@@ -400,8 +400,8 @@ class HandlerSemanticCompute:
     ) -> ModelSemanticEntityList:
         """Extract named entities from content.
 
-        Uses heuristic extraction by default. Falls back to LLM-based
-        extraction in best_effort mode if an LLM provider is available.
+        Uses heuristic extraction in deterministic mode. Uses LLM-based
+        extraction in best_effort mode (requires LLM provider to be configured).
 
         Args:
             content: The text content to analyze.
@@ -412,14 +412,21 @@ class HandlerSemanticCompute:
 
         Raises:
             ValueError: If content is empty.
+            RuntimeError: If LLM extraction is requested but no provider configured.
         """
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
 
         # Determine extraction strategy
-        use_llm = self._policy.should_use_llm_for_entities() and self._llm_provider
+        policy_wants_llm = self._policy.should_use_llm_for_entities()
 
-        if use_llm:
+        if policy_wants_llm:
+            # Fail fast if LLM is required but not configured
+            if not self._llm_provider:
+                raise RuntimeError(
+                    "LLM provider not configured but LLM entity extraction requested "
+                    "(entity_extraction_mode=BEST_EFFORT requires an LLM provider)"
+                )
             entities = await self._extract_entities_llm(content, correlation_id)
         else:
             entities = self._extract_entities_heuristic(content)
@@ -435,7 +442,7 @@ class HandlerSemanticCompute:
         return ModelSemanticEntityList(
             entities=filtered_entities,
             source_text_length=len(content),
-            extraction_model="heuristic" if not use_llm else "llm",
+            extraction_model="llm" if policy_wants_llm else "heuristic",
             is_deterministic=self._config.policy_config.is_deterministic,
         )
 
@@ -547,8 +554,8 @@ class HandlerSemanticCompute:
         """Extract entities using simple heuristics.
 
         This is a basic implementation that identifies capitalized words
-        as potential named entities. For production, consider using spaCy
-        or similar NLP libraries.
+        as potential named entities, while filtering out common sentence-starting
+        words. For production, consider using spaCy or similar NLP libraries.
 
         Args:
             content: Text to extract entities from.
@@ -556,11 +563,110 @@ class HandlerSemanticCompute:
         Returns:
             List of extracted entities.
         """
+        # Common words that start sentences but aren't entities
+        sentence_starting_stopwords = {
+            # Articles and determiners
+            "The",
+            "A",
+            "An",
+            # Demonstratives
+            "This",
+            "That",
+            "These",
+            "Those",
+            # Pronouns
+            "It",
+            "He",
+            "She",
+            "We",
+            "They",
+            "I",
+            "You",
+            # Common sentence starters
+            "However",
+            "Therefore",
+            "Furthermore",
+            "Moreover",
+            "Nevertheless",
+            "Meanwhile",
+            "Additionally",
+            "Consequently",
+            "Subsequently",
+            "Otherwise",
+            "Accordingly",
+            "Similarly",
+            "Likewise",
+            "Indeed",
+            "Hence",
+            "Thus",
+            # Question words
+            "What",
+            "When",
+            "Where",
+            "Who",
+            "Why",
+            "How",
+            "Which",
+            # Other common starters
+            "There",
+            "Here",
+            "If",
+            "As",
+            "So",
+            "But",
+            "And",
+            "Or",
+            "Yet",
+            "For",
+            "Nor",
+            "After",
+            "Before",
+            "Because",
+            "Although",
+            "While",
+            "Since",
+            "Until",
+            "Unless",
+            "Once",
+            "Now",
+            "Then",
+            "Also",
+            "First",
+            "Second",
+            "Third",
+            "Finally",
+            "Next",
+            "Last",
+            "Many",
+            "Most",
+            "Some",
+            "All",
+            "Any",
+            "Each",
+            "Every",
+            "Both",
+            "Few",
+            "Several",
+            "Such",
+            "No",
+            "Not",
+            "Only",
+            "Just",
+            "Even",
+            "Still",
+            "Already",
+        }
+
         entities: list[ModelSemanticEntity] = []
         words = content.split()
 
+        # Track sentence boundaries
+        sentence_end_chars = ".!?"
+
         i = 0
-        for word in words:
+        is_sentence_start = True  # First word is always a sentence start
+
+        for word_idx, word in enumerate(words):
             # Find position in original content
             try:
                 span_start = content.index(word, i)
@@ -573,10 +679,26 @@ class HandlerSemanticCompute:
             clean_word = word.strip(".,!?;:\"'()[]{}").strip()
 
             if not clean_word:
+                # Check if this word ends a sentence for next iteration
+                if any(c in word for c in sentence_end_chars):
+                    is_sentence_start = True
                 continue
 
-            # Simple heuristic: capitalized words that aren't sentence starters
+            # Check if this word is at the start of a sentence
+            word_is_sentence_start = is_sentence_start
+
+            # Update sentence start tracker for next word
+            is_sentence_start = any(c in word for c in sentence_end_chars)
+
+            # Simple heuristic: capitalized words
             if clean_word[0].isupper() and len(clean_word) > 1:
+                # Check if this is a sentence-starting stopword
+                if word_is_sentence_start and clean_word in sentence_starting_stopwords:
+                    # Skip common stopwords at sentence start
+                    # Note: proper nouns like "The Beatles" - "The" is skipped,
+                    # but "Beatles" will be captured on its next iteration
+                    continue
+
                 # Determine entity type based on simple patterns
                 entity_type = self._classify_entity_heuristic(clean_word)
 
@@ -650,9 +772,15 @@ class HandlerSemanticCompute:
 
         Returns:
             List of extracted entities.
+
+        Raises:
+            RuntimeError: If LLM provider is not configured.
+            Exception: If LLM provider fails (propagated from provider).
         """
         if not self._llm_provider:
-            return self._extract_entities_heuristic(content)
+            raise RuntimeError(
+                "LLM provider not configured but LLM entity extraction requested"
+            )
 
         # Build extraction prompt
         prompt = self._build_entity_extraction_prompt(content)
@@ -676,13 +804,9 @@ class HandlerSemanticCompute:
 
             return self._parse_llm_entity_response(response, content)
 
-        except Exception as e:
-            logger.warning(
-                "LLM entity extraction failed, falling back to heuristic: %s",
-                e,
-                exc_info=True,
-            )
-            return self._extract_entities_heuristic(content)
+        except Exception:
+            logger.exception("LLM entity extraction failed")
+            raise
 
     def _build_entity_extraction_prompt(self, content: str) -> str:
         """Build the prompt for LLM-based entity extraction."""

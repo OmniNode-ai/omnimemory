@@ -494,6 +494,48 @@ class TestExtractEntities:
         # Should have entities from fake LLM response
         assert len(result.entities) >= 1
 
+    @pytest.mark.asyncio
+    async def test_extract_entities_llm_failure_propagates(
+        self,
+        fake_embedding_provider: FakeEmbeddingProvider,
+    ) -> None:
+        """LLM failures should propagate as exceptions (fail-fast)."""
+        # Create LLM provider that fails on specific content
+        failing_llm = FakeLLMProvider(fail_on={"Google"})
+        policy_config = ModelSemanticComputePolicyConfig(
+            entity_extraction_mode=EnumEntityExtractionMode.BEST_EFFORT,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(policy_config=policy_config)
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=fake_embedding_provider,
+            llm_provider=failing_llm,
+        )
+
+        # LLM failure should propagate, not silently fall back to heuristic
+        with pytest.raises(RuntimeError, match="Simulated LLM failure"):
+            await handler.extract_entities("John works at Google.")
+
+    @pytest.mark.asyncio
+    async def test_extract_entities_best_effort_without_llm_raises(
+        self,
+        fake_embedding_provider: FakeEmbeddingProvider,
+    ) -> None:
+        """Best effort mode without LLM provider should raise RuntimeError."""
+        policy_config = ModelSemanticComputePolicyConfig(
+            entity_extraction_mode=EnumEntityExtractionMode.BEST_EFFORT,
+        )
+        handler_config = ModelHandlerSemanticComputeConfig(policy_config=policy_config)
+        handler = HandlerSemanticCompute(
+            config=handler_config,
+            embedding_provider=fake_embedding_provider,
+            llm_provider=None,  # No LLM provider
+        )
+
+        # Should raise RuntimeError because LLM is required for best_effort mode
+        with pytest.raises(RuntimeError, match="LLM provider not configured"):
+            await handler.extract_entities("John works at Google.")
+
 
 # =============================================================================
 # Analyze Tests
@@ -945,3 +987,229 @@ class TestIntegration:
         """Handler should provide access to its config."""
         assert handler.config is handler_config
         assert handler.policy is not None
+
+
+# =============================================================================
+# Sentence-Starting Word Filtering Tests
+# =============================================================================
+
+
+class TestSentenceStartingWordFiltering:
+    """Tests for filtering out sentence-starting words from entity extraction."""
+
+    @pytest.mark.asyncio
+    async def test_the_at_sentence_start_not_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """'The' at sentence start should not be extracted as entity."""
+        result = await handler.extract_entities("The quick brown fox jumps.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "The" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_this_at_sentence_start_not_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """'This' at sentence start should not be extracted as entity."""
+        result = await handler.extract_entities("This is a test sentence.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "This" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_however_at_sentence_start_not_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """'However' at sentence start should not be extracted as entity."""
+        result = await handler.extract_entities(
+            "The plan failed. However, we tried again."
+        )
+
+        entity_texts = [e.text for e in result.entities]
+        assert "However" not in entity_texts
+        assert "The" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_therefore_at_sentence_start_not_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """'Therefore' at sentence start should not be extracted as entity."""
+        result = await handler.extract_entities(
+            "The data is clear. Therefore, we proceed."
+        )
+
+        entity_texts = [e.text for e in result.entities]
+        assert "Therefore" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_furthermore_at_sentence_start_not_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """'Furthermore' at sentence start should not be extracted as entity."""
+        result = await handler.extract_entities(
+            "We have evidence. Furthermore, the results are clear."
+        )
+
+        entity_texts = [e.text for e in result.entities]
+        assert "Furthermore" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_it_at_sentence_start_not_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """'It' at sentence start should not be extracted as entity."""
+        result = await handler.extract_entities("It was a sunny day.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "It" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_proper_noun_at_sentence_start_is_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Proper nouns at sentence start should still be extracted."""
+        result = await handler.extract_entities("Google announced new features.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "Google" in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_proper_noun_mid_sentence_is_extracted(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Proper nouns in middle of sentence should be extracted."""
+        result = await handler.extract_entities("The company Google is large.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "Google" in entity_texts
+        assert "The" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_multiple_sentences_filters_correctly(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Multiple sentences should each have their starters filtered."""
+        content = "The dog barked. However, the cat slept. John watched."
+
+        result = await handler.extract_entities(content)
+
+        entity_texts = [e.text for e in result.entities]
+        assert "The" not in entity_texts
+        assert "However" not in entity_texts
+        assert "John" in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_exclamation_ends_sentence(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Exclamation marks should end sentences for filtering."""
+        result = await handler.extract_entities("Wow! The day was great.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "The" not in entity_texts
+        # "Wow" might or might not be captured depending on implementation
+
+    @pytest.mark.asyncio
+    async def test_question_mark_ends_sentence(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Question marks should end sentences for filtering."""
+        result = await handler.extract_entities("Why? The answer is clear.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "The" not in entity_texts
+        # "Why" is a stopword, should also not be captured
+        assert "Why" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_first_word_always_checked_as_sentence_start(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """First word is always treated as sentence start."""
+        # Content starting with a stopword
+        result = await handler.extract_entities("These results are important.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "These" not in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_compound_proper_nouns_second_word_captured(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """In 'The Beatles', 'The' is skipped but 'Beatles' is captured."""
+        result = await handler.extract_entities("The Beatles performed well.")
+
+        entity_texts = [e.text for e in result.entities]
+        assert "The" not in entity_texts
+        assert "Beatles" in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_mixed_content_extracts_correct_entities(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Mixed content with stopwords and proper nouns works correctly."""
+        content = (
+            "The CEO of Apple, Tim Cook, announced new products. "
+            "However, Microsoft responded quickly. "
+            "This competition benefits consumers."
+        )
+
+        result = await handler.extract_entities(content)
+
+        entity_texts = [e.text for e in result.entities]
+
+        # Should NOT be extracted (sentence starters)
+        assert "The" not in entity_texts
+        assert "However" not in entity_texts
+        assert "This" not in entity_texts
+
+        # Should be extracted (proper nouns)
+        assert "Apple" in entity_texts
+        assert "Tim" in entity_texts
+        assert "Cook" in entity_texts
+        assert "Microsoft" in entity_texts
+
+    @pytest.mark.asyncio
+    async def test_all_common_stopwords_filtered_at_sentence_start(
+        self,
+        handler: HandlerSemanticCompute,
+    ) -> None:
+        """Various common stopwords should all be filtered at sentence start."""
+        stopwords_to_test = [
+            "The",
+            "This",
+            "That",
+            "These",
+            "Those",
+            "However",
+            "Therefore",
+            "Furthermore",
+            "Moreover",
+            "Meanwhile",
+            "Additionally",
+            "Nevertheless",
+        ]
+
+        for stopword in stopwords_to_test:
+            content = f"{stopword} test content here."
+            result = await handler.extract_entities(content)
+
+            entity_texts = [e.text for e in result.entities]
+            assert (
+                stopword not in entity_texts
+            ), f"'{stopword}' should not be extracted as entity"
