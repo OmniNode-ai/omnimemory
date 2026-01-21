@@ -260,6 +260,7 @@ class TestModels:
                 ModelRelatedMemory(memory_id="mem_2", score=0.8),
             ],
             total_count=2,
+            candidates_found=5,  # 5 candidates, 2 passed min_score filter
             max_depth_reached=2,
             execution_time_ms=50.0,
         )
@@ -267,7 +268,22 @@ class TestModels:
         assert result.status == "success"
         assert len(result.memories) == 2
         assert result.total_count == 2
+        assert result.candidates_found == 5
         assert result.error_message is None
+
+    def test_related_memory_result_candidates_vs_total(self) -> None:
+        """Test that candidates_found can differ from total_count after filtering."""
+        result = ModelRelatedMemoryResult(
+            status="success",
+            memories=[ModelRelatedMemory(memory_id="mem_1", score=0.5)],
+            total_count=1,
+            candidates_found=10,  # 10 found, only 1 passed min_score
+        )
+
+        assert result.total_count == 1
+        assert result.candidates_found == 10
+        # Difference shows 9 were filtered out
+        assert result.candidates_found - result.total_count == 9
 
     def test_related_memory_result_error(self) -> None:
         """Test ModelRelatedMemoryResult error case."""
@@ -634,6 +650,43 @@ class TestFindRelated:
         find_related_call = mock_handler.execute_query.call_args_list[1]
         parameters = find_related_call[1]["parameters"]
         assert parameters["limit"] == 200
+
+    @pytest.mark.asyncio
+    async def test_find_related_tracks_candidates_found(
+        self,
+        adapter_with_mock: AdapterGraphMemory,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that find_related tracks candidates_found before min_score filtering.
+
+        This verifies the candidates_found field shows how many results were found
+        before min_score filtering was applied, helping users understand data loss.
+        """
+        # Mock 5 results at various depths (1-5), with scores ranging from 0.5 to 0.17
+        mock_handler.execute_query.side_effect = [
+            MagicMock(records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]),
+            MagicMock(
+                records=[
+                    {"memory_id": "mem_1", "labels": [], "properties": {}, "depth": 1},
+                    {"memory_id": "mem_2", "labels": [], "properties": {}, "depth": 2},
+                    {"memory_id": "mem_3", "labels": [], "properties": {}, "depth": 3},
+                    {"memory_id": "mem_4", "labels": [], "properties": {}, "depth": 4},
+                    {"memory_id": "mem_5", "labels": [], "properties": {}, "depth": 5},
+                ]
+            ),
+        ]
+
+        # Use min_score=0.3, which filters out depth >= 3 (score < 0.3)
+        # depth=1: score=0.5, depth=2: score=0.33, depth=3: score=0.25, etc.
+        result = await adapter_with_mock.find_related("mem_start", min_score=0.3)
+
+        assert result.status == "success"
+        # Only depth 1 and 2 pass the min_score filter
+        assert result.total_count == 2
+        # But we found 5 candidates total before filtering
+        assert result.candidates_found == 5
+        # Verify the returned memories are the high-scoring ones
+        assert all(m.score >= 0.3 for m in result.memories)
 
     @pytest.mark.asyncio
     async def test_find_related_not_initialized(
@@ -1257,6 +1310,62 @@ class TestLifecycle:
             call_args = mock_instance.execute_query.call_args
             query = call_args[1]["query"]
             assert "CREATE INDEX ON :CustomMemory(memory_id)" in query
+
+    @pytest.mark.asyncio
+    async def test_initialize_validates_uri_format(
+        self,
+        config: AdapterGraphMemoryConfig,
+    ) -> None:
+        """Test that initialize validates the connection_uri format."""
+        adapter = AdapterGraphMemory(config)
+
+        # Missing scheme and hostname
+        with pytest.raises(ValueError, match="Invalid connection_uri"):
+            await adapter.initialize(connection_uri="invalid-uri")
+
+        # Missing hostname
+        with pytest.raises(ValueError, match="Invalid connection_uri"):
+            await adapter.initialize(connection_uri="bolt://")
+
+        # Empty string
+        with pytest.raises(ValueError, match="Invalid connection_uri"):
+            await adapter.initialize(connection_uri="")
+
+    @pytest.mark.asyncio
+    async def test_initialize_accepts_valid_uri_schemes(
+        self,
+        config: AdapterGraphMemoryConfig,
+    ) -> None:
+        """Test that initialize accepts all valid bolt URI schemes."""
+        adapter = AdapterGraphMemory(config)
+
+        valid_uris = [
+            "bolt://localhost:7687",
+            "bolt+s://localhost:7687",
+            "bolt+ssc://localhost:7687",
+            "neo4j://localhost:7687",
+            "neo4j+s://localhost:7687",
+        ]
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_graph_memory.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            mock_instance.execute_query = AsyncMock()
+            MockHandler.return_value = mock_instance
+
+            with patch(
+                "omnimemory.handlers.adapters.adapter_graph_memory.ModelONEXContainer"
+            ):
+                for uri in valid_uris:
+                    # Reset adapter state for each URI
+                    adapter._initialized = False
+                    adapter._handler = None
+
+                    # Should not raise ValueError for valid schemes
+                    await adapter.initialize(connection_uri=uri)
+                    assert adapter.is_initialized
 
 
 # =============================================================================

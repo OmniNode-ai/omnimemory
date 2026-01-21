@@ -470,7 +470,9 @@ class ModelRelatedMemoryResult(BaseModel):
     Attributes:
         status: Operation status (success, error, not_found, no_results).
         memories: List of related memories ordered by relevance score.
-        total_count: Total number of related memories found.
+        total_count: Total number of related memories returned (after filtering).
+        candidates_found: Number of candidates found before min_score filtering.
+            Useful for understanding how many results were filtered out.
         max_depth_reached: The maximum traversal depth that was reached.
         execution_time_ms: Time taken to execute the query in milliseconds.
         error_message: Error details if status is "error".
@@ -492,7 +494,15 @@ class ModelRelatedMemoryResult(BaseModel):
     total_count: int = Field(
         default=0,
         ge=0,
-        description="Total number of related memories found",
+        description="Total number of related memories returned (after filtering)",
+    )
+    candidates_found: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Number of candidates found before min_score filtering. "
+            "Compare with total_count to see how many were filtered out."
+        ),
     )
     max_depth_reached: int = Field(
         default=0,
@@ -771,8 +781,23 @@ class AdapterGraphMemory:
 
         Raises:
             RuntimeError: If initialization fails.
+            ValueError: If connection_uri is malformed.
             InfraConnectionError: If connection to graph database fails.
         """
+        # Validate URI format before attempting connection
+        parsed_uri = urlparse(connection_uri)
+        if not parsed_uri.scheme or not parsed_uri.hostname:
+            raise ValueError(
+                f"Invalid connection_uri: '{connection_uri}'. "
+                "Expected format: 'bolt://hostname:port' or 'bolt+s://hostname:port'"
+            )
+        if parsed_uri.scheme not in ("bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s"):
+            logger.warning(
+                "Unexpected URI scheme '%s' in connection_uri. "
+                "Expected bolt, bolt+s, bolt+ssc, neo4j, or neo4j+s.",
+                parsed_uri.scheme,
+            )
+
         try:
             async with asyncio.timeout(self._config.timeout_seconds):
                 async with self._init_lock:
@@ -995,11 +1020,16 @@ class AdapterGraphMemory:
             # Convert query results to related memories
             memories: list[ModelRelatedMemory] = []
             max_depth_reached = 0
+            # Track candidates before min_score filtering for observability
+            candidates_found = 0
 
             for record in result.records:
                 node_memory_id = record.get("memory_id")
                 if not isinstance(node_memory_id, str):
                     continue
+
+                # Count valid candidates before score filtering
+                candidates_found += 1
 
                 # Get depth from query result (path length)
                 raw_depth = record.get("depth")
@@ -1047,6 +1077,7 @@ class AdapterGraphMemory:
                     status="no_results",
                     memories=[],
                     total_count=0,
+                    candidates_found=candidates_found,
                     max_depth_reached=max_depth_reached,
                     execution_time_ms=execution_time_ms,
                 )
@@ -1055,6 +1086,7 @@ class AdapterGraphMemory:
                 status="success",
                 memories=memories,
                 total_count=len(memories),
+                candidates_found=candidates_found,
                 max_depth_reached=max_depth_reached,
                 execution_time_ms=execution_time_ms,
             )
@@ -1246,10 +1278,14 @@ class AdapterGraphMemory:
                 error_message=None if handler_healthy else "Handler reports unhealthy",
             )
         except Exception as e:
+            # Log summary at WARNING, full traceback at DEBUG to reduce noise
             logger.warning(
                 "Health check failed with %s: %s",
                 type(e).__name__,
                 e,
+            )
+            logger.debug(
+                "Health check exception traceback",
                 exc_info=True,
             )
             return ModelGraphMemoryHealth(
