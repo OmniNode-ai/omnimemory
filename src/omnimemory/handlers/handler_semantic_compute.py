@@ -49,6 +49,7 @@ Example::
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
@@ -65,6 +66,8 @@ from ..models.intelligence import (
 
 if TYPE_CHECKING:
     from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerSemanticCompute",
@@ -413,8 +416,6 @@ class HandlerSemanticCompute:
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
 
-        start_time = time.perf_counter()
-
         # Determine extraction strategy
         use_llm = self._policy.should_use_llm_for_entities() and self._llm_provider
 
@@ -430,9 +431,6 @@ class HandlerSemanticCompute:
         max_entities = self._config.policy_config.max_entities_per_request
         if len(filtered_entities) > max_entities:
             filtered_entities = filtered_entities[:max_entities]
-
-        # Note: start_time was captured but processing_time is not tracked in the response
-        _ = (time.perf_counter() - start_time) * 1000  # Reserved for future metrics
 
         return ModelSemanticEntityList(
             entities=filtered_entities,
@@ -537,7 +535,8 @@ class HandlerSemanticCompute:
 
     def _update_cache(self, key: str, value: list[float]) -> None:
         """Update the cache with LRU eviction."""
-        # Evict oldest entries if cache is full
+        # Evict oldest entries if cache is full.
+        # Python 3.7+ dicts maintain insertion order, so first key is oldest.
         while len(self._embedding_cache) >= self._config.max_cache_size:
             oldest_key = next(iter(self._embedding_cache))
             del self._embedding_cache[oldest_key]
@@ -677,8 +676,12 @@ class HandlerSemanticCompute:
 
             return self._parse_llm_entity_response(response, content)
 
-        except Exception:
-            # Fallback to heuristic on LLM failure
+        except Exception as e:
+            logger.warning(
+                "LLM entity extraction failed, falling back to heuristic: %s",
+                e,
+                exc_info=True,
+            )
             return self._extract_entities_heuristic(content)
 
     def _build_entity_extraction_prompt(self, content: str) -> str:
@@ -721,8 +724,8 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
 
         for entity_data in response.get("entities", []):
             try:
-                entity_type_str = entity_data.get("type", "misc").upper()
-                entity_type = EnumSemanticEntityType(entity_type_str.lower())
+                entity_type_str = entity_data.get("type", "misc").lower()
+                entity_type = EnumSemanticEntityType(entity_type_str)
             except ValueError:
                 entity_type = EnumSemanticEntityType.MISC
 

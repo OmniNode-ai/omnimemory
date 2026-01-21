@@ -14,8 +14,8 @@ description: >
   Delegates I/O to provider protocols (ProtocolEmbeddingProvider, ProtocolLLMProvider) to maintain compute
   purity. Supports deterministic and best-effort extraction modes.
 node_type: "COMPUTE"
-input_model: "ModelSemanticAnalyzerComputeInput"
-output_model: "ModelSemanticAnalyzerComputeOutput"
+input_model: "ModelSemanticAnalyzerComputeRequest"
+output_model: "ModelSemanticAnalyzerComputeResponse"
 
 # === ALGORITHM CONFIGURATION ===
 algorithm:
