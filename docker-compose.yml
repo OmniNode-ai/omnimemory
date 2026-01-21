@@ -9,12 +9,19 @@
 # - qdrant: Vector database for semantic memory (6333/6334)
 # - memgraph: Graph database for relationship queries (7687/7444)
 #
+# SECURITY WARNING (Non-Local Deployments):
+# - Qdrant and Memgraph are configured WITHOUT authentication by default
+# - For production/non-local deployments, enable authentication:
+#   - Qdrant: Set QDRANT__SERVICE__API_KEY environment variable
+#   - Memgraph: Add --auth-module-mappings and --auth-password-strength-regex
+# - Consider network isolation and TLS for external access
+#
 # ============================================================================
 name: omnimemory
 services:
   # Qdrant Vector Database (Semantic Memory Storage)
   qdrant:
-    image: qdrant/qdrant:${QDRANT_VERSION:-v1.7.4}
+    image: qdrant/qdrant:${QDRANT_VERSION:-v1.16.3}
     container_name: omnimemory-qdrant
     ports:
       - "${QDRANT_PORT:-6333}:6333"  # REST API
@@ -67,7 +74,9 @@ services:
     networks:
       - omnimemory-network
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/7687"]
+      # Uses mgconsole to verify database is ready to accept Cypher queries
+      # (TCP-only check would pass even if database isn't query-ready)
+      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port 7687 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

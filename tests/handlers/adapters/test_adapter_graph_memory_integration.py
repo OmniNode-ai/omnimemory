@@ -89,9 +89,34 @@ def get_memgraph_uri() -> str:
 
 
 def get_memgraph_auth() -> tuple[str, str] | None:
-    """Get Memgraph authentication from environment."""
+    """Get Memgraph authentication from environment.
+
+    Returns a (username, password) tuple if both are configured, or None for
+    anonymous authentication.
+
+    Authentication Behavior:
+        - If BOTH MEMGRAPH_USER and MEMGRAPH_PASSWORD are set (non-empty): Returns tuple
+        - If ONLY MEMGRAPH_USER is set (no password): Returns None (anonymous auth)
+        - If ONLY MEMGRAPH_PASSWORD is set (no user): Returns None (anonymous auth)
+        - If neither is set: Returns None (anonymous auth)
+
+    This is intentional because Memgraph/Neo4j driver requires both username AND
+    password for authentication. Providing only one would cause authentication
+    errors. When auth=None, the driver uses anonymous (no-auth) connection, which
+    is suitable for development Memgraph instances without authentication enabled.
+
+    Note:
+        The default MEMGRAPH_USER="memgraph" is used, but DEFAULT_MEMGRAPH_PASSWORD
+        is empty string, so if password is not explicitly set in environment,
+        anonymous authentication will be used by default.
+
+    Returns:
+        Tuple of (username, password) if both are configured, None otherwise.
+    """
     user = os.environ.get("MEMGRAPH_USER", DEFAULT_MEMGRAPH_USER)
     password = os.environ.get("MEMGRAPH_PASSWORD", DEFAULT_MEMGRAPH_PASSWORD)
+    # Both username AND password required for Memgraph authentication.
+    # If only one is set, fall back to anonymous auth (None) to avoid auth errors.
     if user and password:
         return (user, password)
     return None
@@ -482,8 +507,20 @@ class TestRealTraversal:
         initialized_adapter: AdapterGraphMemory,
         test_graph_data: dict[str, str],
     ) -> None:
-        """Test find_related with relationship type filter."""
+        """Test find_related with relationship type filter.
+
+        Graph structure:
+            mem_a --[related_to]--> mem_b --[related_to]--> mem_d
+            mem_a --[caused_by]--> mem_c --[related_to]--> mem_d
+
+        When filtering by 'related_to' only:
+            - mem_b should be found (direct related_to from mem_a)
+            - mem_d should be found (via mem_b's related_to)
+            - mem_c should NOT be found (connected via caused_by, not related_to)
+        """
         mem_a = test_graph_data["mem_a"]
+        mem_b = test_graph_data["mem_b"]
+        mem_c = test_graph_data["mem_c"]
 
         # Only follow 'related_to' relationships
         result = await initialized_adapter.find_related(
@@ -496,10 +533,17 @@ class TestRealTraversal:
 
         if result.status == "success":
             found_ids = {m.memory_id for m in result.memories}
-            # mem_b is connected via related_to
-            # mem_c is connected via caused_by, so should not be found
-            # with only related_to filter (though bidirectional might affect this)
-            assert len(found_ids) >= 0
+            # mem_b is connected via related_to - should be found
+            assert mem_b in found_ids, (
+                f"Expected mem_b ({mem_b}) to be found via related_to filter, "
+                f"but found: {found_ids}"
+            )
+            # mem_c is connected via caused_by - should NOT be found
+            # when filtering only by related_to
+            assert mem_c not in found_ids, (
+                f"Expected mem_c ({mem_c}) to NOT be found when filtering by "
+                f"related_to only (connected via caused_by), but found: {found_ids}"
+            )
 
     @pytest.mark.asyncio
     async def test_find_related_not_found(

@@ -33,8 +33,8 @@ Example::
             print(f"Related: {memory.memory_id} (score={memory.score:.2f})")
 
         # Get direct connections
-        connections = await adapter.get_connections("memory_abc123")
-        for conn in connections:
+        result = await adapter.get_connections("memory_abc123")
+        for conn in result.connections:
             print(f"{conn.source_id} --[{conn.relationship_type}]--> {conn.target_id}")
 
     asyncio.run(example())
@@ -804,14 +804,14 @@ class AdapterGraphMemory:
                 parsed_uri.scheme,
             )
 
-        async with self._init_lock:
-            # Early return for already-initialized stays outside timeout
-            if self._initialized:
-                return
-
-            try:
-                # Timeout only applies to actual initialization work
-                async with asyncio.timeout(self._config.timeout_seconds):
+        try:
+            # Timeout covers both lock acquisition and initialization work
+            # to prevent hanging if another coroutine holds the lock indefinitely
+            async with asyncio.timeout(self._config.timeout_seconds):
+                async with self._init_lock:
+                    # Early return for already-initialized
+                    if self._initialized:
+                        return
                     try:
                         # Create container if not provided
                         if self._container is None:
@@ -885,11 +885,11 @@ class AdapterGraphMemory:
                             e,
                         )
                         raise RuntimeError(f"Initialization failed: {e}") from e
-            except TimeoutError as e:
-                raise RuntimeError(
-                    f"Initialization timed out after {self._config.timeout_seconds}s. "
-                    "The database connection may be unresponsive."
-                ) from e
+        except TimeoutError as e:
+            raise RuntimeError(
+                f"Initialization timed out after {self._config.timeout_seconds}s. "
+                "The database connection or lock acquisition may be unresponsive."
+            ) from e
 
     def _ensure_initialized(self) -> HandlerGraph:
         """Ensure adapter is initialized and return handler.
@@ -956,12 +956,14 @@ class AdapterGraphMemory:
         """
         handler = self._ensure_initialized()
 
-        # Apply bounds
+        # Apply bounds - use explicit None checks to allow 0 as a valid value
         effective_depth = min(
-            depth or self._config.default_depth, self._config.max_depth
+            depth if depth is not None else self._config.default_depth,
+            self._config.max_depth,
         )
         effective_limit = min(
-            limit or self._config.default_limit, self._config.max_limit
+            limit if limit is not None else self._config.default_limit,
+            self._config.max_limit,
         )
 
         # Determine traversal direction (bidirectional or outgoing-only)
@@ -1150,11 +1152,16 @@ class AdapterGraphMemory:
         """
         handler = self._ensure_initialized()
 
+        # Use explicit None check to allow 0 as a valid value
         effective_limit = min(
-            limit or self._config.default_limit, self._config.max_limit
+            limit if limit is not None else self._config.default_limit,
+            self._config.max_limit,
         )
 
-        # Resolve bidirectional: use passed value if not None, otherwise use config
+        # Resolve bidirectional: use passed value if not None, otherwise use config.
+        # This allows callers to override per-call while falling back to config default.
+        # Verified correct: explicit False passes through, explicit True passes through,
+        # None falls back to self._config.bidirectional.
         effective_bidirectional = (
             bidirectional if bidirectional is not None else self._config.bidirectional
         )
