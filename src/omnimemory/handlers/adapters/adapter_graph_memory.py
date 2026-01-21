@@ -51,14 +51,15 @@ import logging
 import re
 import time
 from collections.abc import Mapping
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-# omnibase_core is always available (regular dependency)
-from omnibase_core.container import ModelONEXContainer
 from omnibase_core.types.type_json import JsonType
+
+if TYPE_CHECKING:
+    from omnibase_core.container import ModelONEXContainer
 
 # omnibase_infra is a dev dependency - make imports conditional
 _OMNIBASE_INFRA_AVAILABLE = False
