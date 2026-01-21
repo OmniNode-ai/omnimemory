@@ -98,10 +98,9 @@ __all__ = [
     "PropertyValue",
 ]
 
-# Type alias for graph property values.
-# Uses omnibase_core's JsonType which properly handles nested structures
-# via PEP 695 recursive type definition, avoiding Pydantic schema recursion errors.
-# This matches the type used by ModelGraphDatabaseNode.properties.
+# Type alias for graph property values (semantic naming only).
+# Delegates to omnibase_core's JsonType which uses PEP 695 recursive type
+# definition for Pydantic 2.x compatibility. Matches ModelGraphDatabaseNode.properties.
 type PropertyValue = JsonType
 
 
