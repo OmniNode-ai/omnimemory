@@ -1152,7 +1152,16 @@ class AdapterGraphMemory:
         """
         handler = self._ensure_initialized()
 
-        # Use explicit None check to allow 0 as a valid value
+        # Validate limit if provided - return early for non-positive values
+        # (consistent with find_related() behavior for edge case handling)
+        if limit is not None and limit < 1:
+            return ModelConnectionsResult(
+                status="no_results",
+                connections=[],
+                total_count=0,
+            )
+
+        # Apply bounds - default to config if None, cap at max_limit
         effective_limit = min(
             limit if limit is not None else self._config.default_limit,
             self._config.max_limit,
