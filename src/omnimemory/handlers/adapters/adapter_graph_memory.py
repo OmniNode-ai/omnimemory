@@ -56,19 +56,21 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+# omnibase_core is always available (regular dependency)
+from omnibase_core.container import ModelONEXContainer
+from omnibase_core.models.graph import (
+    ModelGraphDatabaseNode,
+    ModelGraphRelationship,
+    ModelGraphTraversalFilters,
+    ModelGraphTraversalResult,
+)
+from omnibase_core.types.type_json import JsonType
+
 # omnibase_infra is a dev dependency - make imports conditional
 _OMNIBASE_INFRA_AVAILABLE = False
 _OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
 
 try:
-    from omnibase_core.container import ModelONEXContainer
-    from omnibase_core.models.graph import (
-        ModelGraphDatabaseNode,
-        ModelGraphRelationship,
-        ModelGraphTraversalFilters,
-        ModelGraphTraversalResult,
-    )
-    from omnibase_core.types.type_json import JsonType
     from omnibase_infra.errors import InfraConnectionError
     from omnibase_infra.handlers.handler_graph import HandlerGraph
 
@@ -89,23 +91,6 @@ except ImportError as e:
                 f"Install it with: poetry install --with dev. "
                 f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
             )
-
-    class ModelONEXContainer:  # type: ignore[no-redef]
-        """Stub for ModelONEXContainer."""
-
-    class ModelGraphTraversalResult:  # type: ignore[no-redef]
-        """Stub for ModelGraphTraversalResult."""
-
-    class ModelGraphTraversalFilters:  # type: ignore[no-redef]
-        """Stub for ModelGraphTraversalFilters."""
-
-    class ModelGraphDatabaseNode:  # type: ignore[no-redef]
-        """Stub for ModelGraphDatabaseNode."""
-
-    class ModelGraphRelationship:  # type: ignore[no-redef]
-        """Stub for ModelGraphRelationship."""
-
-    type JsonType = str | int | float | bool | None  # type: ignore[misc,no-redef]
 
 
 logger = logging.getLogger(__name__)
