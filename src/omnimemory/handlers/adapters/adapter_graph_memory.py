@@ -49,7 +49,7 @@ import asyncio
 import heapq
 import logging
 from collections.abc import Mapping
-from typing import Literal
+from typing import Literal, TypeAlias
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
@@ -66,6 +66,7 @@ try:
         ModelGraphTraversalFilters,
         ModelGraphTraversalResult,
     )
+    from omnibase_core.types.type_json import JsonType
     from omnibase_infra.errors import InfraConnectionError
     from omnibase_infra.handlers.handler_graph import HandlerGraph
 
@@ -114,6 +115,8 @@ except ImportError as e:
 
         pass
 
+    JsonType: TypeAlias = str | int | float | bool | None  # type: ignore[misc,no-redef]
+
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +131,11 @@ __all__ = [
     "PropertyValue",
 ]
 
-# Type alias for graph property values (flat JSON-compatible types)
-# Note: Recursive types (nested list/dict) cause Pydantic schema recursion errors,
-# so we use a flat union. For nested properties, values are stored as-is at runtime.
-PropertyValue = str | int | float | bool | None
+# Type alias for graph property values.
+# Uses omnibase_core's JsonType which properly handles nested structures
+# via PEP 695 recursive type definition, avoiding Pydantic schema recursion errors.
+# This matches the type used by ModelGraphDatabaseNode.properties.
+PropertyValue: TypeAlias = JsonType
 
 
 # =============================================================================
@@ -350,7 +354,11 @@ class ModelRelatedMemory(BaseModel):
         ...,
         ge=0.0,
         le=1.0,
-        description="Relevance score (0.0-1.0)",
+        description=(
+            "Relevance score based on graph distance. "
+            "Range is 0.5 (depth=1) to ~0.09 (depth=10). "
+            "Calculated as 1/(depth+1)."
+        ),
     )
     path: list[str] = Field(
         default_factory=list,
@@ -825,8 +833,10 @@ class AdapterGraphMemory:
                 max_depth_reached = max(max_depth_reached, depth_to_node)
 
                 # Calculate relevance score based on traversal depth (edge count).
-                # Score: 1/(depth+1) gives closer nodes higher scores.
-                # E.g.: depth=1 -> 0.5, depth=2 -> 0.33, depth=3 -> 0.25
+                # Score formula: 1/(depth+1) gives closer nodes higher scores.
+                # Score range: 0.5 (depth=1) to ~0.09 (depth=10, max allowed).
+                # Note: Score never reaches 1.0 since minimum traversal depth is 1.
+                # Examples: depth=1 -> 0.5, depth=2 -> 0.33, depth=3 -> 0.25
                 score = 1.0 / (depth_to_node + 1)
 
                 if score < min_score:
@@ -995,12 +1005,16 @@ class AdapterGraphMemory:
             # Convert records to connections
             connections: list[ModelMemoryConnection] = []
             for record in result.records:
+                # Preserve weight=0.0 (falsy but valid), default to 1.0 only for None
+                raw_weight = record.get("weight")
+                weight = raw_weight if raw_weight is not None else 1.0
+
                 connections.append(
                     ModelMemoryConnection(
                         source_id=record["source_id"],
                         target_id=record["target_id"],
                         relationship_type=record["relationship_type"],
-                        weight=w if (w := record.get("weight")) is not None else 1.0,
+                        weight=weight,
                         is_outgoing=record.get("is_outgoing", True),
                         created_at=record.get("created_at"),
                     )
