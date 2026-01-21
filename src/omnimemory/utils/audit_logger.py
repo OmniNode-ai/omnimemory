@@ -370,20 +370,35 @@ class AuditLogger:
         return str(uuid.uuid4())
 
 
-# Global audit logger instance
-_audit_logger: AuditLogger | None = None
+class _AuditLoggerState:
+    """Singleton state manager for the audit logger.
+
+    Manages the global audit logger instance using class-level attributes
+    to avoid global statements.
+    """
+
+    _instance: AuditLogger | None = None
+
+    @classmethod
+    def get_instance(cls) -> AuditLogger | None:
+        """Get the current audit logger instance."""
+        return cls._instance
+
+    @classmethod
+    def set_instance(cls, logger: AuditLogger | None) -> None:
+        """Set the audit logger instance."""
+        cls._instance = logger
 
 
 def get_audit_logger() -> AuditLogger:
     """Get the global audit logger instance."""
-    global _audit_logger
-    if _audit_logger is None:
+    instance = _AuditLoggerState.get_instance()
+    if instance is None:
         # Initialize with default settings
         log_file = Path("logs/audit.log")
-        _audit_logger = AuditLogger(
-            log_file=log_file, console_output=True, json_format=True
-        )
-    return _audit_logger
+        instance = AuditLogger(log_file=log_file, console_output=True, json_format=True)
+        _AuditLoggerState.set_instance(instance)
+    return instance
 
 
 def configure_audit_logger(
@@ -392,7 +407,8 @@ def configure_audit_logger(
     json_format: bool = True,
 ) -> None:
     """Configure the global audit logger."""
-    global _audit_logger
-    _audit_logger = AuditLogger(
-        log_file=log_file, console_output=console_output, json_format=json_format
+    _AuditLoggerState.set_instance(
+        AuditLogger(
+            log_file=log_file, console_output=console_output, json_format=json_format
+        )
     )

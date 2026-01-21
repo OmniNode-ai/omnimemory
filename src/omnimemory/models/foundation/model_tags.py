@@ -7,6 +7,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# Maximum number of tags allowed in a collection
+MAX_TAGS_ALLOWED = 100
+
 
 def normalize_tag_name(name: str) -> str:
     """Normalize a tag name consistently.
@@ -108,8 +111,8 @@ class ModelTagCollection(BaseModel):
     ) -> None:
         """Add a new tag to the collection."""
         # Enforce maximum tag limit
-        if len(self.tags) >= 100:
-            raise ValueError("Maximum of 100 tags allowed")
+        if len(self.tags) >= MAX_TAGS_ALLOWED:
+            raise ValueError(f"Maximum of {MAX_TAGS_ALLOWED} tags allowed")
 
         # Normalize the tag name using the canonical function
         normalized_name = normalize_tag_name(name)

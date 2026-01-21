@@ -116,96 +116,96 @@ line-ending = "auto"
 # Rule sets enabled (includes UP for pyupgrade rules)
 # NOTE: UP007 (PEP 604 union syntax: X | Y instead of Union[X, Y]) is ENABLED
 # and organizationally mandated - do NOT add UP007 to the ignore list
-select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TCH", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "RUF"]
-# Technical debt rules - fix incrementally
+# NOTE: TCH rules have been remapped to TC in ruff 0.8+
+select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TC", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "RUF"]
 # IMPORTANT: UP007 must NEVER be added here (PEP 604 syntax is mandated)
 ignore = [
+    # ==========================================================================
+    # DESIGN CHOICES (intentionally ignored - not technical debt)
+    # ==========================================================================
     "S101",      # Allow assert statements in tests
-    "E501",      # Line too long (technical debt - will fix incrementally)
-    "BLE001",    # Blind exception catching (technical debt)
-    "E402",      # Module level import not at top (technical debt)
-    "TCH001",    # Type checking imports (technical debt)
-    "TCH003",    # Type checking imports (technical debt)
-    "TCH004",    # Type checking imports in __all__ re-exports (technical debt)
-    "PLR0911",   # Too many returns (technical debt)
-    "PLR0912",   # Too many branches (technical debt)
-    "PLR0913",   # Too many arguments (technical debt)
-    "PLR0915",   # Too many statements (technical debt)
-    "PLR2004",   # Magic values (technical debt)
-    "FBT001",    # Boolean positional args (technical debt)
-    "FBT002",    # Boolean default args (technical debt)
-    "EM101",     # Exception string literal (technical debt)
-    "EM102",     # Exception f-string literal (technical debt)
-    "TRY003",    # Long exception messages (technical debt)
-    "TRY004",    # Exception type preference (technical debt)
-    "TRY300",    # Consider else block (technical debt)
-    "DTZ005",    # datetime.now() without tz (technical debt)
-    "B008",      # Function call in defaults (technical debt)
-    "ARG003",    # Unused class method argument (technical debt)
-    "ERA001",    # Commented out code (technical debt)
-    "SIM102",    # Nested if statements (technical debt)
-    "B007",      # Unused loop variable (technical debt)
-    "PT018",     # Assertion breakdown (technical debt)
-    "EXE001",    # Shebang without executable (technical debt)
-    "B904",      # raise from (will fix incrementally)
-    "RET505",    # Unnecessary elif (will fix incrementally)
-    "COM812",    # Trailing commas (will fix incrementally)
-    "C901",      # Function complexity (architectural - not fixable easily)
-    "E721",      # Type comparisons (technical debt)
-    "N806",      # Variable naming (technical debt)
-    "TRY203",    # Redundant exception handler (technical debt)
-    "RUF003",    # Comment formatting (technical debt)
-    "SIM117",    # Nested with statements (technical debt)
-    "SIM105",    # contextlib.suppress (technical debt)
-    "PTH123",    # Path.open() (technical debt)
-    "PT017",     # pytest.raises in except (technical debt)
-    "F841",      # Unused variable (technical debt)
-    "ARG002",    # Unused method argument (technical debt)
-    "T201",      # Print statements (technical debt)
-    "FBT003",    # Boolean positional value in call (technical debt)
-    "N802",      # Invalid function name (technical debt)
-    "ARG001",    # Unused function argument (technical debt)
-    "PLR0917",   # Too many positional args (technical debt)
-    "S311",      # Random not for crypto (technical debt)
-    "RET504",    # Unnecessary assignment (technical debt)
-    "INP001",    # Missing __init__.py (scripts don't need it)
-    "TRY002",    # Raise vanilla class (technical debt)
-    "PGH003",    # type: ignore without code (technical debt)
-    "RUF001",    # String ambiguous unicode (technical debt)
-    "RUF002",    # Docstring ambiguous unicode (technical debt)
-    "RUF022",    # __all__ not sorted (technical debt)
-    "TID252",    # Relative imports from parent (technical debt - will fix)
-    "A004",      # Import shadowing builtin (technical debt - SystemError alias)
-    "S608",      # SQL injection (test code)
-    "PT019",     # Fixture without value (technical debt)
-    "PT012",     # pytest.raises multiple statements (technical debt)
-    "B015",      # Pointless comparison (test code)
-    "B018",      # Useless expression (test code)
-    "N801",      # Invalid class name (technical debt)
-    "N803",      # Invalid argument name (technical debt)
-    "N999",      # Invalid module name (technical debt)
-    "F821",      # Undefined name (protocols use forward refs)
-    "PLR0206",   # Cannot have defined parameters for properties (design choice)
-    "UP017",     # Use datetime.UTC (prefer timezone.utc for Python 3.10 compatibility)
-    "A002",      # Function argument shadowing builtin (design choice)
-    "B024",      # Abstract class without abstract methods (design choice)
-    "SLF001",    # Private member accessed (test code needs this)
-    "S105",      # Possible hardcoded password (test fixtures)
-    "PT011",     # pytest.raises too broad (tech debt)
-    "SIM118",    # Use key in dict instead of dict.keys() (tech debt)
-    "A001",      # Variable shadowing builtin (design choice)
-    "RUF012",    # Mutable class attrs should be ClassVar (tech debt)
-    "PLW0603",   # Using global statement (design choice)
-    "ARG005",    # Unused lambda argument (design choice)
-    "TRY301",    # Abstract raise to inner function (tech debt)
-    "TRY400",    # Use logging.exception (tech debt)
-    "F822",      # Undefined name in __all__ (tech debt - will fix)
-    "SIM110",    # Use any() instead of for loop (tech debt)
-    "G004",      # Logging uses f-string (tech debt)
-    "B017",      # pytest.raises(Exception) evil (test code)
-    "S110",      # try-except-pass (design choice in cleanup)
-    "SIM101",    # Multiple isinstance calls (tech debt)
-    "RUF005",    # Consider unpacking instead of concatenation (tech debt)
+    "PLR0206",   # Properties with parameters (design choice for descriptors)
+    "UP017",     # Use datetime.UTC (prefer timezone.utc for Python 3.10 compat)
+    "A002",      # Function argument shadowing builtin (id, type, etc. are common)
+    "B024",      # Abstract class without abstract methods (base class patterns)
+    "ARG005",    # Unused lambda argument (callback signatures require it)
+    "S110",      # try-except-pass (intentional in cleanup/shutdown code)
+
+    # ==========================================================================
+    # TEST CODE ONLY (acceptable in test files)
+    # ==========================================================================
+    "SLF001",    # Private member accessed (tests need to verify internals)
+    "S105",      # Hardcoded password (test fixtures use fake credentials)
+    "S608",      # SQL injection (test code with controlled input)
+    "B017",      # pytest.raises(Exception) (acceptable for broad exception tests)
+    "PT011",     # pytest.raises too broad (will add match= incrementally)
+
+    # ==========================================================================
+    # COMPLEXITY RULES (architectural - requires refactoring)
+    # ==========================================================================
+    "C901",      # Function complexity (>10) - requires architectural changes
+    "PLR0911",   # Too many return statements (>6)
+    "PLR0912",   # Too many branches (>12)
+    "PLR0913",   # Too many arguments (>5)
+    "PLR0915",   # Too many statements (>50)
+    "PLR2004",   # Magic values in comparisons
+
+    # ==========================================================================
+    # EXCEPTION HANDLING (technical debt - fix incrementally)
+    # ==========================================================================
+    "BLE001",    # Blind exception catching (Exception)
+    "EM101",     # Exception must not use string literal
+    "EM102",     # Exception must not use f-string literal
+    "TRY003",    # Long exception messages outside exception class
+    "TRY004",    # Prefer TypeError for invalid type
+    "TRY203",    # Redundant exception handler (useless re-raise)
+    "TRY300",    # Consider moving to else block
+    "TRY301",    # Abstract raise to inner function
+    "TRY400",    # Use logging.exception instead of logging.error
+    "B904",      # raise ... from err/None in except blocks
+
+    # ==========================================================================
+    # BOOLEAN PARAMETERS (technical debt - fix incrementally)
+    # ==========================================================================
+    "FBT001",    # Boolean positional argument in function definition
+    "FBT002",    # Boolean default positional argument
+    "FBT003",    # Boolean positional value in function call
+
+    # ==========================================================================
+    # UNUSED ARGUMENTS (technical debt - interface compliance)
+    # ==========================================================================
+    "ARG001",    # Unused function argument (callback signatures)
+    "ARG002",    # Unused method argument (interface compliance)
+
+    # ==========================================================================
+    # SIMPLIFICATION RULES (technical debt - fix incrementally)
+    # ==========================================================================
+    "SIM102",    # Nested if statements (use single if with and)
+    "SIM105",    # Use contextlib.suppress instead of try-except-pass
+    "SIM110",    # Use any() instead of for loop
+    "SIM117",    # Nested with statements (use single with)
+    "SIM118",    # Use key in dict instead of key in dict.keys()
+    "SIM101",    # Multiple isinstance calls (merge into single call)
+    "RET504",    # Unnecessary assignment before return
+    "RET505",    # Unnecessary elif after return
+
+    # ==========================================================================
+    # CODE STYLE (technical debt - fix incrementally)
+    # ==========================================================================
+    "E501",      # Line too long (>88 characters)
+    "E402",      # Module level import not at top of file
+    "TC003",     # Move stdlib import into TYPE_CHECKING block
+    "COM812",    # Trailing comma missing
+    "N806",      # Variable in function should be lowercase
+    "PTH123",    # Use Path.open() instead of open()
+    "TID252",    # Prefer absolute imports over relative from parent
+    "T201",      # print() found (use logging instead)
+    "S311",      # Random not suitable for crypto (acceptable for non-crypto)
+    "RUF022",    # __all__ is not sorted
+    "RUF012",    # Mutable class attrs should be ClassVar
+    "RUF005",    # Consider unpacking instead of concatenation
+    "G004",      # Logging statement uses f-string
+    "B007",      # Unused loop control variable
 ]
 
 [tool.ruff.lint.isort]

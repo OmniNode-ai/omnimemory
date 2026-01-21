@@ -41,8 +41,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Sequence
-from typing import assert_never
+from typing import TYPE_CHECKING, assert_never
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access

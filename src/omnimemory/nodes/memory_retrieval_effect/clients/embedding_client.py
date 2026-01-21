@@ -39,12 +39,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from types import TracebackType
+from typing import TYPE_CHECKING
 
 import httpx
+
+if TYPE_CHECKING:
+    from types import TracebackType
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
+
+# HTTP status code ranges for error classification
+HTTP_CLIENT_ERROR_MIN = 400
+HTTP_CLIENT_ERROR_MAX = 500  # Exclusive upper bound for client errors (4xx range)
 
 __all__ = [
     "EmbeddingClient",
@@ -290,7 +297,11 @@ class EmbeddingClient:
 
             except httpx.HTTPStatusError as e:
                 # Don't retry on client errors (4xx)
-                if 400 <= e.response.status_code < 500:
+                if (
+                    HTTP_CLIENT_ERROR_MIN
+                    <= e.response.status_code
+                    < HTTP_CLIENT_ERROR_MAX
+                ):
                     raise EmbeddingClientError(
                         f"Embedding server returned client error: "
                         f"{e.response.status_code} - {e.response.text}"

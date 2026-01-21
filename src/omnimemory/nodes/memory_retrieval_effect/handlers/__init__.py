@@ -24,13 +24,13 @@ from .handler_graph_mock import (
 from .handler_qdrant_mock import HandlerQdrantMock, ModelHandlerQdrantMockConfig
 
 __all__ = [
-    # Qdrant (semantic search)
+    # Qdrant - semantic search
     "HandlerQdrantMock",
     "ModelHandlerQdrantMockConfig",
-    # Database (full-text search)
+    # Database - full-text search
     "HandlerDbMock",
     "ModelHandlerDbMockConfig",
-    # Graph (traversal)
+    # Graph - traversal
     "HandlerGraphMock",
     "ModelHandlerGraphMockConfig",
     "HandlerGraphRelationship",

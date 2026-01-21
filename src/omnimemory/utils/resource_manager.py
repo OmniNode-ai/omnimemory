@@ -24,11 +24,13 @@ import asyncio
 import contextlib
 import random
 import time
-from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Callable
 
 import structlog
 from pydantic import BaseModel, Field

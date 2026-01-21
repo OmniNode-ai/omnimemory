@@ -11,9 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Import local omnimemory enums (always available)
-from ...enums.enum_error_code import EnumOmniMemoryErrorCode
-from ...enums.enum_severity import EnumSeverity
+from ...enums.enum_error_code import EnumOmniMemoryErrorCode  # noqa: TC001
+from ...enums.enum_severity import EnumSeverity  # noqa: TC001
 
 
 class ModelErrorDetails(BaseModel):

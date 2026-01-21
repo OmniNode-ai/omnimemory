@@ -17,6 +17,13 @@ from pydantic import (
 
 from omnimemory.enums import EnumDecayFunction, EnumTrustLevel
 
+# Trust level score thresholds for categorization
+TRUST_LEVEL_VERIFIED_THRESHOLD = 0.95
+TRUST_LEVEL_TRUSTED_THRESHOLD = 0.9
+TRUST_LEVEL_HIGH_THRESHOLD = 0.7
+TRUST_LEVEL_MEDIUM_THRESHOLD = 0.5
+TRUST_LEVEL_LOW_THRESHOLD = 0.2
+
 
 def ensure_timezone_aware(
     dt: datetime | None, field_name: str = "datetime"
@@ -150,15 +157,15 @@ class ModelTrustScore(BaseModel):
     @staticmethod
     def _score_to_level(score: float) -> EnumTrustLevel:
         """Convert numeric score to trust level."""
-        if score >= 0.95:
+        if score >= TRUST_LEVEL_VERIFIED_THRESHOLD:
             return EnumTrustLevel.VERIFIED
-        elif score >= 0.9:
+        elif score >= TRUST_LEVEL_TRUSTED_THRESHOLD:
             return EnumTrustLevel.TRUSTED
-        elif score >= 0.7:
+        elif score >= TRUST_LEVEL_HIGH_THRESHOLD:
             return EnumTrustLevel.HIGH
-        elif score >= 0.5:
+        elif score >= TRUST_LEVEL_MEDIUM_THRESHOLD:
             return EnumTrustLevel.MEDIUM
-        elif score >= 0.2:
+        elif score >= TRUST_LEVEL_LOW_THRESHOLD:
             return EnumTrustLevel.LOW
         else:
             return EnumTrustLevel.UNTRUSTED

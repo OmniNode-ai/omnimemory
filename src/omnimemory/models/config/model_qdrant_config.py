@@ -14,6 +14,9 @@ from pydantic import (
     model_validator,
 )
 
+# Qdrant collection name maximum length
+COLLECTION_NAME_MAX_LENGTH = 255
+
 
 class ModelQdrantConfig(BaseModel):
     """Configuration for Qdrant vector storage.
@@ -97,8 +100,10 @@ class ModelQdrantConfig(BaseModel):
             raise ValueError(
                 "collection_name must contain only alphanumeric, underscore, or hyphen"
             )
-        if len(v) > 255:
-            raise ValueError("collection_name cannot exceed 255 characters")
+        if len(v) > COLLECTION_NAME_MAX_LENGTH:
+            raise ValueError(
+                f"collection_name cannot exceed {COLLECTION_NAME_MAX_LENGTH} characters"
+            )
         return v
 
     @field_validator("distance_metric")

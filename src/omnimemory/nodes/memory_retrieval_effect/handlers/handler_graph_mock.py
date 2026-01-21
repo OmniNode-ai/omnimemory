@@ -47,13 +47,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
-from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
 )
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from ..models import (
     ModelMemoryRetrievalRequest,
@@ -372,7 +375,7 @@ class HandlerGraphMock:
         results: list[ModelSearchResult] = []
         visited: set[str] = {start_id}
 
-        # Queue: (node_id, depth, path, cumulative_weight)
+        # Queue entries are tuples of node_id, depth, path, cumulative_weight
         queue: deque[tuple[str, int, list[str], float]] = deque()
         queue.append((start_id, 0, [start_id], 1.0))
 

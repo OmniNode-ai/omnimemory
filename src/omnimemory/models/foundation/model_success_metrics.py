@@ -6,6 +6,15 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
+# Confidence level thresholds for human-readable categorization
+CONFIDENCE_VERY_HIGH_THRESHOLD = 0.9
+CONFIDENCE_HIGH_THRESHOLD = 0.75
+CONFIDENCE_MEDIUM_THRESHOLD = 0.5
+CONFIDENCE_LOW_THRESHOLD = 0.25
+
+# Reliability threshold for high quality determination
+HIGH_QUALITY_RELIABILITY_THRESHOLD = 0.8
+
 
 class ModelSuccessRate(BaseModel):
     """Success rate metric following ONEX standards."""
@@ -136,13 +145,13 @@ class ModelConfidenceScore(BaseModel):
     @property
     def confidence_level(self) -> str:
         """Get human-readable confidence level."""
-        if self.score >= 0.9:
+        if self.score >= CONFIDENCE_VERY_HIGH_THRESHOLD:
             return "Very High"
-        elif self.score >= 0.75:
+        elif self.score >= CONFIDENCE_HIGH_THRESHOLD:
             return "High"
-        elif self.score >= 0.5:
+        elif self.score >= CONFIDENCE_MEDIUM_THRESHOLD:
             return "Medium"
-        elif self.score >= 0.25:
+        elif self.score >= CONFIDENCE_LOW_THRESHOLD:
             return "Low"
         else:
             return "Very Low"
@@ -192,4 +201,7 @@ class ModelQualityMetrics(BaseModel):
     @property
     def is_high_quality(self) -> bool:
         """Check if metrics indicate high quality."""
-        return self.quality_grade in {"A+", "A", "B+"} and self.reliability_index >= 0.8
+        return (
+            self.quality_grade in {"A+", "A", "B+"}
+            and self.reliability_index >= HIGH_QUALITY_RELIABILITY_THRESHOLD
+        )

@@ -14,10 +14,12 @@ import asyncio
 import os
 import sys
 import time
-from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 # Optional psutil import for resource metrics - gracefully degrade if unavailable
 _PSUTIL_AVAILABLE = False

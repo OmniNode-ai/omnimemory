@@ -46,10 +46,12 @@ Performance:
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from omnimemory.models.memory.model_similarity_result import ModelSimilarityResult
 

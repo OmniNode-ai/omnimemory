@@ -16,6 +16,9 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
+# Maximum reasonable length for an exception class name
+MAX_EXCEPTION_NAME_LENGTH = 100
+
 from ...enums import (
     EnumFileProcessingStatus,
     EnumMigrationPriority,
@@ -461,7 +464,7 @@ class MigrationProgressTracker(BaseModel):
             potential_type
             and potential_type[0].isupper()
             and potential_type.isidentifier()
-            and len(potential_type) <= 100  # Reasonable max for exception name
+            and len(potential_type) <= MAX_EXCEPTION_NAME_LENGTH
         ):
             return potential_type
 

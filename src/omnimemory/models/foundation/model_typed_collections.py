@@ -13,9 +13,12 @@ All models follow ONEX standards with:
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # === STRING COLLECTIONS ===
 

@@ -51,12 +51,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
 )
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from ..models import (
     ModelMemoryRetrievalRequest,
@@ -65,6 +68,9 @@ from ..models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Minimum token length for text tokenization (filters out short words)
+MIN_TOKEN_LENGTH = 2
 
 __all__ = [
     "HandlerDbMock",
@@ -295,7 +301,7 @@ class HandlerDbMock:
         # Split on non-alphanumeric characters
         tokens = re.split(r"[^\w]+", text)
         # Filter empty tokens and short words
-        return [t for t in tokens if len(t) >= 2]
+        return [t for t in tokens if len(t) >= MIN_TOKEN_LENGTH]
 
     def _get_snapshot_text(self, snapshot: ModelMemorySnapshot) -> str:
         """Extract searchable text from a snapshot.

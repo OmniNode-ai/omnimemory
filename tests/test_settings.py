@@ -316,10 +316,10 @@ class TestLoadSettings:
         """Test loading a full configuration from environment."""
         _clear_omnimemory_env_vars(monkeypatch)
 
-        # Filesystem (required)
+        # Filesystem - required
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        # Postgres (optional but enabled)
+        # Postgres - optional but enabled
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
         monkeypatch.setenv(
             "OMNIMEMORY__POSTGRES__DSN", "postgresql://user@localhost/db"

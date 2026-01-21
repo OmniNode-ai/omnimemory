@@ -9,8 +9,10 @@ that integrate with NodeResult for consistent error handling across the system.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
-from uuid import UUID
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from uuid import UUID
 
 # Type alias for field values in validation errors
 # Supports common field types that can fail validation

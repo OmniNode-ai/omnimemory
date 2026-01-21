@@ -6,9 +6,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.models.config.model_filesystem_config import ModelFilesystemConfig
-from omnimemory.models.config.model_postgres_config import ModelPostgresConfig
-from omnimemory.models.config.model_qdrant_config import ModelQdrantConfig
+from omnimemory.models.config.model_filesystem_config import (  # noqa: TC001
+    ModelFilesystemConfig,
+)
+from omnimemory.models.config.model_postgres_config import (  # noqa: TC001
+    ModelPostgresConfig,
+)
+from omnimemory.models.config.model_qdrant_config import (  # noqa: TC001
+    ModelQdrantConfig,
+)
 
 
 class ModelMemoryServiceConfig(BaseModel):
