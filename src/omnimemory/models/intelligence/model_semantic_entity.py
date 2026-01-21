@@ -8,7 +8,9 @@ full type information, confidence scores, and span positions.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...enums.enum_semantic_entity_type import EnumSemanticEntityType  # noqa: TC001
 
@@ -76,6 +78,22 @@ class ModelSemanticEntity(BaseModel):
         default_factory=dict,
         description="Additional metadata about the entity (e.g., wikidata_id, dbpedia_uri)",
     )
+
+    @model_validator(mode="after")
+    def validate_span_ordering(self) -> Self:
+        """Validate span ordering and that span length matches text length."""
+        if self.span_end <= self.span_start:
+            raise ValueError(
+                f"span_end ({self.span_end}) must be greater than span_start ({self.span_start})"
+            )
+        span_length = self.span_end - self.span_start
+        text_length = len(self.text)
+        if span_length != text_length:
+            raise ValueError(
+                f"span length ({span_length}) must equal text length ({text_length}); "
+                f"span_start={self.span_start}, span_end={self.span_end}, text={self.text!r}"
+            )
+        return self
 
     @property
     def span_length(self) -> int:

@@ -673,13 +673,24 @@ class TestPolicy:
         self,
         policy: HandlerSemanticComputePolicy,
     ) -> None:
-        """Retry delay should follow exponential backoff."""
-        delay1 = policy.get_retry_delay_ms(1)
-        delay2 = policy.get_retry_delay_ms(2)
-        delay3 = policy.get_retry_delay_ms(3)
+        """Retry delay should follow exponential backoff with jitter.
 
-        assert delay2 == delay1 * 2
-        assert delay3 == delay2 * 2
+        Jitter is applied as: base_delay * 2^(attempt-1) * uniform(0.5, 1.0)
+        So delays should be within 50%-100% of the base exponential value.
+        Default base is 100ms.
+        """
+        # Sample multiple times to verify jitter range
+        for _ in range(10):
+            delay1 = policy.get_retry_delay_ms(1)
+            delay2 = policy.get_retry_delay_ms(2)
+            delay3 = policy.get_retry_delay_ms(3)
+
+            # Attempt 1: base * 1, jittered to 50-100%
+            assert 50 <= delay1 <= 100, f"delay1={delay1} not in [50, 100]"
+            # Attempt 2: base * 2, jittered to 50-100%
+            assert 100 <= delay2 <= 200, f"delay2={delay2} not in [100, 200]"
+            # Attempt 3: base * 4, jittered to 50-100%
+            assert 200 <= delay3 <= 400, f"delay3={delay3} not in [200, 400]"
 
     def test_policy_effective_llm_params_deterministic(
         self,
@@ -924,8 +935,11 @@ class TestEntityClassification:
             for e in result.entities
             if e.entity_type == EnumSemanticEntityType.ORGANIZATION
         ]
-        # Inc should trigger org classification
-        assert len(org_entities) >= 0  # May or may not find depending on heuristics
+        # Inc should trigger org classification (matches "inc" suffix in heuristic)
+        assert len(org_entities) >= 1, (
+            f"Expected 'Inc' to be classified as ORGANIZATION. "
+            f"Got entities: {[(e.text, e.entity_type) for e in result.entities]}"
+        )
 
     @pytest.mark.asyncio
     async def test_misc_classification_for_capitalized_words(

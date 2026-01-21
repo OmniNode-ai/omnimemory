@@ -21,7 +21,7 @@ class ModelSemanticEntityList(BaseModel):
     """
 
     model_config = ConfigDict(
-        frozen=False,
+        frozen=True,
         extra="forbid",
     )
 

@@ -51,6 +51,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import random
 import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
@@ -66,6 +67,14 @@ from ..models.intelligence import (
     ModelSemanticEntity,
     ModelSemanticEntityList,
 )
+from ..utils.handler_constants import (
+    COMPLEXITY_SENTENCE_LEN_MIN,
+    COMPLEXITY_SENTENCE_LEN_RANGE,
+    COMPLEXITY_WORD_LEN_MIN,
+    COMPLEXITY_WORD_LEN_RANGE,
+    KEY_CONCEPT_CONFIDENCE_THRESHOLD,
+    SENTENCE_STARTING_STOPWORDS,
+)
 
 if TYPE_CHECKING:
     from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
@@ -80,134 +89,6 @@ __all__ = [
 
 # TypeVar for generic retry helper
 _T = TypeVar("_T")
-
-# Confidence threshold for extracting key concepts from entities.
-# Higher than general entity filtering to ensure only high-confidence
-# entities are promoted to key concepts.
-_KEY_CONCEPT_CONFIDENCE_THRESHOLD: float = 0.8
-
-# =============================================================================
-# Module-Level Constants
-# =============================================================================
-
-# Common words that start sentences but aren't named entities.
-# Used by _extract_entities_heuristic() to filter false positives.
-_SENTENCE_STARTING_STOPWORDS: frozenset[str] = frozenset(
-    {
-        # Articles and determiners
-        "The",
-        "A",
-        "An",
-        # Demonstratives
-        "This",
-        "That",
-        "These",
-        "Those",
-        # Pronouns
-        "It",
-        "He",
-        "She",
-        "We",
-        "They",
-        "I",
-        "You",
-        # Common sentence starters
-        "However",
-        "Therefore",
-        "Furthermore",
-        "Moreover",
-        "Nevertheless",
-        "Meanwhile",
-        "Additionally",
-        "Consequently",
-        "Subsequently",
-        "Otherwise",
-        "Accordingly",
-        "Similarly",
-        "Likewise",
-        "Indeed",
-        "Hence",
-        "Thus",
-        "Regardless",
-        "Nonetheless",
-        "Notwithstanding",
-        # Question words
-        "What",
-        "When",
-        "Where",
-        "Who",
-        "Why",
-        "How",
-        "Which",
-        # Other common starters
-        "There",
-        "Here",
-        "If",
-        "As",
-        "So",
-        "But",
-        "And",
-        "Or",
-        "Yet",
-        "For",
-        "Nor",
-        "After",
-        "Before",
-        "Because",
-        "Although",
-        "While",
-        "Since",
-        "Until",
-        "Unless",
-        "Once",
-        "Now",
-        "Then",
-        "Also",
-        "First",
-        "Second",
-        "Third",
-        "Finally",
-        "Next",
-        "Last",
-        "Many",
-        "Most",
-        "Some",
-        "All",
-        "Any",
-        "Each",
-        "Every",
-        "Both",
-        "Few",
-        "Several",
-        "Such",
-        "No",
-        "Not",
-        "Only",
-        "Just",
-        "Even",
-        "Still",
-        "Already",
-        # Adverbial starters
-        "Recently",
-        "Currently",
-        "Actually",
-        "Basically",
-        "Essentially",
-        "Generally",
-        "Usually",
-        "Obviously",
-        "Clearly",
-        "Certainly",
-        "Probably",
-        "Perhaps",
-        "Maybe",
-        "Possibly",
-        # Temporal starters (common in sentence-start context, not entity names)
-        "Today",
-        "Tomorrow",
-        "Yesterday",
-    }
-)
 
 
 # =============================================================================
@@ -342,7 +223,19 @@ class HandlerSemanticComputePolicy:
     def get_retry_delay_ms(self, attempt: int) -> int:
         """Calculate the retry delay for an attempt.
 
-        Uses exponential backoff with jitter.
+        Uses exponential backoff with jitter. The jitter behavior depends on
+        the deterministic mode setting:
+
+        - **Deterministic mode** (``is_deterministic=True``): Uses a seeded
+          random number generator based on ``llm_seed`` and the attempt number.
+          This ensures the same delay is returned for the same attempt across
+          calls, making tests reproducible while still providing variation
+          between different retry attempts.
+
+        - **Non-deterministic mode** (``is_deterministic=False``): Uses the
+          global random number generator for true randomness in jitter. This
+          is preferred in production to prevent thundering herd issues when
+          multiple clients retry simultaneously.
 
         Args:
             attempt: Current attempt number (1-indexed).
@@ -355,7 +248,21 @@ class HandlerSemanticComputePolicy:
 
         # Exponential backoff: base * 2^(attempt-1)
         delay = min(base * (2 ** (attempt - 1)), max_delay)
-        return int(delay)
+
+        # Apply jitter (full jitter pattern: multiply by random factor 0.5-1.0)
+        # This helps prevent thundering herd when multiple clients retry simultaneously
+        if self._config.is_deterministic:
+            # In deterministic mode, use a seeded RNG for reproducible jitter.
+            # Seed combines llm_seed (or 0 if None) with attempt number to ensure
+            # different but reproducible jitter values for each retry attempt.
+            seed_value = (self._config.effective_llm_seed or 0) + attempt
+            seeded_rng = random.Random(seed_value)
+            jitter_factor = seeded_rng.uniform(0.5, 1.0)
+        else:
+            # In non-deterministic mode, use global RNG for true randomness
+            jitter_factor = random.uniform(0.5, 1.0)
+
+        return int(delay * jitter_factor)
 
     def get_effective_llm_params(self) -> dict[str, float | int | None]:
         """Get effective LLM parameters based on extraction mode.
@@ -757,6 +664,43 @@ class HandlerSemanticCompute:
 
         Raises:
             ValueError: If content is empty or analysis_type is invalid.
+
+        Note:
+            **Topic Extraction Limitations**:
+
+            The ``topics`` field uses ``_extract_topics_heuristic()``, a simple
+            word-frequency approach that does NOT perform semantic topic modeling.
+
+            How it works:
+                - Converts text to lowercase and splits into words
+                - Filters common stopwords (the, is, are, etc.) and short words (<4 chars)
+                - Counts frequency of remaining words
+                - Returns the top 5 most frequent words as "topics"
+
+            Limitations:
+                - **No semantic understanding**: Topics are just frequent words, not
+                  conceptual themes. "Python" appearing 5 times becomes a topic regardless
+                  of context (programming language vs snake).
+                - **No multi-word topics**: Cannot extract phrases like "machine learning"
+                  or "climate change" as single topics.
+                - **No topic modeling algorithms**: Does NOT use LDA (Latent Dirichlet
+                  Allocation), NMF, or embeddings-based clustering.
+                - **No document-level coherence**: Topics are based solely on word
+                  frequency, not semantic relationships between concepts.
+                - **Stopword-dependent quality**: Topic quality depends heavily on the
+                  hardcoded stopword list; domain-specific common words may pollute results.
+
+            Use Cases:
+                - Quick keyword extraction for indexing
+                - Testing and development (deterministic, reproducible)
+                - Lightweight analysis where precision is not critical
+
+            For sophisticated topic analysis (semantic topic modeling, multi-word
+            topic extraction, or hierarchical topic structures), consider integrating
+            external NLP services or dedicated topic modeling libraries (gensim, BERTopic).
+
+            **Entity Extraction**: See :meth:`extract_entities` for detailed documentation
+            on entity extraction modes, capabilities, and limitations.
         """
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
@@ -894,14 +838,19 @@ class HandlerSemanticCompute:
         for word in words:
             # Find position in original content
             try:
-                span_start = content.index(word, i)
-                span_end = span_start + len(word)
-                i = span_end
+                word_start = content.index(word, i)
+                i = word_start + len(word)
             except ValueError:
                 continue
 
             # Strip punctuation for analysis
             clean_word = word.strip(".,!?;:\"'()[]{}").strip()
+
+            # Calculate span for the cleaned word (without punctuation)
+            # Find where clean_word starts within word and adjust span accordingly
+            clean_offset = word.find(clean_word)
+            span_start = word_start + clean_offset
+            span_end = span_start + len(clean_word)
 
             if not clean_word:
                 # Check if this word ends a sentence for next iteration
@@ -918,10 +867,7 @@ class HandlerSemanticCompute:
             # Simple heuristic: capitalized words
             if clean_word[0].isupper() and len(clean_word) > 1:
                 # Check if this is a sentence-starting stopword
-                if (
-                    word_is_sentence_start
-                    and clean_word in _SENTENCE_STARTING_STOPWORDS
-                ):
+                if word_is_sentence_start and clean_word in SENTENCE_STARTING_STOPWORDS:
                     # Skip common stopwords at sentence start
                     # Note: proper nouns like "The Beatles" - "The" is skipped,
                     # but "Beatles" will be captured on its next iteration
@@ -1135,7 +1081,7 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
         concepts = [
             e.text
             for e in entities
-            if e.confidence >= _KEY_CONCEPT_CONFIDENCE_THRESHOLD
+            if e.confidence >= KEY_CONCEPT_CONFIDENCE_THRESHOLD
             and e.entity_type
             in {
                 EnumSemanticEntityType.ORGANIZATION,
@@ -1269,16 +1215,29 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
 
         avg_word_len = sum(len(w) for w in words) / len(words)
 
-        # Normalize: 4 chars = 0.3, 8+ chars = 0.8
-        word_complexity = min(1.0, max(0.0, (avg_word_len - 2) / 8))
+        # Normalize word complexity using module constants
+        word_complexity = min(
+            1.0,
+            max(
+                0.0,
+                (avg_word_len - COMPLEXITY_WORD_LEN_MIN) / COMPLEXITY_WORD_LEN_RANGE,
+            ),
+        )
 
         # Sentence length factor
         sentences = content.count(".") + content.count("!") + content.count("?")
         sentences = max(1, sentences)
         avg_sentence_len = len(words) / sentences
 
-        # Normalize: 10 words = 0.3, 30+ words = 0.8
-        sentence_complexity = min(1.0, max(0.0, (avg_sentence_len - 5) / 30))
+        # Normalize sentence complexity using module constants
+        sentence_complexity = min(
+            1.0,
+            max(
+                0.0,
+                (avg_sentence_len - COMPLEXITY_SENTENCE_LEN_MIN)
+                / COMPLEXITY_SENTENCE_LEN_RANGE,
+            ),
+        )
 
         return (word_complexity + sentence_complexity) / 2
 
