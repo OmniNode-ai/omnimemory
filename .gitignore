@@ -213,6 +213,7 @@ env.bak/
 # Env files
 .env
 .env.*
+!.env.example
 
 # Misc
 *.log

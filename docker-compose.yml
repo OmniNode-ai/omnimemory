@@ -16,7 +16,7 @@ services:
 
   # Qdrant Vector Database (Semantic Memory Storage)
   qdrant:
-    image: qdrant/qdrant:v1.7.4
+    image: qdrant/qdrant:${QDRANT_VERSION:-v1.7.4}
     container_name: omnimemory-qdrant
     ports:
       - "${QDRANT_PORT:-6333}:6333"      # REST API
@@ -51,7 +51,7 @@ services:
 
   # Memgraph Database (Graph Memory / Relationship Queries)
   memgraph:
-    image: memgraph/memgraph:2.18.1
+    image: memgraph/memgraph:${MEMGRAPH_VERSION:-2.18.1}
     container_name: omnimemory-memgraph
     ports:
       - "${MEMGRAPH_BOLT_PORT:-7687}:7687"  # Bolt protocol

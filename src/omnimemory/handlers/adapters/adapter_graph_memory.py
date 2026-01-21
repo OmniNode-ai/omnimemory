@@ -48,12 +48,13 @@ from __future__ import annotations
 import asyncio
 import heapq
 import logging
+import re
 import time
 from collections.abc import Mapping
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # omnibase_infra is a dev dependency - make imports conditional
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -436,9 +437,10 @@ class ModelRelatedMemory(BaseModel):
         ge=0.0,
         le=1.0,
         description=(
-            "Relevance score based on graph distance. "
-            "Range is 0.5 (depth=1) to ~0.09 (depth=10). "
-            "Calculated as 1/(depth+1)."
+            "Relevance score based on graph distance. Calculated as 1/(depth+1). "
+            "Minimum depth is 1 (starting node excluded), "
+            "so range is 0.5 (depth=1) to ~0.09 (depth=10). "
+            "Score never reaches 1.0 since depth is always >= 1."
         ),
     )
     path: list[str] = Field(
@@ -670,6 +672,33 @@ class AdapterGraphMemoryConfig(BaseModel):
         ),
     )
 
+    @field_validator("memory_node_label")
+    @classmethod
+    def validate_node_label(cls, v: str) -> str:
+        """Validate memory_node_label is a valid Cypher label.
+
+        Cypher labels must start with a letter or underscore and contain
+        only letters, numbers, and underscores. This validation prevents
+        potential injection issues when the label is used in queries.
+
+        Args:
+            v: The memory_node_label value to validate.
+
+        Returns:
+            The validated label if valid.
+
+        Raises:
+            ValueError: If the label does not match the required pattern.
+        """
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", v):
+            msg = (
+                f"memory_node_label '{v}' is not a valid Cypher label. "
+                "Must start with a letter or underscore, and contain only "
+                "letters, numbers, and underscores."
+            )
+            raise ValueError(msg)
+        return v
+
     @model_validator(mode="after")
     def validate_bounds(self) -> AdapterGraphMemoryConfig:
         """Ensure default values do not exceed their maximums."""
@@ -798,12 +827,14 @@ class AdapterGraphMemory:
                 parsed_uri.scheme,
             )
 
-        try:
-            async with asyncio.timeout(self._config.timeout_seconds):
-                async with self._init_lock:
-                    if self._initialized:
-                        return
+        async with self._init_lock:
+            # Early return for already-initialized stays outside timeout
+            if self._initialized:
+                return
 
+            try:
+                # Timeout only applies to actual initialization work
+                async with asyncio.timeout(self._config.timeout_seconds):
                     try:
                         # Create container if not provided
                         if self._container is None:
@@ -877,12 +908,11 @@ class AdapterGraphMemory:
                             e,
                         )
                         raise RuntimeError(f"Initialization failed: {e}") from e
-        except TimeoutError as e:
-            raise RuntimeError(
-                f"Initialization timed out after {self._config.timeout_seconds}s. "
-                "Another initialization may be in progress or the database is "
-                "unresponsive."
-            ) from e
+            except TimeoutError as e:
+                raise RuntimeError(
+                    f"Initialization timed out after {self._config.timeout_seconds}s. "
+                    "The database connection may be unresponsive."
+                ) from e
 
     def _ensure_initialized(self) -> HandlerGraph:
         """Ensure adapter is initialized and return handler.
