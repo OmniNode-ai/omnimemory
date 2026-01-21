@@ -9,7 +9,7 @@ that integrate with NodeResult for consistent error handling across the system.
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -229,7 +229,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         cause: BaseException | None = None,
         recovery_hint: str | None = None,
         retry_after: int | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> None:
         """
         Initialize OmniMemory error.
@@ -332,9 +332,9 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
         field_name: str | None = None,
         field_value: FieldValueType | None = None,
         validation_rule: str | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
         cause: BaseException | None = None,
-        **kwargs: Any,
     ) -> None:
         # Determine specific validation error code
         error_code = EnumOmniMemoryErrorCode.INVALID_INPUT
@@ -350,9 +350,7 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.VALUE_OUT_OF_RANGE
 
         # Build context with validation details - normalize to mutable dict
-        context_dict: dict[str, object] = _normalize_context_to_dict(
-            kwargs.get("context")
-        )
+        context_dict: dict[str, object] = _normalize_context_to_dict(context)
         if field_name:
             context_dict["field_name"] = field_name
         if field_value is not None:
@@ -378,9 +376,9 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
         message: str,
         storage_system: str | None = None,
         operation: str | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
         cause: BaseException | None = None,
-        **kwargs: Any,
     ) -> None:
         # Determine specific storage error code
         error_code = EnumOmniMemoryErrorCode.STORAGE_UNAVAILABLE
@@ -402,9 +400,7 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.TRANSACTION_FAILED
 
         # Build context with storage details - normalize to mutable dict
-        context_dict: dict[str, object] = _normalize_context_to_dict(
-            kwargs.get("context")
-        )
+        context_dict: dict[str, object] = _normalize_context_to_dict(context)
         if storage_system:
             context_dict["storage_system"] = storage_system
         if operation:
@@ -429,9 +425,9 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
         message: str,
         memory_id: UUID | None = None,
         query: str | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
         cause: BaseException | None = None,
-        **kwargs: Any,
     ) -> None:
         # Determine specific retrieval error code
         error_code = EnumOmniMemoryErrorCode.SEARCH_FAILED
@@ -455,9 +451,7 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.FILTER_INVALID
 
         # Build context with retrieval details - normalize to mutable dict
-        context_dict: dict[str, object] = _normalize_context_to_dict(
-            kwargs.get("context")
-        )
+        context_dict: dict[str, object] = _normalize_context_to_dict(context)
         if memory_id:
             context_dict["memory_id"] = str(memory_id)
         if query:
@@ -481,9 +475,9 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
         message: str,
         processing_stage: str | None = None,
         model_name: str | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
         cause: BaseException | None = None,
-        **kwargs: Any,
     ) -> None:
         # Determine specific processing error code
         error_code = EnumOmniMemoryErrorCode.PROCESSING_FAILED
@@ -507,9 +501,7 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.COMPUTATION_TIMEOUT
 
         # Build context with processing details - normalize to mutable dict
-        context_dict: dict[str, object] = _normalize_context_to_dict(
-            kwargs.get("context")
-        )
+        context_dict: dict[str, object] = _normalize_context_to_dict(context)
         if processing_stage:
             context_dict["processing_stage"] = processing_stage
         if model_name:
@@ -533,9 +525,9 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
         message: str,
         workflow_id: UUID | None = None,
         agent_ids: list[UUID] | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
         cause: BaseException | None = None,
-        **kwargs: Any,
     ) -> None:
         # Determine specific coordination error code
         error_code = EnumOmniMemoryErrorCode.WORKFLOW_FAILED
@@ -559,9 +551,7 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.ORCHESTRATION_FAILED
 
         # Build context with coordination details - normalize to mutable dict
-        context_dict: dict[str, object] = _normalize_context_to_dict(
-            kwargs.get("context")
-        )
+        context_dict: dict[str, object] = _normalize_context_to_dict(context)
         if workflow_id:
             context_dict["workflow_id"] = str(workflow_id)
         if agent_ids:
@@ -584,9 +574,9 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
         self,
         message: str,
         system_component: str | None = None,
+        context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
         cause: BaseException | None = None,
-        **kwargs: Any,
     ) -> None:
         # Determine specific system error code
         error_code = EnumOmniMemoryErrorCode.INTERNAL_ERROR
@@ -610,9 +600,7 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
             error_code = EnumOmniMemoryErrorCode.RATE_LIMIT_EXCEEDED
 
         # Build context with system details - normalize to mutable dict
-        context_dict: dict[str, object] = _normalize_context_to_dict(
-            kwargs.get("context")
-        )
+        context_dict: dict[str, object] = _normalize_context_to_dict(context)
         if system_component:
             context_dict["system_component"] = system_component
 

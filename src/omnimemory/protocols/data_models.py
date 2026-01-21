@@ -225,6 +225,20 @@ class SearchResult(BaseMemoryModel):
     )
 
 
+class ModelConfidenceInterval(BaseMemoryModel):
+    """Confidence interval for predictions with lower and upper bounds."""
+
+    lower: float = Field(
+        ge=0.0, le=1.0, description="Lower bound of confidence interval"
+    )
+    upper: float = Field(
+        ge=0.0, le=1.0, description="Upper bound of confidence interval"
+    )
+    confidence_level: float = Field(
+        0.95, ge=0.0, le=1.0, description="Confidence level (e.g., 0.95 for 95%)"
+    )
+
+
 # === BASE REQUEST/RESPONSE MODELS ===
 
 
@@ -756,7 +770,7 @@ class PatternPredictionResponse(BaseMemoryResponse):
     predictions: ModelResultCollection = Field(
         default_factory=ModelResultCollection, description="Pattern predictions"
     )
-    confidence_intervals: list[dict[str, float]] = Field(
+    confidence_intervals: list[ModelConfidenceInterval] = Field(
         default_factory=list, description="Prediction confidence intervals"
     )
 

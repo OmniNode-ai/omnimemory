@@ -7,6 +7,7 @@ including memory access, configuration changes, and PII detection events.
 
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -374,10 +375,11 @@ class _AuditLoggerState:
     """Singleton state manager for the audit logger.
 
     Manages the global audit logger instance using class-level attributes
-    to avoid global statements.
+    to avoid global statements. Uses a lock for thread-safe initialization.
     """
 
     _instance: AuditLogger | None = None
+    _lock: threading.Lock = threading.Lock()
 
     @classmethod
     def get_instance(cls) -> AuditLogger | None:
@@ -389,15 +391,29 @@ class _AuditLoggerState:
         """Set the audit logger instance."""
         cls._instance = logger
 
+    @classmethod
+    def get_lock(cls) -> threading.Lock:
+        """Get the singleton initialization lock."""
+        return cls._lock
+
 
 def get_audit_logger() -> AuditLogger:
-    """Get the global audit logger instance."""
+    """Get the global audit logger instance.
+
+    Uses double-checked locking pattern for thread-safe lazy initialization.
+    """
     instance = _AuditLoggerState.get_instance()
     if instance is None:
-        # Initialize with default settings
-        log_file = Path("logs/audit.log")
-        instance = AuditLogger(log_file=log_file, console_output=True, json_format=True)
-        _AuditLoggerState.set_instance(instance)
+        with _AuditLoggerState.get_lock():
+            # Double-check after acquiring lock
+            instance = _AuditLoggerState.get_instance()
+            if instance is None:
+                # Initialize with default settings
+                log_file = Path("logs/audit.log")
+                instance = AuditLogger(
+                    log_file=log_file, console_output=True, json_format=True
+                )
+                _AuditLoggerState.set_instance(instance)
     return instance
 
 
@@ -406,9 +422,15 @@ def configure_audit_logger(
     console_output: bool = True,
     json_format: bool = True,
 ) -> None:
-    """Configure the global audit logger."""
-    _AuditLoggerState.set_instance(
-        AuditLogger(
-            log_file=log_file, console_output=console_output, json_format=json_format
+    """Configure the global audit logger.
+
+    Thread-safe configuration that replaces the existing logger instance.
+    """
+    with _AuditLoggerState.get_lock():
+        _AuditLoggerState.set_instance(
+            AuditLogger(
+                log_file=log_file,
+                console_output=console_output,
+                json_format=json_format,
+            )
         )
-    )

@@ -50,7 +50,7 @@ class ModelSearchResult(BaseModel):
             snapshot IDs from start to this result).
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, from_attributes=True)
 
     snapshot: ModelMemorySnapshot = Field(
         ...,
@@ -113,7 +113,7 @@ class ModelMemoryRetrievalResponse(BaseModel):
         ... )
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, from_attributes=True)
 
     status: Literal["success", "error", "no_results"] = Field(
         ...,

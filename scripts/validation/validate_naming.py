@@ -458,8 +458,8 @@ def main() -> int:
         return 1
 
     directory = Path(sys.argv[1])
-    if not directory.exists():
-        print(f"Directory not found: {directory}")
+    if not directory.is_dir():
+        print(f"Directory not found or not a directory: {directory}")
         return 1
 
     files_to_check = list(directory.rglob("*.py"))

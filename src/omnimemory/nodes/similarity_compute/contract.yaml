@@ -8,6 +8,9 @@
 # === REQUIRED ROOT FIELDS ===
 name: "similarity_compute"
 version: {major: 0, minor: 1, patch: 0}
+# TODO(OMN-1432): Enable after OMN-1431 lands in omnibase_core
+# contract_version: {major: 0, minor: 1, patch: 0}
+# node_version: {major: 0, minor: 1, patch: 0}
 description: "Pure compute node for vector similarity calculations. Supports cosine and euclidean distance
   metrics with optional threshold matching. No I/O operations."
 node_type: "COMPUTE"

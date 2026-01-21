@@ -87,7 +87,7 @@ class ModelHandlerDbMockConfig(BaseModel):
         case_sensitive: Whether text search is case-sensitive. Defaults to False.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, from_attributes=True)
 
     simulate_latency_ms: int = Field(
         default=0,

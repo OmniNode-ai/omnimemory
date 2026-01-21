@@ -5,7 +5,7 @@ Validates that Pydantic models follow ONEX conventions:
 - Use Field() with descriptions
 - Use ConfigDict with proper settings
 - No bare model_config = {} assignments
-- Proper inheritance from BaseModel
+- Identifies Pydantic models via BaseModel/GenericModel/BaseSettings inheritance
 - Handles inherited model_config from parent classes
 - Detects ConfigDict imports with aliases
 
@@ -59,14 +59,8 @@ class ImportAliasCollector(ast.NodeVisitor):
         """Visit from-import statements."""
         if node.module and ("pydantic" in node.module):
             for alias in node.names:
-                # Handle ConfigDict from pydantic
-                if alias.name == "ConfigDict":
-                    # from pydantic import ConfigDict as CD
-                    actual_name = alias.asname if alias.asname else alias.name
-                    self.config_dict_aliases.add(actual_name)
-                # Handle SettingsConfigDict from pydantic_settings
-                elif alias.name == "SettingsConfigDict":
-                    # from pydantic_settings import SettingsConfigDict as SCD
+                # Handle ConfigDict and SettingsConfigDict (supports aliased imports)
+                if alias.name in {"ConfigDict", "SettingsConfigDict"}:
                     actual_name = alias.asname if alias.asname else alias.name
                     self.config_dict_aliases.add(actual_name)
         self.generic_visit(node)
@@ -125,6 +119,7 @@ class ClassModelConfigCollector(ast.NodeVisitor):
                 ):
                     self.classes_with_model_config.add(node.name)
                     model_config_found = True
+                    break
 
         self.generic_visit(node)
 
@@ -220,7 +215,7 @@ class PydanticPatternVisitor(ast.NodeVisitor):
         # Handle: ConfigDict(), SettingsConfigDict(), or aliased names like CD()
         if isinstance(func, ast.Name) and func.id in self.config_dict_aliases:
             return True
-        # Handle: pydantic.ConfigDict() or pydantic_settings.SettingsConfigDict()
+        # Handle fully-qualified calls via attribute access
         if isinstance(func, ast.Attribute):
             return func.attr in {"ConfigDict", "SettingsConfigDict"}
         return False
@@ -244,9 +239,7 @@ class PydanticPatternVisitor(ast.NodeVisitor):
         # Handle bare ClassVar (without subscript, though less common)
         if isinstance(annotation, ast.Name) and annotation.id == "ClassVar":
             return True
-        if isinstance(annotation, ast.Attribute) and annotation.attr == "ClassVar":
-            return True
-        return False
+        return isinstance(annotation, ast.Attribute) and annotation.attr == "ClassVar"
 
     def _is_pydantic_field(self, item: ast.stmt) -> bool:
         """Check if an AST statement is a Pydantic model field.
@@ -267,9 +260,7 @@ class PydanticPatternVisitor(ast.NodeVisitor):
             return False
         if name == "model_config":
             return False
-        if self._is_classvar_annotation(item.annotation):
-            return False
-        return True
+        return not self._is_classvar_annotation(item.annotation)
 
     def _check_inherited_model_config(self, node: ast.ClassDef) -> bool:
         """Check if model_config is inherited from a parent class.

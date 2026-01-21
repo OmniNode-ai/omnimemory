@@ -5,7 +5,7 @@ This module provides strongly typed replacements for Dict[str, Any] patterns
 in health management, ensuring type safety and validation.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -67,7 +67,7 @@ class AggregateHealthMetadata(BaseModel):
     )
 
     last_update_timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When this aggregate was last calculated",
     )
 

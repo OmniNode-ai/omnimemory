@@ -230,9 +230,10 @@ class ModelTrustScore(BaseModel):
             return False
 
         # Ensure as_of is timezone-aware for safe comparison
+        # Note: ensure_timezone_aware only returns None if input is None,
+        # but as_of is required, so we assert the result is not None
         validated_as_of = ensure_timezone_aware(as_of, "as_of")
-        if validated_as_of is None:
-            return False
+        assert validated_as_of is not None, "as_of is required and cannot be None"
 
         cache_age = (validated_as_of - self._cache_timestamp).total_seconds()
         return cache_age < self._cache_ttl_seconds

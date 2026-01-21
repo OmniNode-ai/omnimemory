@@ -60,7 +60,9 @@ PATTERNS = [
 # Lines to skip (false positives)
 SKIP_PATTERNS = [
     re.compile(r"from omnibase_core"),  # Importing from dependencies is fine
-    re.compile(r"\"\"\".*deprecated.*\"\"\"", re.IGNORECASE),  # Docstrings explaining why something is NOT deprecated
+    re.compile(
+        r"\"\"\".*deprecated.*\"\"\"", re.IGNORECASE
+    ),  # Docstrings explaining why something is NOT deprecated
 ]
 
 
@@ -90,9 +92,7 @@ def validate_file(filepath: Path) -> list[Violation]:
 
         for pattern, message in PATTERNS:
             if pattern.search(line):
-                violations.append(
-                    Violation(str(filepath), line_num, message)
-                )
+                violations.append(Violation(str(filepath), line_num, message))
                 break  # Only one violation per line
 
     return violations
@@ -104,7 +104,8 @@ def main() -> int:
         description="Detect backward compatibility anti-patterns"
     )
     parser.add_argument(
-        "-d", "--directory",
+        "-d",
+        "--directory",
         default="src/",
         help="Directory to scan",
     )

@@ -7,14 +7,20 @@ and coordination in the ONEX 4-node architecture.
 
 from __future__ import annotations
 
+# NOTE: omnibase_core >= 0.1.0 required for EnumHealthStatus
+# The fallback below mirrors the production enum values for development environments
 try:
     from omnibase_core.enums import EnumHealthStatus
 except ImportError:
-    # Fallback for development environments without omnibase_core
+    # Fallback for development environments without omnibase_core installed
     from enum import Enum
 
     class EnumHealthStatus(str, Enum):  # type: ignore[no-redef]
-        """Fallback health status levels (use omnibase_core.enums.EnumHealthStatus in production)."""
+        """Fallback health status levels for development.
+
+        Production code MUST use omnibase_core.enums.EnumHealthStatus.
+        This fallback is only for isolated testing/development.
+        """
 
         HEALTHY = "healthy"
         DEGRADED = "degraded"

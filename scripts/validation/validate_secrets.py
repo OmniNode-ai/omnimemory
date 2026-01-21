@@ -71,7 +71,7 @@ SECRET_PATTERNS = [
         # Matches any os.getenv/os.environ.get with a string literal default 10+ chars
         re.compile(
             r'(?i)(?:os\.getenv|os\.environ\.get)\s*\(\s*["\'][^"\']*'
-            r'(?:API[_-]?KEY|SECRET[_-]?KEY|PASSWORD|TOKEN|CREDENTIAL|PRIVATE[_-]?KEY)'
+            r"(?:API[_-]?KEY|SECRET[_-]?KEY|PASSWORD|TOKEN|CREDENTIAL|PRIVATE[_-]?KEY)"
             r'[^"\']*["\']\s*,\s*["\'][^"\']{10,}["\']'
         ),
         "Potential hardcoded secret in env var default",
@@ -101,24 +101,26 @@ SECRET_PATTERNS = [
 # 4. Document the exact scenario each pattern catches
 SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # -------------------------------------------------------------------------
-    # CATEGORY: Runtime environment variable access (NO default value)
+    # CATEGORY: Runtime environment variable access (STRICT safe patterns only)
     # SAFE BECAUSE: Values come from environment at runtime, not hardcoded
-    # PATTERN PRECISION: Only matches calls WITHOUT a default string literal
     #
-    # SECURITY NOTE: We specifically DO NOT skip lines with hardcoded defaults!
-    # These patterns use negative lookahead to ensure no string literal follows
-    # the env var name as a default argument.
+    # SECURITY NOTE: These patterns are INTENTIONALLY NARROW.
+    # We only skip the most obviously safe patterns:
+    #   1. os.environ["VAR"] - dict access, no default possible
+    #   2. os.getenv("VAR") - single arg, no default
+    #   3. os.environ.get("VAR") - single arg, no default
+    #   4. os.getenv("VAR", None) - explicit None default
+    #   5. os.getenv("VAR", "") - empty string default
     #
-    # SAFE examples (matched by these patterns):
-    #   api_key = os.getenv("API_KEY")
-    #   api_key = os.getenv("API_KEY", None)
-    #   api_key = os.getenv("API_KEY", default_var)
-    #   api_key = os.environ["API_KEY"]
-    #   api_key = os.environ.get("API_KEY", get_default())
+    # We DO NOT skip calls with:
+    #   - Variable references as defaults (could hide secrets in variables)
+    #   - Function calls as defaults (could return secrets)
+    #   - Any non-empty string literal (caught by SECRET_PATTERNS)
     #
-    # UNSAFE examples (NOT matched by skip patterns, will be flagged):
-    #   api_key = os.getenv("API_KEY", "xxx...")  # literal default
-    #   api_key = os.environ.get("API_KEY", "xxx...")  # literal default
+    # UNSAFE examples (NOT matched, will be checked by SECRET_PATTERNS):
+    #   api_key = os.getenv("API_KEY", "sk-xxx...")  # literal secret
+    #   api_key = os.getenv("API_KEY", default_var)  # variable could be secret
+    #   api_key = os.getenv("API_KEY", get_key())    # function could return secret
     # -------------------------------------------------------------------------
     (
         # os.environ[] dict access - no default possible, always safe
@@ -126,22 +128,31 @@ SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "os.environ[] dict access - value from runtime environment",
     ),
     (
-        # os.environ.get() WITHOUT a string literal default
-        # Matches: os.environ.get("VAR"), os.environ.get("VAR", None), os.environ.get("VAR", var)
-        # Does NOT match: os.environ.get("VAR", "literal-default")
-        re.compile(r"\bos\.environ\.get\s*\(\s*[\"'][^\"']*[\"']\s*(?:,\s*(?:None|[a-zA-Z_][a-zA-Z0-9_]*(?:\([^)]*\))?))?\s*\)"),
-        "os.environ.get() call without string literal default",
+        # os.getenv() with NO default argument at all
+        # Only matches: os.getenv("VAR") with closing paren immediately after
+        re.compile(r"\bos\.getenv\s*\(\s*[\"'][^\"']*[\"']\s*\)"),
+        "os.getenv() with no default argument",
     ),
     (
-        # os.getenv() WITHOUT a string literal default
-        # Matches: os.getenv("VAR"), os.getenv("VAR", None), os.getenv("VAR", var)
-        # Does NOT match: os.getenv("VAR", "literal-default")
-        re.compile(r"\bos\.getenv\s*\(\s*[\"'][^\"']*[\"']\s*(?:,\s*(?:None|[a-zA-Z_][a-zA-Z0-9_]*(?:\([^)]*\))?))?\s*\)"),
-        "os.getenv() call without string literal default",
+        # os.environ.get() with NO default argument at all
+        # Only matches: os.environ.get("VAR") with closing paren immediately after
+        re.compile(r"\bos\.environ\.get\s*\(\s*[\"'][^\"']*[\"']\s*\)"),
+        "os.environ.get() with no default argument",
     ),
     (
-        # os.environ.get() or os.getenv() with EMPTY string default - safe
-        re.compile(r"\b(?:os\.environ\.get|os\.getenv)\s*\(\s*[\"'][^\"']*[\"']\s*,\s*(?:\"\"|'')\s*\)"),
+        # os.getenv() or os.environ.get() with explicit None default
+        # Only matches: os.getenv("VAR", None) - the word None, not a variable
+        re.compile(
+            r"\b(?:os\.getenv|os\.environ\.get)\s*\(\s*[\"'][^\"']*[\"']\s*,\s*None\s*\)"
+        ),
+        "os.getenv/environ.get() with explicit None default",
+    ),
+    (
+        # os.getenv() or os.environ.get() with EMPTY string default - safe
+        # Only matches: os.getenv("VAR", "") or os.getenv("VAR", '')
+        re.compile(
+            r"\b(?:os\.getenv|os\.environ\.get)\s*\(\s*[\"'][^\"']*[\"']\s*,\s*(?:\"\"|'')\s*\)"
+        ),
         "os.getenv/environ.get() with empty string default",
     ),
     # -------------------------------------------------------------------------
@@ -232,62 +243,10 @@ SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
 ]
 
-# Additional patterns that only skip in test files
-# SECURITY NOTE: These patterns are ONLY applied to files identified as tests.
-# This prevents test fixtures from accidentally allowing secrets in prod code.
-#
-# Test file detection: test_*.py, *_test.py, or in tests/ directory
-TEST_ONLY_SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # -------------------------------------------------------------------------
-    # CATEGORY: Mock/fake values in test fixtures
-    # SAFE BECAUSE: Test files intentionally use fake credentials
-    # PATTERN PRECISION: Uses word boundaries and requires secret-related context
-    # -------------------------------------------------------------------------
-    (
-        # Matches: mock_api_key, mock_password, mock_secret_key
-        # Does NOT match: hammock_key (no word boundary), mock_data (not a secret)
-        re.compile(
-            r"\bmock[-_]?(api[-_]?key|secret[-_]?key|password|token|credential)\b",
-            re.IGNORECASE,
-        ),
-        "Test fixture: mock_{secret-type}",
-    ),
-    (
-        # Matches: api_key_mock, password_mock, secret_mock
-        re.compile(
-            r"\b(api[-_]?key|secret[-_]?key|password|token|credential)[-_]?mock\b",
-            re.IGNORECASE,
-        ),
-        "Test fixture: {secret-type}_mock",
-    ),
-    (
-        # Matches: fake_api_key, fake_password, fake_secret
-        re.compile(
-            r"\bfake[-_]?(api[-_]?key|secret[-_]?key|password|token|credential)\b",
-            re.IGNORECASE,
-        ),
-        "Test fixture: fake_{secret-type}",
-    ),
-    (
-        # Matches: api_key_fake, password_fake, token_fake
-        re.compile(
-            r"\b(api[-_]?key|secret[-_]?key|password|token|credential)[-_]?fake\b",
-            re.IGNORECASE,
-        ),
-        "Test fixture: {secret-type}_fake",
-    ),
-    (
-        # Matches: = "test_secret_value", = 'test_api_key_12345'
-        # Requires "test_" prefix in the string value itself
-        re.compile(r'=\s*["\']test[-_][a-zA-Z0-9_-]+["\']', re.IGNORECASE),
-        "Test fixture: literal 'test_...' value assignment",
-    ),
-    (
-        # Matches pytest fixtures and unittest.mock patterns
-        re.compile(r"@pytest\.fixture|@mock\.patch|MagicMock|Mock\(", re.IGNORECASE),
-        "Test framework: pytest fixture or mock decorator/class",
-    ),
-]
+# NOTE: Test files are skipped entirely at file level in validate_file().
+# No line-level TEST_ONLY_SKIP_PATTERNS are needed - this is more reliable
+# and prevents any possibility of test fixture patterns masking real secrets
+# in production code that happens to use test-like naming.
 
 
 def is_test_file(filepath: Path) -> bool:
@@ -437,9 +396,6 @@ def validate_file(filepath: Path, verbose: bool = False) -> list[Violation]:
                 )
             continue
 
-        # Note: Test files are skipped entirely at file level (line 386-389)
-        # so TEST_ONLY_SKIP_PATTERNS are no longer applied here
-
         # Line contains potential secret and wasn't skipped
         violations.append(Violation(str(filepath), line_num, potential_secret))
 
@@ -491,9 +447,7 @@ def main() -> int:
 
     if verbose:
         print(f"Scanning {len(files_to_check)} Python file(s)...")
-        print(
-            f"Skip patterns: {len(SKIP_PATTERNS)} general, {len(TEST_ONLY_SKIP_PATTERNS)} test-only"
-        )
+        print(f"Skip patterns: {len(SKIP_PATTERNS)} (test files skipped at file level)")
         print()
 
     all_violations: list[Violation] = []
