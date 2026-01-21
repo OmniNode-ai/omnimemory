@@ -50,7 +50,7 @@ import heapq
 import logging
 import time
 from collections.abc import Mapping
-from typing import Literal, TypeAlias
+from typing import Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -79,8 +79,6 @@ except ImportError as e:
     class InfraConnectionError(Exception):  # type: ignore[no-redef]
         """Stub for InfraConnectionError when omnibase_infra is not installed."""
 
-        pass
-
     class HandlerGraph:  # type: ignore[no-redef]
         """Stub for HandlerGraph when omnibase_infra is not installed."""
 
@@ -94,29 +92,19 @@ except ImportError as e:
     class ModelONEXContainer:  # type: ignore[no-redef]
         """Stub for ModelONEXContainer."""
 
-        pass
-
     class ModelGraphTraversalResult:  # type: ignore[no-redef]
         """Stub for ModelGraphTraversalResult."""
-
-        pass
 
     class ModelGraphTraversalFilters:  # type: ignore[no-redef]
         """Stub for ModelGraphTraversalFilters."""
 
-        pass
-
     class ModelGraphDatabaseNode:  # type: ignore[no-redef]
         """Stub for ModelGraphDatabaseNode."""
-
-        pass
 
     class ModelGraphRelationship:  # type: ignore[no-redef]
         """Stub for ModelGraphRelationship."""
 
-        pass
-
-    JsonType: TypeAlias = str | int | float | bool | None  # type: ignore[misc,no-redef]
+    type JsonType = str | int | float | bool | None  # type: ignore[misc,no-redef]
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +124,7 @@ __all__ = [
 # Uses omnibase_core's JsonType which properly handles nested structures
 # via PEP 695 recursive type definition, avoiding Pydantic schema recursion errors.
 # This matches the type used by ModelGraphDatabaseNode.properties.
-PropertyValue: TypeAlias = JsonType
+type PropertyValue = JsonType
 
 
 # =============================================================================
@@ -673,7 +661,7 @@ class AdapterGraphMemoryConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_bounds(self) -> "AdapterGraphMemoryConfig":
+    def validate_bounds(self) -> AdapterGraphMemoryConfig:
         """Ensure default values do not exceed their maximums."""
         if self.default_depth > self.max_depth:
             msg = (
