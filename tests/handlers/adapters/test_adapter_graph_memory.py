@@ -310,6 +310,51 @@ class TestCypherTemplates:
         assert "$memory_id" in template
         assert "LIMIT 1" in template
 
+    def test_bidirectional_templates_use_undirected_pattern(self) -> None:
+        """Verify bidirectional templates use -[r]- undirected pattern."""
+        bidirectional_templates = [
+            CypherTemplates.GET_CONNECTIONS,
+            CypherTemplates.GET_CONNECTIONS_BY_TYPE,
+        ]
+
+        for template in bidirectional_templates:
+            normalized = template.replace(" ", "").replace("\n", "")
+            # Should have undirected pattern -[r]- (not -[r]->)
+            assert (
+                "-[r]-" in normalized
+            ), f"Bidirectional template missing -[r]- pattern: {template[:80]}..."
+            # Should NOT have directed outgoing pattern
+            assert (
+                "-[r]->" not in normalized
+            ), f"Bidirectional template has directed pattern -[r]->: {template[:80]}..."
+
+    def test_outgoing_templates_use_directed_pattern(self) -> None:
+        """Verify outgoing templates use -[r]-> directed pattern."""
+        outgoing_templates = [
+            CypherTemplates.GET_CONNECTIONS_OUTGOING,
+            CypherTemplates.GET_CONNECTIONS_BY_TYPE_OUTGOING,
+        ]
+
+        for template in outgoing_templates:
+            normalized = template.replace(" ", "").replace("\n", "")
+            # Should have directed outgoing pattern -[r]->
+            assert (
+                "-[r]->" in normalized
+            ), f"Outgoing template missing -[r]-> pattern: {template[:80]}..."
+
+    def test_outgoing_templates_have_required_parameters(self) -> None:
+        """Verify outgoing templates have required parameters."""
+        # GET_CONNECTIONS_OUTGOING should have memory_id and limit
+        template = CypherTemplates.GET_CONNECTIONS_OUTGOING
+        assert "$memory_id" in template
+        assert "$limit" in template
+
+        # GET_CONNECTIONS_BY_TYPE_OUTGOING should also have relationship_types
+        template_by_type = CypherTemplates.GET_CONNECTIONS_BY_TYPE_OUTGOING
+        assert "$memory_id" in template_by_type
+        assert "$limit" in template_by_type
+        assert "$relationship_types" in template_by_type
+
 
 # =============================================================================
 # find_related Tests
@@ -600,6 +645,165 @@ class TestGetConnections:
         query = call_args[1]["query"]
         assert "-[r]-" in query.replace(" ", "").replace("\n", "")
         assert "-[r]->" not in query.replace(" ", "").replace("\n", "")
+
+    @pytest.mark.asyncio
+    async def test_get_connections_outgoing_only(
+        self,
+        adapter_with_mock: AdapterGraphMemory,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections with bidirectional=False uses outgoing template."""
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "related_to",
+                    "weight": 0.9,
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+            ]
+        )
+
+        result = await adapter_with_mock.get_connections(
+            "mem_1",
+            bidirectional=False,
+        )
+
+        assert result.status == "success"
+        assert len(result.connections) == 1
+        # Verify the outgoing template was used (contains -[r]-> not -[r]-)
+        call_args = mock_handler.execute_query.call_args
+        query = call_args[1]["query"]
+        normalized_query = query.replace(" ", "").replace("\n", "")
+        assert (
+            "-[r]->" in normalized_query
+        ), f"Expected outgoing pattern -[r]-> in query: {query}"
+
+    @pytest.mark.asyncio
+    async def test_get_connections_outgoing_with_type_filter(
+        self,
+        adapter_with_mock: AdapterGraphMemory,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections with bidirectional=False and type filter."""
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "related_to",
+                    "weight": 1.0,
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+            ]
+        )
+
+        result = await adapter_with_mock.get_connections(
+            "mem_1",
+            relationship_types=["related_to"],
+            bidirectional=False,
+        )
+
+        assert result.status == "success"
+        # Verify the outgoing template with type filter was used
+        call_args = mock_handler.execute_query.call_args
+        query = call_args[1]["query"]
+        normalized_query = query.replace(" ", "").replace("\n", "")
+        assert (
+            "-[r]->" in normalized_query
+        ), f"Expected outgoing pattern -[r]-> in query: {query}"
+        # Verify type filter parameters are passed
+        assert "relationship_types" in call_args[1]["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_get_connections_uses_config_bidirectional_default(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections uses config.bidirectional when param not specified."""
+        # Create config with bidirectional=False
+        config = AdapterGraphMemoryConfig(
+            max_depth=5,
+            default_depth=2,
+            default_limit=100,
+            max_limit=1000,
+            bidirectional=False,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "related_to",
+                    "weight": 0.9,
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+            ]
+        )
+
+        # Call get_connections WITHOUT bidirectional param (should use config default)
+        result = await adapter.get_connections("mem_1")
+
+        assert result.status == "success"
+        # Verify the outgoing template was used (respecting config.bidirectional=False)
+        call_args = mock_handler.execute_query.call_args
+        query = call_args[1]["query"]
+        normalized_query = query.replace(" ", "").replace("\n", "")
+        assert (
+            "-[r]->" in normalized_query
+        ), f"Expected outgoing pattern -[r]-> when config.bidirectional=False: {query}"
+
+    @pytest.mark.asyncio
+    async def test_get_connections_param_overrides_config_default(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections bidirectional param overrides config default."""
+        # Create config with bidirectional=False
+        config = AdapterGraphMemoryConfig(
+            max_depth=5,
+            default_depth=2,
+            default_limit=100,
+            max_limit=1000,
+            bidirectional=False,  # Config says outgoing only
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "related_to",
+                    "weight": 0.9,
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+            ]
+        )
+
+        # Call with explicit bidirectional=True (should override config)
+        result = await adapter.get_connections("mem_1", bidirectional=True)
+
+        assert result.status == "success"
+        # Verify the bidirectional template was used (param override)
+        call_args = mock_handler.execute_query.call_args
+        query = call_args[1]["query"]
+        normalized_query = query.replace(" ", "").replace("\n", "")
+        # Bidirectional uses -[r]- without arrow
+        assert (
+            "-[r]-(" in normalized_query or "-[r]-(n" in normalized_query
+        ), f"Expected bidirectional pattern -[r]- when param=True: {query}"
 
 
 # =============================================================================

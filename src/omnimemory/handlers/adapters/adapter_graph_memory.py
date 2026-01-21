@@ -147,16 +147,19 @@ class CypherTemplates:
     Direction Behavior:
         - GET_CONNECTIONS: Bidirectional (matches both incoming and outgoing)
         - GET_CONNECTIONS_BY_TYPE: Bidirectional with type filtering
+        - GET_CONNECTIONS_OUTGOING: Outgoing only (from source to target)
+        - GET_CONNECTIONS_BY_TYPE_OUTGOING: Outgoing only with type filtering
 
-        All templates use `startNode(r) = m AS is_outgoing` to dynamically determine
-        edge direction.
+        Bidirectional templates use `startNode(r) = m AS is_outgoing` to dynamically
+        determine edge direction. Outgoing-only templates always return `true` for
+        is_outgoing since all edges are outgoing by definition.
 
     Security:
         All queries use parameters ($param) instead of string interpolation.
         NEVER construct queries by concatenating user input.
     """
 
-    # Find direct edges (relationships) for a memory node
+    # Find direct edges (relationships) for a memory node (bidirectional)
     GET_CONNECTIONS = """
     MATCH (m:Memory {memory_id: $memory_id})-[r]-(n:Memory)
     RETURN
@@ -180,6 +183,33 @@ class CypherTemplates:
         r.weight AS weight,
         r.created_at AS created_at,
         startNode(r) = m AS is_outgoing
+    LIMIT $limit
+    """
+
+    # Find outgoing edges only (from source to target)
+    GET_CONNECTIONS_OUTGOING = """
+    MATCH (m:Memory {memory_id: $memory_id})-[r]->(n:Memory)
+    RETURN
+        m.memory_id AS source_id,
+        n.memory_id AS target_id,
+        type(r) AS relationship_type,
+        r.weight AS weight,
+        r.created_at AS created_at,
+        true AS is_outgoing
+    LIMIT $limit
+    """
+
+    # Find outgoing connections filtered by relationship type
+    GET_CONNECTIONS_BY_TYPE_OUTGOING = """
+    MATCH (m:Memory {memory_id: $memory_id})-[r]->(n:Memory)
+    WHERE type(r) IN $relationship_types
+    RETURN
+        m.memory_id AS source_id,
+        n.memory_id AS target_id,
+        type(r) AS relationship_type,
+        r.weight AS weight,
+        r.created_at AS created_at,
+        true AS is_outgoing
     LIMIT $limit
     """
 
@@ -248,7 +278,8 @@ class ModelRelatedMemory(BaseModel):
     Attributes:
         memory_id: The related memory's identifier.
         score: Relevance score based on path weight and distance (0.0-1.0).
-        path: Traversal path from start memory to this memory (list of memory IDs).
+        path: Path endpoints as [start_memory_id, related_memory_id]. Does not
+            include intermediate nodes; use 'depth' to determine hop count.
         depth: Number of hops from the starting memory.
         labels: Graph labels on the memory node.
         properties: Additional properties from the graph node.
@@ -267,10 +298,9 @@ class ModelRelatedMemory(BaseModel):
     path: list[str] = Field(
         default_factory=list,
         description=(
-            "Partial traversal path containing start and end memory IDs. "
-            "Note: Intermediate nodes are not included; full path reconstruction "
-            "would require additional queries. For complete path information, "
-            "use the depth field which indicates the number of hops."
+            "Path endpoints: [start_memory_id, related_memory_id]. "
+            "Note: Intermediate nodes are not included in this list. "
+            "Use 'depth' field to determine the number of hops."
         ),
     )
     depth: int = Field(
@@ -792,8 +822,8 @@ class AdapterGraphMemory:
     ) -> ModelConnectionsResult:
         """Get direct connections (edges) for a memory node.
 
-        Retrieves all relationships connected to the specified memory,
-        optionally filtered by relationship type.
+        Retrieves relationships connected to the specified memory,
+        optionally filtered by relationship type and direction.
 
         Args:
             memory_id: The memory's identifier.
@@ -802,8 +832,8 @@ class AdapterGraphMemory:
             limit: Maximum number of connections. Defaults to config.default_limit.
             bidirectional: Whether to include both incoming and outgoing connections.
                 If None, defaults to config.bidirectional. When True, returns
-                connections in both directions. When False, returns only outgoing
-                connections (only applies when relationship_types is specified).
+                connections in both directions (using `-[r]-` pattern). When False,
+                returns only outgoing connections (using `-[r]->` pattern).
 
         Returns:
             ModelConnectionsResult with the memory's connections.
@@ -817,21 +847,43 @@ class AdapterGraphMemory:
             limit or self._config.default_limit, self._config.max_limit
         )
 
+        # Resolve bidirectional: use passed value if not None, otherwise use config
+        effective_bidirectional = (
+            bidirectional if bidirectional is not None else self._config.bidirectional
+        )
+
         try:
-            # Choose query based on whether we're filtering by type
-            if relationship_types:
-                query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
-                parameters: dict[str, object] = {
-                    "memory_id": memory_id,
-                    "relationship_types": relationship_types,
-                    "limit": effective_limit,
-                }
+            # Choose query based on bidirectional flag and relationship_types
+            if effective_bidirectional:
+                # Bidirectional queries (both incoming and outgoing)
+                if relationship_types:
+                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
+                    parameters: dict[str, object] = {
+                        "memory_id": memory_id,
+                        "relationship_types": relationship_types,
+                        "limit": effective_limit,
+                    }
+                else:
+                    query = CypherTemplates.GET_CONNECTIONS
+                    parameters = {
+                        "memory_id": memory_id,
+                        "limit": effective_limit,
+                    }
             else:
-                query = CypherTemplates.GET_CONNECTIONS
-                parameters = {
-                    "memory_id": memory_id,
-                    "limit": effective_limit,
-                }
+                # Outgoing-only queries
+                if relationship_types:
+                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE_OUTGOING
+                    parameters = {
+                        "memory_id": memory_id,
+                        "relationship_types": relationship_types,
+                        "limit": effective_limit,
+                    }
+                else:
+                    query = CypherTemplates.GET_CONNECTIONS_OUTGOING
+                    parameters = {
+                        "memory_id": memory_id,
+                        "limit": effective_limit,
+                    }
 
             result = await handler.execute_query(
                 query=query,
