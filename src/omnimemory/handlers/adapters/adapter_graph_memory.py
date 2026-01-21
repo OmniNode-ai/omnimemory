@@ -587,52 +587,60 @@ class AdapterGraphMemory:
         if self._initialized:
             return
 
-        async with self._init_lock:
-            if self._initialized:
-                return
+        try:
+            async with asyncio.timeout(self._config.timeout_seconds):
+                async with self._init_lock:
+                    if self._initialized:
+                        return
 
-            try:
-                # Create container if not provided
-                if self._container is None:
-                    # Import here to get the real class
-                    from omnibase_core.container import ModelONEXContainer
+                    try:
+                        # Create container if not provided
+                        if self._container is None:
+                            # Import here to get the real class
+                            from omnibase_core.container import ModelONEXContainer
 
-                    self._container = ModelONEXContainer()
+                            self._container = ModelONEXContainer()
 
-                # Create and initialize handler
-                self._handler = HandlerGraph(self._container)
+                        # Create and initialize handler
+                        self._handler = HandlerGraph(self._container)
 
-                init_options: dict[str, object] = {
-                    "timeout_seconds": self._config.timeout_seconds,
-                }
-                if options:
-                    init_options.update(options)
+                        init_options: dict[str, object] = {
+                            "timeout_seconds": self._config.timeout_seconds,
+                        }
+                        if options:
+                            init_options.update(options)
 
-                await self._handler.initialize(
-                    connection_uri=connection_uri,
-                    auth=auth,
-                    options=init_options,
-                )
+                        await self._handler.initialize(
+                            connection_uri=connection_uri,
+                            auth=auth,
+                            options=init_options,
+                        )
 
-                self._initialized = True
-                # Safely extract host info without credentials
-                parsed_uri = urlparse(connection_uri)
-                safe_uri = f"{parsed_uri.scheme}://{parsed_uri.hostname}"
-                if parsed_uri.port:
-                    safe_uri += f":{parsed_uri.port}"
-                logger.info(
-                    "AdapterGraphMemory initialized with connection to %s",
-                    safe_uri,
-                )
+                        self._initialized = True
+                        # Safely extract host info without credentials
+                        parsed_uri = urlparse(connection_uri)
+                        safe_uri = f"{parsed_uri.scheme}://{parsed_uri.hostname}"
+                        if parsed_uri.port:
+                            safe_uri += f":{parsed_uri.port}"
+                        logger.info(
+                            "AdapterGraphMemory initialized with connection to %s",
+                            safe_uri,
+                        )
 
-            except InfraConnectionError:
-                raise
-            except Exception as e:
-                logger.error(
-                    "Failed to initialize AdapterGraphMemory: %s",
-                    e,
-                )
-                raise RuntimeError(f"Initialization failed: {e}") from e
+                    except InfraConnectionError:
+                        raise
+                    except Exception as e:
+                        logger.error(
+                            "Failed to initialize AdapterGraphMemory: %s",
+                            e,
+                        )
+                        raise RuntimeError(f"Initialization failed: {e}") from e
+        except TimeoutError as e:
+            raise RuntimeError(
+                f"Initialization timed out after {self._config.timeout_seconds}s. "
+                "Another initialization may be in progress or the database is "
+                "unresponsive."
+            ) from e
 
     def _ensure_initialized(self) -> HandlerGraph:
         """Ensure adapter is initialized and return handler.
@@ -973,6 +981,12 @@ class AdapterGraphMemory:
                 error_message=None if handler_healthy else "Handler reports unhealthy",
             )
         except Exception as e:
+            logger.warning(
+                "Health check failed with %s: %s",
+                type(e).__name__,
+                e,
+                exc_info=True,
+            )
             return ModelGraphMemoryHealth(
                 is_healthy=False,
                 initialized=True,

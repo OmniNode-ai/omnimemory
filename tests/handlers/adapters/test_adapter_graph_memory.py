@@ -805,6 +805,49 @@ class TestGetConnections:
             "-[r]-(" in normalized_query or "-[r]-(n" in normalized_query
         ), f"Expected bidirectional pattern -[r]- when param=True: {query}"
 
+    @pytest.mark.asyncio
+    async def test_get_connections_weight_zero_preserved(
+        self,
+        adapter_with_mock: AdapterGraphMemory,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that weight=0.0 is preserved, not defaulted to 1.0.
+
+        This verifies the walrus operator correctly handles the edge case where
+        weight=0.0 (falsy but valid) vs weight=None (should default to 1.0).
+        """
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_2",
+                    "relationship_type": "weak_link",
+                    "weight": 0.0,  # Explicit zero weight - should be preserved
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+                {
+                    "source_id": "mem_1",
+                    "target_id": "mem_3",
+                    "relationship_type": "related",
+                    "weight": None,  # None should default to 1.0
+                    "is_outgoing": True,
+                    "created_at": None,
+                },
+            ]
+        )
+
+        result = await adapter_with_mock.get_connections("mem_1")
+
+        assert result.status == "success"
+        assert len(result.connections) == 2
+        # weight=0.0 should be preserved (not converted to 1.0)
+        assert result.connections[0].weight == 0.0
+        assert result.connections[0].relationship_type == "weak_link"
+        # weight=None should default to 1.0
+        assert result.connections[1].weight == 1.0
+        assert result.connections[1].relationship_type == "related"
+
 
 # =============================================================================
 # Lifecycle Tests
@@ -924,6 +967,31 @@ class TestLifecycle:
         assert result.initialized is False
         assert result.handler_healthy is None
         assert result.error_message is not None
+
+    @pytest.mark.asyncio
+    async def test_initialize_timeout_on_lock_acquisition(self) -> None:
+        """Test that initialization times out if lock cannot be acquired.
+
+        This verifies the timeout handling for the initialization lock, which
+        prevents indefinite hangs if another initialization is in progress or
+        the database is unresponsive.
+        """
+        # Use a very short timeout to make the test fast
+        config = AdapterGraphMemoryConfig(timeout_seconds=0.1)
+        adapter = AdapterGraphMemory(config)
+
+        # Acquire the lock to simulate another initialization in progress
+        async with adapter._init_lock:
+            # Try to initialize while lock is held - should timeout
+            with pytest.raises(RuntimeError) as exc_info:
+                await adapter.initialize(connection_uri="bolt://localhost:7687")
+
+            # Verify the error message mentions timeout
+            assert "timed out" in str(exc_info.value).lower()
+            assert "0.1" in str(exc_info.value)
+
+        # Adapter should not be initialized after timeout
+        assert not adapter.is_initialized
 
 
 # =============================================================================
