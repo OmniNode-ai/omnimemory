@@ -48,11 +48,12 @@ from __future__ import annotations
 import asyncio
 import heapq
 import logging
+import time
 from collections.abc import Mapping
 from typing import Literal, TypeAlias
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # omnibase_infra is a dev dependency - make imports conditional
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -148,100 +149,179 @@ PropertyValue: TypeAlias = JsonType
 class CypherTemplates:
     """Parameterized Cypher query templates for memory graph operations.
 
-    Direction Behavior:
-        - GET_CONNECTIONS: Bidirectional (matches both incoming and outgoing)
-        - GET_CONNECTIONS_BY_TYPE: Bidirectional with type filtering
-        - GET_CONNECTIONS_OUTGOING: Outgoing only (from source to target)
-        - GET_CONNECTIONS_BY_TYPE_OUTGOING: Outgoing only with type filtering
+    All template methods accept a ``node_label`` parameter to allow configurable
+    node labels (defaults to "Memory" in AdapterGraphMemoryConfig).
 
-        Bidirectional templates use `startNode(r) = m AS is_outgoing` to dynamically
-        determine edge direction. Outgoing-only templates always return `true` for
+    Direction Behavior:
+        - get_connections: Bidirectional (matches both incoming and outgoing)
+        - get_connections_by_type: Bidirectional with type filtering
+        - get_connections_outgoing: Outgoing only (from source to target)
+        - get_connections_by_type_outgoing: Outgoing only with type filtering
+
+        Bidirectional templates use ``startNode(r) = m AS is_outgoing`` to dynamically
+        determine edge direction. Outgoing-only templates always return ``true`` for
         is_outgoing since all edges are outgoing by definition.
 
     Security:
         All queries use parameters ($param) instead of string interpolation.
+        The ``node_label`` parameter is safe from injection as it comes from
+        config validation (string type with pydantic validation).
         NEVER construct queries by concatenating user input.
     """
 
-    # Find direct edges (relationships) for a memory node (bidirectional)
-    GET_CONNECTIONS = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]-(n:Memory)
-    RETURN
-        m.memory_id AS source_id,
-        n.memory_id AS target_id,
-        type(r) AS relationship_type,
-        r.weight AS weight,
-        r.created_at AS created_at,
-        startNode(r) = m AS is_outgoing
-    LIMIT $limit
-    """
+    @staticmethod
+    def get_connections(node_label: str) -> str:
+        """Generate query to find direct edges for a memory node (bidirectional).
 
-    # Find connections filtered by relationship type (bidirectional)
-    GET_CONNECTIONS_BY_TYPE = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]-(n:Memory)
-    WHERE type(r) IN $relationship_types
-    RETURN
-        m.memory_id AS source_id,
-        n.memory_id AS target_id,
-        type(r) AS relationship_type,
-        r.weight AS weight,
-        r.created_at AS created_at,
-        startNode(r) = m AS is_outgoing
-    LIMIT $limit
-    """
+        Args:
+            node_label: Graph label for memory nodes (e.g., "Memory").
 
-    # Find outgoing edges only (from source to target)
-    GET_CONNECTIONS_OUTGOING = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]->(n:Memory)
-    RETURN
-        m.memory_id AS source_id,
-        n.memory_id AS target_id,
-        type(r) AS relationship_type,
-        r.weight AS weight,
-        r.created_at AS created_at,
-        true AS is_outgoing
-    LIMIT $limit
-    """
+        Returns:
+            Cypher query string.
+        """
+        return f"""
+        MATCH (m:{node_label} {{memory_id: $memory_id}})-[r]-(n:{node_label})
+        RETURN
+            m.memory_id AS source_id,
+            n.memory_id AS target_id,
+            type(r) AS relationship_type,
+            r.weight AS weight,
+            r.created_at AS created_at,
+            startNode(r) = m AS is_outgoing
+        LIMIT $limit
+        """
 
-    # Find outgoing connections filtered by relationship type
-    GET_CONNECTIONS_BY_TYPE_OUTGOING = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]->(n:Memory)
-    WHERE type(r) IN $relationship_types
-    RETURN
-        m.memory_id AS source_id,
-        n.memory_id AS target_id,
-        type(r) AS relationship_type,
-        r.weight AS weight,
-        r.created_at AS created_at,
-        true AS is_outgoing
-    LIMIT $limit
-    """
+    @staticmethod
+    def get_connections_by_type(node_label: str) -> str:
+        """Generate query to find connections filtered by type (bidirectional).
 
-    # Count connections for a memory
-    COUNT_CONNECTIONS = """
-    MATCH (m:Memory {memory_id: $memory_id})-[r]-()
-    RETURN count(r) AS connection_count
-    """
+        Args:
+            node_label: Graph label for memory nodes (e.g., "Memory").
 
-    # Check if a memory node exists
-    # Note: Using id(m) instead of elementId(m) for Memgraph compatibility
-    # (Neo4j 5.x prefers elementId() but id() still works)
-    NODE_EXISTS = """
-    MATCH (m:Memory {memory_id: $memory_id})
-    RETURN m.memory_id AS memory_id, id(m) AS element_id
-    LIMIT 1
-    """
+        Returns:
+            Cypher query string.
+        """
+        return f"""
+        MATCH (m:{node_label} {{memory_id: $memory_id}})-[r]-(n:{node_label})
+        WHERE type(r) IN $relationship_types
+        RETURN
+            m.memory_id AS source_id,
+            n.memory_id AS target_id,
+            type(r) AS relationship_type,
+            r.weight AS weight,
+            r.created_at AS created_at,
+            startNode(r) = m AS is_outgoing
+        LIMIT $limit
+        """
+
+    @staticmethod
+    def get_connections_outgoing(node_label: str) -> str:
+        """Generate query to find outgoing edges only (from source to target).
+
+        Args:
+            node_label: Graph label for memory nodes (e.g., "Memory").
+
+        Returns:
+            Cypher query string.
+        """
+        return f"""
+        MATCH (m:{node_label} {{memory_id: $memory_id}})-[r]->(n:{node_label})
+        RETURN
+            m.memory_id AS source_id,
+            n.memory_id AS target_id,
+            type(r) AS relationship_type,
+            r.weight AS weight,
+            r.created_at AS created_at,
+            true AS is_outgoing
+        LIMIT $limit
+        """
+
+    @staticmethod
+    def get_connections_by_type_outgoing(node_label: str) -> str:
+        """Generate query to find outgoing connections filtered by type.
+
+        Args:
+            node_label: Graph label for memory nodes (e.g., "Memory").
+
+        Returns:
+            Cypher query string.
+        """
+        return f"""
+        MATCH (m:{node_label} {{memory_id: $memory_id}})-[r]->(n:{node_label})
+        WHERE type(r) IN $relationship_types
+        RETURN
+            m.memory_id AS source_id,
+            n.memory_id AS target_id,
+            type(r) AS relationship_type,
+            r.weight AS weight,
+            r.created_at AS created_at,
+            true AS is_outgoing
+        LIMIT $limit
+        """
+
+    @staticmethod
+    def count_connections(node_label: str) -> str:
+        """Generate query to count connections for a memory.
+
+        Args:
+            node_label: Graph label for memory nodes (e.g., "Memory").
+
+        Returns:
+            Cypher query string.
+        """
+        return f"""
+        MATCH (m:{node_label} {{memory_id: $memory_id}})-[r]-()
+        RETURN count(r) AS connection_count
+        """
+
+    @staticmethod
+    def node_exists(node_label: str) -> str:
+        """Generate query to check if a memory node exists.
+
+        Note: Using id(m) instead of elementId(m) for Memgraph compatibility
+        (Neo4j 5.x prefers elementId() but id() still works).
+
+        Args:
+            node_label: Graph label for memory nodes (e.g., "Memory").
+
+        Returns:
+            Cypher query string.
+        """
+        return f"""
+        MATCH (m:{node_label} {{memory_id: $memory_id}})
+        RETURN m.memory_id AS memory_id, id(m) AS element_id
+        LIMIT 1
+        """
+
+    # Template for index creation - uses node_label parameter
+    # NOTE: Index creation is idempotent in Memgraph (creating an existing index
+    # returns an error that we can safely ignore). The index dramatically improves
+    # query performance for memory_id lookups.
+    @staticmethod
+    def create_memory_index(node_label: str) -> str:
+        """Generate index creation query for memory_id property.
+
+        Args:
+            node_label: The label for memory nodes (e.g., "Memory").
+
+        Returns:
+            Cypher query string to create the index.
+        """
+        return f"CREATE INDEX ON :{node_label}(memory_id);"
 
     # Template functions for find_related queries
     # NOTE: Memgraph does NOT support parameterized depth in variable-length paths
     # (e.g., `[*1..$max_depth]` fails), so we must embed the depth value directly.
     # This is safe because depth is bounded by config validation (1-10 integer).
     @staticmethod
-    def find_related_query(max_depth: int, bidirectional: bool = True) -> str:
+    def find_related_query(
+        max_depth: int, node_label: str, bidirectional: bool = True
+    ) -> str:
         """Generate FIND_RELATED query with embedded depth value.
 
         Args:
             max_depth: Maximum traversal depth (must be a bounded integer, 1-10).
+            node_label: Graph label for memory nodes (e.g., "Memory").
             bidirectional: Whether to traverse in both directions.
 
         Returns:
@@ -249,8 +329,8 @@ class CypherTemplates:
         """
         direction = "-" if bidirectional else "->"
         return f"""
-        MATCH (start:Memory {{memory_id: $memory_id}})-[r*1..{max_depth}]{direction}
-              (related:Memory)
+        MATCH (start:{node_label} {{memory_id: $memory_id}})
+              -[r*1..{max_depth}]{direction}(related:{node_label})
         WHERE related.memory_id <> $memory_id
         RETURN DISTINCT
             related.memory_id AS memory_id,
@@ -262,11 +342,14 @@ class CypherTemplates:
         """
 
     @staticmethod
-    def find_related_by_type_query(max_depth: int, bidirectional: bool = True) -> str:
+    def find_related_by_type_query(
+        max_depth: int, node_label: str, bidirectional: bool = True
+    ) -> str:
         """Generate FIND_RELATED_BY_TYPE query with embedded depth value.
 
         Args:
             max_depth: Maximum traversal depth (must be a bounded integer, 1-10).
+            node_label: Graph label for memory nodes (e.g., "Memory").
             bidirectional: Whether to traverse in both directions.
 
         Returns:
@@ -274,8 +357,8 @@ class CypherTemplates:
         """
         direction = "-" if bidirectional else "->"
         return f"""
-        MATCH (start:Memory {{memory_id: $memory_id}})-[r*1..{max_depth}]{direction}
-              (related:Memory)
+        MATCH (start:{node_label} {{memory_id: $memory_id}})
+              -[r*1..{max_depth}]{direction}(related:{node_label})
         WHERE related.memory_id <> $memory_id
           AND ALL(rel IN r WHERE type(rel) IN $relationship_types)
         RETURN DISTINCT
@@ -304,6 +387,11 @@ class ModelMemoryConnection(BaseModel):
         is_outgoing: True if this is an outgoing edge from source, False if incoming.
         created_at: ISO timestamp when the connection was created.
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     source_id: str = Field(
         ...,
@@ -345,6 +433,11 @@ class ModelRelatedMemory(BaseModel):
         labels: Graph labels on the memory node.
         properties: Additional properties from the graph node.
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     memory_id: str = Field(
         ...,
@@ -395,6 +488,11 @@ class ModelRelatedMemoryResult(BaseModel):
         error_message: Error details if status is "error".
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
     status: Literal["success", "error", "not_found", "no_results"] = Field(
         ...,
         description="Operation status",
@@ -434,6 +532,11 @@ class ModelConnectionsResult(BaseModel):
         error_message: Error details if status is "error".
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
     status: Literal["success", "error", "not_found", "no_results"] = Field(
         ...,
         description="Operation status",
@@ -462,6 +565,11 @@ class ModelGraphMemoryHealth(BaseModel):
         handler_healthy: Health status from the underlying graph handler.
         error_message: Error details if unhealthy.
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     is_healthy: bool = Field(
         ...,
@@ -499,7 +607,17 @@ class AdapterGraphMemoryConfig(BaseModel):
             Defaults to True.
         memory_node_label: Graph label for memory nodes. Defaults to "Memory".
         timeout_seconds: Query timeout in seconds. Defaults to 30.0.
+        score_filter_multiplier: Multiplier for query limit when min_score
+            filtering is used. Higher values fetch more candidates but
+            increase query cost. Defaults to 3.0. Range: 1.0-10.0.
+        ensure_indexes: Whether to create indexes on memory_id during
+            initialization. Defaults to True. Index creation is idempotent.
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     max_depth: int = Field(
         default=5,
@@ -534,6 +652,24 @@ class AdapterGraphMemoryConfig(BaseModel):
         default=30.0,
         gt=0.0,
         description="Query timeout in seconds",
+    )
+    score_filter_multiplier: float = Field(
+        default=3.0,
+        ge=1.0,
+        le=10.0,
+        description=(
+            "Multiplier for query limit when min_score filtering is used. "
+            "Higher values fetch more candidates but increase query cost. "
+            "If min_score is high (>0.5), consider increasing this value."
+        ),
+    )
+    ensure_indexes: bool = Field(
+        default=True,
+        description=(
+            "Whether to create indexes on memory_id during initialization. "
+            "Index creation is idempotent (safe to run multiple times). "
+            "Set to False to skip index creation if managing indexes manually."
+        ),
     )
 
     @model_validator(mode="after")
@@ -692,6 +828,23 @@ class AdapterGraphMemory:
                             safe_uri,
                         )
 
+                        # Ensure indexes exist for optimal query performance
+                        if self._config.ensure_indexes:
+                            try:
+                                await self._handler.execute_query(
+                                    query=CypherTemplates.create_memory_index(
+                                        self._config.memory_node_label
+                                    ),
+                                    parameters={},
+                                )
+                                logger.info(
+                                    "Ensured index on %s(memory_id)",
+                                    self._config.memory_node_label,
+                                )
+                            except Exception as e:
+                                # Index may already exist - log but don't fail
+                                logger.debug("Index creation note: %s", e)
+
                     except InfraConnectionError:
                         raise
                     except Exception as e:
@@ -753,9 +906,23 @@ class AdapterGraphMemory:
 
         Raises:
             RuntimeError: If adapter is not initialized.
-        """
-        import time
 
+        Note:
+            **Score Filtering and Result Count Tradeoff**
+
+            When ``min_score`` is set above 0.0, this method fetches extra
+            candidates (controlled by ``config.score_filter_multiplier``,
+            default 3.0) to account for results that will be filtered out.
+
+            However, if ``min_score`` is high (e.g., 0.9) and most graph
+            relationships have lower scores, fewer results than ``limit``
+            may be returned. This is expected behavior.
+
+            To increase the likelihood of receiving ``limit`` results when
+            using high ``min_score`` values, increase
+            ``score_filter_multiplier`` in the adapter configuration (up to
+            10.0). Be aware that higher multipliers increase query cost.
+        """
         handler = self._ensure_initialized()
 
         # Apply bounds
@@ -774,7 +941,7 @@ class AdapterGraphMemory:
 
             # First, check if the memory node exists
             node_result = await handler.execute_query(
-                query=CypherTemplates.NODE_EXISTS,
+                query=CypherTemplates.node_exists(self._config.memory_node_label),
                 parameters={"memory_id": memory_id},
             )
 
@@ -785,14 +952,20 @@ class AdapterGraphMemory:
                 )
 
             # Select appropriate query template based on direction and filters
-            # Request more results than needed to account for min_score filtering
-            query_limit = min(effective_limit * 3, self._config.max_limit)
+            # Request more results than needed to account for min_score filtering.
+            # The multiplier is configurable via score_filter_multiplier.
+            query_limit = min(
+                int(effective_limit * self._config.score_filter_multiplier),
+                self._config.max_limit,
+            )
 
             # Generate query with embedded depth (required for Memgraph compatibility)
             # Memgraph does NOT support parameterized depth in variable-length paths
+            node_label = self._config.memory_node_label
             if relationship_types:
                 query = CypherTemplates.find_related_by_type_query(
                     max_depth=effective_depth,
+                    node_label=node_label,
                     bidirectional=is_bidirectional,
                 )
                 parameters: dict[str, object] = {
@@ -803,6 +976,7 @@ class AdapterGraphMemory:
             else:
                 query = CypherTemplates.find_related_query(
                     max_depth=effective_depth,
+                    node_label=node_label,
                     bidirectional=is_bidirectional,
                 )
                 parameters = {
@@ -948,17 +1122,18 @@ class AdapterGraphMemory:
 
         try:
             # Choose query based on bidirectional flag and relationship_types
+            node_label = self._config.memory_node_label
             if effective_bidirectional:
                 # Bidirectional queries (both incoming and outgoing)
                 if relationship_types:
-                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE
+                    query = CypherTemplates.get_connections_by_type(node_label)
                     parameters: dict[str, object] = {
                         "memory_id": memory_id,
                         "relationship_types": relationship_types,
                         "limit": effective_limit,
                     }
                 else:
-                    query = CypherTemplates.GET_CONNECTIONS
+                    query = CypherTemplates.get_connections(node_label)
                     parameters = {
                         "memory_id": memory_id,
                         "limit": effective_limit,
@@ -966,14 +1141,14 @@ class AdapterGraphMemory:
             else:
                 # Outgoing-only queries
                 if relationship_types:
-                    query = CypherTemplates.GET_CONNECTIONS_BY_TYPE_OUTGOING
+                    query = CypherTemplates.get_connections_by_type_outgoing(node_label)
                     parameters = {
                         "memory_id": memory_id,
                         "relationship_types": relationship_types,
                         "limit": effective_limit,
                     }
                 else:
-                    query = CypherTemplates.GET_CONNECTIONS_OUTGOING
+                    query = CypherTemplates.get_connections_outgoing(node_label)
                     parameters = {
                         "memory_id": memory_id,
                         "limit": effective_limit,
@@ -987,7 +1162,7 @@ class AdapterGraphMemory:
             if not result.records:
                 # Check if node exists
                 exists_result = await handler.execute_query(
-                    query=CypherTemplates.NODE_EXISTS,
+                    query=CypherTemplates.node_exists(node_label),
                     parameters={"memory_id": memory_id},
                 )
                 if not exists_result.records:

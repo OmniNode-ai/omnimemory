@@ -119,6 +119,8 @@ class TestAdapterGraphMemoryConfig:
         assert config.bidirectional is True
         assert config.memory_node_label == "Memory"
         assert config.timeout_seconds == 30.0
+        assert config.score_filter_multiplier == 3.0
+        assert config.ensure_indexes is True
 
     def test_custom_config(self) -> None:
         """Test custom configuration values."""
@@ -129,6 +131,8 @@ class TestAdapterGraphMemoryConfig:
             bidirectional=False,
             memory_node_label="MemoryNode",
             timeout_seconds=60.0,
+            score_filter_multiplier=5.0,
+            ensure_indexes=False,
         )
 
         assert config.max_depth == 3
@@ -137,6 +141,8 @@ class TestAdapterGraphMemoryConfig:
         assert config.bidirectional is False
         assert config.memory_node_label == "MemoryNode"
         assert config.timeout_seconds == 60.0
+        assert config.score_filter_multiplier == 5.0
+        assert config.ensure_indexes is False
 
     def test_max_depth_bounds(self) -> None:
         """Test max_depth has valid bounds."""
@@ -156,6 +162,25 @@ class TestAdapterGraphMemoryConfig:
 
         with pytest.raises(ValidationError):
             AdapterGraphMemoryConfig(timeout_seconds=0)
+
+    def test_score_filter_multiplier_bounds(self) -> None:
+        """Test score_filter_multiplier has valid bounds (1.0 to 10.0)."""
+        from pydantic import ValidationError
+
+        # Valid at bounds
+        config_min = AdapterGraphMemoryConfig(score_filter_multiplier=1.0)
+        assert config_min.score_filter_multiplier == 1.0
+
+        config_max = AdapterGraphMemoryConfig(score_filter_multiplier=10.0)
+        assert config_max.score_filter_multiplier == 10.0
+
+        # Too low
+        with pytest.raises(ValidationError):
+            AdapterGraphMemoryConfig(score_filter_multiplier=0.5)
+
+        # Too high
+        with pytest.raises(ValidationError):
+            AdapterGraphMemoryConfig(score_filter_multiplier=11.0)
 
     def test_default_depth_exceeds_max_depth_raises(self) -> None:
         """Test that default_depth > max_depth raises validation error."""
@@ -266,11 +291,13 @@ class TestCypherTemplates:
 
     def test_templates_use_parameters(self) -> None:
         """Verify all templates use parameterized queries (no string interpolation)."""
+        # All templates now require node_label parameter
+        node_label = "Memory"
         templates = [
-            CypherTemplates.GET_CONNECTIONS,
-            CypherTemplates.GET_CONNECTIONS_BY_TYPE,
-            CypherTemplates.COUNT_CONNECTIONS,
-            CypherTemplates.NODE_EXISTS,
+            CypherTemplates.get_connections(node_label),
+            CypherTemplates.get_connections_by_type(node_label),
+            CypherTemplates.count_connections(node_label),
+            CypherTemplates.node_exists(node_label),
         ]
 
         for template in templates:
@@ -297,24 +324,25 @@ class TestCypherTemplates:
                 )
 
     def test_get_connections_template(self) -> None:
-        """Test GET_CONNECTIONS template structure."""
-        template = CypherTemplates.GET_CONNECTIONS
+        """Test get_connections template structure."""
+        template = CypherTemplates.get_connections("Memory")
         assert "$memory_id" in template
         assert "$limit" in template
         assert "MATCH" in template
         assert "RETURN" in template
 
     def test_node_exists_template(self) -> None:
-        """Test NODE_EXISTS template structure."""
-        template = CypherTemplates.NODE_EXISTS
+        """Test node_exists template structure."""
+        template = CypherTemplates.node_exists("Memory")
         assert "$memory_id" in template
         assert "LIMIT 1" in template
 
     def test_bidirectional_templates_use_undirected_pattern(self) -> None:
         """Verify bidirectional templates use -[r]- undirected pattern."""
+        node_label = "Memory"
         bidirectional_templates = [
-            CypherTemplates.GET_CONNECTIONS,
-            CypherTemplates.GET_CONNECTIONS_BY_TYPE,
+            CypherTemplates.get_connections(node_label),
+            CypherTemplates.get_connections_by_type(node_label),
         ]
 
         for template in bidirectional_templates:
@@ -330,9 +358,10 @@ class TestCypherTemplates:
 
     def test_outgoing_templates_use_directed_pattern(self) -> None:
         """Verify outgoing templates use -[r]-> directed pattern."""
+        node_label = "Memory"
         outgoing_templates = [
-            CypherTemplates.GET_CONNECTIONS_OUTGOING,
-            CypherTemplates.GET_CONNECTIONS_BY_TYPE_OUTGOING,
+            CypherTemplates.get_connections_outgoing(node_label),
+            CypherTemplates.get_connections_by_type_outgoing(node_label),
         ]
 
         for template in outgoing_templates:
@@ -344,16 +373,63 @@ class TestCypherTemplates:
 
     def test_outgoing_templates_have_required_parameters(self) -> None:
         """Verify outgoing templates have required parameters."""
-        # GET_CONNECTIONS_OUTGOING should have memory_id and limit
-        template = CypherTemplates.GET_CONNECTIONS_OUTGOING
+        node_label = "Memory"
+        # get_connections_outgoing should have memory_id and limit
+        template = CypherTemplates.get_connections_outgoing(node_label)
         assert "$memory_id" in template
         assert "$limit" in template
 
-        # GET_CONNECTIONS_BY_TYPE_OUTGOING should also have relationship_types
-        template_by_type = CypherTemplates.GET_CONNECTIONS_BY_TYPE_OUTGOING
+        # get_connections_by_type_outgoing should also have relationship_types
+        template_by_type = CypherTemplates.get_connections_by_type_outgoing(node_label)
         assert "$memory_id" in template_by_type
         assert "$limit" in template_by_type
         assert "$relationship_types" in template_by_type
+
+    def test_create_memory_index_template(self) -> None:
+        """Test create_memory_index generates correct Cypher query."""
+        # Default label
+        query = CypherTemplates.create_memory_index("Memory")
+        assert query == "CREATE INDEX ON :Memory(memory_id);"
+
+        # Custom label
+        query_custom = CypherTemplates.create_memory_index("CustomNode")
+        assert query_custom == "CREATE INDEX ON :CustomNode(memory_id);"
+
+    def test_templates_use_configured_node_label(self) -> None:
+        """Verify templates correctly use the configured node_label."""
+        custom_label = "CustomMemory"
+
+        # Test all templates use the custom label
+        templates_and_checks = [
+            (CypherTemplates.get_connections(custom_label), ":CustomMemory"),
+            (CypherTemplates.get_connections_by_type(custom_label), ":CustomMemory"),
+            (CypherTemplates.get_connections_outgoing(custom_label), ":CustomMemory"),
+            (
+                CypherTemplates.get_connections_by_type_outgoing(custom_label),
+                ":CustomMemory",
+            ),
+            (CypherTemplates.count_connections(custom_label), ":CustomMemory"),
+            (CypherTemplates.node_exists(custom_label), ":CustomMemory"),
+            (
+                CypherTemplates.find_related_query(3, custom_label),
+                ":CustomMemory",
+            ),
+            (
+                CypherTemplates.find_related_by_type_query(3, custom_label),
+                ":CustomMemory",
+            ),
+        ]
+
+        for template, expected_label in templates_and_checks:
+            assert expected_label in template, (
+                f"Template should contain {expected_label}, "
+                f"got: {template[:100]}..."
+            )
+            # Ensure default "Memory" label is NOT present
+            assert ":Memory " not in template and ":Memory{" not in template, (
+                f"Template should NOT contain ':Memory' when custom label is used, "
+                f"got: {template[:100]}..."
+            )
 
 
 # =============================================================================
@@ -492,6 +568,72 @@ class TestFindRelated:
         find_related_call = mock_handler.execute_query.call_args_list[1]
         parameters = find_related_call[1]["parameters"]
         assert parameters["relationship_types"] == ["related_to", "caused_by"]
+
+    @pytest.mark.asyncio
+    async def test_find_related_uses_score_filter_multiplier(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that find_related uses the configurable score_filter_multiplier.
+
+        The multiplier determines how many extra candidates are fetched
+        to account for min_score filtering. This test verifies:
+        1. Default multiplier (3.0) results in query_limit = limit * 3
+        2. Custom multiplier changes the query_limit accordingly
+        """
+        # Create config with custom multiplier
+        config = AdapterGraphMemoryConfig(
+            default_limit=100,
+            max_limit=1000,
+            score_filter_multiplier=5.0,  # Custom multiplier
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        # Mock execute_query with side_effect for multiple calls
+        mock_handler.execute_query.side_effect = [
+            MagicMock(records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]),
+            MagicMock(records=[]),  # No related memories
+        ]
+
+        # Call find_related with default limit (100)
+        await adapter.find_related("mem_start", limit=100)
+
+        # Verify execute_query was called twice
+        assert mock_handler.execute_query.call_count == 2
+
+        # Check second call (FIND_RELATED) has query_limit = 100 * 5.0 = 500
+        find_related_call = mock_handler.execute_query.call_args_list[1]
+        parameters = find_related_call[1]["parameters"]
+        assert parameters["limit"] == 500  # 100 * 5.0 multiplier
+
+    @pytest.mark.asyncio
+    async def test_find_related_multiplier_respects_max_limit(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that query_limit is capped by max_limit even with high multiplier."""
+        config = AdapterGraphMemoryConfig(
+            default_limit=100,
+            max_limit=200,  # Low max_limit
+            score_filter_multiplier=5.0,  # Would give 500, but capped at 200
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        mock_handler.execute_query.side_effect = [
+            MagicMock(records=[{"memory_id": "mem_start", "element_id": "4:abc:123"}]),
+            MagicMock(records=[]),
+        ]
+
+        await adapter.find_related("mem_start", limit=100)
+
+        # query_limit should be min(100 * 5.0, 200) = 200 (capped by max_limit)
+        find_related_call = mock_handler.execute_query.call_args_list[1]
+        parameters = find_related_call[1]["parameters"]
+        assert parameters["limit"] == 200
 
     @pytest.mark.asyncio
     async def test_find_related_not_initialized(
@@ -1003,6 +1145,118 @@ class TestLifecycle:
 
         # Adapter should not be initialized after timeout
         assert not adapter.is_initialized
+
+    @pytest.mark.asyncio
+    async def test_initialize_creates_index_by_default(
+        self,
+        config: AdapterGraphMemoryConfig,
+    ) -> None:
+        """Test that index is created during initialization by default."""
+        adapter = AdapterGraphMemory(config)
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_graph_memory.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            mock_instance.execute_query = AsyncMock()
+            MockHandler.return_value = mock_instance
+
+            with patch(
+                "omnimemory.handlers.adapters.adapter_graph_memory.ModelONEXContainer"
+            ):
+                await adapter.initialize(
+                    connection_uri="bolt://localhost:7687",
+                    auth=("neo4j", "password"),
+                )
+
+            assert adapter.is_initialized
+            # Verify execute_query was called with index creation query
+            mock_instance.execute_query.assert_called_once()
+            call_args = mock_instance.execute_query.call_args
+            query = call_args[1]["query"]
+            assert "CREATE INDEX ON :Memory(memory_id)" in query
+
+    @pytest.mark.asyncio
+    async def test_initialize_skips_index_when_disabled(self) -> None:
+        """Test that index creation is skipped when ensure_indexes=False."""
+        config = AdapterGraphMemoryConfig(ensure_indexes=False)
+        adapter = AdapterGraphMemory(config)
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_graph_memory.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            mock_instance.execute_query = AsyncMock()
+            MockHandler.return_value = mock_instance
+
+            with patch(
+                "omnimemory.handlers.adapters.adapter_graph_memory.ModelONEXContainer"
+            ):
+                await adapter.initialize(
+                    connection_uri="bolt://localhost:7687",
+                )
+
+            assert adapter.is_initialized
+            # Verify execute_query was NOT called (no index creation)
+            mock_instance.execute_query.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_initialize_handles_index_already_exists(
+        self,
+        config: AdapterGraphMemoryConfig,
+    ) -> None:
+        """Test that index creation error (e.g., already exists) doesn't fail init."""
+        adapter = AdapterGraphMemory(config)
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_graph_memory.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            # Simulate index already exists error
+            mock_instance.execute_query = AsyncMock(
+                side_effect=Exception("Index already exists")
+            )
+            MockHandler.return_value = mock_instance
+
+            with patch(
+                "omnimemory.handlers.adapters.adapter_graph_memory.ModelONEXContainer"
+            ):
+                # Should NOT raise - index errors are caught and logged
+                await adapter.initialize(
+                    connection_uri="bolt://localhost:7687",
+                )
+
+            # Adapter should still be initialized despite index error
+            assert adapter.is_initialized
+
+    @pytest.mark.asyncio
+    async def test_initialize_uses_custom_node_label_for_index(self) -> None:
+        """Test that index creation uses the configured memory_node_label."""
+        config = AdapterGraphMemoryConfig(memory_node_label="CustomMemory")
+        adapter = AdapterGraphMemory(config)
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_graph_memory.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            mock_instance.execute_query = AsyncMock()
+            MockHandler.return_value = mock_instance
+
+            with patch(
+                "omnimemory.handlers.adapters.adapter_graph_memory.ModelONEXContainer"
+            ):
+                await adapter.initialize(
+                    connection_uri="bolt://localhost:7687",
+                )
+
+            # Verify the custom label was used in index creation
+            call_args = mock_instance.execute_query.call_args
+            query = call_args[1]["query"]
+            assert "CREATE INDEX ON :CustomMemory(memory_id)" in query
 
 
 # =============================================================================
