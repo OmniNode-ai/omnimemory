@@ -1179,14 +1179,14 @@ class MetricsRegistry:
             # Double-check after acquiring lock
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
-                cls._instance._initialized = False
+                cls._instance._initialized = False  # noqa: SLF001  # Intentional private access in singleton pattern
                 # Create instance-level RLock for multi-metric operations
                 # RLock allows reentrant access from the same thread
-                cls._instance._instance_lock = threading.RLock()
+                cls._instance._instance_lock = threading.RLock()  # noqa: SLF001  # Intentional private access in singleton pattern
 
             # Initialize inside the lock to prevent concurrent initialization
-            if not cls._instance._initialized:
-                cls._instance._do_initialize()
+            if not cls._instance._initialized:  # noqa: SLF001  # Intentional private access in singleton pattern
+                cls._instance._do_initialize()  # noqa: SLF001  # Intentional private access in singleton pattern
 
             return cls._instance
 
@@ -1298,13 +1298,13 @@ class MetricsRegistry:
             )
 
         with cls._class_lock:
-            if cls._instance is not None and cls._instance._initialized:
+            if cls._instance is not None and cls._instance._initialized:  # noqa: SLF001  # Intentional private access in singleton pattern
                 # Acquire instance lock to prevent concurrent get_all_metrics()
-                with cls._instance._instance_lock:
+                with cls._instance._instance_lock:  # noqa: SLF001  # Intentional private access in singleton pattern
                     # Clear all metrics data from the existing instance
                     # This preserves references while resetting state
                     # Note: We do NOT set _instance = None to avoid orphaning references
-                    cls._instance._clear_all_metrics()
+                    cls._instance._clear_all_metrics()  # noqa: SLF001  # Intentional private access in singleton pattern
 
     @classmethod
     def _reset_instance_for_testing(cls) -> None:
@@ -1322,10 +1322,10 @@ class MetricsRegistry:
         It will invalidate any references obtained before the reset completes.
         """
         with cls._class_lock:
-            if cls._instance is not None and cls._instance._initialized:
+            if cls._instance is not None and cls._instance._initialized:  # noqa: SLF001  # Intentional private access in singleton pattern
                 # Clear metrics first to help any stale references
-                with cls._instance._instance_lock:
-                    cls._instance._clear_all_metrics()
+                with cls._instance._instance_lock:  # noqa: SLF001  # Intentional private access in singleton pattern
+                    cls._instance._clear_all_metrics()  # noqa: SLF001  # Intentional private access in singleton pattern
             # Reset the instance - next access will create a new one
             cls._instance = None
 
@@ -1339,19 +1339,19 @@ class MetricsRegistry:
         It acquires each metric's individual lock to safely clear the data,
         ensuring no metric operation is in progress during the clear.
         """
-        # Clear counter values
-        with self.memory_operation_total._lock:
-            self.memory_operation_total._values.clear()
+        # Clear counter values - intentional private access for thread-safe metric clearing
+        with self.memory_operation_total._lock:  # noqa: SLF001
+            self.memory_operation_total._values.clear()  # noqa: SLF001
 
         # Clear histogram values
-        with self.memory_storage_latency_ms._lock:
-            self.memory_storage_latency_ms._values.clear()
-        with self.memory_retrieval_latency_ms._lock:
-            self.memory_retrieval_latency_ms._values.clear()
+        with self.memory_storage_latency_ms._lock:  # noqa: SLF001
+            self.memory_storage_latency_ms._values.clear()  # noqa: SLF001
+        with self.memory_retrieval_latency_ms._lock:  # noqa: SLF001
+            self.memory_retrieval_latency_ms._values.clear()  # noqa: SLF001
 
         # Clear gauge values
-        with self.handler_health_status._lock:
-            self.handler_health_status._values.clear()
+        with self.handler_health_status._lock:  # noqa: SLF001
+            self.handler_health_status._values.clear()  # noqa: SLF001
 
 
 # Global metrics registry instance

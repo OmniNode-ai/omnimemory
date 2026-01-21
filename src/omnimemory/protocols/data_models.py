@@ -67,7 +67,7 @@ class AccessLevel(str, Enum):
     INTERNAL = "internal"
     RESTRICTED = "restricted"
     CONFIDENTIAL = "confidential"
-    SECRET = "secret"
+    SECRET = "secret"  # noqa: S105  # Not a password - access level classification enum value
 
 
 class IndexingStatus(str, Enum):

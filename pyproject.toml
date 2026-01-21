@@ -132,15 +132,6 @@ ignore = [
     "S110",      # try-except-pass (intentional in cleanup/shutdown code)
 
     # ==========================================================================
-    # TEST CODE ONLY (acceptable in test files)
-    # ==========================================================================
-    "SLF001",    # Private member accessed (tests need to verify internals)
-    "S105",      # Hardcoded password (test fixtures use fake credentials)
-    "S608",      # SQL injection (test code with controlled input)
-    "B017",      # pytest.raises(Exception) (acceptable for broad exception tests)
-    "PT011",     # pytest.raises too broad (will add match= incrementally)
-
-    # ==========================================================================
     # COMPLEXITY RULES (architectural - requires refactoring)
     # ==========================================================================
     "C901",      # Function complexity (>10) - requires architectural changes
@@ -220,6 +211,14 @@ known-first-party = ["omnimemory"]
     "S605",  # start process with shell
     "S606",  # start process without shell
     "S607",  # start process with partial path
+]
+# Test-only rules - acceptable in test files
+"tests/**/*" = [
+    "SLF001",  # Private member accessed (tests need to verify internals)
+    "S105",    # Hardcoded password (test fixtures use fake credentials)
+    "S608",    # SQL injection (test code with controlled input)
+    "B017",    # pytest.raises(Exception) (acceptable for broad exception tests)
+    "PT011",   # pytest.raises too broad (will add match= incrementally)
 ]
 
 [tool.mypy]

@@ -7,10 +7,10 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
-# Prevent auto-cancellation of running workflows when new commits are pushed
+# Cancel previous runs when new commits are pushed to save CI resources
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   POETRY_VERSION: "2.2.1"
