@@ -135,6 +135,9 @@ from ..models.utils.model_structured_log_entry import (
     TraceLevel,
 )
 
+# Re-export TraceLevel for public API
+__all__ = ["TraceLevel"]
+
 # Aliases for internal use
 CorrelationContext = ModelCorrelationContext
 StructuredLogEntry = ModelStructuredLogEntry

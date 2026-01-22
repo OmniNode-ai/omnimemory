@@ -38,6 +38,10 @@ from ..models.utils.model_circuit_breaker_config import ModelCircuitBreakerConfi
 from ..models.utils.model_circuit_breaker_stats_response import (
     ModelCircuitBreakerStatsResponse,
 )
+
+# Re-export ModelCircuitBreakerConfig for public API
+__all__ = ["ModelCircuitBreakerConfig"]
+
 from .error_sanitizer import SanitizationLevel
 from .error_sanitizer import sanitize_error as _base_sanitize_error
 
