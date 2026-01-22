@@ -191,6 +191,141 @@ Used by:
     HandlerSemanticCompute._extract_entities_heuristic()
 """
 
+TOPIC_EXTRACTION_STOPWORDS: frozenset[str] = frozenset(
+    {
+        # -------------------------------------------------------------------------
+        # Articles and determiners
+        # -------------------------------------------------------------------------
+        "the",
+        "a",
+        "an",
+        # -------------------------------------------------------------------------
+        # Verbs: be forms
+        # -------------------------------------------------------------------------
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        # -------------------------------------------------------------------------
+        # Verbs: have forms
+        # -------------------------------------------------------------------------
+        "have",
+        "has",
+        "had",
+        # -------------------------------------------------------------------------
+        # Verbs: do forms
+        # -------------------------------------------------------------------------
+        "do",
+        "does",
+        "did",
+        # -------------------------------------------------------------------------
+        # Modal verbs
+        # -------------------------------------------------------------------------
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "ought",
+        "used",
+        # -------------------------------------------------------------------------
+        # Prepositions
+        # -------------------------------------------------------------------------
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        # -------------------------------------------------------------------------
+        # Conjunctions
+        # -------------------------------------------------------------------------
+        "and",
+        "but",
+        "or",
+        "nor",
+        "so",
+        "yet",
+        "both",
+        "either",
+        "neither",
+        # -------------------------------------------------------------------------
+        # Adverbs and modifiers
+        # -------------------------------------------------------------------------
+        "not",
+        "only",
+        "own",
+        "same",
+        "than",
+        "too",
+        "very",
+        "just",
+        # -------------------------------------------------------------------------
+        # Demonstratives and pronouns
+        # -------------------------------------------------------------------------
+        "this",
+        "that",
+        "these",
+        "those",
+        "it",
+        "its",
+    }
+)
+"""Common English stopwords for topic extraction.
+
+Used by the heuristic topic extraction to filter out high-frequency words
+that carry little semantic meaning for topic identification. These words
+are filtered BEFORE frequency analysis to improve topic quality.
+
+All words are lowercase since topic extraction normalizes text to lowercase
+before processing.
+
+Categories:
+    - Articles and determiners (the, a, an)
+    - Verbs: be forms (is, are, was, were, be, been, being)
+    - Verbs: have forms (have, has, had)
+    - Verbs: do forms (do, does, did)
+    - Modal verbs (will, would, could, should, may, might, must, etc.)
+    - Prepositions (to, of, in, for, on, with, at, by, from, etc.)
+    - Conjunctions (and, but, or, nor, so, yet, both, either, neither)
+    - Adverbs and modifiers (not, only, own, same, than, too, very, just)
+    - Demonstratives and pronouns (this, that, these, those, it, its)
+
+.. note::
+    Unlike SENTENCE_STARTING_STOPWORDS which uses title case for
+    sentence-start detection, this set uses lowercase since topic
+    extraction normalizes all text to lowercase.
+
+Used by:
+    HandlerSemanticCompute._extract_topics_heuristic()
+"""
+
 # =============================================================================
 # Complexity Score Constants
 # =============================================================================
@@ -240,6 +375,7 @@ Used by:
 __all__ = [
     "KEY_CONCEPT_CONFIDENCE_THRESHOLD",
     "SENTENCE_STARTING_STOPWORDS",
+    "TOPIC_EXTRACTION_STOPWORDS",
     "COMPLEXITY_WORD_LEN_MIN",
     "COMPLEXITY_WORD_LEN_RANGE",
     "COMPLEXITY_SENTENCE_LEN_MIN",

@@ -164,6 +164,13 @@ class ModelSemanticComputePolicyConfig(BaseModel):
         description="Minimum confidence threshold for entity extraction",
     )
 
+    heuristic_entity_confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score assigned to heuristic-extracted entities",
+    )
+
     max_entities_per_request: int = Field(
         default=100,
         ge=1,

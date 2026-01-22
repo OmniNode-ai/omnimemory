@@ -74,6 +74,7 @@ from ..utils.handler_constants import (
     COMPLEXITY_WORD_LEN_RANGE,
     KEY_CONCEPT_CONFIDENCE_THRESHOLD,
     SENTENCE_STARTING_STOPWORDS,
+    TOPIC_EXTRACTION_STOPWORDS,
 )
 
 if TYPE_CHECKING:
@@ -881,7 +882,7 @@ class HandlerSemanticCompute:
                         ModelSemanticEntity(
                             entity_type=entity_type,
                             text=clean_word,
-                            confidence=0.7,  # Lower confidence for heuristic
+                            confidence=self._config.policy_config.heuristic_entity_confidence,
                             span_start=span_start,
                             span_end=span_end,
                         )
@@ -985,7 +986,7 @@ class HandlerSemanticCompute:
             response = await self._execute_with_retry(
                 _do_llm_extract, "llm_entity_extraction"
             )
-            return self._parse_llm_entity_response(response, content)
+            return self._parse_llm_entity_response(response)
 
         except Exception:
             logger.exception("LLM entity extraction failed after retries")
@@ -1024,7 +1025,7 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
         }
 
     def _parse_llm_entity_response(
-        self, response: dict[str, object], content: str
+        self, response: dict[str, object]
     ) -> list[ModelSemanticEntity]:
         """Parse LLM response into entity models."""
         entities: list[ModelSemanticEntity] = []
@@ -1112,89 +1113,11 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
         # Simple word frequency approach
         words = content.lower().split()
 
-        # Filter stop words and short words
-        stop_words = {
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "was",
-            "were",
-            "be",
-            "been",
-            "being",
-            "have",
-            "has",
-            "had",
-            "do",
-            "does",
-            "did",
-            "will",
-            "would",
-            "could",
-            "should",
-            "may",
-            "might",
-            "must",
-            "shall",
-            "can",
-            "need",
-            "dare",
-            "ought",
-            "used",
-            "to",
-            "of",
-            "in",
-            "for",
-            "on",
-            "with",
-            "at",
-            "by",
-            "from",
-            "as",
-            "into",
-            "through",
-            "during",
-            "before",
-            "after",
-            "above",
-            "below",
-            "between",
-            "under",
-            "again",
-            "further",
-            "then",
-            "once",
-            "and",
-            "but",
-            "or",
-            "nor",
-            "so",
-            "yet",
-            "both",
-            "either",
-            "neither",
-            "not",
-            "only",
-            "own",
-            "same",
-            "than",
-            "too",
-            "very",
-            "just",
-            "this",
-            "that",
-            "these",
-            "those",
-            "it",
-            "its",
-        }
-
+        # Filter stop words and short words (using module-level constant)
         filtered_words = [
             w.strip(".,!?;:\"'()[]{}").lower()
             for w in words
-            if len(w) > 3 and w.lower() not in stop_words
+            if len(w) > 3 and w.lower() not in TOPIC_EXTRACTION_STOPWORDS
         ]
 
         # Count frequencies

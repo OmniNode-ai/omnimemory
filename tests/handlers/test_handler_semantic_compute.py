@@ -588,8 +588,15 @@ class TestAnalyze:
 
         assert result.analysis_type == "entities_only"
         assert result.semantic_vector == []
-        # Should have entities
-        assert len(result.entities) >= 0
+        # Should have entities - John and Google should be extracted
+        # result.entities is list[str] containing entity names
+        assert len(result.entities) > 0, "entities_only mode should extract entities"
+        assert (
+            "John" in result.entities
+        ), f"Expected 'John' in entities, got: {result.entities}"
+        assert (
+            "Google" in result.entities
+        ), f"Expected 'Google' in entities, got: {result.entities}"
 
     @pytest.mark.asyncio
     async def test_analyze_invalid_type_raises_error(
