@@ -18,6 +18,10 @@
 # - All services require authentication
 # - Health checks are more aggressive for faster failure detection
 # - Resource limits are tighter for production workloads
+#
+# VERSION REQUIREMENT:
+# - Requires Docker Compose v2.20.0+ (uses !override YAML tag to clear ports)
+# - Check version: docker compose version
 # ============================================================================
 name: omnimemory-prod
 
@@ -40,6 +44,10 @@ services:
       QDRANT__LOG_LEVEL: WARN
       # REQUIRED - service will fail without this
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?QDRANT_API_KEY is required for production}
+    # Health check note: The /readyz endpoint is a Kubernetes-style readiness probe
+    # that is typically accessible WITHOUT authentication in Qdrant. If your Qdrant
+    # version requires auth for /readyz, add the api-key header to the health check:
+    #   'GET /readyz HTTP/1.1\r\nHost: ...\r\napi-key: ${QDRANT_API_KEY}\r\n\r\n'
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/${QDRANT_HTTP_PORT:-6333} && echo -e 'GET
           /readyz HTTP/1.1\\r\\nHost: localhost:${QDRANT_HTTP_PORT:-6333}\\r\\n\\r\\n' >&3 && timeout
