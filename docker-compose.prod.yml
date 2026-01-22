@@ -95,7 +95,7 @@ services:
       resources:
         limits:
           cpus: '${MEMGRAPH_PROD_CPU_LIMIT:-4.0}'
-          memory: ${MEMGRAPH_PROD_MEMORY_LIMIT:-8G}
+          memory: ${MEMGRAPH_PROD_CONTAINER_MEMORY:-8G}
         reservations:
           cpus: '${MEMGRAPH_PROD_CPU_RESERVATION:-0.5}'
           memory: ${MEMGRAPH_PROD_MEMORY_RESERVATION:-1G}
@@ -132,7 +132,31 @@ networks:
   omnimemory-network:
     driver: bridge
     name: omnimemory-prod-network
-    # When internal: true, containers can only communicate with each other
-    # (no host access, no external network access, no internet)
-    # Set to true for maximum isolation; false allows reverse proxy access
-    internal: false
+    # =========================================================================
+    # Network Isolation Setting (internal)
+    # =========================================================================
+    # Controls whether containers can access networks outside this bridge.
+    #
+    # INTERNAL: TRUE (Maximum Isolation)
+    #   - Containers can ONLY communicate with each other on this network
+    #   - NO access to host network, external networks, or internet
+    #   - NO outbound connections (cannot reach external APIs, registries, etc.)
+    #   - Use when: Services are fully self-contained and don't need external
+    #     connectivity (air-gapped environments, strict security requirements)
+    #
+    # INTERNAL: FALSE (Default - External Access Allowed)
+    #   - Containers can communicate with each other AND external networks
+    #   - Required for: Reverse proxy access (nginx/traefik), external API calls,
+    #     pulling updates, connecting to external databases
+    #   - Use when: You need to expose services via load balancer or services
+    #     must reach external endpoints
+    #
+    # SECURITY IMPLICATIONS:
+    #   - true:  Stronger isolation, but services cannot fetch external data
+    #   - false: More flexible, but containers can make outbound connections
+    #   - Note: Even with internal:false, services are NOT exposed to host
+    #     unless ports are explicitly published (ports: vs expose:)
+    #
+    # Override via environment: NETWORK_INTERNAL=true docker compose up
+    # =========================================================================
+    internal: ${NETWORK_INTERNAL:-false}
