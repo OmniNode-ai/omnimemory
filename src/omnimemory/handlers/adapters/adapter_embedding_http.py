@@ -45,6 +45,12 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from omnibase_infra.errors import (
+    InfraConnectionError,
+    InfraTimeoutError,
+)
+from omnibase_infra.handlers.handler_http import HandlerHttpRest
+
 from omnimemory.handlers.adapters.adapter_rate_limiter import ProviderRateLimiter
 from omnimemory.models.config import (
     EnumEmbeddingProviderType,
@@ -56,40 +62,13 @@ if TYPE_CHECKING:
     from types import TracebackType
     from uuid import UUID
 
-# omnibase_infra is a dev dependency - make imports conditional
-_OMNIBASE_INFRA_AVAILABLE = False
-_OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
-
-try:
-    from omnibase_infra.errors import (
-        InfraConnectionError,
-        InfraTimeoutError,
-    )
-    from omnibase_infra.handlers.handler_http import HandlerHttpRest
-
-    _OMNIBASE_INFRA_AVAILABLE = True
-except ImportError as e:
-    _OMNIBASE_INFRA_IMPORT_ERROR = str(e)
-
-    # Provide stub types for type checking
-    class InfraConnectionError(Exception):  # type: ignore[no-redef]
-        """Stub for InfraConnectionError when omnibase_infra is not installed."""
-
-    class InfraTimeoutError(Exception):  # type: ignore[no-redef]
-        """Stub for InfraTimeoutError when omnibase_infra is not installed."""
-
-    class HandlerHttpRest:  # type: ignore[no-redef]
-        """Stub for HandlerHttpRest when omnibase_infra is not installed."""
-
-        async def initialize(self, config: dict[str, object]) -> None:
-            raise ImportError(
-                f"omnibase_infra is required for EmbeddingHttpClient. "
-                f"Install it with: poetry install --with dev. "
-                f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
-            )
-
 
 logger = logging.getLogger(__name__)
+
+# When only TPM is configured (RPM=0), use this high RPM value to enable the limiter
+# with TPM as the primary constraint. This allows ~167 requests/second which is
+# effectively unlimited for most use cases while still enforcing token limits.
+TPM_ONLY_DEFAULT_RPM = 10_000
 
 __all__ = [
     "EmbeddingHttpClient",
@@ -98,6 +77,7 @@ __all__ = [
     "EmbeddingConnectionError",
     "EmbeddingTimeoutError",
     "EnumEmbeddingProviderType",
+    "TPM_ONLY_DEFAULT_RPM",
 ]
 
 
@@ -165,7 +145,11 @@ class EmbeddingHttpClient:
         elif config.rate_limit_rpm > 0 or config.rate_limit_tpm > 0:
             # If only TPM is set (RPM=0), use a default RPM to enable the limiter
             # but with very high request throughput - TPM will be the real constraint
-            rpm = config.rate_limit_rpm if config.rate_limit_rpm > 0 else 10_000
+            rpm = (
+                config.rate_limit_rpm
+                if config.rate_limit_rpm > 0
+                else TPM_ONLY_DEFAULT_RPM
+            )
             if config.rate_limit_rpm == 0 and config.rate_limit_tpm > 0:
                 logger.info(
                     "TPM-only rate limiting configured for %s/%s: TPM=%d. "
@@ -204,13 +188,6 @@ class EmbeddingHttpClient:
         async with self._init_lock:
             if self._initialized:
                 return
-
-            if not _OMNIBASE_INFRA_AVAILABLE:
-                raise ImportError(
-                    f"omnibase_infra is required for EmbeddingHttpClient. "
-                    f"Install it with: poetry install --with dev. "
-                    f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
-                )
 
             self._handler = HandlerHttpRest()
             await self._handler.initialize(

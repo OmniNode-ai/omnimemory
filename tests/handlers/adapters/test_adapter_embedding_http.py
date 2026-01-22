@@ -28,12 +28,8 @@ from uuid import uuid4
 
 import pytest
 
-# Skip all tests if omnibase_infra is not installed
-pytest.importorskip(
-    "omnibase_infra", reason="omnibase_infra required for adapter tests"
-)
-
 from omnimemory.handlers.adapters.adapter_embedding_http import (
+    TPM_ONLY_DEFAULT_RPM,
     EmbeddingClientError,
     EmbeddingConnectionError,
     EmbeddingHttpClient,
@@ -854,7 +850,9 @@ class TestEmbeddingHttpClientRateLimiting:
             assert client._rate_limiter is not None
 
             # Should use high RPM (10,000) as fallback
-            assert client._rate_limiter.config.requests_per_minute == 10_000
+            assert (
+                client._rate_limiter.config.requests_per_minute == TPM_ONLY_DEFAULT_RPM
+            )
 
             # Should use the configured TPM
             assert client._rate_limiter.config.tokens_per_minute == 100_000
