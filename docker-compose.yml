@@ -122,7 +122,8 @@ services:
       - omnimemory-network
     healthcheck:
       # Auth-aware ping (works with or without VALKEY_PASSWORD set)
-      test: ["CMD", "sh", "-c", "valkey-cli -p ${VALKEY_PORT:-6379} ${VALKEY_PASSWORD:+-a $VALKEY_PASSWORD}
+      # Uses REDISCLI_AUTH env var to avoid exposing password in process listing
+      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=${VALKEY_PASSWORD:-} valkey-cli -p ${VALKEY_PORT:-6379}
           ping"]
       interval: 30s
       timeout: 10s
