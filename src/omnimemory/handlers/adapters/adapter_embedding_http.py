@@ -384,12 +384,36 @@ class EmbeddingHttpClient:
         if self._rate_limiter is not None:
             await self._rate_limiter.acquire(tokens=1, correlation_id=cid)
 
+        return await self._execute_embedding_request(text, cid)
+
+    async def _execute_embedding_request(
+        self,
+        text: str,
+        correlation_id: UUID,
+    ) -> list[float]:
+        """Execute the embedding request without rate limiting.
+
+        This is an internal method that performs the actual HTTP request.
+        Rate limiting should be handled by the caller if needed.
+
+        Args:
+            text: The text to embed.
+            correlation_id: Correlation ID for distributed tracing.
+
+        Returns:
+            A list of floats representing the embedding vector.
+
+        Raises:
+            EmbeddingConnectionError: If connection to server fails.
+            EmbeddingTimeoutError: If request times out.
+            EmbeddingClientError: If response is invalid.
+        """
         # Build the envelope for HandlerHttp
-        envelope = self._build_envelope(text, cid)
+        envelope = self._build_envelope(text, correlation_id)
 
         try:
             result = await self._handler.execute(envelope)  # type: ignore[union-attr]
-            return self._parse_response(result, cid)
+            return self._parse_response(result, correlation_id)
 
         except InfraConnectionError as e:
             raise EmbeddingConnectionError(
@@ -604,14 +628,33 @@ class EmbeddingHttpClient:
     async def health_check(self, correlation_id: UUID | None = None) -> bool:
         """Check if the embedding server is reachable.
 
+        This method bypasses rate limiting to avoid consuming tokens for
+        infrastructure health checks. It sends a minimal test request to
+        verify the server is responding correctly.
+
         Args:
-            correlation_id: Optional correlation ID.
+            correlation_id: Optional correlation ID for distributed tracing.
 
         Returns:
-            True if server is healthy, False otherwise.
+            True if server is healthy and returns a valid embedding response,
+            False otherwise (connection errors, timeouts, invalid responses).
+
+        Note:
+            This method does NOT consume rate limit tokens. It directly
+            executes the embedding request to avoid impacting rate budgets
+            during health monitoring scenarios (e.g., Kubernetes liveness
+            probes, load balancer health checks).
         """
+        # Ensure initialized
+        if not self._initialized:
+            await self.initialize()
+
+        cid = correlation_id or uuid4()
+
         try:
-            await self.get_embedding("health check", correlation_id)
+            # Use a minimal test phrase for health check
+            # Bypasses rate limiter by calling internal method directly
+            await self._execute_embedding_request("health", cid)
             return True
         except EmbeddingClientError:
             return False

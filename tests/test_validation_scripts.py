@@ -32,6 +32,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "validation"))
 
 from validate_enum_casing import validate_file as validate_enum_casing
+from validate_http_imports import validate_file as validate_http_imports
 from validate_naming import validate_file as validate_naming
 from validate_no_backward_compatibility import (
     validate_file as validate_no_backward_compat,
@@ -1452,6 +1453,173 @@ def old_function():
 
 
 # =============================================================================
+# TEST: validate_http_imports.py
+# =============================================================================
+
+
+class TestValidateHttpImports:
+    """Tests for validate_http_imports.py - HTTP import boundary enforcement."""
+
+    def test_detects_direct_httpx_import(self) -> None:
+        """Test detection of direct 'import httpx'."""
+        code = """import httpx"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 1
+            assert "import httpx" in violations[0].message.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_detects_from_httpx_import(self) -> None:
+        """Test detection of 'from httpx import ...'."""
+        code = """from httpx import AsyncClient"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 1
+            assert "from httpx" in violations[0].message.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_detects_direct_requests_import(self) -> None:
+        """Test detection of direct 'import requests'."""
+        code = """import requests"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 1
+            assert "import requests" in violations[0].message.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_detects_direct_aiohttp_import(self) -> None:
+        """Test detection of direct 'import aiohttp'."""
+        code = """import aiohttp"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 1
+            assert "import aiohttp" in violations[0].message.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_allows_type_checking_imports(self) -> None:
+        """Test that imports in TYPE_CHECKING blocks are allowed."""
+        code = """
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import httpx
+    from requests import Session
+"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 0
+        finally:
+            cleanup_temp_file(path)
+
+    def test_allows_explicit_exemption_annotation(self) -> None:
+        """Test that explicit omnimemory-http-exempt annotation skips the line."""
+        code = (
+            """import httpx  # omnimemory-http-exempt: Testing HTTP client directly"""
+        )
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 0
+        finally:
+            cleanup_temp_file(path)
+
+    def test_allows_exemption_annotation_case_insensitive(self) -> None:
+        """Test that exemption annotation works case-insensitively."""
+        code = (
+            """import httpx  # OMNIMEMORY-HTTP-EXEMPT: Testing HTTP client directly"""
+        )
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 0
+        finally:
+            cleanup_temp_file(path)
+
+    def test_does_not_match_generic_adapter_comment(self) -> None:
+        """Test that generic 'use adapter' comments do NOT skip violations.
+
+        This is the key test ensuring the pattern is specific enough.
+        Comments like '# We use adapter pattern here' should NOT be exemptions.
+        """
+        code = """# We use adapter pattern here for this implementation
+import httpx"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            # Should still detect the violation - generic adapter comments don't count
+            assert len(violations) == 1
+            assert "httpx" in violations[0].message.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_does_not_match_using_adapter_comment(self) -> None:
+        """Test that 'using adapter' comments do NOT skip violations."""
+        code = """# This function will be using adapter for X
+import requests"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            # Should still detect the violation
+            assert len(violations) == 1
+            assert "requests" in violations[0].message.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_allows_adapters_directory(self) -> None:
+        """Test that files in handlers/adapters/ directory are allowed."""
+        code = """import httpx
+from requests import Session"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            adapters_dir = Path(tmpdir) / "handlers" / "adapters"
+            adapters_dir.mkdir(parents=True)
+            adapter_file = adapters_dir / "http_client.py"
+            adapter_file.write_text(code)
+            violations = validate_http_imports(adapter_file)
+            assert len(violations) == 0
+
+    def test_allows_tests_directory(self) -> None:
+        """Test that files in tests/ directory are allowed."""
+        code = """import httpx"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tests_dir = Path(tmpdir) / "tests"
+            tests_dir.mkdir()
+            test_file = tests_dir / "test_http.py"
+            test_file.write_text(code)
+            violations = validate_http_imports(test_file)
+            assert len(violations) == 0
+
+    def test_clean_file_passes(self) -> None:
+        """Test that clean files without HTTP imports pass."""
+        code = """
+from typing import Protocol
+
+class HttpClientProtocol(Protocol):
+    async def get(self, url: str) -> dict: ...
+"""
+        path = write_temp_file(code)
+        try:
+            violations = validate_http_imports(path)
+            assert len(violations) == 0
+        finally:
+            cleanup_temp_file(path)
+
+    def test_handles_missing_file(self) -> None:
+        """Test that missing files are handled gracefully."""
+        path = Path("/nonexistent/file.py")
+        violations = validate_http_imports(path)
+        assert violations == []
+
+
+# =============================================================================
 # ADDITIONAL COVERAGE TESTS
 # =============================================================================
 
@@ -2409,6 +2577,90 @@ class TestValidateNoBackwardCompatMain:
                     "-d",
                     tmpdir,
                 ],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert result.returncode == 0
+
+
+class TestValidateHttpImportsMain:
+    """Tests for validate_http_imports.py main() function."""
+
+    def test_main_with_clean_file(self) -> None:
+        """Test main() with a clean file without HTTP imports."""
+        import subprocess
+
+        code = """from typing import Protocol
+
+class HttpClientProtocol(Protocol):
+    async def get(self, url: str) -> dict: ...
+"""
+        path = write_temp_file(code)
+        try:
+            result = subprocess.run(
+                ["python", "scripts/validation/validate_http_imports.py", str(path)],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert result.returncode == 0
+        finally:
+            cleanup_temp_file(path)
+
+    def test_main_with_violation(self) -> None:
+        """Test main() with HTTP import violation."""
+        import subprocess
+
+        code = """import httpx"""
+        path = write_temp_file(code)
+        try:
+            result = subprocess.run(
+                ["python", "scripts/validation/validate_http_imports.py", str(path)],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert result.returncode == 1
+            assert "http import boundary" in result.stdout.lower()
+        finally:
+            cleanup_temp_file(path)
+
+    def test_main_with_exemption_annotation(self) -> None:
+        """Test main() with exemption annotation passes."""
+        import subprocess
+
+        code = """import httpx  # omnimemory-http-exempt: Test utility"""
+        path = write_temp_file(code)
+        try:
+            result = subprocess.run(
+                ["python", "scripts/validation/validate_http_imports.py", str(path)],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert result.returncode == 0
+        finally:
+            cleanup_temp_file(path)
+
+    def test_main_with_directory(self) -> None:
+        """Test main() scanning a directory."""
+        import subprocess
+
+        code = """from typing import Dict
+
+def process_data(data: Dict) -> None:
+    pass
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "module.py"
+            test_file.write_text(code)
+            result = subprocess.run(
+                ["python", "scripts/validation/validate_http_imports.py", tmpdir],
                 cwd=PROJECT_ROOT,
                 capture_output=True,
                 text=True,

@@ -12,6 +12,19 @@ Allowed locations for HTTP imports:
 
 All other locations must use the adapter layer for HTTP operations.
 
+Exemption Annotation:
+    If a file legitimately needs direct HTTP imports outside the allowed
+    locations (rare), add a comment with the explicit exemption annotation
+    on the SAME LINE as the import:
+
+        import httpx  # omnimemory-http-exempt: <reason>
+
+    Example:
+        import httpx  # omnimemory-http-exempt: Low-level HTTP utility for adapter testing
+
+    This annotation is intentionally specific to prevent accidental matches
+    with unrelated comments containing words like "adapter".
+
 Usage:
     python scripts/validation/validate_http_imports.py src/
     python scripts/validation/validate_http_imports.py src/omnimemory/
@@ -99,8 +112,11 @@ ALLOWED_PATHS = [
 SKIP_PATTERNS = [
     # TYPE_CHECKING blocks are fine (type hints only, not runtime)
     re.compile(r"if\s+TYPE_CHECKING"),
-    # Comments explaining why HTTP is not used directly
-    re.compile(r"#.*(?:use|using)\s+adapter"),
+    # Explicit HTTP boundary exemption annotation
+    # Format: # omnimemory-http-exempt: <reason>
+    # This is intentionally specific to prevent accidental matches with
+    # unrelated comments like "# We use adapter pattern here"
+    re.compile(r"#\s*omnimemory-http-exempt:", re.IGNORECASE),
 ]
 
 

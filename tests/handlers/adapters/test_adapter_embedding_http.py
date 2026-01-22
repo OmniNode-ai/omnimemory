@@ -788,3 +788,68 @@ class TestEmbeddingHttpClientHealthCheck:
             async with EmbeddingHttpClient(local_config) as client:
                 result = await client.health_check()
                 assert result is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_does_not_consume_rate_limit_tokens(
+        self,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test health check bypasses rate limiter and does not consume tokens.
+
+        This is critical for infrastructure health checks (e.g., Kubernetes
+        liveness probes) that should not impact the rate limit budget.
+        """
+        # Config with rate limiting enabled
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            rate_limit_rpm=60,
+        )
+
+        mock_handler.execute.return_value = mock_handler_result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            client = EmbeddingHttpClient(config)
+            await client.initialize()
+
+            # Verify rate limiter was created
+            assert client._rate_limiter is not None
+
+            # Mock the rate limiter's acquire method
+            client._rate_limiter.acquire = AsyncMock()
+
+            # Perform health check
+            result = await client.health_check()
+            assert result is True
+
+            # Verify rate limiter was NOT called
+            client._rate_limiter.acquire.assert_not_called()
+
+            # Verify the actual HTTP request was still made
+            mock_handler.execute.assert_called_once()
+
+            await client.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_health_check_uses_minimal_test_text(
+        self,
+        local_config: ModelEmbeddingHttpClientConfig,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test health check uses a minimal test phrase."""
+        mock_handler.execute.return_value = mock_handler_result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(local_config) as client:
+                await client.health_check()
+
+                # Verify the request used "health" as the test text
+                call_args = mock_handler.execute.call_args[0][0]
+                assert call_args["payload"]["body"] == {"text": "health"}
