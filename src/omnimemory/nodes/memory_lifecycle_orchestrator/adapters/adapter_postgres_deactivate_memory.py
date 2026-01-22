@@ -47,7 +47,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums.enum_memory_lifecycle_state import EnumMemoryLifecycleState
-from omnimemory.nodes.memory_lifecycle_orchestrator.validators.lifecycle_transition_validator import (
+from omnimemory.nodes.memory_lifecycle_orchestrator.validators.validator_lifecycle_transition import (
     ModelLifecycleTransitionResult,
     apply_transition,
 )

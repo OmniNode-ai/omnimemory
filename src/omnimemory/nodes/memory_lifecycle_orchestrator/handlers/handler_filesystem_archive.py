@@ -17,6 +17,7 @@ Example::
         ModelArchiveRequest,
     )
     from omnimemory.enums import EnumMemoryLifecycleState
+    from omnimemory.models.foundation.model_typed_collections import ModelMetadata
 
     async def example():
         handler = HandlerFileSystemArchive()
@@ -29,7 +30,7 @@ Example::
             archived_at=now,
             correlation_id=uuid4(),
             content="Important memory content",
-            metadata={"source": "agent_001"},
+            metadata=ModelMetadata.from_dict({"source": "agent_001"}),
         )
 
         request = ModelArchiveRequest(
@@ -61,6 +62,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnimemory.enums import (
     EnumMemoryLifecycleState,  # noqa: TC001 - needed at runtime for Pydantic
 )
+from omnimemory.models.foundation.model_typed_collections import ModelMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +108,8 @@ class ModelArchiveRecord(BaseModel):
 
     # Memory payload snapshot
     content: str = Field(description="Memory content")
-    metadata: dict[str, str] = Field(
-        default_factory=dict,
+    metadata: ModelMetadata = Field(
+        default_factory=ModelMetadata,
         description="Memory metadata snapshot",
     )
 

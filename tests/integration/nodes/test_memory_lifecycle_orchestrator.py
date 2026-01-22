@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 
 from omnimemory.enums.enum_memory_lifecycle_state import EnumMemoryLifecycleState
+from omnimemory.models.foundation.model_typed_collections import ModelMetadata
 from omnimemory.nodes.memory_lifecycle_orchestrator.adapters.adapter_postgres_deactivate_memory import (
     AdapterPostgresDeactivateMemory,
     ModelMemoryExpireRequest,
@@ -354,7 +355,7 @@ class TestHandlerFileSystemArchive:
                     archived_at=now,
                     correlation_id=correlation_id,
                     content="Test memory content",
-                    metadata={"key": "value"},
+                    metadata=ModelMetadata.from_dict({"key": "value"}),
                 ),
             ]
 
@@ -570,7 +571,9 @@ class TestHandlerFileSystemArchive:
                 archived_at=now,
                 correlation_id=correlation_id,
                 content="Memory with full metadata",
-                metadata={"source": "test", "category": "important"},
+                metadata=ModelMetadata.from_dict(
+                    {"source": "test", "category": "important"}
+                ),
                 created_at=created,
                 expires_at=expires,
                 expired_at=expired,
@@ -594,7 +597,7 @@ class TestHandlerFileSystemArchive:
             assert r.memory_id == memory_id
             assert r.lifecycle_revision == 5
             assert r.content == "Memory with full metadata"
-            assert r.metadata == {"source": "test", "category": "important"}
+            assert r.metadata.to_dict() == {"source": "test", "category": "important"}
             assert r.created_at == created
             assert r.expires_at == expires
             assert r.expired_at == expired
