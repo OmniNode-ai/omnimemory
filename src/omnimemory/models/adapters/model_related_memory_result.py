@@ -11,12 +11,14 @@ the result of a find_related operation in the graph.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    from omnimemory.models.adapters.model_related_memory import ModelRelatedMemory
+# Runtime import required for Pydantic schema building (not TYPE_CHECKING)
+from omnimemory.models.adapters.model_related_memory import (
+    ModelRelatedMemory,  # noqa: TC001
+)
 
 __all__ = [
     "ModelRelatedMemoryResult",

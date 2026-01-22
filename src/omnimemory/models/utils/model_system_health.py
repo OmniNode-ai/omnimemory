@@ -7,13 +7,12 @@ This module contains the ModelSystemHealth class.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    from .model_health_status import HealthStatus
-    from .model_resource_health_check import ModelResourceHealthCheck
+# Runtime imports required for Pydantic schema building (not TYPE_CHECKING)
+from .model_health_status import HealthStatus  # noqa: TC001
+from .model_resource_health_check import ModelResourceHealthCheck  # noqa: TC001
 
 __all__ = [
     "ModelSystemHealth",

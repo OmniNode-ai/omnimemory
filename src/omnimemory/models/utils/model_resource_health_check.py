@@ -6,14 +6,12 @@ This module contains the ModelResourceHealthCheck class.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from .model_health_check_details import ModelHealthCheckDetails
 
-if TYPE_CHECKING:
-    from .model_health_status import HealthStatus
+# Runtime import required for Pydantic schema building (not TYPE_CHECKING)
+from .model_health_status import HealthStatus  # noqa: TC001
 
 __all__ = [
     "ModelResourceHealthCheck",

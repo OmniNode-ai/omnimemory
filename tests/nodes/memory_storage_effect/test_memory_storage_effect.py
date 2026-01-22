@@ -37,7 +37,7 @@ from omnibase_core.models.omnimemory import (
 
 from omnimemory.nodes.memory_storage_effect import (
     HandlerFileSystemAdapter,
-    HandlerFileSystemAdapterConfig,
+    ModelFileSystemAdapterConfig,
     ModelMemoryStorageRequest,
 )
 
@@ -56,7 +56,7 @@ def adapter(tmp_path: Path) -> HandlerFileSystemAdapter:
     Returns:
         Configured HandlerFileSystemAdapter instance.
     """
-    config = HandlerFileSystemAdapterConfig(base_path=tmp_path)
+    config = ModelFileSystemAdapterConfig(base_path=tmp_path)
     adapter = HandlerFileSystemAdapter(config)
     return adapter
 
@@ -869,7 +869,7 @@ class TestAdapterLifecycle:
         When: Executing an operation
         Then: Adapter initializes automatically
         """
-        config = HandlerFileSystemAdapterConfig(base_path=tmp_path)
+        config = ModelFileSystemAdapterConfig(base_path=tmp_path)
         adapter = HandlerFileSystemAdapter(config)
 
         assert not adapter.is_initialized
@@ -890,7 +890,7 @@ class TestAdapterLifecycle:
         When: Initializing or executing first operation
         Then: Snapshots directory is created
         """
-        config = HandlerFileSystemAdapterConfig(base_path=tmp_path)
+        config = ModelFileSystemAdapterConfig(base_path=tmp_path)
         adapter = HandlerFileSystemAdapter(config)
 
         await adapter.initialize()
@@ -954,7 +954,7 @@ class TestAdapterLifecycle:
         """
         import asyncio
 
-        config = HandlerFileSystemAdapterConfig(base_path=tmp_path)
+        config = ModelFileSystemAdapterConfig(base_path=tmp_path)
         adapter = HandlerFileSystemAdapter(config)
         initialization_count = 0
         original_initialize = adapter._handler.initialize
@@ -991,7 +991,7 @@ class TestAdapterLifecycle:
         """
         import asyncio
 
-        config = HandlerFileSystemAdapterConfig(base_path=tmp_path)
+        config = ModelFileSystemAdapterConfig(base_path=tmp_path)
         adapter = HandlerFileSystemAdapter(config)
 
         # Launch multiple concurrent execute calls that will trigger init
@@ -1034,7 +1034,7 @@ class TestAdapterConfiguration:
         When: Storing a snapshot
         Then: File is created in the custom directory
         """
-        config = HandlerFileSystemAdapterConfig(
+        config = ModelFileSystemAdapterConfig(
             base_path=tmp_path,
             snapshots_dir="custom_memories",
         )
@@ -1058,7 +1058,7 @@ class TestAdapterConfiguration:
         When: Accessing properties
         Then: Properties return expected values
         """
-        config = HandlerFileSystemAdapterConfig(
+        config = ModelFileSystemAdapterConfig(
             base_path=tmp_path,
             snapshots_dir="memories",
             max_file_size=5 * 1024 * 1024,  # 5MB
@@ -1420,7 +1420,7 @@ class TestSecurityValidation:
         Then: Response status is 'error' with file size message
         """
         # Create adapter with very small file size limit
-        config = HandlerFileSystemAdapterConfig(
+        config = ModelFileSystemAdapterConfig(
             base_path=tmp_path,
             max_file_size=100,  # Very small limit
         )

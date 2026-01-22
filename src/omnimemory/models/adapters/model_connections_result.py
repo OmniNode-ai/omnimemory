@@ -11,12 +11,14 @@ the result of a get_connections operation in the graph.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    from omnimemory.models.adapters.model_memory_connection import ModelMemoryConnection
+# Runtime import required for Pydantic schema building (not TYPE_CHECKING)
+from omnimemory.models.adapters.model_memory_connection import (
+    ModelMemoryConnection,  # noqa: TC001
+)
 
 __all__ = [
     "ModelConnectionsResult",

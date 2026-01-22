@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelStructuredLogEntry",
@@ -68,6 +68,11 @@ class ModelStructuredLogEntry(BaseModel):
             error_message="Permission denied"
         )
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     correlation_id: str = Field(
         ...,
