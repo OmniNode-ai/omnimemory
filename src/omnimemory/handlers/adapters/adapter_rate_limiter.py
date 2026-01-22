@@ -163,10 +163,18 @@ class ProviderRateLimiter:
 
         backoff = 0.1  # Start with 100ms
         max_backoff = 5.0  # Cap at 5 seconds
+        waited = False
 
         while True:
             acquired = await self.try_acquire(tokens, correlation_id)
             if acquired:
+                if not waited and correlation_id:
+                    logger.debug(
+                        "Rate limit acquired immediately for %s/%s (correlation_id=%s)",
+                        self._config.provider,
+                        self._config.model,
+                        correlation_id,
+                    )
                 return
 
             # Calculate wait time
@@ -183,6 +191,7 @@ class ProviderRateLimiter:
                 )
 
             await asyncio.sleep(wait_time)
+            waited = True
 
             # Exponential backoff with cap
             backoff = min(backoff * 2, max_backoff)
@@ -279,6 +288,16 @@ class ProviderRateLimiter:
         This is a best-effort observability method that provides an approximate
         reset time without acquiring the async lock. The value may be slightly
         inaccurate under high contention due to concurrent modifications.
+
+        Staleness Tolerance:
+            This method intentionally skips locking for non-blocking reads.
+            The returned value may be stale by a few milliseconds under
+            concurrent access. This is acceptable for monitoring, logging,
+            and display purposes where exact precision is not required.
+
+            For precise rate limit timing decisions, rely on the return
+            values and blocking behavior of :meth:`acquire` or
+            :meth:`try_acquire` instead.
 
         Note:
             This method safely handles the case where the window becomes empty

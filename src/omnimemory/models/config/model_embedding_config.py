@@ -92,6 +92,7 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
+        frozen=True,
     )
 
     provider: EnumEmbeddingProviderType = Field(

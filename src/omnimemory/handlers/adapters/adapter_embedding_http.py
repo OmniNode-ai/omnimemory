@@ -77,7 +77,6 @@ __all__ = [
     "EmbeddingConnectionError",
     "EmbeddingTimeoutError",
     "EnumEmbeddingProviderType",
-    "TPM_ONLY_DEFAULT_RPM",
 ]
 
 
