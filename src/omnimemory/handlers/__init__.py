@@ -13,14 +13,14 @@ Example::
 
     from omnimemory.handlers.adapters import (
         AdapterGraphMemory,
-        AdapterGraphMemoryConfig,
+        ModelGraphMemoryConfig,
     )
 """
 
 from omnimemory.handlers.adapters import (
     AdapterGraphMemory,
-    AdapterGraphMemoryConfig,
     ModelConnectionsResult,
+    ModelGraphMemoryConfig,
     ModelGraphMemoryHealth,
     ModelMemoryConnection,
     ModelRelatedMemory,
@@ -29,8 +29,8 @@ from omnimemory.handlers.adapters import (
 
 __all__ = [
     "AdapterGraphMemory",
-    "AdapterGraphMemoryConfig",
     "ModelConnectionsResult",
+    "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",
     "ModelMemoryConnection",
     "ModelRelatedMemory",

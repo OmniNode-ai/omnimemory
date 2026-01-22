@@ -8,9 +8,9 @@ failures in OmniMemory operations with configurable backoff strategies.
 from __future__ import annotations
 
 __all__ = [
-    "RetryConfig",
-    "RetryAttemptInfo",
-    "RetryStatistics",
+    "ModelRetryConfig",
+    "ModelRetryAttemptInfo",
+    "ModelRetryStatistics",
     "RetryManager",
     "calculate_delay",
     "is_retryable_exception",
@@ -28,11 +28,9 @@ from collections.abc import Callable
 from typing import Any, TypeVar, cast
 from uuid import UUID
 
-from ..models.utils.model_retry import (
-    RetryAttemptInfo,
-    RetryConfig,
-    RetryStatistics,
-)
+from ..models.utils.model_retry_attempt_info import ModelRetryAttemptInfo
+from ..models.utils.model_retry_config import ModelRetryConfig
+from ..models.utils.model_retry_statistics import ModelRetryStatistics
 from .error_sanitizer import SanitizationLevel, sanitize_error
 
 logger = logging.getLogger(__name__)
@@ -67,7 +65,7 @@ def is_retryable_exception(
     return False
 
 
-def calculate_delay(attempt: int, config: RetryConfig) -> int:
+def calculate_delay(attempt: int, config: ModelRetryConfig) -> int:
     """
     Calculate delay for a retry attempt with exponential backoff.
 
@@ -98,7 +96,7 @@ def calculate_delay(attempt: int, config: RetryConfig) -> int:
 
 async def retry_with_backoff(
     operation: Callable[..., T],
-    config: RetryConfig,
+    config: ModelRetryConfig,
     correlation_id: UUID | None = None,
     *args: Any,
     **kwargs: Any,
@@ -120,7 +118,7 @@ async def retry_with_backoff(
         The last exception if all retry attempts fail
     """
     last_exception = None
-    attempts: list[RetryAttemptInfo] = []
+    attempts: list[ModelRetryAttemptInfo] = []
 
     for attempt in range(1, config.max_attempts + 1):
         try:
@@ -134,7 +132,7 @@ async def retry_with_backoff(
                 await asyncio.sleep(delay_ms / 1000.0)
 
             # Record attempt
-            attempt_info = RetryAttemptInfo(
+            attempt_info = ModelRetryAttemptInfo(
                 attempt_number=attempt, delay_ms=delay_ms, correlation_id=correlation_id
             )
             attempts.append(attempt_info)
@@ -189,7 +187,7 @@ async def retry_with_backoff(
 
 
 def retry_decorator(
-    config: RetryConfig | None = None,
+    config: ModelRetryConfig | None = None,
     max_attempts: int = 3,
     base_delay_ms: int = 1000,
     max_delay_ms: int = 30000,
@@ -212,9 +210,9 @@ def retry_decorator(
     Returns:
         Decorated function with retry behavior
     """
-    # Build config with proper defaults - honor RetryConfig defaults when
+    # Build config with proper defaults - honor ModelRetryConfig defaults when
     # retryable_exceptions is None
-    effective_config: RetryConfig
+    effective_config: ModelRetryConfig
     if config is not None:
         effective_config = config
     else:
@@ -228,7 +226,7 @@ def retry_decorator(
         # Only override retryable_exceptions if explicitly provided
         if retryable_exceptions is not None:
             config_kwargs["retryable_exceptions"] = retryable_exceptions
-        effective_config = RetryConfig(**config_kwargs)
+        effective_config = ModelRetryConfig(**config_kwargs)
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
@@ -273,22 +271,22 @@ class RetryManager:
     Manager for retry operations with statistics tracking.
     """
 
-    def __init__(self, default_config: RetryConfig | None = None) -> None:
+    def __init__(self, default_config: ModelRetryConfig | None = None) -> None:
         """
         Initialize retry manager.
 
         Args:
             default_config: Default retry configuration
         """
-        self.default_config = default_config or RetryConfig()
-        self.statistics = RetryStatistics()
+        self.default_config = default_config or ModelRetryConfig()
+        self.statistics = ModelRetryStatistics()
         self._operation_attempts: dict[str, int] = {}
 
     async def execute_with_retry(
         self,
         operation: Callable[..., T],
         operation_name: str,
-        config: RetryConfig | None = None,
+        config: ModelRetryConfig | None = None,
         correlation_id: UUID | None = None,
         *args: Any,
         **kwargs: Any,
@@ -333,7 +331,7 @@ class RetryManager:
 
             raise
 
-    def get_statistics(self) -> RetryStatistics:
+    def get_statistics(self) -> ModelRetryStatistics:
         """
         Get current retry statistics.
 
@@ -350,7 +348,7 @@ class RetryManager:
 
     def reset_statistics(self) -> None:
         """Reset all statistics."""
-        self.statistics = RetryStatistics()
+        self.statistics = ModelRetryStatistics()
         self._operation_attempts.clear()
 
 

@@ -38,15 +38,22 @@ from ..models.foundation.model_health_response import (
     ModelCircuitBreakerStatsCollection,
     ModelRateLimitedHealthCheckResponse,
 )
-from ..models.utils.model_health import (
+from ..models.utils import (
     DependencyType,
-    HealthCheckConfig,
-    HealthCheckDetails,
-    HealthCheckResult,
     HealthStatus,
-    ResourceHealthCheck,
-    SystemHealth,
+    ModelHealthCheckConfig,
+    ModelHealthCheckDetails,
+    ModelHealthCheckResult,
+    ModelResourceHealthCheck,
+    ModelSystemHealth,
 )
+
+# Internal aliases for code compatibility
+HealthCheckConfig = ModelHealthCheckConfig
+HealthCheckDetails = ModelHealthCheckDetails
+HealthCheckResult = ModelHealthCheckResult
+ResourceHealthCheck = ModelResourceHealthCheck
+SystemHealth = ModelSystemHealth
 from .error_sanitizer import SanitizationLevel, sanitize_error
 
 # === RATE LIMITING ===

@@ -38,11 +38,7 @@ from .adapter_filesystem import (
     HandlerFileSystemAdapter,
 )
 
-# Backward compatibility alias - deprecated, use ModelFileSystemAdapterConfig
-HandlerFileSystemAdapterConfig = ModelFileSystemAdapterConfig
-
 __all__ = [
     "HandlerFileSystemAdapter",
-    "HandlerFileSystemAdapterConfig",  # Backward compatibility alias
     "ModelFileSystemAdapterConfig",
 ]

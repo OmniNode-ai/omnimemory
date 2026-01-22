@@ -32,7 +32,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 # Type variable for generic function return types
 F = TypeVar("F", bound=Callable[..., Any])
@@ -44,7 +44,6 @@ import structlog
 from ..models.foundation.model_connection_metadata import (
     ConnectionMetadata,
 )
-from ..models.utils.model_concurrency import ConnectionPoolConfig
 from .error_sanitizer import SanitizationLevel
 from .error_sanitizer import sanitize_error as _base_sanitize_error
 from .observability import (
@@ -52,6 +51,9 @@ from .observability import (
     correlation_context,
     trace_operation,
 )
+
+if TYPE_CHECKING:
+    from ..models.utils.model_concurrency import ModelConnectionPoolConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -452,7 +454,7 @@ class AsyncConnectionPool:
 
     def __init__(
         self,
-        config: ConnectionPoolConfig,
+        config: ModelConnectionPoolConfig,
         create_connection: Callable[[], Any],
         validate_connection: Callable[[Any], bool] | None = None,
         close_connection: Callable[[Any], None] | None = None,
@@ -839,7 +841,7 @@ async def get_fair_semaphore(name: str, permits: int) -> FairSemaphore:
 
 async def register_connection_pool(
     name: str,
-    config: ConnectionPoolConfig,
+    config: ModelConnectionPoolConfig,
     create_connection: Callable[[], Any],
     validate_connection: Callable[[Any], bool] | None = None,
     close_connection: Callable[[Any], None] | None = None,

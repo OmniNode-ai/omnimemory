@@ -59,7 +59,7 @@ except ImportError:
 try:
     from omnimemory.handlers.adapters.adapter_graph_memory import (
         AdapterGraphMemory,
-        AdapterGraphMemoryConfig,
+        ModelGraphMemoryConfig,
     )
 except ImportError:
     _MEMGRAPH_AVAILABLE = False
@@ -262,9 +262,9 @@ async def test_graph_data(
 
 
 @pytest.fixture
-def adapter_config() -> AdapterGraphMemoryConfig:
+def adapter_config() -> ModelGraphMemoryConfig:
     """Create adapter configuration for tests."""
-    return AdapterGraphMemoryConfig(
+    return ModelGraphMemoryConfig(
         max_depth=5,
         default_depth=2,
         default_limit=100,
@@ -278,7 +278,7 @@ def adapter_config() -> AdapterGraphMemoryConfig:
 @pytest.fixture
 async def initialized_adapter(
     memgraph_available: bool,
-    adapter_config: AdapterGraphMemoryConfig,
+    adapter_config: ModelGraphMemoryConfig,
 ) -> AsyncGenerator[AdapterGraphMemory, None]:
     """Create and initialize an adapter for testing.
 
@@ -311,7 +311,7 @@ class TestRealConnection:
     async def test_initialize_real_connection(
         self,
         memgraph_available: bool,
-        adapter_config: AdapterGraphMemoryConfig,
+        adapter_config: ModelGraphMemoryConfig,
     ) -> None:
         """Test actual connection to Memgraph database."""
         if not memgraph_available:
@@ -339,7 +339,7 @@ class TestRealConnection:
     async def test_initialize_idempotent_real(
         self,
         memgraph_available: bool,
-        adapter_config: AdapterGraphMemoryConfig,
+        adapter_config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that multiple initialize calls are safe."""
         if not memgraph_available:
@@ -362,7 +362,7 @@ class TestRealConnection:
     async def test_shutdown_real(
         self,
         memgraph_available: bool,
-        adapter_config: AdapterGraphMemoryConfig,
+        adapter_config: ModelGraphMemoryConfig,
     ) -> None:
         """Test clean shutdown of real connection."""
         if not memgraph_available:
@@ -412,7 +412,7 @@ class TestRealHealthCheck:
     async def test_health_check_not_initialized(
         self,
         memgraph_available: bool,
-        adapter_config: AdapterGraphMemoryConfig,
+        adapter_config: ModelGraphMemoryConfig,
     ) -> None:
         """Test health check returns unhealthy when not initialized."""
         if not memgraph_available:
@@ -718,7 +718,7 @@ class TestRealErrorHandling:
     async def test_operations_before_initialize_raise_error(
         self,
         memgraph_available: bool,
-        adapter_config: AdapterGraphMemoryConfig,
+        adapter_config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that operations before initialize raise RuntimeError."""
         if not memgraph_available:
@@ -736,7 +736,7 @@ class TestRealErrorHandling:
     async def test_invalid_connection_uri(
         self,
         memgraph_available: bool,
-        adapter_config: AdapterGraphMemoryConfig,
+        adapter_config: ModelGraphMemoryConfig,
     ) -> None:
         """Test connection to invalid URI fails gracefully."""
         if not memgraph_available:

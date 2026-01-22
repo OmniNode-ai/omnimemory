@@ -63,7 +63,3 @@ class ModelContractVersion(BaseModel):
         self_semver = self.get_semver()
         other_semver = ModelSemVer.from_string(other_version)
         return self_semver.is_compatible_with(other_semver)
-
-
-# Type alias for backward compatibility with omnibase_core naming
-ContractVersionMixin = ModelContractVersion

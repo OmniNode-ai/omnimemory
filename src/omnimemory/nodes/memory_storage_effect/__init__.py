@@ -13,14 +13,14 @@ This is a fully declarative ONEX node:
 Node Type: EFFECT
 """
 
-from .adapters import HandlerFileSystemAdapter, HandlerFileSystemAdapterConfig
+from .adapters import HandlerFileSystemAdapter, ModelFileSystemAdapterConfig
 from .models import ModelMemoryStorageRequest, ModelMemoryStorageResponse
 
 __all__ = [
     # Models
     "ModelMemoryStorageRequest",
     "ModelMemoryStorageResponse",
+    "ModelFileSystemAdapterConfig",
     # Handlers
     "HandlerFileSystemAdapter",
-    "HandlerFileSystemAdapterConfig",
 ]

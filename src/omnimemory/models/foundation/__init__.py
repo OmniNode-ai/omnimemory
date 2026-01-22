@@ -32,7 +32,6 @@ from .model_connection_metadata import (
 )
 from .model_contract_version import (
     DEFAULT_CONTRACT_VERSION,
-    ContractVersionMixin,
     ModelContractVersion,
 )
 from .model_error_details import ModelErrorDetails
@@ -166,7 +165,6 @@ __all__ = [
     "ProgressSummaryResponse",
     # Contract versioning support
     "ModelContractVersion",
-    "ContractVersionMixin",
     "DEFAULT_CONTRACT_VERSION",
     # Tag normalization support
     "ModelTag",

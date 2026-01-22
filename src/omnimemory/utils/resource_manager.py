@@ -34,9 +34,9 @@ if TYPE_CHECKING:
 
 import structlog
 
-from ..models.utils.model_resource_manager import (
-    CircuitBreakerConfig,
-    CircuitBreakerStatsResponse,
+from ..models.utils.model_circuit_breaker_config import ModelCircuitBreakerConfig
+from ..models.utils.model_circuit_breaker_stats_response import (
+    ModelCircuitBreakerStatsResponse,
 )
 from .error_sanitizer import SanitizationLevel
 from .error_sanitizer import sanitize_error as _base_sanitize_error
@@ -100,9 +100,9 @@ class AsyncCircuitBreaker:
     gracefully and provide fast failure when services are known to be down.
     """
 
-    def __init__(self, name: str, config: CircuitBreakerConfig | None = None):
+    def __init__(self, name: str, config: ModelCircuitBreakerConfig | None = None):
         self.name = name
-        self.config = config or CircuitBreakerConfig()
+        self.config = config or ModelCircuitBreakerConfig()
         self.state = CircuitState.CLOSED
         self.stats = CircuitBreakerStats()
         self._lock = asyncio.Lock()
@@ -240,7 +240,7 @@ class AsyncResourceManager:
         self._locks: dict[str, asyncio.Lock] = {}
 
     def get_circuit_breaker(
-        self, name: str, config: CircuitBreakerConfig | None = None
+        self, name: str, config: ModelCircuitBreakerConfig | None = None
     ) -> AsyncCircuitBreaker:
         """Get or create a circuit breaker for a service."""
         if name not in self._circuit_breakers:
@@ -265,7 +265,7 @@ class AsyncResourceManager:
         resource_name: str,
         acquire_func: Callable[..., Any],
         release_func: Callable[[Any], None] | None = None,
-        circuit_breaker_config: CircuitBreakerConfig | None = None,
+        circuit_breaker_config: ModelCircuitBreakerConfig | None = None,
         semaphore_limit: int | None = None,
         *args: Any,
         **kwargs: Any,
@@ -336,11 +336,11 @@ class AsyncResourceManager:
             if semaphore:
                 semaphore.release()
 
-    def get_circuit_breaker_stats(self) -> dict[str, CircuitBreakerStatsResponse]:
+    def get_circuit_breaker_stats(self) -> dict[str, ModelCircuitBreakerStatsResponse]:
         """Get typed statistics for all circuit breakers."""
         stats = {}
         for name, cb in self._circuit_breakers.items():
-            stats[name] = CircuitBreakerStatsResponse(
+            stats[name] = ModelCircuitBreakerStatsResponse(
                 state=cb.state.value,
                 failure_count=cb.stats.failure_count,
                 success_count=cb.stats.success_count,
@@ -364,7 +364,7 @@ resource_manager = AsyncResourceManager()
 async def with_circuit_breaker(
     service_name: str,
     func: Callable[..., Any],
-    config: CircuitBreakerConfig | None = None,
+    config: ModelCircuitBreakerConfig | None = None,
     *args: Any,
     **kwargs: Any,
 ) -> Any:

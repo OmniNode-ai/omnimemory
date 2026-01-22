@@ -20,8 +20,6 @@ __all__ = [
     "AuditEventType",
     "AuditSeverity",
     "ModelAuditEvent",
-    # Backward compatibility alias
-    "AuditEvent",
 ]
 
 
@@ -97,7 +95,3 @@ class ModelAuditEvent(BaseModel):
         str_strip_whitespace=True,
         ser_json_timedelta="iso8601",
     )
-
-
-# Backward compatibility alias
-AuditEvent = ModelAuditEvent

@@ -7,20 +7,20 @@ in memory content to ensure compliance with privacy regulations.
 
 import re
 
-from ..models.utils.model_pii import (
-    PIIDetectionResult,
-    PIIDetectorConfig,
-    PIIMatch,
-    PIIPatternConfig,
+from ..models.utils import (
+    ModelPIIDetectionResult,
+    ModelPIIDetectorConfig,
+    ModelPIIMatch,
+    ModelPIIPatternConfig,
     PIIType,
 )
 
 __all__ = [
-    "PIIDetectionResult",
+    "ModelPIIDetectionResult",
+    "ModelPIIDetectorConfig",
+    "ModelPIIMatch",
+    "ModelPIIPatternConfig",
     "PIIDetector",
-    "PIIDetectorConfig",
-    "PIIMatch",
-    "PIIPatternConfig",
     "PIIType",
 ]
 
@@ -28,9 +28,9 @@ __all__ = [
 class PIIDetector:
     """Advanced PII detection with configurable patterns and sensitivity levels."""
 
-    def __init__(self, config: PIIDetectorConfig | None = None):
+    def __init__(self, config: ModelPIIDetectorConfig | None = None):
         """Initialize PII detector with configurable settings."""
-        self.config = config or PIIDetectorConfig()
+        self.config = config or ModelPIIDetectorConfig()
         self._patterns = self._initialize_patterns()
         self._compiled_patterns = self._compile_patterns()
         self._common_names = self._load_common_names()
@@ -80,7 +80,7 @@ class PIIDetector:
         )
         return pattern
 
-    def _initialize_patterns(self) -> dict[PIIType, list[PIIPatternConfig]]:
+    def _initialize_patterns(self) -> dict[PIIType, list[ModelPIIPatternConfig]]:
         """Initialize regex patterns for different PII types using configuration.
 
         Note: The following PIIType values do NOT have patterns implemented:
@@ -93,31 +93,31 @@ class PIIDetector:
         """
         return {
             PIIType.EMAIL: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
                     confidence=self.config.medium_high_confidence,
                     mask_template="***@***.***",
                 )
             ],
             PIIType.PHONE: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"(\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",
                     confidence=self.config.medium_confidence,
                     mask_template="***-***-****",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}",
                     confidence=self.config.reduced_confidence,
                     mask_template="+***-***-***",
                 ),
             ],
             PIIType.SSN: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"\b\d{3}-\d{2}-\d{4}\b",
                     confidence=self.config.high_confidence,
                     mask_template="***-**-****",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     # Improved SSN validation: excludes invalid area codes
                     # Format: (?!invalid_areas)AAA(?!00)GG(?!0000)SSSS
                     pattern=self._build_ssn_validation_pattern(),
@@ -126,7 +126,7 @@ class PIIDetector:
                 ),
             ],
             PIIType.CREDIT_CARD: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     # Implemented: Visa (4xxx), Mastercard (51-55xx), Amex (34xx/37xx)
                     # NOT implemented: Discover (starts with 6011, 65, or 644-649)
                     pattern=r"\b4\d{15}\b|\b5[1-5]\d{14}\b|\b3[47]\d{13}\b",
@@ -135,13 +135,13 @@ class PIIDetector:
                 )
             ],
             PIIType.IP_ADDRESS: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     # IPv4 address pattern (e.g., 192.168.1.1)
                     pattern=r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
                     confidence=self.config.medium_confidence,
                     mask_template="***.***.***.***",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     # IPv6 full-form only (e.g., 2001:0db8:85a3::8a2e:0370:7334)
                     # Does not match abbreviated forms (e.g., ::1, fe80::1)
                     pattern=r"\b[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4}){7}\b",
@@ -150,32 +150,32 @@ class PIIDetector:
                 ),
             ],
             PIIType.API_KEY: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r'[Aa]pi[_-]?[Kk]ey["\s]*[:=]["\s]*([A-Za-z0-9\-_]{16,})',
                     confidence=self.config.medium_high_confidence,
                     mask_template="api_key=***REDACTED***",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r'[Tt]oken["\s]*[:=]["\s]*([A-Za-z0-9\-_]{20,})',
                     confidence=self.config.medium_confidence,
                     mask_template="token=***REDACTED***",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"sk-[A-Za-z0-9]{32,}",  # OpenAI API keys
                     confidence=self.config.high_confidence,
                     mask_template="sk-***REDACTED***",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"ghp_[A-Za-z0-9]{36}",  # GitHub personal access tokens
                     confidence=self.config.high_confidence,
                     mask_template="ghp_***REDACTED***",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r"AIza[A-Za-z0-9\-_]{35}",  # Google API keys
                     confidence=self.config.high_confidence,
                     mask_template="AIza***REDACTED***",
                 ),
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     # AWS access key IDs - broad pattern may have false positives
                     # Real keys use prefixes: AKIA (IAM), ASIA (STS), AIDA (user ID)
                     # Consider stricter pattern: r"A[SK]IA[A-Z0-9]{16}" for fewer FPs
@@ -185,7 +185,7 @@ class PIIDetector:
                 ),
             ],
             PIIType.PASSWORD_HASH: [
-                PIIPatternConfig(
+                ModelPIIPatternConfig(
                     pattern=r'[Pp]assword["\s]*[:=]["\s]*([A-Za-z0-9\-_\$\.\/]{20,})',
                     confidence=self.config.medium_confidence,
                     mask_template="password=***REDACTED***",
@@ -226,7 +226,7 @@ class PIIDetector:
 
     def detect_pii(
         self, content: str, sensitivity_level: str = "medium"
-    ) -> PIIDetectionResult:
+    ) -> ModelPIIDetectionResult:
         """
         Detect PII in the given content.
 
@@ -235,7 +235,7 @@ class PIIDetector:
             sensitivity_level: Detection sensitivity ('low', 'medium', 'high')
 
         Returns:
-            PIIDetectionResult with all detected PII and sanitized content
+            ModelPIIDetectionResult with all detected PII and sanitized content
         """
         import time
 
@@ -247,7 +247,7 @@ class PIIDetector:
             msg = f"Content length {len(content)} exceeds max {max_len}"
             raise ValueError(msg)
 
-        matches: list[PIIMatch] = []
+        matches: list[ModelPIIMatch] = []
         pii_types_detected: set[PIIType] = set()
         sanitized_content = content
 
@@ -276,7 +276,7 @@ class PIIDetector:
                     if matches_for_type >= self.config.max_matches_per_type:
                         break  # Prevent excessive matches for any single PII type
 
-                    pii_match = PIIMatch(
+                    pii_match = ModelPIIMatch(
                         pii_type=pii_type,
                         value=match.group(0),
                         start_index=match.start(),
@@ -299,7 +299,7 @@ class PIIDetector:
         # Calculate scan duration
         scan_duration_ms = (time.time() - start_time) * 1000
 
-        return PIIDetectionResult(
+        return ModelPIIDetectionResult(
             has_pii=len(matches) > 0,
             matches=matches,
             sanitized_content=sanitized_content,
@@ -307,7 +307,7 @@ class PIIDetector:
             scan_duration_ms=scan_duration_ms,
         )
 
-    def _deduplicate_matches(self, matches: list[PIIMatch]) -> list[PIIMatch]:
+    def _deduplicate_matches(self, matches: list[ModelPIIMatch]) -> list[ModelPIIMatch]:
         """Remove overlapping or duplicate matches, keeping the highest confidence ones."""
         if not matches:
             return matches
@@ -315,7 +315,7 @@ class PIIDetector:
         # Sort by start position and confidence
         matches.sort(key=lambda x: (x.start_index, -x.confidence))
 
-        deduplicated: list[PIIMatch] = []
+        deduplicated: list[ModelPIIMatch] = []
         for match in matches:
             # Check if this match overlaps with any existing match
             overlap = False
@@ -332,7 +332,7 @@ class PIIDetector:
 
         return deduplicated
 
-    def _sanitize_content(self, content: str, matches: list[PIIMatch]) -> str:
+    def _sanitize_content(self, content: str, matches: list[ModelPIIMatch]) -> str:
         """Replace PII in content with masked values."""
         # Sort matches by start position in reverse order for proper replacement
         sorted_matches = sorted(matches, key=lambda x: x.start_index, reverse=True)

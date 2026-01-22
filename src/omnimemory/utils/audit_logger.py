@@ -16,9 +16,9 @@ from ..models.foundation.model_audit_metadata import (
     AuditEventDetails,
 )
 from ..models.utils.model_audit import (
-    AuditEvent,
     AuditEventType,
     AuditSeverity,
+    ModelAuditEvent,
 )
 
 
@@ -96,7 +96,7 @@ class AuditLogger:
         """Create human-readable log formatter."""
         return logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-    def log_event(self, event: AuditEvent) -> None:
+    def log_event(self, event: ModelAuditEvent) -> None:
         """
         Log an audit event.
 
@@ -152,7 +152,7 @@ class AuditLogger:
             "delete": AuditEventType.MEMORY_DELETE,
         }
 
-        event = AuditEvent(
+        event = ModelAuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
             event_type=event_type_map.get(operation_type, AuditEventType.MEMORY_STORE),
@@ -195,7 +195,7 @@ class AuditLogger:
             },
         )
 
-        event = AuditEvent(
+        event = ModelAuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
             event_type=(
@@ -223,7 +223,7 @@ class AuditLogger:
         details: AuditEventDetails | None = None,
     ) -> None:
         """Log security violation event."""
-        event = AuditEvent(
+        event = ModelAuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
             event_type=AuditEventType.SECURITY_VIOLATION,
@@ -278,7 +278,7 @@ class AuditLogger:
                 user_agent=details.user_agent,
             )
 
-        event = AuditEvent(
+        event = ModelAuditEvent(
             event_id=self._generate_event_id(),
             timestamp=datetime.now(timezone.utc),
             event_type=AuditEventType.CONFIG_CHANGE,

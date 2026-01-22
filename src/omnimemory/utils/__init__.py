@@ -11,9 +11,9 @@ This package provides common utilities used across the OmniMemory system:
 - Common validation patterns
 """
 
+from ..models.utils.model_concurrency import ModelConnectionPoolConfig
 from .concurrency import (
     AsyncConnectionPool,
-    ConnectionPoolConfig,
     FairSemaphore,
     LockPriority,
     PoolStatus,
@@ -68,28 +68,29 @@ from .observability import (
     validate_correlation_id,
 )
 from .pii_detector import (
-    PIIDetectionResult,
+    ModelPIIDetectionResult,
+    ModelPIIDetectorConfig,
+    ModelPIIMatch,
+    ModelPIIPatternConfig,
     PIIDetector,
-    PIIDetectorConfig,
-    PIIMatch,
     PIIType,
 )
 from .resource_manager import (
     AsyncCircuitBreaker,
     AsyncResourceManager,
-    CircuitBreakerConfig,
     CircuitBreakerError,
     CircuitState,
+    ModelCircuitBreakerConfig,
     resource_manager,
     with_circuit_breaker,
     with_semaphore,
     with_timeout,
 )
 from .retry_utils import (
-    RetryAttemptInfo,
-    RetryConfig,
+    ModelRetryAttemptInfo,
+    ModelRetryConfig,
+    ModelRetryStatistics,
     RetryManager,
-    RetryStatistics,
     calculate_delay,
     default_retry_manager,
     is_retryable_exception,
@@ -99,9 +100,9 @@ from .retry_utils import (
 
 __all__ = [
     # Retry utilities
-    "RetryConfig",
-    "RetryAttemptInfo",
-    "RetryStatistics",
+    "ModelRetryConfig",
+    "ModelRetryAttemptInfo",
+    "ModelRetryStatistics",
     "RetryManager",
     "default_retry_manager",
     "retry_decorator",
@@ -110,7 +111,7 @@ __all__ = [
     "calculate_delay",
     # Resource management
     "CircuitState",
-    "CircuitBreakerConfig",
+    "ModelCircuitBreakerConfig",
     "CircuitBreakerError",
     "AsyncCircuitBreaker",
     "AsyncResourceManager",
@@ -144,7 +145,7 @@ __all__ = [
     # Concurrency
     "LockPriority",
     "PoolStatus",
-    "ConnectionPoolConfig",
+    "ModelConnectionPoolConfig",
     "PriorityLock",
     "FairSemaphore",
     "AsyncConnectionPool",
@@ -167,11 +168,12 @@ __all__ = [
     "create_redis_health_check",
     "create_pinecone_health_check",
     # PII Detection
-    "PIIType",
-    "PIIMatch",
-    "PIIDetectionResult",
-    "PIIDetectorConfig",
+    "ModelPIIDetectionResult",
+    "ModelPIIDetectorConfig",
+    "ModelPIIMatch",
+    "ModelPIIPatternConfig",
     "PIIDetector",
+    "PIIType",
     # Error Sanitization
     "SanitizationLevel",
     "ErrorSanitizer",

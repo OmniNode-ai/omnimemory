@@ -129,11 +129,15 @@ from ..models.foundation.model_typed_collections import (
     ModelKeyValuePair,
     ModelMetadata,
 )
-from ..models.utils.model_observability import (
-    CorrelationContext,
-    StructuredLogEntry,
+from ..models.utils.model_correlation_context import ModelCorrelationContext
+from ..models.utils.model_structured_log_entry import (
+    ModelStructuredLogEntry,
     TraceLevel,
 )
+
+# Aliases for internal use
+CorrelationContext = ModelCorrelationContext
+StructuredLogEntry = ModelStructuredLogEntry
 
 # Type variable for generic function types
 F = TypeVar("F", bound=Callable[..., object])

@@ -10,8 +10,6 @@ from pydantic import BaseModel, Field
 
 __all__ = [
     "ModelConnectionPoolConfig",
-    # Backward compatibility alias
-    "ConnectionPoolConfig",
 ]
 
 
@@ -37,7 +35,3 @@ class ModelConnectionPoolConfig(BaseModel):
     retry_attempts: int = Field(
         default=3, ge=0, description="Retry attempts for failed connections"
     )
-
-
-# Backward compatibility alias
-ConnectionPoolConfig = ModelConnectionPoolConfig

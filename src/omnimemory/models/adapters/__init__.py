@@ -17,19 +17,19 @@ Graph Memory Models:
     Initial implementation for OMN-1389.
 """
 
-from omnimemory.models.adapters.model_graph_memory import (
-    AdapterGraphMemoryConfig,  # Backward compatibility alias
-    ModelConnectionsResult,
-    ModelGraphMemoryConfig,
-    ModelGraphMemoryHealth,
-    ModelMemoryConnection,
+from omnimemory.models.adapters.model_connections_result import ModelConnectionsResult
+from omnimemory.models.adapters.model_graph_memory_config import ModelGraphMemoryConfig
+from omnimemory.models.adapters.model_graph_memory_health import ModelGraphMemoryHealth
+from omnimemory.models.adapters.model_memory_connection import ModelMemoryConnection
+from omnimemory.models.adapters.model_related_memory import (
     ModelRelatedMemory,
-    ModelRelatedMemoryResult,
     PropertyValue,
+)
+from omnimemory.models.adapters.model_related_memory_result import (
+    ModelRelatedMemoryResult,
 )
 
 __all__ = [
-    # Graph memory models (ONEX naming)
     "ModelConnectionsResult",
     "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",
@@ -37,6 +37,4 @@ __all__ = [
     "ModelRelatedMemory",
     "ModelRelatedMemoryResult",
     "PropertyValue",
-    # Backward compatibility alias
-    "AdapterGraphMemoryConfig",
 ]

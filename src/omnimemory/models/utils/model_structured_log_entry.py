@@ -1,26 +1,19 @@
 """
-Observability-related Pydantic models for OmniMemory ONEX architecture.
+Structured log entry Pydantic model for OmniMemory ONEX architecture.
 
-This module contains models for structured logging and correlation tracking.
+This module contains the ModelStructuredLogEntry model for structured logging.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ..foundation.model_typed_collections import ModelMetadata
-
 __all__ = [
-    "ModelCorrelationContext",
     "ModelStructuredLogEntry",
     "TraceLevel",
-    # Backward compatibility aliases
-    "CorrelationContext",
-    "StructuredLogEntry",
 ]
 
 
@@ -123,21 +116,3 @@ class ModelStructuredLogEntry(BaseModel):
         max_length=1000,
         description="Sanitized error message (only on failure, PII-safe)",
     )
-
-
-class ModelCorrelationContext(BaseModel):
-    """Context information for correlation tracking."""
-
-    correlation_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
-    request_id: str | None = Field(default=None)
-    user_id: str | None = Field(default=None)
-    operation: str | None = Field(default=None)
-    parent_correlation_id: str | None = Field(default=None)
-    trace_level: TraceLevel = Field(default=TraceLevel.INFO)
-    metadata: ModelMetadata = Field(default_factory=ModelMetadata)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-# Backward compatibility aliases
-StructuredLogEntry = ModelStructuredLogEntry
-CorrelationContext = ModelCorrelationContext

@@ -18,13 +18,13 @@ Example::
 
     from omnimemory.handlers.adapters import (
         AdapterGraphMemory,
-        AdapterGraphMemoryConfig,
+        ModelGraphMemoryConfig,
         EmbeddingHttpClient,
         ModelEmbeddingHttpClientConfig,
     )
 
     # Graph adapter
-    config = AdapterGraphMemoryConfig(max_depth=3)
+    config = ModelGraphMemoryConfig(max_depth=3)
     adapter = AdapterGraphMemory(config)
     await adapter.initialize(connection_uri="bolt://localhost:7687")
 
@@ -57,7 +57,6 @@ from omnimemory.handlers.adapters.adapter_rate_limiter import (
     RateLimiterRegistry,
 )
 from omnimemory.models.adapters import (
-    AdapterGraphMemoryConfig,  # Backward compatibility alias
     ModelConnectionsResult,
     ModelGraphMemoryConfig,
     ModelGraphMemoryHealth,
@@ -70,7 +69,6 @@ from omnimemory.models.config import ModelRateLimiterConfig
 __all__ = [
     # Graph memory adapter
     "AdapterGraphMemory",
-    "AdapterGraphMemoryConfig",  # Backward compatibility alias
     "ModelConnectionsResult",
     "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",

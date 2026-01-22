@@ -16,11 +16,11 @@ Example::
     import asyncio
     from omnimemory.handlers.adapters import (
         AdapterGraphMemory,
-        AdapterGraphMemoryConfig,
+        ModelGraphMemoryConfig,
     )
 
     async def example():
-        config = AdapterGraphMemoryConfig(max_depth=5)
+        config = ModelGraphMemoryConfig(max_depth=5)
         adapter = AdapterGraphMemory(config)
         await adapter.initialize(
             connection_uri="bolt://localhost:7687",
@@ -55,7 +55,6 @@ from urllib.parse import urlparse
 from omnibase_core.container import ModelONEXContainer  # noqa: TC002 - used at runtime
 
 from omnimemory.models.adapters import (
-    AdapterGraphMemoryConfig,  # Backward compatibility alias
     ModelConnectionsResult,
     ModelGraphMemoryConfig,
     ModelGraphMemoryHealth,
@@ -96,7 +95,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "AdapterGraphMemory",
-    "AdapterGraphMemoryConfig",  # Backward compatibility alias
     "ModelConnectionsResult",
     "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",
@@ -118,7 +116,7 @@ class CypherTemplates:
     """Parameterized Cypher query templates for memory graph operations.
 
     All template methods accept a ``node_label`` parameter to allow configurable
-    node labels (defaults to "Memory" in AdapterGraphMemoryConfig).
+    node labels (defaults to "Memory" in ModelGraphMemoryConfig).
 
     Direction Behavior:
         - get_connections: Bidirectional (matches both incoming and outgoing)
@@ -366,7 +364,7 @@ class AdapterGraphMemory:
     Example::
 
         async def example():
-            config = AdapterGraphMemoryConfig(max_depth=3)
+            config = ModelGraphMemoryConfig(max_depth=3)
             adapter = AdapterGraphMemory(config)
             await adapter.initialize(
                 connection_uri="bolt://localhost:7687",
@@ -382,7 +380,7 @@ class AdapterGraphMemory:
 
     def __init__(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
         container: ModelONEXContainer | None = None,
     ) -> None:
         """Initialize the adapter with configuration.
@@ -399,7 +397,7 @@ class AdapterGraphMemory:
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> AdapterGraphMemoryConfig:
+    def config(self) -> ModelGraphMemoryConfig:
         """Get the adapter configuration."""
         return self._config
 
@@ -538,7 +536,7 @@ class AdapterGraphMemory:
                 "call is still in progress); (2) Database connection issue - the "
                 "graph database may be slow or unresponsive. Suggestions: Check if "
                 "another initialization is in progress, verify the database is "
-                "reachable, or increase timeout_seconds in AdapterGraphMemoryConfig."
+                "reachable, or increase timeout_seconds in ModelGraphMemoryConfig."
             ) from e
 
     def _ensure_initialized(self) -> HandlerGraph:

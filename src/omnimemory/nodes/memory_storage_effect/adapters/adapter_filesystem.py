@@ -14,12 +14,12 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_storage_effect.handlers import (
         HandlerFileSystemAdapter,
-        HandlerFileSystemAdapterConfig,
+        ModelFileSystemAdapterConfig,
     )
     from pathlib import Path
 
     async def example():
-        config = HandlerFileSystemAdapterConfig(base_path=Path("/data/memory"))
+        config = ModelFileSystemAdapterConfig(base_path=Path("/data/memory"))
         adapter = HandlerFileSystemAdapter(config)
         await adapter.initialize()
 
@@ -77,14 +77,10 @@ from ..models import (
     ModelMemoryStorageResponse,
 )
 
-# Backward compatibility alias - deprecated, use ModelFileSystemAdapterConfig
-HandlerFileSystemAdapterConfig = ModelFileSystemAdapterConfig
-
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerFileSystemAdapter",
-    "HandlerFileSystemAdapterConfig",  # Backward compatibility alias
     "ModelFileSystemAdapterConfig",
 ]
 
