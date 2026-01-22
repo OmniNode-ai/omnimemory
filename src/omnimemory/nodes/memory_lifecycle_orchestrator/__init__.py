@@ -4,7 +4,41 @@
 
 Full lifecycle management: store -> analyze -> consolidate -> archive.
 
-Status: Scaffold only - implementation pending.
+This orchestrator manages the memory lifecycle state machine:
+    ACTIVE -> EXPIRED -> ARCHIVED -> DELETED
+
+Any state (except DELETED) can be PROMOTED back to ACTIVE.
+
+Components:
+    Adapters:
+        - AdapterRuntimeTickMemory: Tick-based lifecycle processing
+        - ModelMemoryLifecycleTickResult: Result model for tick processing
+
+    Validators:
+        - validate_transition: Check if a state transition is valid
+        - apply_transition: Validate and compute transition results
+        - VALID_TRANSITIONS: Dict of valid state transitions
+        - ModelLifecycleTransitionResult: Result model for transitions
 """
 
-__all__: list[str] = []
+from omnimemory.nodes.memory_lifecycle_orchestrator.adapters import (
+    AdapterRuntimeTickMemory,
+    ModelMemoryLifecycleTickResult,
+)
+from omnimemory.nodes.memory_lifecycle_orchestrator.validators import (
+    VALID_TRANSITIONS,
+    ModelLifecycleTransitionResult,
+    apply_transition,
+    validate_transition,
+)
+
+__all__ = [
+    # Adapters
+    "AdapterRuntimeTickMemory",
+    "ModelMemoryLifecycleTickResult",
+    # Validators
+    "VALID_TRANSITIONS",
+    "ModelLifecycleTransitionResult",
+    "apply_transition",
+    "validate_transition",
+]

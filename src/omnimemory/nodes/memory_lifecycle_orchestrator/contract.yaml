@@ -1,0 +1,228 @@
+---
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+
+# Memory Lifecycle ORCHESTRATOR - ONEX Contract
+# ORCHESTRATOR node for memory lifecycle management - expire, archive, and promote operations.
+# Tick-based persistent service for automated lifecycle transitions.
+
+# === REQUIRED ROOT FIELDS ===
+name: "memory_lifecycle_orchestrator"
+version: {major: 0, minor: 1, patch: 0}
+description: "Orchestrator for memory lifecycle management - expire, archive, and promote operations.
+  Tick-based persistent service that processes lifecycle transitions using envelope timestamps for deterministic,
+  reproducible behavior."
+node_type: "ORCHESTRATOR"
+input_model: "ModelMemoryLifecycleRequest"
+output_model: "ModelMemoryLifecycleResponse"
+
+# === ORCHESTRATION CONFIGURATION (Required for ORCHESTRATOR nodes) ===
+# Defines the orchestration pattern and tick-based execution
+orchestration:
+  pattern: "tick_based_lifecycle"
+  tick_interval_ms: 5000
+  max_concurrent_operations: 10
+  batch_size: 100
+  lifecycle_states:
+    - active
+    - expired
+    - archived
+    - deleted
+  state_transitions:
+    - from: active
+      to: expired
+      trigger: ttl_exceeded
+    - from: expired
+      to: archived
+      trigger: archive_policy
+    - from: archived
+      to: deleted
+      trigger: retention_exceeded
+    - from: active
+      to: active
+      trigger: promote
+      note: "Tier promotion within active state"
+
+# === NODE CONFIGURATION ===
+tool_specification:
+  tool_name: "node_memory_lifecycle_orchestrator"
+  version: {major: 0, minor: 1, patch: 0}
+  description: "Memory lifecycle orchestrator for expire, archive, and promote operations"
+  main_tool_class: "NodeMemoryLifecycleOrchestrator"
+  container_injection: "ONEXContainer"
+  business_logic_pattern: "orchestrator"
+
+# === SERVICE CONFIGURATION ===
+service_configuration:
+  is_persistent_service: true
+  requires_external_dependencies: true
+  tick_interval_ms: 5000
+  archive_root_path: "var/omnimemory/archive/"
+  archive_format: "jsonl_gzip"
+  retention_policy:
+    expired_retention_hours: 24
+    archived_retention_days: 90
+
+# === INPUT/OUTPUT STATE ===
+input_state:
+  object_type: "object"
+  required: ["operation"]
+  optional: ["memory_ids", "target_tier", "archive_path", "envelope_timestamp", "correlation_id", "batch_options",
+    "force"]
+
+output_state:
+  object_type: "object"
+  required: ["status"]
+  optional: ["expired_count", "archived_count", "promoted", "deleted_count", "expired_ids", "archive_manifest",
+    "new_tier", "events", "error_message", "lifecycle_revision"]
+
+# === ACTIONS ===
+actions:
+  - name: "tick"
+    description: "Process lifecycle tick - check for expired and archivable memories using envelope timestamp"
+    inputs: ["envelope_timestamp", "correlation_id"]
+    outputs: ["expired_count", "archived_count", "events"]
+
+  - name: "expire"
+    description: "Expire memories that have exceeded their TTL based on envelope timestamp comparison"
+    inputs: ["memory_ids", "envelope_timestamp"]
+    outputs: ["expired_count", "expired_ids", "lifecycle_revision"]
+
+  - name: "archive"
+    description: "Archive expired memories to cold storage (filesystem with gzip compression)"
+    inputs: ["memory_ids", "archive_path"]
+    outputs: ["archived_count", "archive_manifest", "lifecycle_revision"]
+
+  - name: "promote"
+    description: "Promote memory to higher tier (explicit trigger only, not tick-based)"
+    inputs: ["memory_id", "target_tier"]
+    outputs: ["promoted", "new_tier", "lifecycle_revision"]
+
+  - name: "delete"
+    description: "Soft-delete archived memories (marks as deleted, does not remove from archive)"
+    inputs: ["memory_ids"]
+    outputs: ["deleted_count", "lifecycle_revision"]
+
+  - name: "health_check"
+    description: "Check orchestrator health and pending lifecycle operations"
+    inputs: []
+    outputs: ["status", "pending_expirations", "pending_archives"]
+
+# === DEPENDENCIES ===
+# Orchestrator coordinates handlers for lifecycle operations
+dependencies:
+  # Handler Dependencies
+  - name: HandlerRuntimeTick
+    dependency_type: handler
+    strategy: ADAPTER
+    description: Tick-based lifecycle event processing and scheduling
+    required: true
+
+  - name: HandlerPostgresDeactivate
+    dependency_type: handler
+    strategy: ADAPTER
+    description: Memory expiration and deactivation in PostgreSQL
+    required: true
+
+  - name: HandlerFileSystem
+    dependency_type: handler
+    strategy: DIRECT
+    description: Archive to cold storage (gzip-compressed JSONL files)
+    required: true
+
+  # Protocol Dependencies
+  - name: ProtocolMemoryLifecycle
+    dependency_type: protocol
+    description: Memory lifecycle operations protocol
+    required: true
+
+  - name: ProtocolMemoryOperations
+    dependency_type: protocol
+    description: Memory CRUD operations protocol
+    required: true
+
+  # Service Dependencies
+  - name: postgresql
+    dependency_type: service
+    description: PostgreSQL database for memory state tracking
+    required: true
+
+  - name: filesystem
+    dependency_type: service
+    description: FileSystem for archive storage
+    required: true
+
+# === PERFORMANCE ===
+performance:
+  tick_processing_max_ms: 1000
+  single_operation_max_ms: 100
+  batch_operation_max_ms: 5000
+  max_memories_per_tick: 1000
+
+# === EVENT TYPE CONFIGURATION ===
+event_type:
+  version: {major: 1, minor: 0, patch: 0}
+  primary_events: ["memory_expired", "memory_archived", "memory_promoted", "memory_deleted", "lifecycle_tick_completed"]
+  event_categories: ["memory", "orchestrator", "lifecycle"]
+  publish_events: true
+  subscribe_events: true
+  subscribed_events: ["memory_stored", "memory_updated", "memory_ttl_set"]
+  event_routing: "memory_lifecycle"
+
+# === INFRASTRUCTURE ===
+infrastructure:
+  storage_backends:
+    - postgresql  # Primary state storage
+    - filesystem  # Archive storage
+  archive_configuration:
+    root_path: "var/omnimemory/archive/"
+    format: "jsonl_gzip"
+    partition_by: "date"
+    compression_level: 6
+
+# === VALIDATION RULES ===
+validation_rules:
+  strict_typing_enabled: true
+  input_validation_enabled: true
+  output_validation_enabled: true
+  performance_validation_enabled: true
+
+  # Critical lifecycle rules
+  constraint_definitions:
+    operation: "Literal['tick', 'expire', 'archive', 'promote', 'delete'] - lifecycle operation to perform"
+    status: "Literal['success', 'partial', 'error', 'no_op'] - operation result status"
+    envelope_timestamp: "datetime - MUST be used for all time comparisons, never datetime.now()"
+    memory_ids: "list[str] - memory identifiers to process"
+    target_tier: "Literal['hot', 'warm', 'cold'] - target tier for promotion"
+    archive_path: "string - path for archive output (relative to archive_root_path)"
+    lifecycle_revision: "int - incremented on every state transition for consistency tracking"
+
+  # Mandatory rules for deterministic behavior
+  custom_rules:
+    - rule: "all_timestamps_from_envelope"
+      description: "All lifecycle decisions MUST use envelope.envelope_timestamp, never datetime.now()"
+      severity: critical
+
+    - rule: "lifecycle_revision_increment"
+      description: "Every state transition MUST increment lifecycle_revision atomically"
+      severity: critical
+
+    - rule: "archive_includes_revision"
+      description: "Archived records MUST include lifecycle_revision for consistency verification"
+      severity: critical
+
+    - rule: "idempotent_operations"
+      description: "All lifecycle operations MUST be idempotent when replayed with same envelope"
+      severity: critical
+
+# === TAGS ===
+tags:
+  - memory
+  - lifecycle
+  - orchestrator
+  - expire
+  - archive
+  - promote
+  - tick
+  - p4a
+  - deterministic

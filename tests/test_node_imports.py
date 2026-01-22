@@ -94,6 +94,10 @@ class TestNodeStructure:
         # development/testing. Will be removed when omnibase_infra is integrated.
         # TODO: Remove from exclusion list when migrating to real handlers.
         "memory_retrieval_effect",
+        # ORCHESTRATOR node: HandlerFileSystemArchive for cold storage archival.
+        # Uses DIRECT strategy per handler_reuse_matrix.md - JSONL+gzip format
+        # specialized for memory archival (OMN-1392).
+        "memory_lifecycle_orchestrator",
     }
 
     @pytest.mark.parametrize("node_name", CORE_8_NODES)

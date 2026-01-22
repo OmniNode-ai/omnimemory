@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ...enums.enum_memory_lifecycle_state import EnumMemoryLifecycleState
 from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC001
 
 
@@ -128,6 +129,32 @@ class ModelMemoryItem(BaseModel):
     indexed: bool = Field(
         default=False,
         description="Whether this item has been indexed for search",
+    )
+
+    # Lifecycle state machine
+    lifecycle_state: EnumMemoryLifecycleState = Field(
+        default=EnumMemoryLifecycleState.ACTIVE,
+        description="Current lifecycle state of the memory",
+    )
+    lifecycle_revision: int = Field(
+        default=0,
+        description="Increments on every state transition for concurrency safety",
+    )
+    expired_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when memory was expired",
+    )
+    archived_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when memory was archived to cold storage",
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when memory was soft-deleted",
+    )
+    last_promoted_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of most recent promotion to higher tier",
     )
 
     # Validation using Pydantic v2 syntax
