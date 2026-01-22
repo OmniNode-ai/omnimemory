@@ -376,6 +376,11 @@ class RateLimiterRegistry:
         self._limiters: dict[tuple[str, str], ProviderRateLimiter] = {}
         self._lock = asyncio.Lock()
 
+    @staticmethod
+    def _normalize_key(provider: str, model: str) -> tuple[str, str]:
+        """Normalize provider and model to lowercase for consistent keying."""
+        return (provider.lower().strip(), model.lower().strip())
+
     async def get_or_create(
         self,
         provider: str,
@@ -396,7 +401,7 @@ class RateLimiterRegistry:
         Returns:
             The rate limiter for the (provider, model) combination.
         """
-        key = (provider.lower().strip(), model.lower().strip())
+        key = self._normalize_key(provider, model)
 
         async with self._lock:
             if key not in self._limiters:
@@ -430,7 +435,7 @@ class RateLimiterRegistry:
         Returns:
             The rate limiter if it exists, None otherwise.
         """
-        key = (provider.lower().strip(), model.lower().strip())
+        key = self._normalize_key(provider, model)
         async with self._lock:
             return self._limiters.get(key)
 
@@ -444,7 +449,7 @@ class RateLimiterRegistry:
         Returns:
             True if a limiter was removed, False if not found.
         """
-        key = (provider.lower().strip(), model.lower().strip())
+        key = self._normalize_key(provider, model)
         async with self._lock:
             if key in self._limiters:
                 del self._limiters[key]
