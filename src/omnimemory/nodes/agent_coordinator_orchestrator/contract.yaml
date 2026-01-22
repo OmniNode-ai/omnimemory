@@ -1,0 +1,238 @@
+---
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+
+# Agent Coordinator ORCHESTRATOR - ONEX Contract
+# Orchestrator node for cross-agent memory coordination.
+# Manages subscriptions and notifications for memory change events.
+
+# === REQUIRED ROOT FIELDS ===
+name: "agent_coordinator_orchestrator"
+version: {major: 0, minor: 1, patch: 0}
+description: "Orchestrator node for cross-agent memory coordination. Manages subscriptions and notifications
+  for memory change events."
+node_type: "ORCHESTRATOR"
+input_model: "ModelAgentCoordinatorRequest"
+output_model: "ModelAgentCoordinatorResponse"
+
+# === IO OPERATIONS (Required for ORCHESTRATOR nodes with external I/O) ===
+io_operations:
+  - operation_type: "database_read"
+    description: "Read subscriptions from PostgreSQL"
+    atomic: false
+    timeout_seconds: 30
+    validation_enabled: true
+  - operation_type: "database_write"
+    description: "Write subscriptions to PostgreSQL"
+    atomic: true
+    timeout_seconds: 30
+    validation_enabled: true
+  - operation_type: "cache_read"
+    description: "Read from Valkey cache"
+    atomic: false
+    timeout_seconds: 5
+    validation_enabled: true
+  - operation_type: "cache_write"
+    description: "Write to Valkey cache"
+    atomic: false
+    timeout_seconds: 5
+    validation_enabled: true
+  - operation_type: "http_request"
+    description: "Webhook delivery to subscribers"
+    atomic: false
+    timeout_seconds: 30
+    validation_enabled: true
+
+# === NODE CONFIGURATION ===
+tool_specification:
+  tool_name: "node_agent_coordinator_orchestrator"
+  version: {major: 0, minor: 1, patch: 0}
+  description: "Agent coordinator orchestrator for cross-agent memory coordination"
+  main_tool_class: "NodeAgentCoordinatorOrchestrator"
+  container_injection: "ONEXContainer"
+  business_logic_pattern: "orchestrator"
+
+# === SERVICE CONFIGURATION ===
+service_configuration:
+  is_persistent_service: false
+  requires_external_dependencies: true
+
+# === INPUT/OUTPUT STATE ===
+input_state:
+  object_type: "object"
+  required: ["action"]
+  optional: ["agent_id", "topic", "delivery", "event", "correlation_id"]
+
+output_state:
+  object_type: "object"
+  required: ["success", "action", "correlation_id"]
+  optional:
+    - "subscription"
+    - "subscriptions"
+    - "delivery_attempts"
+    - "success_count"
+    - "failure_count"
+    - "error_message"
+    - "error_code"
+
+# === ACTIONS ===
+actions:
+  - name: "subscribe"
+    description: "Register an agent's subscription to memory topic"
+    inputs:
+      - name: "agent_id"
+        type: "string"
+        required: true
+        description: "Unique identifier of the subscribing agent"
+      - name: "topic"
+        type: "string"
+        required: true
+        pattern: "^memory\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+        description: "Topic pattern to subscribe to (format: memory.<entity>.<event>)"
+      - name: "delivery"
+        type: "ModelSubscriptionDeliveryWebhook"
+        required: true
+        description: "Webhook delivery configuration"
+    outputs:
+      - name: "subscription"
+        type: "ModelSubscription"
+        description: "Created subscription object with ID and status"
+
+  - name: "unsubscribe"
+    description: "Remove an agent's subscription"
+    inputs:
+      - name: "agent_id"
+        type: "string"
+        required: true
+        description: "Unique identifier of the agent"
+      - name: "topic"
+        type: "string"
+        required: true
+        description: "Topic to unsubscribe from"
+    outputs:
+      - name: "success"
+        type: "boolean"
+        description: "Whether unsubscription was successful"
+
+  - name: "list_subscriptions"
+    description: "List all subscriptions for an agent"
+    inputs:
+      - name: "agent_id"
+        type: "string"
+        required: true
+        description: "Unique identifier of the agent"
+    outputs:
+      - name: "subscriptions"
+        type: "array"
+        items_type: "ModelSubscription"
+        description: "List of active subscriptions"
+
+  - name: "notify"
+    description: "Notify all subscribers of a memory change event"
+    inputs:
+      - name: "topic"
+        type: "string"
+        required: true
+        description: "Topic to publish event to"
+      - name: "event"
+        type: "ModelNotificationEvent"
+        required: true
+        description: "Event to deliver to subscribers"
+    outputs:
+      - name: "delivery_attempts"
+        type: "array"
+        items_type: "ModelNotificationDeliveryAttempt"
+        description: "Record of all delivery attempts"
+      - name: "success_count"
+        type: "integer"
+        description: "Number of successful deliveries"
+      - name: "failure_count"
+        type: "integer"
+        description: "Number of failed deliveries"
+
+# === DEPENDENCIES ===
+dependencies:
+  # Handler Dependencies
+  - name: "HandlerSubscription"
+    dependency_type: "handler"
+    description: "Subscription management handler"
+    required: true
+  - name: "HandlerDb"
+    dependency_type: "handler"
+    description: "Database handler for subscription persistence"
+    required: true
+  - name: "HandlerHttpRest"
+    dependency_type: "handler"
+    description: "HTTP handler for webhook delivery"
+    required: true
+
+  # Adapter Dependencies
+  - name: "AdapterValkey"
+    dependency_type: "adapter"
+    description: "Valkey/Redis adapter for caching"
+    required: true
+
+  # Protocol Dependencies
+  - name: "ProtocolSubscriptionManager"
+    dependency_type: "protocol"
+    description: "Subscription lifecycle management protocol"
+    required: true
+  - name: "ProtocolNotificationDelivery"
+    dependency_type: "protocol"
+    description: "Notification delivery protocol"
+    required: true
+
+# === PERFORMANCE ===
+performance:
+  max_response_time_ms: 100
+  notify_timeout_ms: 30000
+
+# === EVENT TYPE CONFIGURATION ===
+event_type:
+  version: {major: 1, minor: 0, patch: 0}
+  primary_events:
+    - "subscription_created"
+    - "subscription_deleted"
+    - "notification_sent"
+    - "notification_failed"
+  event_categories: ["subscription", "notification", "orchestrator"]
+  publish_events: true
+  subscribe_events: true
+  event_routing: "memory"
+
+# === VALIDATION RULES ===
+validation_rules:
+  strict_typing_enabled: true
+  input_validation_enabled: true
+  output_validation_enabled: true
+  performance_validation_enabled: true
+  topic_pattern: "^memory\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+  constraint_definitions:
+    action: "Literal['subscribe', 'unsubscribe', 'list_subscriptions', 'notify']"
+    agent_id: "string type for agent identifier"
+    topic: "string matching memory.<entity>.<event> pattern"
+    delivery: "ModelSubscriptionDeliveryWebhook for webhook configuration"
+    event: "ModelNotificationEvent for notification payload"
+
+# === RETRY POLICY ===
+retry_policy:
+  max_attempts: 5
+  base_delay_ms: 1000
+  max_delay_ms: 60000
+  backoff_multiplier: 2
+
+# === CIRCUIT BREAKER ===
+circuit_breaker:
+  failure_threshold: 5
+  success_threshold: 3
+  cooldown_seconds: 60
+
+# === TAGS ===
+tags:
+  - memory
+  - subscription
+  - notification
+  - orchestrator
+  - cross-agent
+  - webhook
+  - coordination
