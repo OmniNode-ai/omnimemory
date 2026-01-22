@@ -60,14 +60,9 @@ def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
     if not base.exists():
         return []
 
-    contracts: list[str] = []
-    for node_dir in base.iterdir():
-        if node_dir.is_dir():
-            contract_path = node_dir / "contract.yaml"
-            if contract_path.exists():
-                contracts.append(node_dir.name)
-
-    return sorted(contracts)
+    return sorted(
+        d.name for d in base.iterdir() if d.is_dir() and (d / "contract.yaml").exists()
+    )
 
 
 class TestContractVersionField:
@@ -169,6 +164,32 @@ class TestContractVersionField:
             "REDUCER",
             "ORCHESTRATOR",
         ), f"node_type must be a valid ONEX type, got '{node_type}': {node_name}"
+
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
+    def test_nested_version_fields_preserved(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
+        """Verify nested version fields (tool_specification, event_type) are preserved.
+
+        The migration only affects root-level 'version' field. Nested version
+        fields in tool_specification or event_type are intentionally kept as
+        they serve different purposes.
+        """
+        # Check tool_specification.version if present (should be preserved)
+        tool_spec: object = contract_data.get("tool_specification")
+        if isinstance(tool_spec, dict) and "version" in tool_spec:
+            version = tool_spec["version"]
+            assert isinstance(
+                version, str
+            ), f"tool_specification.version should be a string: {node_name}"
+
+        # Check event_type.version if present (should be preserved)
+        event_type: object = contract_data.get("event_type")
+        if isinstance(event_type, dict) and "version" in event_type:
+            version = event_type["version"]
+            assert isinstance(
+                version, str
+            ), f"event_type.version should be a string: {node_name}"
 
 
 class TestContractVersionValues:

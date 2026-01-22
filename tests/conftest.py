@@ -151,11 +151,9 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
     with open(contract_path) as f:
         data: YamlData = yaml.safe_load(f)
 
-    if not isinstance(data, dict):
-        pytest.fail(
-            f"Contract must be a dict, got {type(data).__name__}: {contract_path}"
-        )
-
+    assert isinstance(
+        data, dict
+    ), f"Contract must be a dict, got {type(data).__name__}: {contract_path}"
     return data
 
 
