@@ -16,8 +16,8 @@
 #
 # To enable authentication, set these in your .env file:
 # - Qdrant: QDRANT_API_KEY=your-api-key
-# - Memgraph: MEMGRAPH_USER=admin and MEMGRAPH_PASSWORD=your-password
 # - Valkey: VALKEY_PASSWORD=your-password
+# - Memgraph: Use docker-compose.prod.yml overlay (Memgraph fails on empty credentials)
 #
 # SECURITY WARNING (Non-Local Deployments):
 # - For production/non-local deployments, ALWAYS enable authentication
@@ -75,7 +75,8 @@ services:
       MEMGRAPH_BOLT_PORT: 7687
       MEMGRAPH_HTTP_PORT: 7444
       MEMGRAPH_MEMORY_LIMIT: 4096
-    # Base command - authentication added via docker-compose.prod.yml overlay
+      # Note: Memgraph auth configured via docker-compose.prod.yml overlay
+      # (Memgraph fails on empty MEMGRAPH_USER, unlike Qdrant/Valkey)
     command:
       - --storage-snapshot-retention-count=2
       - --storage-wal-enabled=true
@@ -86,7 +87,7 @@ services:
       - omnimemory-network
     healthcheck:
       # Uses mgconsole to verify database is ready to accept Cypher queries
-      # (TCP-only check would pass even if database isn't query-ready)
+      # (Auth-aware health check is in docker-compose.prod.yml)
       test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port 7687 || exit 1"]
       interval: 30s
       timeout: 10s
