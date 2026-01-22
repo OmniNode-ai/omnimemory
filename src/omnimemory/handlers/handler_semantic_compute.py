@@ -58,7 +58,7 @@ from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
 from cachetools import LRUCache
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
 from ..models.config import ModelSemanticComputePolicyConfig
@@ -1051,27 +1051,35 @@ Return a JSON array of entities with: type, text, confidence (0-1), start, end."
             start_value = entity_data.get("start", 0)
             end_value = entity_data.get("end", 0)
 
-            entities.append(
-                ModelSemanticEntity(
-                    entity_type=entity_type,
-                    text=str(text_value) if text_value else "",
-                    confidence=min(
-                        1.0,
-                        max(
-                            0.0,
-                            float(confidence_value)
-                            if isinstance(confidence_value, int | float)
-                            else 0.8,
+            try:
+                entities.append(
+                    ModelSemanticEntity(
+                        entity_type=entity_type,
+                        text=str(text_value) if text_value else "",
+                        confidence=min(
+                            1.0,
+                            max(
+                                0.0,
+                                float(confidence_value)
+                                if isinstance(confidence_value, int | float)
+                                else 0.8,
+                            ),
                         ),
-                    ),
-                    span_start=int(start_value)
-                    if isinstance(start_value, int | float)
-                    else 0,
-                    span_end=int(end_value)
-                    if isinstance(end_value, int | float)
-                    else 0,
+                        span_start=int(start_value)
+                        if isinstance(start_value, int | float)
+                        else 0,
+                        span_end=int(end_value)
+                        if isinstance(end_value, int | float)
+                        else 0,
+                    )
                 )
-            )
+            except (ValueError, ValidationError) as e:
+                logger.warning(
+                    "Skipping invalid entity from LLM response: %s (error: %s)",
+                    entity_data,
+                    e,
+                )
+                continue
 
         return entities
 
