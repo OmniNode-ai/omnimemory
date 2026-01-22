@@ -204,24 +204,33 @@ class TestProviderRateLimiter:
     @pytest.mark.asyncio
     async def test_get_reset_time_with_requests(
         self,
-        limiter: ProviderRateLimiter,
+        config: ModelRateLimiterConfig,
     ) -> None:
-        """Test reset time after requests.
+        """Test reset time after requests using mocked time.
 
-        Note:
-            Uses a wide tolerance (55-60 seconds) to handle CI environments
-            where scheduling delays may occur between try_acquire() and
-            get_reset_time() calls. The key invariant is that reset time
-            should be close to 60 seconds, not exactly 60.
+        Uses mocked time.monotonic to make the test deterministic and
+        avoid flakiness in CI environments where scheduling delays could
+        cause timing-based assertions to fail.
         """
-        await limiter.try_acquire()
-        reset_time = limiter.get_reset_time()
-        # Reset time should be close to 60 seconds.
-        # Use wide tolerance (55s) for CI environments with potential delays.
-        # Upper bound of 60.1s accounts for floating-point precision.
-        assert (
-            55.0 <= reset_time <= 60.1
-        ), f"Reset time {reset_time:.2f}s outside expected range [55.0, 60.1]"
+        from unittest.mock import patch
+
+        # Create a fresh limiter for this test (not the fixture)
+        # so we control the timing from the start
+        with patch(
+            "omnimemory.handlers.adapters.adapter_rate_limiter.time.monotonic"
+        ) as mock_time:
+            mock_time.return_value = 1000.0  # Fixed start time
+            limiter = ProviderRateLimiter(config)
+
+            # Acquire at t=1000.0
+            await limiter.try_acquire()
+
+            # Simulate 5 seconds passing
+            mock_time.return_value = 1005.0
+            reset_time = limiter.get_reset_time()
+
+            # Should be 55 seconds until the oldest request expires (60 - 5 = 55)
+            assert reset_time == pytest.approx(55.0, abs=0.1)
 
     @pytest.mark.asyncio
     async def test_acquire_blocks_when_limited(self) -> None:

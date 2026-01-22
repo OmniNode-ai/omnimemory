@@ -26,13 +26,11 @@ from omnimemory.models.config.model_postgres_config import ModelPostgresConfig
 from omnimemory.models.config.model_qdrant_config import ModelQdrantConfig
 from omnimemory.models.config.model_rate_limiter_config import (
     DEFAULT_REQUESTS_PER_MINUTE,
-    DEFAULT_TOKENS_PER_MINUTE,
     ModelRateLimiterConfig,
 )
 
 __all__ = [
     "DEFAULT_REQUESTS_PER_MINUTE",
-    "DEFAULT_TOKENS_PER_MINUTE",
     "EnumEmbeddingProviderType",
     "ModelEmbeddingHttpClientConfig",
     "ModelFilesystemConfig",

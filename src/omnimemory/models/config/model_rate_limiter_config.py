@@ -23,9 +23,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+__all__ = [
+    "DEFAULT_REQUESTS_PER_MINUTE",
+    "ModelRateLimiterConfig",
+]
+
 # Constants for rate limiting
 DEFAULT_REQUESTS_PER_MINUTE = 60
-DEFAULT_TOKENS_PER_MINUTE = 150_000  # OpenAI default for embeddings
 
 
 class ModelRateLimiterConfig(BaseModel):
