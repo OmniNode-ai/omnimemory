@@ -38,6 +38,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
+
+# Type alias for parsed YAML contract data
+YamlData = dict[str, object]
 
 # Core 8 node names - shared across node-related test modules
 CORE_8_NODES: list[str] = [
@@ -97,6 +101,62 @@ def implemented_nodes(nodes_dir: Path) -> list[str]:
 
 # Alias for backwards compatibility - prefer implemented_nodes
 nodes_with_contracts = implemented_nodes
+
+
+@pytest.fixture
+def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
+    """Load and parse contract.yaml for a parametrized node name.
+
+    This fixture reduces redundant YAML file reads across tests by loading
+    the contract data once per test. Use with pytest.mark.parametrize to
+    specify the node_name.
+
+    Usage:
+        @pytest.mark.parametrize("node_name", ["memory_storage_effect", "similarity_compute"])
+        def test_something(self, contract_data: YamlData, node_name: str) -> None:
+            # contract_data contains the parsed YAML
+            assert "name" in contract_data
+
+    Note:
+        The fixture accesses node_name from request.node.callspec.params,
+        so tests must have a 'node_name' parameter defined via parametrize.
+
+    Args:
+        request: Pytest fixture request object for accessing test parameters
+        nodes_dir: Path to the nodes directory (injected fixture)
+
+    Returns:
+        Parsed YAML data as a dictionary
+
+    Raises:
+        pytest.skip: If the contract file does not exist
+        ValueError: If the test is not parametrized with 'node_name'
+    """
+    # Extract node_name from parametrize
+    if (
+        not hasattr(request.node, "callspec")
+        or "node_name" not in request.node.callspec.params
+    ):
+        pytest.fail(
+            "contract_data fixture requires test to be parametrized with 'node_name'. "
+            "Use @pytest.mark.parametrize('node_name', [...]) on your test."
+        )
+
+    node_name: str = request.node.callspec.params["node_name"]
+    contract_path: Path = nodes_dir / node_name / "contract.yaml"
+
+    if not contract_path.exists():
+        pytest.skip(f"Contract file not yet implemented: {contract_path}")
+
+    with open(contract_path) as f:
+        data: YamlData = yaml.safe_load(f)
+
+    if not isinstance(data, dict):
+        pytest.fail(
+            f"Contract must be a dict, got {type(data).__name__}: {contract_path}"
+        )
+
+    return data
 
 
 def pytest_configure(config: pytest.Config) -> None:
