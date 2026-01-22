@@ -68,13 +68,13 @@ def get_all_contracts() -> list[str]:
 class TestContractVersionField:
     """Test contract_version field exists and has correct structure."""
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_contract_file_exists(self, node_name: str, nodes_dir: Path) -> None:
         """Verify contract.yaml exists for each migrated node."""
         contract_path: Path = nodes_dir / node_name / "contract.yaml"
         assert contract_path.exists(), f"Missing contract: {contract_path}"
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_contract_version_field_exists(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -87,7 +87,7 @@ class TestContractVersionField:
             "contract_version" in contract_data
         ), f"Contract must have 'contract_version' field (not 'version'): {node_name}"
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_contract_version_structure(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -121,7 +121,7 @@ class TestContractVersionField:
                 value >= 0
             ), f"contract_version.{field} must be non-negative: {node_name}"
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_no_legacy_version_field(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -137,7 +137,7 @@ class TestContractVersionField:
             f"should be 'contract_version': {node_name}"
         )
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_name_field_matches_node(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -148,7 +148,7 @@ class TestContractVersionField:
             f"got '{contract_data['name']}'"
         )
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_node_type_field_exists(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -176,6 +176,7 @@ class TestContractVersionValues:
             ("memory_storage_effect", "EFFECT"),
             ("similarity_compute", "COMPUTE"),
         ],
+        ids=["memory_retrieval_effect", "memory_storage_effect", "similarity_compute"],
     )
     def test_node_type_values(
         self, contract_data: YamlData, node_name: str, expected_type: str
@@ -186,7 +187,7 @@ class TestContractVersionValues:
             f"got '{contract_data.get('node_type')}'"
         )
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_contract_version_is_0_1_0(
         self, contract_data: YamlData, node_name: str
     ) -> None:
