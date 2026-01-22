@@ -367,26 +367,28 @@ class RateLimiterRegistry:
         key = (provider.lower().strip(), model.lower().strip())
         return self._limiters.get(key)
 
-    def remove(self, provider: str, model: str) -> bool:
+    async def remove(self, provider: str, model: str) -> bool:
         """Remove a rate limiter from the registry.
 
         Args:
-            provider: Provider identifier.
-            model: Model identifier.
+            provider: The provider name.
+            model: The model name.
 
         Returns:
             True if a limiter was removed, False if not found.
         """
         key = (provider.lower().strip(), model.lower().strip())
-        if key in self._limiters:
-            del self._limiters[key]
-            logger.info("Removed rate limiter for %s/%s", provider, model)
-            return True
-        return False
+        async with self._lock:
+            if key in self._limiters:
+                del self._limiters[key]
+                logger.info("Removed rate limiter for %s/%s", provider, model)
+                return True
+            return False
 
-    def clear(self) -> None:
+    async def clear(self) -> None:
         """Remove all rate limiters from the registry."""
-        self._limiters.clear()
+        async with self._lock:
+            self._limiters.clear()
         logger.info("Cleared all rate limiters from registry")
 
     @property

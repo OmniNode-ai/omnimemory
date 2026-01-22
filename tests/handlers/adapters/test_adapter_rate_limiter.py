@@ -335,16 +335,17 @@ class TestRateLimiterRegistry:
         await registry.get_or_create(provider="openai", model="test")
         assert registry.count == 1
 
-        removed = registry.remove("openai", "test")
+        removed = await registry.remove("openai", "test")
         assert removed is True
         assert registry.count == 0
 
-    def test_remove_returns_false_for_missing(
+    @pytest.mark.asyncio
+    async def test_remove_returns_false_for_missing(
         self,
         registry: RateLimiterRegistry,
     ) -> None:
         """Test remove returns False for non-existent limiter."""
-        removed = registry.remove("unknown", "unknown")
+        removed = await registry.remove("unknown", "unknown")
         assert removed is False
 
     @pytest.mark.asyncio
@@ -354,5 +355,5 @@ class TestRateLimiterRegistry:
         await registry.get_or_create(provider="openai", model="test2")
         assert registry.count == 2
 
-        registry.clear()
+        await registry.clear()
         assert registry.count == 0
