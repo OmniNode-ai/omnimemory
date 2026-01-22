@@ -115,7 +115,8 @@ services:
     networks:
       - omnimemory-network
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      # Auth-aware ping (works with or without VALKEY_PASSWORD set)
+      test: ["CMD", "sh", "-c", "valkey-cli ${VALKEY_PASSWORD:+-a $VALKEY_PASSWORD} ping"]
       interval: 30s
       timeout: 10s
       retries: 3
