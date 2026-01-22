@@ -158,7 +158,7 @@ def validate_contract_specification() -> dict[str, Any]:
         if not contract_path.exists():
             return {"success": False, "error": "contract.yaml not found"}
 
-        with open(contract_path) as f:
+        with open(contract_path, encoding="utf-8") as f:
             contract = yaml.safe_load(f)
 
         # Validate contract structure

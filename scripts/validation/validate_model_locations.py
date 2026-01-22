@@ -85,12 +85,28 @@ EXEMPTION_PATTERN = re.compile(r"#\s*omnimemory-model-exempt:", re.IGNORECASE)
 
 
 def is_path_allowed(filepath: Path) -> bool:
-    """Check if the file path is in an allowed location for Pydantic models."""
-    filepath_str = str(filepath)
+    """Check if the file path is in an allowed location for Pydantic models.
 
-    # Check static allowed paths
-    if any(allowed in filepath_str for allowed in ALLOWED_PATHS):
-        return True
+    Uses path normalization and explicit boundary checking to avoid
+    false positives from substring matching (e.g., 'models_extra' matching 'models/').
+    """
+    # Normalize to forward slashes for consistent matching
+    filepath_str = str(filepath).replace("\\", "/")
+
+    # Check static allowed paths with proper boundary matching
+    for allowed in ALLOWED_PATHS:
+        # Normalize allowed path
+        allowed_normalized = allowed.replace("\\", "/")
+        # Check if the path contains this allowed segment
+        if allowed_normalized in filepath_str:
+            # Verify it's a proper directory boundary, not a prefix of another name
+            # e.g., "models/" should not match "models_extra/"
+            idx = filepath_str.find(allowed_normalized)
+            if idx != -1:
+                # Either at the end or followed by a path separator
+                end_idx = idx + len(allowed_normalized)
+                if end_idx >= len(filepath_str) or allowed_normalized.endswith("/"):
+                    return True
 
     # Check dynamic node models pattern
     if NODE_MODELS_PATTERN.search(filepath_str):
@@ -108,20 +124,36 @@ class PydanticModelVisitor(ast.NodeVisitor):
         self.in_type_checking = False
 
     def visit_If(self, node: ast.If) -> None:
-        """Track TYPE_CHECKING blocks."""
-        # Check if this is a TYPE_CHECKING block
-        if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+        """Track TYPE_CHECKING blocks.
+
+        Handles multiple patterns for TYPE_CHECKING:
+        - Direct: if TYPE_CHECKING:
+        - Module-qualified: if typing.TYPE_CHECKING:
+        - Any module prefix: if <module>.TYPE_CHECKING:
+        """
+        # Check if this is a TYPE_CHECKING block using various patterns
+        if self._is_type_checking_test(node.test):
             # Don't visit inside TYPE_CHECKING blocks
             return
-        if isinstance(node.test, ast.Attribute):
-            if (
-                isinstance(node.test.value, ast.Name)
-                and node.test.value.id == "typing"
-                and node.test.attr == "TYPE_CHECKING"
-            ):
-                return
 
         self.generic_visit(node)
+
+    def _is_type_checking_test(self, test: ast.expr) -> bool:
+        """Check if an if-test is checking TYPE_CHECKING.
+
+        Handles:
+        - Direct name: TYPE_CHECKING
+        - Attribute access: typing.TYPE_CHECKING, foo.TYPE_CHECKING
+        """
+        # Pattern 1: Direct name (from typing import TYPE_CHECKING)
+        if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+            return True
+
+        # Pattern 2: Attribute access (typing.TYPE_CHECKING or any_module.TYPE_CHECKING)
+        if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+            return True
+
+        return False
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definitions to find Pydantic models."""

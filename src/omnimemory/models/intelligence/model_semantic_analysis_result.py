@@ -106,7 +106,8 @@ class ModelSemanticAnalysisResult(BaseModel):
         description="Version of the semantic model",
     )
     processing_time_ms: int = Field(
-        description="Time taken for semantic analysis",
+        ge=0,
+        description="Time taken for semantic analysis in milliseconds",
     )
 
     # Temporal information

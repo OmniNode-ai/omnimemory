@@ -154,7 +154,7 @@ def validate_contract(contract_path: Path) -> ContractValidationResult:
         return ContractValidationResult(False, f"Contract not found: {contract_path}")
 
     try:
-        with open(contract_path) as f:
+        with open(contract_path, encoding="utf-8") as f:
             data: dict = yaml.safe_load(f)
     except yaml.YAMLError as e:
         return ContractValidationResult(False, f"Invalid YAML: {e}")

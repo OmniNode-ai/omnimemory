@@ -64,6 +64,7 @@ class ModelIntelligenceAnalysis(BaseModel):
 
     # Processing information
     processing_time_ms: int = Field(
+        ge=0,
         description="Time taken to perform the analysis",
     )
     model_version: str = Field(
@@ -100,12 +101,15 @@ class ModelIntelligenceAnalysis(BaseModel):
     )
     validation_score: float | None = Field(
         default=None,
+        ge=0.0,
+        le=1.0,
         description="Validation score if validated",
     )
 
     # Usage tracking
     access_count: int = Field(
         default=0,
+        ge=0,
         description="Number of times this analysis has been accessed",
     )
     last_accessed_at: datetime | None = Field(
