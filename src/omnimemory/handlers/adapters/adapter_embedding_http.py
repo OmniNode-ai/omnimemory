@@ -262,6 +262,7 @@ class EmbeddingHttpClient:
         self._handler: HandlerHttpRest | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
+        self._rate_limiter: ProviderRateLimiter | None = None
 
         # Set up rate limiter if configured
         if rate_limiter is not None:
@@ -274,8 +275,6 @@ class EmbeddingHttpClient:
                 tokens_per_minute=config.rate_limit_tpm,
             )
             self._rate_limiter = ProviderRateLimiter(limiter_config)
-        else:
-            self._rate_limiter = None
 
     @property
     def config(self) -> ModelEmbeddingHttpClientConfig:
