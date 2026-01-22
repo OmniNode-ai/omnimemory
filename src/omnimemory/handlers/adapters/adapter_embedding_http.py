@@ -390,6 +390,7 @@ class EmbeddingHttpClient:
         self,
         text: str,
         correlation_id: UUID,
+        skip_dimension_validation: bool = False,
     ) -> list[float]:
         """Execute the embedding request without rate limiting.
 
@@ -399,6 +400,8 @@ class EmbeddingHttpClient:
         Args:
             text: The text to embed.
             correlation_id: Correlation ID for distributed tracing.
+            skip_dimension_validation: If True, skip dimension validation.
+                Used by health_check() to avoid warnings/errors from test text.
 
         Returns:
             A list of floats representing the embedding vector.
@@ -412,8 +415,17 @@ class EmbeddingHttpClient:
         envelope = self._build_envelope(text, correlation_id)
 
         try:
-            result = await self._handler.execute(envelope)  # type: ignore[union-attr]
-            return self._parse_response(result, correlation_id)
+            handler = self._handler
+            if handler is None:
+                raise EmbeddingClientError(
+                    "Client not initialized - call initialize() first"
+                )
+            result = await handler.execute(envelope)
+            return self._parse_response(
+                result,
+                correlation_id,
+                skip_dimension_validation=skip_dimension_validation,
+            )
 
         except InfraConnectionError as e:
             raise EmbeddingConnectionError(
@@ -466,12 +478,14 @@ class EmbeddingHttpClient:
         self,
         result: object,
         correlation_id: UUID,
+        skip_dimension_validation: bool = False,
     ) -> list[float]:
         """Parse the HTTP response to extract embedding vector.
 
         Args:
             result: The ModelHandlerOutput from HandlerHttp.
             correlation_id: Correlation ID for logging.
+            skip_dimension_validation: If True, skip dimension validation.
 
         Returns:
             The embedding vector.
@@ -520,12 +534,17 @@ class EmbeddingHttpClient:
 
         # Extract embedding from response body
         body = payload.get("body")
-        return self._extract_embedding(body, correlation_id)
+        return self._extract_embedding(
+            body,
+            correlation_id,
+            skip_dimension_validation=skip_dimension_validation,
+        )
 
     def _extract_embedding(
         self,
         body: object,
         correlation_id: UUID,
+        skip_dimension_validation: bool = False,
     ) -> list[float]:
         """Extract embedding vector from response body.
 
@@ -536,13 +555,17 @@ class EmbeddingHttpClient:
         Args:
             body: The response body (dict or list).
             correlation_id: Correlation ID for logging.
+            skip_dimension_validation: If True, skip dimension validation entirely.
+                Used by health_check() to avoid warnings/errors from test text
+                that may return embeddings with different dimensions than configured.
 
         Returns:
             The embedding vector.
 
         Raises:
             EmbeddingClientError: If embedding cannot be extracted, or if
-                strict_dimension_validation is enabled and dimension mismatches.
+                strict_dimension_validation is enabled and dimension mismatches
+                (unless skip_dimension_validation is True).
         """
         embedding: list[float] | None = None
 
@@ -575,15 +598,16 @@ class EmbeddingHttpClient:
                 f"(correlation_id={correlation_id})"
             )
 
-        # Validate dimension
-        if len(embedding) != self._config.embedding_dimension:
-            msg = (
-                f"Embedding dimension mismatch: expected {self._config.embedding_dimension}, "
-                f"got {len(embedding)} (correlation_id={correlation_id})"
-            )
-            if self._config.strict_dimension_validation:
-                raise EmbeddingClientError(msg)
-            logger.warning(msg)
+        # Validate dimension (skip for health checks to avoid spurious warnings)
+        if not skip_dimension_validation:
+            if len(embedding) != self._config.embedding_dimension:
+                msg = (
+                    f"Embedding dimension mismatch: expected {self._config.embedding_dimension}, "
+                    f"got {len(embedding)} (correlation_id={correlation_id})"
+                )
+                if self._config.strict_dimension_validation:
+                    raise EmbeddingClientError(msg)
+                logger.warning(msg)
 
         return embedding
 
@@ -640,10 +664,11 @@ class EmbeddingHttpClient:
             False otherwise (connection errors, timeouts, invalid responses).
 
         Note:
-            This method does NOT consume rate limit tokens. It directly
-            executes the embedding request to avoid impacting rate budgets
-            during health monitoring scenarios (e.g., Kubernetes liveness
-            probes, load balancer health checks).
+            This method does NOT consume rate limit tokens and does NOT
+            validate embedding dimensions. It directly executes the embedding
+            request to avoid impacting rate budgets and to prevent spurious
+            warnings during health monitoring scenarios (e.g., Kubernetes
+            liveness probes, load balancer health checks).
         """
         # Ensure initialized
         if not self._initialized:
@@ -654,7 +679,10 @@ class EmbeddingHttpClient:
         try:
             # Use a minimal test phrase for health check
             # Bypasses rate limiter by calling internal method directly
-            await self._execute_embedding_request("health", cid)
+            # Skips dimension validation to avoid warnings from test text
+            await self._execute_embedding_request(
+                "health", cid, skip_dimension_validation=True
+            )
             return True
         except EmbeddingClientError:
             return False

@@ -853,3 +853,83 @@ class TestEmbeddingHttpClientHealthCheck:
                 # Verify the request used "health" as the test text
                 call_args = mock_handler.execute.call_args[0][0]
                 assert call_args["payload"]["body"] == {"text": "health"}
+
+    @pytest.mark.asyncio
+    async def test_health_check_skips_dimension_validation(
+        self,
+        mock_handler: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test health check skips dimension validation even with mismatch.
+
+        Health checks use arbitrary test text ("health") which may return
+        embeddings with different dimensions than configured. The health
+        check should NOT log warnings or raise errors for dimension mismatch.
+        """
+        # Config expects 1024 dimensions
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            embedding_dimension=1024,
+            strict_dimension_validation=False,
+        )
+
+        # But health check response returns 512 dimensions (mismatch)
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 200,
+                "body": {"embedding": [0.1] * 512},  # Different dimension!
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Health check should succeed despite dimension mismatch
+                is_healthy = await client.health_check()
+                assert is_healthy is True
+
+        # No dimension mismatch warning should be logged
+        assert "dimension mismatch" not in caplog.text.lower()
+
+    @pytest.mark.asyncio
+    async def test_health_check_skips_dimension_validation_strict_mode(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test health check skips dimension validation even in strict mode.
+
+        Even when strict_dimension_validation is enabled, health checks should
+        NOT raise errors for dimension mismatch since the test text may return
+        different dimensions than real content.
+        """
+        # Config expects 1024 dimensions with STRICT validation
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            embedding_dimension=1024,
+            strict_dimension_validation=True,  # Strict mode enabled
+        )
+
+        # But health check response returns 512 dimensions (mismatch)
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 200,
+                "body": {"embedding": [0.1] * 512},  # Different dimension!
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Health check should succeed despite strict mode + mismatch
+                is_healthy = await client.health_check()
+                assert is_healthy is True
