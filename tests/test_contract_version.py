@@ -38,6 +38,39 @@ MIGRATED_CONTRACTS: list[str] = [
 ]
 
 
+def _assert_valid_contract_version(contract_version: object, node_name: str) -> None:
+    """Assert contract_version has valid structure with major, minor, patch.
+
+    Validates that the contract_version field:
+    - Is not None
+    - Is a dict
+    - Contains major, minor, patch fields
+    - All version fields are non-negative integers
+
+    Args:
+        contract_version: The contract_version value from the YAML contract.
+        node_name: Name of the node for error messages.
+
+    Raises:
+        AssertionError: If any validation fails.
+    """
+    assert contract_version is not None, f"contract_version field is None: {node_name}"
+    assert isinstance(
+        contract_version, dict
+    ), f"contract_version must be a dict with major/minor/patch: {node_name}"
+
+    for field in ("major", "minor", "patch"):
+        assert (
+            field in contract_version
+        ), f"contract_version missing '{field}' field: {node_name}"
+        value: object = contract_version[field]
+        assert isinstance(value, int), (
+            f"contract_version.{field} must be an integer, "
+            f"got {type(value).__name__}: {node_name}"
+        )
+        assert value >= 0, f"contract_version.{field} must be non-negative: {node_name}"
+
+
 def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
     """Discover all contracts in the nodes directory dynamically.
 
@@ -99,27 +132,7 @@ class TestContractVersionField:
         - patch: int
         """
         contract_version: object | None = contract_data.get("contract_version")
-        assert (
-            contract_version is not None
-        ), f"contract_version field is None: {node_name}"
-        assert isinstance(
-            contract_version, dict
-        ), f"contract_version must be a dict with major/minor/patch: {node_name}"
-
-        # Verify required version components
-        required_fields: list[str] = ["major", "minor", "patch"]
-        for field in required_fields:
-            assert (
-                field in contract_version
-            ), f"contract_version missing '{field}' field: {node_name}"
-            value: object = contract_version[field]
-            assert isinstance(value, int), (
-                f"contract_version.{field} must be an integer, "
-                f"got {type(value).__name__}: {node_name}"
-            )
-            assert (
-                value >= 0
-            ), f"contract_version.{field} must be non-negative: {node_name}"
+        _assert_valid_contract_version(contract_version, node_name)
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_no_legacy_version_field(
@@ -174,22 +187,34 @@ class TestContractVersionField:
         The migration only affects root-level 'version' field. Nested version
         fields in tool_specification or event_type are intentionally kept as
         they serve different purposes.
+
+        Version can be either:
+        - A string (legacy format, e.g., "1.0.0")
+        - A dict with major/minor/patch structure (YAML contract format)
         """
         # Check tool_specification.version if present (should be preserved)
         tool_spec: object = contract_data.get("tool_specification")
         if isinstance(tool_spec, dict) and "version" in tool_spec:
             version = tool_spec["version"]
+            # Version can be either a string or a structured dict
             assert isinstance(
-                version, str
-            ), f"tool_specification.version should be a string: {node_name}"
+                version, str | dict
+            ), f"tool_specification.version should be a string or dict: {node_name}"
+            if isinstance(version, dict):
+                _assert_valid_contract_version(
+                    version, f"{node_name}/tool_specification"
+                )
 
         # Check event_type.version if present (should be preserved)
         event_type: object = contract_data.get("event_type")
         if isinstance(event_type, dict) and "version" in event_type:
             version = event_type["version"]
+            # Version can be either a string or a structured dict
             assert isinstance(
-                version, str
-            ), f"event_type.version should be a string: {node_name}"
+                version, str | dict
+            ), f"event_type.version should be a string or dict: {node_name}"
+            if isinstance(version, dict):
+                _assert_valid_contract_version(version, f"{node_name}/event_type")
 
 
 class TestContractVersionValues:
@@ -287,25 +312,7 @@ class TestAllContractsDiscovery:
         - patch: int (non-negative)
         """
         contract_version: object | None = contract_data.get("contract_version")
-        assert (
-            contract_version is not None
-        ), f"contract_version field is None: {node_name}"
-        assert isinstance(
-            contract_version, dict
-        ), f"contract_version must be a dict: {node_name}"
-
-        for field in ("major", "minor", "patch"):
-            assert (
-                field in contract_version
-            ), f"contract_version missing '{field}': {node_name}"
-            value: object = contract_version[field]
-            assert isinstance(value, int), (
-                f"contract_version.{field} must be int, "
-                f"got {type(value).__name__}: {node_name}"
-            )
-            assert (
-                value >= 0
-            ), f"contract_version.{field} must be non-negative: {node_name}"
+        _assert_valid_contract_version(contract_version, node_name)
 
     @pytest.mark.parametrize(
         "node_name",
@@ -320,3 +327,8 @@ class TestAllContractsDiscovery:
             f"Contract has legacy 'version' field - "
             f"should use 'contract_version': {node_name}"
         )
+
+    def test_get_all_contracts_nonexistent_dir(self, tmp_path: Path) -> None:
+        """Verify get_all_contracts returns empty list for nonexistent dir."""
+        result = get_all_contracts(tmp_path / "nonexistent")
+        assert result == []
