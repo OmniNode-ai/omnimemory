@@ -122,6 +122,11 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
         The fixture accesses node_name from request.node.callspec.params,
         so tests must have a 'node_name' parameter defined via parametrize.
 
+    When to use:
+        Use this fixture for parametrized tests that iterate over multiple contracts.
+        For single-contract tests or non-parametrized tests, load the YAML file
+        directly with yaml.safe_load() to avoid the parametrize requirement overhead.
+
     Args:
         request: Pytest fixture request object for accessing test parameters
         nodes_dir: Path to the nodes directory (injected fixture)

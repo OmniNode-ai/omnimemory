@@ -69,6 +69,9 @@ def _assert_valid_contract_version(contract_version: object, node_name: str) -> 
             f"got {type(value).__name__}: {node_name}"
         )
         assert value >= 0, f"contract_version.{field} must be non-negative: {node_name}"
+        assert (
+            value < 10000
+        ), f"contract_version.{field} seems unreasonably large ({value}): {node_name}"
 
 
 def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
