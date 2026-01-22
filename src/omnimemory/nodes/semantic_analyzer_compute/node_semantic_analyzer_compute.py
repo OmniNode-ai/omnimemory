@@ -38,7 +38,7 @@ Example::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, assert_never
+from typing import TYPE_CHECKING
 
 from ..base import BaseComputeNode, ContainerType
 from .handlers import HandlerSemanticCompute, ModelHandlerSemanticComputeConfig
@@ -197,7 +197,13 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
                     )
 
                 case _:
-                    assert_never(request.operation)
+                    # Defensive handling for type safety - Pydantic validates Literal types,
+                    # but this provides a clear error if reached (e.g., deserialization bypass)
+                    return ModelSemanticAnalyzerComputeResponse(
+                        status="error",
+                        operation=request.operation,
+                        error_message=f"Unknown operation: {request.operation}",
+                    )
 
         except ValueError as e:
             return ModelSemanticAnalyzerComputeResponse(

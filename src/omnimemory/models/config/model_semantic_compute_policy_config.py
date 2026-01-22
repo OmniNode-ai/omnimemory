@@ -140,7 +140,7 @@ class ModelSemanticComputePolicyConfig(BaseModel):
         default=3600,
         ge=60,
         le=86400,
-        description="Cache time-to-live in seconds",
+        description="Cache time-to-live in seconds (not yet implemented; reserved for future TTL-based cache expiration)",
     )
 
     cache_key_include_model: bool = Field(
