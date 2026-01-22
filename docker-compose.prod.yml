@@ -29,11 +29,11 @@ services:
     # Services should connect via omnimemory-network using service name
     ports: !override []
     expose:
-      - "6333"
-      - "6334"
+      - "${QDRANT_HTTP_PORT:-6333}"
+      - "${QDRANT_GRPC_PORT:-6334}"
     environment:
-      QDRANT__SERVICE__HTTP_PORT: 6333
-      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__HTTP_PORT: ${QDRANT_HTTP_PORT:-6333}
+      QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
       QDRANT__SERVICE__HOST: 0.0.0.0
       QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
       QDRANT__STORAGE__ON_DISK_PAYLOAD: true
@@ -41,8 +41,9 @@ services:
       # REQUIRED - service will fail without this
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?QDRANT_API_KEY is required for production}
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && echo -e 'GET /readyz HTTP/1.1\\r\\nHost:
-          localhost:6333\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q 'ready'"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/${QDRANT_HTTP_PORT:-6333} && echo -e 'GET
+          /readyz HTTP/1.1\\r\\nHost: localhost:${QDRANT_HTTP_PORT:-6333}\\r\\n\\r\\n' >&3 && timeout
+          2 cat <&3 | grep -q 'ready'"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -50,11 +51,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4.0'
-          memory: 4G
+          cpus: '${QDRANT_PROD_CPU_LIMIT:-4.0}'
+          memory: ${QDRANT_PROD_MEMORY_LIMIT:-4G}
         reservations:
-          cpus: '0.5'
-          memory: 1G
+          cpus: '${QDRANT_PROD_CPU_RESERVATION:-0.5}'
+          memory: ${QDRANT_PROD_MEMORY_RESERVATION:-1G}
     restart: always
 
   # Memgraph Database - Production Configuration
@@ -63,12 +64,12 @@ services:
     # Remove host port exposure - internal network only
     ports: !override []
     expose:
-      - "7687"
-      - "7444"
+      - "${MEMGRAPH_BOLT_PORT:-7687}"
+      - "${MEMGRAPH_HTTP_PORT:-7444}"
     environment:
-      MEMGRAPH_BOLT_PORT: 7687
-      MEMGRAPH_HTTP_PORT: 7444
-      MEMGRAPH_MEMORY_LIMIT: 8192
+      MEMGRAPH_BOLT_PORT: ${MEMGRAPH_BOLT_PORT:-7687}
+      MEMGRAPH_HTTP_PORT: ${MEMGRAPH_HTTP_PORT:-7444}
+      MEMGRAPH_MEMORY_LIMIT: ${MEMGRAPH_PROD_MEMORY_LIMIT_MB:-8192}
       # REQUIRED - service will fail without these
       MEMGRAPH_USER: ${MEMGRAPH_USER:?MEMGRAPH_USER is required for production}
       MEMGRAPH_PASSWORD: ${MEMGRAPH_PASSWORD:?MEMGRAPH_PASSWORD is required for production}
@@ -76,15 +77,16 @@ services:
       - --storage-snapshot-retention-count=3
       - --storage-wal-enabled=true
       - --storage-snapshot-interval-sec=1800
+      - --bolt-port=${MEMGRAPH_BOLT_PORT:-7687}
       # Production performance tuning
       - --log-level=WARNING
-      - --query-execution-timeout-sec=600
+      - --query-execution-timeout-sec=${MEMGRAPH_QUERY_TIMEOUT_SEC:-600}
       # Authentication enforcement
       - --auth-user-or-role-regex=.+
     healthcheck:
       # Production health check with authentication
-      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port 7687 --username
-          $MEMGRAPH_USER --password $MEMGRAPH_PASSWORD || exit 1"]
+      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port ${MEMGRAPH_BOLT_PORT:-7687}
+          --username $MEMGRAPH_USER --password $MEMGRAPH_PASSWORD || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -92,11 +94,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4.0'
-          memory: 8G
+          cpus: '${MEMGRAPH_PROD_CPU_LIMIT:-4.0}'
+          memory: ${MEMGRAPH_PROD_MEMORY_LIMIT:-8G}
         reservations:
-          cpus: '0.5'
-          memory: 1G
+          cpus: '${MEMGRAPH_PROD_CPU_RESERVATION:-0.5}'
+          memory: ${MEMGRAPH_PROD_MEMORY_RESERVATION:-1G}
     restart: always
 
   # Valkey In-Memory Data Store - Production Configuration
@@ -105,13 +107,13 @@ services:
     # Remove host port exposure - internal network only
     ports: !override []
     expose:
-      - "6379"
+      - "${VALKEY_PORT:-6379}"
     command: >
-      valkey-server --appendonly yes --requirepass ${VALKEY_PASSWORD:?VALKEY_PASSWORD is required for
-      production}
+      valkey-server --port ${VALKEY_PORT:-6379} --appendonly yes --requirepass ${VALKEY_PASSWORD:?VALKEY_PASSWORD
+      is required for production}
     healthcheck:
       # Ping with authentication (password passed via env var to avoid exposure in process listing)
-      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=$VALKEY_PASSWORD valkey-cli ping"]
+      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=$VALKEY_PASSWORD valkey-cli -p ${VALKEY_PORT:-6379} ping"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -119,11 +121,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
+          cpus: '${VALKEY_PROD_CPU_LIMIT:-2.0}'
+          memory: ${VALKEY_PROD_MEMORY_LIMIT:-2G}
         reservations:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '${VALKEY_PROD_CPU_RESERVATION:-0.25}'
+          memory: ${VALKEY_PROD_MEMORY_RESERVATION:-256M}
     restart: always
 
 networks:
