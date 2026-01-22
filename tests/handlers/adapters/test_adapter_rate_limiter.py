@@ -381,12 +381,13 @@ class TestRateLimiterRegistry:
         )
         assert limiter1 is limiter2
 
-    def test_get_returns_none_for_missing(
+    @pytest.mark.asyncio
+    async def test_get_returns_none_for_missing(
         self,
         registry: RateLimiterRegistry,
     ) -> None:
         """Test get returns None for non-existent limiter."""
-        result = registry.get("unknown", "unknown")
+        result = await registry.get("unknown", "unknown")
         assert result is None
 
     @pytest.mark.asyncio
@@ -399,7 +400,7 @@ class TestRateLimiterRegistry:
             provider="openai",
             model="test",
         )
-        result = registry.get("openai", "test")
+        result = await registry.get("openai", "test")
         assert result is not None
 
     @pytest.mark.asyncio

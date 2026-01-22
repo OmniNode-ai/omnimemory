@@ -375,8 +375,11 @@ class RateLimiterRegistry:
 
             return self._limiters[key]
 
-    def get(self, provider: str, model: str) -> ProviderRateLimiter | None:
+    async def get(self, provider: str, model: str) -> ProviderRateLimiter | None:
         """Get existing rate limiter without creating.
+
+        This is an async method for consistency with other registry methods
+        that access shared state under the async lock.
 
         Args:
             provider: Provider identifier.
@@ -386,7 +389,8 @@ class RateLimiterRegistry:
             The rate limiter if it exists, None otherwise.
         """
         key = (provider.lower().strip(), model.lower().strip())
-        return self._limiters.get(key)
+        async with self._lock:
+            return self._limiters.get(key)
 
     async def remove(self, provider: str, model: str) -> bool:
         """Remove a rate limiter from the registry.

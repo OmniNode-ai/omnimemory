@@ -124,6 +124,55 @@ def mock_openai_result() -> MagicMock:
 
 
 # =============================================================================
+# Protocol Conformance Tests
+# =============================================================================
+
+
+class TestProtocolConformance:
+    """Tests verifying protocol conformance for embedding and rate limiting."""
+
+    def test_embedding_http_client_implements_protocol(self) -> None:
+        """Verify EmbeddingHttpClient conforms to ProtocolEmbeddingClient.
+
+        Uses runtime_checkable Protocol to verify structural conformance.
+        This ensures the adapter properly implements the contract boundary.
+        """
+        from omnimemory.protocols import ProtocolEmbeddingClient
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8000",
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+        ):
+            client = EmbeddingHttpClient(config)
+
+            assert isinstance(
+                client, ProtocolEmbeddingClient
+            ), "EmbeddingHttpClient must implement ProtocolEmbeddingClient protocol"
+
+    def test_provider_rate_limiter_implements_protocol(self) -> None:
+        """Verify ProviderRateLimiter conforms to ProtocolRateLimiter.
+
+        Uses runtime_checkable Protocol to verify structural conformance.
+        This ensures the rate limiter properly implements the contract boundary.
+        """
+        from omnimemory.protocols import ProtocolRateLimiter
+
+        config = ModelRateLimiterConfig(
+            provider="test",
+            model="test-model",
+            requests_per_minute=60,
+        )
+        limiter = ProviderRateLimiter(config)
+
+        assert isinstance(
+            limiter, ProtocolRateLimiter
+        ), "ProviderRateLimiter must implement ProtocolRateLimiter protocol"
+
+
+# =============================================================================
 # Configuration Tests
 # =============================================================================
 
