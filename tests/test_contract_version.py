@@ -18,12 +18,15 @@ PR Reference: #19 - YAML contract version migration
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-import yaml
 
-# Node directory path - use Path(__file__) for CWD independence
-NODES_DIR: Path = Path(__file__).parent.parent / "src" / "omnimemory" / "nodes"
+# Import shared constants from conftest
+from tests.conftest import NODES_DIR
+
+if TYPE_CHECKING:
+    from tests.shared_types import YamlData
 
 # Contracts that were migrated in PR #19 (OMN-1436)
 # NOTE: This list tracks specific contracts from the migration. For comprehensive
@@ -62,40 +65,32 @@ def get_all_contracts() -> list[str]:
     return sorted(contracts)
 
 
-# Type alias for YAML data
-YamlData = dict[str, object]
-
-
 class TestContractVersionField:
     """Test contract_version field exists and has correct structure."""
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_contract_file_exists(self, node_name: str) -> None:
+    def test_contract_file_exists(self, node_name: str, nodes_dir: Path) -> None:
         """Verify contract.yaml exists for each migrated node."""
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        contract_path: Path = nodes_dir / node_name / "contract.yaml"
         assert contract_path.exists(), f"Missing contract: {contract_path}"
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_contract_version_field_exists(self, node_name: str) -> None:
+    def test_contract_version_field_exists(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify contract_version field exists (not legacy version field).
 
         After OMN-1436 migration, contracts must use contract_version
         instead of root-level version field.
         """
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert isinstance(data, dict), f"Contract must be a dict: {node_name}"
         assert (
-            "contract_version" in data
+            "contract_version" in contract_data
         ), f"Contract must have 'contract_version' field (not 'version'): {node_name}"
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_contract_version_structure(self, node_name: str) -> None:
+    def test_contract_version_structure(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify contract_version has major, minor, patch structure.
 
         The contract_version field must be a dict with:
@@ -103,14 +98,7 @@ class TestContractVersionField:
         - minor: int
         - patch: int
         """
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        contract_version: object | None = data.get("contract_version")
+        contract_version: object | None = contract_data.get("contract_version")
         assert (
             contract_version is not None
         ), f"contract_version field is None: {node_name}"
@@ -134,7 +122,9 @@ class TestContractVersionField:
             ), f"contract_version.{field} must be non-negative: {node_name}"
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_no_legacy_version_field(self, node_name: str) -> None:
+    def test_no_legacy_version_field(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify no legacy root-level 'version' field exists.
 
         After migration, contracts should not have a root-level 'version'
@@ -142,45 +132,31 @@ class TestContractVersionField:
 
         Note: tool_specification.version is still valid and separate.
         """
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert "version" not in data, (
+        assert "version" not in contract_data, (
             f"Contract has legacy root-level 'version' field - "
             f"should be 'contract_version': {node_name}"
         )
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_name_field_matches_node(self, node_name: str) -> None:
+    def test_name_field_matches_node(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify name field matches expected node name."""
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert "name" in data, f"Contract must have 'name' field: {node_name}"
-        assert data["name"] == node_name, (
-            f"Contract name mismatch: expected '{node_name}', " f"got '{data['name']}'"
+        assert "name" in contract_data, f"Contract must have 'name' field: {node_name}"
+        assert contract_data["name"] == node_name, (
+            f"Contract name mismatch: expected '{node_name}', "
+            f"got '{contract_data['name']}'"
         )
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_node_type_field_exists(self, node_name: str) -> None:
+    def test_node_type_field_exists(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify node_type field exists."""
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert "node_type" in data, f"Contract must have 'node_type' field: {node_name}"
-        node_type: object = data["node_type"]
+        assert (
+            "node_type" in contract_data
+        ), f"Contract must have 'node_type' field: {node_name}"
+        node_type: object = contract_data["node_type"]
         assert isinstance(node_type, str), f"node_type must be a string: {node_name}"
         assert node_type in (
             "EFFECT",
@@ -201,34 +177,24 @@ class TestContractVersionValues:
             ("similarity_compute", "COMPUTE"),
         ],
     )
-    def test_node_type_values(self, node_name: str, expected_type: str) -> None:
+    def test_node_type_values(
+        self, contract_data: YamlData, node_name: str, expected_type: str
+    ) -> None:
         """Verify each contract has the expected node_type."""
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert data.get("node_type") == expected_type, (
+        assert contract_data.get("node_type") == expected_type, (
             f"Expected node_type '{expected_type}' for {node_name}, "
-            f"got '{data.get('node_type')}'"
+            f"got '{contract_data.get('node_type')}'"
         )
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS)
-    def test_contract_version_is_0_1_0(self, node_name: str) -> None:
+    def test_contract_version_is_0_1_0(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify all migrated contracts have version 0.1.0.
 
         All three contracts in this migration have contract_version 0.1.0.
         """
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        contract_version: object = data.get("contract_version", {})
+        contract_version: object = contract_data.get("contract_version", {})
         if isinstance(contract_version, dict):
             major: object | None = contract_version.get("major")
             minor: object | None = contract_version.get("minor")
@@ -249,14 +215,10 @@ class TestAllContractsDiscovery:
     without requiring manual updates to test lists.
     """
 
-    def test_get_all_contracts_returns_list(self) -> None:
-        """Verify get_all_contracts returns a list."""
+    def test_get_all_contracts_behavior(self) -> None:
+        """Verify get_all_contracts returns expected list with migrated contracts."""
         contracts = get_all_contracts()
         assert isinstance(contracts, list), "get_all_contracts must return a list"
-
-    def test_get_all_contracts_finds_existing(self) -> None:
-        """Verify get_all_contracts finds at least the migrated contracts."""
-        contracts = get_all_contracts()
         for node_name in MIGRATED_CONTRACTS:
             assert node_name in contracts, (
                 f"get_all_contracts() should find '{node_name}' "
@@ -268,21 +230,16 @@ class TestAllContractsDiscovery:
         get_all_contracts(),
         ids=lambda x: x,
     )
-    def test_discovered_contract_has_contract_version(self, node_name: str) -> None:
+    def test_discovered_contract_has_contract_version(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify all discovered contracts have contract_version field.
 
         This test automatically validates any new contracts added to the
         nodes directory, ensuring they follow the contract_version standard.
         """
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        assert contract_path.exists(), f"Contract file missing: {contract_path}"
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert isinstance(data, dict), f"Contract must be a dict: {node_name}"
         assert (
-            "contract_version" in data
+            "contract_version" in contract_data
         ), f"Contract must have 'contract_version' field: {node_name}"
 
     @pytest.mark.parametrize(
@@ -290,7 +247,9 @@ class TestAllContractsDiscovery:
         get_all_contracts(),
         ids=lambda x: x,
     )
-    def test_discovered_contract_version_structure(self, node_name: str) -> None:
+    def test_discovered_contract_version_structure(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify all discovered contracts have valid contract_version structure.
 
         The contract_version field must be a dict with:
@@ -298,14 +257,7 @@ class TestAllContractsDiscovery:
         - minor: int (non-negative)
         - patch: int (non-negative)
         """
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"Contract not found: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        contract_version: object | None = data.get("contract_version")
+        contract_version: object | None = contract_data.get("contract_version")
         assert (
             contract_version is not None
         ), f"contract_version field is None: {node_name}"
@@ -331,16 +283,11 @@ class TestAllContractsDiscovery:
         get_all_contracts(),
         ids=lambda x: x,
     )
-    def test_discovered_contract_no_legacy_version(self, node_name: str) -> None:
+    def test_discovered_contract_no_legacy_version(
+        self, contract_data: YamlData, node_name: str
+    ) -> None:
         """Verify discovered contracts do not have legacy root-level version field."""
-        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
-        if not contract_path.exists():
-            pytest.skip(f"Contract not found: {contract_path}")
-
-        with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
-
-        assert "version" not in data, (
+        assert "version" not in contract_data, (
             f"Contract has legacy 'version' field - "
             f"should use 'contract_version': {node_name}"
         )

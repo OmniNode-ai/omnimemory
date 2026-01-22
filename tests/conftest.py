@@ -36,12 +36,13 @@ what implementations are pending.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
 
-# Type alias for parsed YAML contract data
-YamlData = dict[str, object]
+if TYPE_CHECKING:
+    from tests.shared_types import YamlData
 
 # Core 8 node names - shared across node-related test modules
 CORE_8_NODES: list[str] = [
