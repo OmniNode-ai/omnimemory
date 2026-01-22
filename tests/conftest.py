@@ -138,9 +138,8 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
         not hasattr(request.node, "callspec")
         or "node_name" not in request.node.callspec.params
     ):
-        pytest.fail(
-            "contract_data fixture requires test to be parametrized with 'node_name'. "
-            "Use @pytest.mark.parametrize('node_name', [...]) on your test."
+        raise ValueError(
+            "contract_data fixture requires 'node_name' parameter via @pytest.mark.parametrize"
         )
 
     node_name: str = request.node.callspec.params["node_name"]

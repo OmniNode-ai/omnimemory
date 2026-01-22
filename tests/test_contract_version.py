@@ -38,11 +38,15 @@ MIGRATED_CONTRACTS: list[str] = [
 ]
 
 
-def get_all_contracts() -> list[str]:
+def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
     """Discover all contracts in the nodes directory dynamically.
 
-    Scans NODES_DIR for all subdirectories containing a contract.yaml file
-    and returns the list of node names (parent directory names).
+    Scans the specified nodes directory (or NODES_DIR if not provided) for all
+    subdirectories containing a contract.yaml file and returns the list of node
+    names (parent directory names).
+
+    Args:
+        nodes_dir: Optional path to the nodes directory. Defaults to NODES_DIR.
 
     Returns:
         list[str]: List of node names that have contract.yaml files.
@@ -52,11 +56,12 @@ def get_all_contracts() -> list[str]:
         >>> print(contracts)
         ['memory_retrieval_effect', 'memory_storage_effect', 'similarity_compute']
     """
-    if not NODES_DIR.exists():
+    base = nodes_dir if nodes_dir is not None else NODES_DIR
+    if not base.exists():
         return []
 
     contracts: list[str] = []
-    for node_dir in NODES_DIR.iterdir():
+    for node_dir in base.iterdir():
         if node_dir.is_dir():
             contract_path = node_dir / "contract.yaml"
             if contract_path.exists():
@@ -196,15 +201,17 @@ class TestContractVersionValues:
         All three contracts in this migration have contract_version 0.1.0.
         """
         contract_version: object = contract_data.get("contract_version", {})
-        if isinstance(contract_version, dict):
-            major: object | None = contract_version.get("major")
-            minor: object | None = contract_version.get("minor")
-            patch: object | None = contract_version.get("patch")
+        assert isinstance(
+            contract_version, dict
+        ), f"contract_version must be a dict: {node_name}"
+        major: object | None = contract_version.get("major")
+        minor: object | None = contract_version.get("minor")
+        patch: object | None = contract_version.get("patch")
 
-            assert (major, minor, patch) == (0, 1, 0), (
-                f"Expected contract_version 0.1.0, "
-                f"got {major}.{minor}.{patch}: {node_name}"
-            )
+        assert (major, minor, patch) == (0, 1, 0), (
+            f"Expected contract_version 0.1.0, "
+            f"got {major}.{minor}.{patch}: {node_name}"
+        )
 
 
 class TestAllContractsDiscovery:
@@ -229,7 +236,7 @@ class TestAllContractsDiscovery:
     @pytest.mark.parametrize(
         "node_name",
         get_all_contracts(),
-        ids=lambda x: x,
+        ids=str,
     )
     def test_discovered_contract_has_contract_version(
         self, contract_data: YamlData, node_name: str
@@ -246,7 +253,7 @@ class TestAllContractsDiscovery:
     @pytest.mark.parametrize(
         "node_name",
         get_all_contracts(),
-        ids=lambda x: x,
+        ids=str,
     )
     def test_discovered_contract_version_structure(
         self, contract_data: YamlData, node_name: str
@@ -282,7 +289,7 @@ class TestAllContractsDiscovery:
     @pytest.mark.parametrize(
         "node_name",
         get_all_contracts(),
-        ids=lambda x: x,
+        ids=str,
     )
     def test_discovered_contract_no_legacy_version(
         self, contract_data: YamlData, node_name: str
