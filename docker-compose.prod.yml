@@ -1,0 +1,131 @@
+---
+# ============================================================================
+# OmniMemory - Production Configuration
+# ============================================================================
+# Purpose: Secure production deployment with authentication REQUIRED
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# REQUIRED ENVIRONMENT VARIABLES:
+# - QDRANT_API_KEY: API key for Qdrant access (min 32 characters recommended)
+# - MEMGRAPH_USER: Username for Memgraph authentication
+# - MEMGRAPH_PASSWORD: Password for Memgraph authentication (min 8 characters)
+# - VALKEY_PASSWORD: Password for Valkey access
+#
+# Without these variables, services will FAIL to start.
+#
+# SECURITY NOTES:
+# - Ports are NOT exposed on host - services communicate via internal network
+# - All services require authentication
+# - Health checks are more aggressive for faster failure detection
+# - Resource limits are tighter for production workloads
+# ============================================================================
+name: omnimemory-prod
+
+services:
+  # Qdrant Vector Database - Production Configuration
+  qdrant:
+    container_name: omnimemory-prod-qdrant
+    # Remove host port exposure - internal network only
+    # Services should connect via omnimemory-network using service name
+    ports: !override []
+    expose:
+      - "6333"
+      - "6334"
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__HOST: 0.0.0.0
+      QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
+      QDRANT__STORAGE__ON_DISK_PAYLOAD: true
+      QDRANT__LOG_LEVEL: WARN
+      # REQUIRED - service will fail without this
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?QDRANT_API_KEY is required for production}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && echo -e 'GET /readyz HTTP/1.1\\r\\nHost:
+          localhost:6333\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q 'ready'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    restart: always
+
+  # Memgraph Database - Production Configuration
+  memgraph:
+    container_name: omnimemory-prod-memgraph
+    # Remove host port exposure - internal network only
+    ports: !override []
+    expose:
+      - "7687"
+      - "7444"
+    environment:
+      MEMGRAPH_BOLT_PORT: 7687
+      MEMGRAPH_HTTP_PORT: 7444
+      MEMGRAPH_MEMORY_LIMIT: 8192
+      # REQUIRED - service will fail without these
+      MEMGRAPH_USER: ${MEMGRAPH_USER:?MEMGRAPH_USER is required for production}
+      MEMGRAPH_PASSWORD: ${MEMGRAPH_PASSWORD:?MEMGRAPH_PASSWORD is required for production}
+    command:
+      - --storage-snapshot-retention-count=3
+      - --storage-wal-enabled=true
+      - --storage-snapshot-interval-sec=1800
+      # Production performance tuning
+      - --log-level=WARNING
+      - --query-execution-timeout-sec=600
+    healthcheck:
+      # Production health check - TCP connectivity
+      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port 7687 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    restart: always
+
+  # Valkey In-Memory Data Store - Production Configuration
+  valkey:
+    container_name: omnimemory-prod-valkey
+    # Remove host port exposure - internal network only
+    ports: !override []
+    expose:
+      - "6379"
+    command: >
+      valkey-server --appendonly yes --requirepass ${VALKEY_PASSWORD:?VALKEY_PASSWORD is required for
+      production}
+    healthcheck:
+      # Ping with authentication
+      test: ["CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD}", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: always
+
+networks:
+  omnimemory-network:
+    driver: bridge
+    name: omnimemory-prod-network
+    # Production network should be internal (no external access)
+    internal: false  # Set to true if services should have no internet access
