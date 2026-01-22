@@ -290,30 +290,59 @@ class ProviderRateLimiter:
             return True
 
     def get_remaining(self) -> int:
-        """Get remaining requests in current window.
+        """Get approximate remaining requests in current window.
+
+        This is a best-effort observability method that provides an approximate
+        count without acquiring the async lock. The value may be slightly stale
+        under high contention, as it does not clean up expired window entries.
+
+        Note:
+            This method is intentionally non-modifying to be safe for concurrent
+            reads. For accurate counts, the next ``try_acquire()`` call will
+            perform cleanup and provide precise limiting.
 
         Returns:
-            Number of requests remaining before rate limit.
+            Approximate number of requests remaining before rate limit.
         """
-        now = time.monotonic()
-        self._cleanup_window(now)
+        # Intentionally skip _cleanup_window() to avoid modifying shared state
+        # without the lock. This may return a slightly conservative estimate
+        # (fewer remaining than actual) if expired entries haven't been cleaned.
         request_count, _ = self._get_current_usage()
         return max(0, self._max_requests - request_count)
 
     def get_reset_time(self) -> float:
-        """Get seconds until rate limit resets.
+        """Get approximate seconds until rate limit resets.
+
+        This is a best-effort observability method that provides an approximate
+        reset time without acquiring the async lock. The value may be slightly
+        inaccurate under high contention due to concurrent modifications.
+
+        Note:
+            This method safely handles the case where the window becomes empty
+            between the check and access by catching IndexError. Under high
+            contention, this may occasionally return 0.0 even when requests
+            are pending cleanup.
 
         Returns:
-            Seconds until the oldest request in the window expires.
-            Returns 0 if the window is empty.
+            Approximate seconds until the oldest request in the window expires.
+            Returns 0.0 if the window is empty or becomes empty during access.
         """
-        if not self._request_window:
-            return 0.0
+        # Safely access the deque without locking. The deque may be modified
+        # concurrently, so we catch IndexError if it becomes empty between
+        # the check and access.
+        try:
+            # Capture reference to avoid issues if deque is cleared
+            window = self._request_window
+            if not window:
+                return 0.0
 
-        now = time.monotonic()
-        oldest_timestamp = self._request_window[0][0]
-        time_until_reset = (oldest_timestamp + SECONDS_PER_MINUTE) - now
-        return max(0.0, time_until_reset)
+            now = time.monotonic()
+            oldest_timestamp = window[0][0]
+            time_until_reset = (oldest_timestamp + SECONDS_PER_MINUTE) - now
+            return max(0.0, time_until_reset)
+        except IndexError:
+            # Window was emptied between check and access
+            return 0.0
 
 
 class RateLimiterRegistry:

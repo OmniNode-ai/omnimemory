@@ -140,6 +140,7 @@ class TestModelEmbeddingHttpClientConfig:
         assert config.model == "gte-qwen2"
         assert config.timeout_seconds == 30.0
         assert config.embedding_dimension == 1024
+        assert config.strict_dimension_validation is False
         assert config.rate_limit_rpm == 0
         assert config.auth_header is None
 
@@ -545,6 +546,125 @@ class TestEmbeddingHttpClientErrors:
                     match="Could not extract embedding",
                 ):
                     await client.get_embedding("test")
+
+
+# =============================================================================
+# Dimension Validation Tests
+# =============================================================================
+
+
+class TestDimensionValidation:
+    """Tests for strict_dimension_validation feature."""
+
+    @pytest.mark.asyncio
+    async def test_dimension_mismatch_warning_by_default(
+        self,
+        mock_handler: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test dimension mismatch logs warning when strict mode is disabled (default)."""
+        # Config expects 1024 dimensions
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            embedding_dimension=1024,
+            strict_dimension_validation=False,  # default
+        )
+
+        # But response returns 512 dimensions
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 200,
+                "body": {"embedding": [0.1] * 512},
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Should NOT raise, just warn
+                embedding = await client.get_embedding("test")
+                assert len(embedding) == 512  # Returns mismatched embedding
+
+        # Verify warning was logged
+        assert "dimension mismatch" in caplog.text.lower()
+
+    @pytest.mark.asyncio
+    async def test_dimension_mismatch_raises_when_strict(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test dimension mismatch raises error when strict mode is enabled."""
+        # Config expects 1024 dimensions with strict validation
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            embedding_dimension=1024,
+            strict_dimension_validation=True,
+        )
+
+        # But response returns 512 dimensions
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 200,
+                "body": {"embedding": [0.1] * 512},
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                with pytest.raises(
+                    EmbeddingClientError,
+                    match=r"dimension mismatch.*expected 1024.*got 512",
+                ):
+                    await client.get_embedding("test")
+
+    @pytest.mark.asyncio
+    async def test_correct_dimension_no_error_in_strict_mode(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test correct dimensions do not raise even in strict mode."""
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            embedding_dimension=1024,
+            strict_dimension_validation=True,
+        )
+
+        # Response returns correct 1024 dimensions
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 200,
+                "body": {"embedding": [0.1] * 1024},
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                embedding = await client.get_embedding("test")
+                assert len(embedding) == 1024
+
+    def test_strict_dimension_validation_default_is_false(self) -> None:
+        """Test strict_dimension_validation defaults to False."""
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+        )
+        assert config.strict_dimension_validation is False
 
 
 # =============================================================================

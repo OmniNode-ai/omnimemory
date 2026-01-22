@@ -155,6 +155,8 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         model: Model identifier for the embedding model.
         timeout_seconds: Request timeout in seconds.
         embedding_dimension: Expected dimension of embedding vectors.
+        strict_dimension_validation: If True, raise error on dimension mismatch;
+            if False (default), log warning only.
         rate_limit_rpm: Requests per minute limit (0 for no limit).
         rate_limit_tpm: Tokens per minute limit (0 for no limit).
         auth_header: Optional authorization header value (e.g., "Bearer <token>").
@@ -190,6 +192,10 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         gt=0,
         le=8192,
         description="Expected embedding vector dimension",
+    )
+    strict_dimension_validation: bool = Field(
+        default=False,
+        description="If True, raise error on dimension mismatch; if False, log warning only",
     )
     rate_limit_rpm: int = Field(
         default=0,
@@ -511,7 +517,8 @@ class EmbeddingHttpClient:
             The embedding vector.
 
         Raises:
-            EmbeddingClientError: If embedding cannot be extracted.
+            EmbeddingClientError: If embedding cannot be extracted, or if
+                strict_dimension_validation is enabled and dimension mismatches.
         """
         embedding: list[float] | None = None
 
@@ -546,13 +553,13 @@ class EmbeddingHttpClient:
 
         # Validate dimension
         if len(embedding) != self._config.embedding_dimension:
-            logger.warning(
-                "Embedding dimension mismatch: expected %d, got %d "
-                "(correlation_id=%s)",
-                self._config.embedding_dimension,
-                len(embedding),
-                correlation_id,
+            msg = (
+                f"Embedding dimension mismatch: expected {self._config.embedding_dimension}, "
+                f"got {len(embedding)} (correlation_id={correlation_id})"
             )
+            if self._config.strict_dimension_validation:
+                raise EmbeddingClientError(msg)
+            logger.warning(msg)
 
         return embedding
 
