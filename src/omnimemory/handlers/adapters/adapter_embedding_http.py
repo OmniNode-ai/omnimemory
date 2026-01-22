@@ -65,9 +65,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# When only TPM is configured (RPM=0), use this high RPM value to enable the limiter
-# with TPM as the primary constraint. This allows ~167 requests/second which is
-# effectively unlimited for most use cases while still enforcing token limits.
+# Default RPM used when only TPM is configured (i.e., rate_limit_rpm=0, rate_limit_tpm>0).
+#
+# The ProviderRateLimiter requires a positive RPM to function. When users want
+# token-based limiting only (TPM without RPM), we use this high RPM value as a
+# fallback to enable the limiter while making TPM the effective constraint.
+#
+# Why 10,000?
+# - At 10,000 RPM, that's ~167 requests/second - effectively unlimited for
+#   most embedding workloads where network latency is the bottleneck
+# - High enough that request-per-minute won't be the limiting factor
+# - Low enough to still provide a safety ceiling against runaway loops
+# - The TPM limit becomes the actual throttling mechanism as intended
+#
+# Example: If TPM=100,000 and average tokens/request=100, you'd hit TPM
+# after 1,000 requests. With RPM=10,000, you'd never hit the RPM limit first.
 TPM_ONLY_DEFAULT_RPM = 10_000
 
 __all__ = [
@@ -115,6 +127,39 @@ class EmbeddingHttpClient:
     IMPORTANT: No retry logic is implemented here. Retries are orchestrator-owned
     per the ONEX handler architecture.
 
+    Rate Limiting Modes
+    -------------------
+    The client supports four rate limiting configurations via ``rate_limit_rpm``
+    and ``rate_limit_tpm`` in the config:
+
+    1. **No rate limiting** (rpm=0, tpm=0):
+       No limiter is created. Requests proceed without throttling.
+
+    2. **RPM only** (rpm>0, tpm=0):
+       Limits requests per minute. Useful when you want to cap request
+       frequency regardless of payload size.
+
+    3. **TPM only** (rpm=0, tpm>0):
+       Limits tokens per minute. Since ProviderRateLimiter requires a
+       positive RPM to function, the client uses ``TPM_ONLY_DEFAULT_RPM``
+       (10,000) as a high fallback RPM. This makes TPM the effective
+       constraint while RPM remains practically unlimited.
+
+    4. **Both RPM and TPM** (rpm>0, tpm>0):
+       Both limits are enforced. Requests must satisfy BOTH constraints,
+       whichever is more restrictive at any given moment.
+
+    Example::
+
+        # TPM-only configuration (common for OpenAI)
+        config = ModelEmbeddingHttpClientConfig(
+            provider="openai",
+            model="text-embedding-3-small",
+            rate_limit_rpm=0,      # No RPM limit desired
+            rate_limit_tpm=100000, # 100K tokens/minute
+        )
+        # Internally uses RPM=10,000 to enable limiter with TPM as constraint
+
     Attributes:
         config: The client configuration.
     """
@@ -137,27 +182,35 @@ class EmbeddingHttpClient:
         self._init_lock = asyncio.Lock()
         self._rate_limiter: ProviderRateLimiter | None = None
 
-        # Set up rate limiter if configured
-        # Create limiter if RPM or TPM is set (either can trigger rate limiting)
+        # Rate limiter setup: supports RPM-only, TPM-only, or both.
+        # See class docstring "Rate Limiting Modes" for detailed explanation.
         if rate_limiter is not None:
+            # Use externally-provided limiter (e.g., for testing or shared limiters)
             self._rate_limiter = rate_limiter
         elif config.rate_limit_rpm > 0 or config.rate_limit_tpm > 0:
-            # If only TPM is set (RPM=0), use a default RPM to enable the limiter
-            # but with very high request throughput - TPM will be the real constraint
+            # At least one limit is configured - create a limiter.
+            #
+            # Handle TPM-only case (rpm=0, tpm>0):
+            # ProviderRateLimiter requires positive RPM to function, so we use
+            # TPM_ONLY_DEFAULT_RPM (10,000) as a fallback. This high value means
+            # RPM won't be the bottleneck - TPM becomes the effective constraint.
             rpm = (
                 config.rate_limit_rpm
                 if config.rate_limit_rpm > 0
                 else TPM_ONLY_DEFAULT_RPM
             )
+
+            # Log when using TPM-only mode for transparency
             if config.rate_limit_rpm == 0 and config.rate_limit_tpm > 0:
                 logger.info(
                     "TPM-only rate limiting configured for %s/%s: TPM=%d. "
-                    "Using high RPM (%d) to enable limiter with TPM as primary constraint.",
+                    "Using fallback RPM=%d to enable limiter with TPM as primary constraint.",
                     config.provider.value,
                     config.model,
                     config.rate_limit_tpm,
                     rpm,
                 )
+
             limiter_config = ModelRateLimiterConfig(
                 provider=config.provider.value,
                 model=config.model,
@@ -165,6 +218,7 @@ class EmbeddingHttpClient:
                 tokens_per_minute=config.rate_limit_tpm,
             )
             self._rate_limiter = ProviderRateLimiter(limiter_config)
+        # else: both rpm=0 and tpm=0 means no rate limiting - limiter stays None
 
     @property
     def config(self) -> ModelEmbeddingHttpClientConfig:

@@ -956,25 +956,28 @@ class TestEmbeddingHttpClientHealthCheck:
 
         mock_handler.execute.return_value = mock_handler_result
 
+        # Create a mock rate limiter that we can verify was not called
+        mock_rate_limiter = MagicMock()
+        mock_rate_limiter.acquire = AsyncMock()
+
         with patch(
             "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
             return_value=mock_handler,
         ):
-            client = EmbeddingHttpClient(config)
+            # Inject the mock rate limiter via constructor
+            # (rate_limiter param takes precedence over config-based creation)
+            client = EmbeddingHttpClient(config, rate_limiter=mock_rate_limiter)
             await client.initialize()
 
-            # Verify rate limiter was created
-            assert client._rate_limiter is not None
-
-            # Mock the rate limiter's acquire method
-            client._rate_limiter.acquire = AsyncMock()
+            # Verify our mock rate limiter was used
+            assert client._rate_limiter is mock_rate_limiter
 
             # Perform health check
             result = await client.health_check()
             assert result is True
 
-            # Verify rate limiter was NOT called
-            client._rate_limiter.acquire.assert_not_called()
+            # Verify rate limiter was NOT called (health check bypasses it)
+            mock_rate_limiter.acquire.assert_not_called()
 
             # Verify the actual HTTP request was still made
             mock_handler.execute.assert_called_once()

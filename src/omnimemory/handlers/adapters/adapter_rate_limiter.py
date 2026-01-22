@@ -80,6 +80,8 @@ class ProviderRateLimiter:
         config: The rate limiter configuration.
     """
 
+    __slots__ = ("_config", "_lock", "_max_requests", "_max_tokens", "_request_window")
+
     def __init__(self, config: ModelRateLimiterConfig) -> None:
         """Initialize the rate limiter.
 
@@ -149,6 +151,12 @@ class ProviderRateLimiter:
 
         Raises:
             ValueError: If tokens is negative or exceeds maximum allowed.
+
+        Note:
+            Exponential backoff starts at 0.1 seconds and doubles on each
+            retry, capping at a maximum of 5.0 seconds. The actual wait time
+            is the minimum of the backoff value and the time until the oldest
+            request in the window expires.
         """
         # Validate token count to prevent infinite waits
         if tokens < 0:
@@ -268,6 +276,11 @@ class ProviderRateLimiter:
         count without acquiring the async lock. The value may be slightly stale
         under high contention, as it does not clean up expired window entries.
 
+        Staleness Tolerance:
+            Values may be stale by up to a few hundred milliseconds under high
+            contention due to concurrent modifications and lack of window cleanup.
+            This is acceptable for monitoring, logging, and display purposes.
+
         Note:
             This method is intentionally non-modifying to be safe for concurrent
             reads. For accurate counts, the next ``try_acquire()`` call will
@@ -347,6 +360,8 @@ class RateLimiterRegistry:
 
         await limiter.acquire()
     """
+
+    __slots__ = ("_limiters", "_lock")
 
     def __init__(self) -> None:
         """Initialize the registry."""
