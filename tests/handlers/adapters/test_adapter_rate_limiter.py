@@ -338,6 +338,55 @@ class TestProviderRateLimiter:
         result = await limiter.try_acquire(tokens=1001)
         assert result is False
 
+    @pytest.mark.asyncio
+    async def test_concurrent_try_acquire(self) -> None:
+        """Test multiple concurrent try_acquire calls respect the rate limit.
+
+        This validates the async lock properly serializes concurrent access
+        and ensures exactly the configured number of requests succeed.
+        """
+        config = ModelRateLimiterConfig(
+            provider="test",
+            model="concurrent-test",
+            requests_per_minute=10,
+        )
+        limiter = ProviderRateLimiter(config)
+
+        # Attempt 15 concurrent acquisitions (more than the 10 allowed)
+        results = await asyncio.gather(*[limiter.try_acquire() for _ in range(15)])
+
+        # Exactly 10 should succeed (the rate limit)
+        successful = sum(1 for r in results if r is True)
+        failed = sum(1 for r in results if r is False)
+
+        assert successful == 10, f"Expected 10 successful, got {successful}"
+        assert failed == 5, f"Expected 5 failed, got {failed}"
+        assert limiter.get_remaining() == 0
+
+    @pytest.mark.asyncio
+    async def test_concurrent_try_acquire_with_tokens(self) -> None:
+        """Test concurrent token-based rate limiting.
+
+        Validates that concurrent token-based acquisitions are properly
+        serialized and the total tokens consumed respects the limit.
+        """
+        config = ModelRateLimiterConfig(
+            provider="test",
+            model="concurrent-token-test",
+            requests_per_minute=100,  # High RPM so tokens are the constraint
+            tokens_per_minute=1000,
+        )
+        limiter = ProviderRateLimiter(config)
+
+        # 5 concurrent requests each requesting 300 tokens
+        # Only 3 should succeed (300*3=900 < 1000, 300*4=1200 > 1000)
+        results = await asyncio.gather(
+            *[limiter.try_acquire(tokens=300) for _ in range(5)]
+        )
+
+        successful = sum(1 for r in results if r is True)
+        assert successful == 3, f"Expected 3 successful (900 tokens), got {successful}"
+
 
 # =============================================================================
 # Registry Tests

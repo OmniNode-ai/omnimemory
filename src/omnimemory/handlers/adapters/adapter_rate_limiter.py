@@ -91,15 +91,18 @@ class ProviderRateLimiter:
         self._config = config
         self._lock = asyncio.Lock()
 
-        # Sliding window: deque of (timestamp, tokens) tuples
-        self._request_window: deque[tuple[float, int]] = deque()
-
-        # Pre-calculate limits
+        # Pre-calculate limits (needed for maxlen calculation)
         self._max_requests = int(config.requests_per_minute * config.burst_multiplier)
         self._max_tokens = (
             int(config.tokens_per_minute * config.burst_multiplier)
             if config.tokens_per_minute > 0
             else 0
+        )
+
+        # Sliding window: deque of (timestamp, tokens) tuples
+        # Safety ceiling: 2x burst capacity to prevent runaway memory in edge cases
+        self._request_window: deque[tuple[float, int]] = deque(
+            maxlen=self._max_requests * 2
         )
 
         logger.debug(
@@ -289,11 +292,16 @@ class ProviderRateLimiter:
         Returns:
             Approximate number of requests remaining before rate limit.
         """
+        # Snapshot to avoid iteration issues during concurrent modification.
         # Intentionally skip _cleanup_window() to avoid modifying shared state
         # without the lock. This may return a slightly conservative estimate
         # (fewer remaining than actual) if expired entries haven't been cleaned.
-        request_count, _ = self._get_current_usage()
-        return max(0, self._max_requests - request_count)
+        try:
+            window_snapshot = list(self._request_window)
+            return max(0, self._max_requests - len(window_snapshot))
+        except RuntimeError:
+            # Deque was modified during iteration - return conservative estimate
+            return 0
 
     def get_reset_time(self) -> float:
         """Get approximate seconds until rate limit resets.

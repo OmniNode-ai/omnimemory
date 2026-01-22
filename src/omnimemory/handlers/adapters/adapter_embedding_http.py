@@ -98,7 +98,25 @@ __all__ = [
 
 
 class EmbeddingClientError(Exception):
-    """Base exception for embedding client errors."""
+    """Base exception for embedding client errors.
+
+    Attributes:
+        correlation_id: Optional correlation ID for distributed tracing.
+            When set, enables correlating exceptions with specific requests
+            in observability systems.
+    """
+
+    __slots__ = ("correlation_id",)
+
+    def __init__(self, message: str, correlation_id: UUID | None = None) -> None:
+        """Initialize the exception.
+
+        Args:
+            message: Human-readable error message.
+            correlation_id: Optional correlation ID for distributed tracing.
+        """
+        super().__init__(message)
+        self.correlation_id = correlation_id
 
 
 class EmbeddingConnectionError(EmbeddingClientError):
@@ -302,7 +320,7 @@ class EmbeddingHttpClient:
             EmbeddingTimeoutError: If request times out.
         """
         if not text or not text.strip():
-            raise EmbeddingClientError("Text cannot be empty")
+            raise EmbeddingClientError("Text cannot be empty", correlation_id)
 
         # Ensure initialized
         if not self._initialized:
@@ -349,7 +367,8 @@ class EmbeddingHttpClient:
             handler = self._handler
             if handler is None:
                 raise EmbeddingClientError(
-                    "Client not initialized - call initialize() first"
+                    "Client not initialized - call initialize() first",
+                    correlation_id,
                 )
             result = await handler.execute(envelope)
             return self._parse_response(
@@ -360,12 +379,14 @@ class EmbeddingHttpClient:
 
         except InfraConnectionError as e:
             raise EmbeddingConnectionError(
-                f"Connection failed to {self._config.base_url}: {e}"
+                f"Connection failed to {self._config.base_url}: {e}",
+                correlation_id,
             ) from e
 
         except InfraTimeoutError as e:
             raise EmbeddingTimeoutError(
-                f"Timeout after {self._config.timeout_seconds}s: {e}"
+                f"Timeout after {self._config.timeout_seconds}s: {e}",
+                correlation_id,
             ) from e
 
     def _build_envelope(self, text: str, correlation_id: UUID) -> dict[str, object]:
@@ -428,14 +449,16 @@ class EmbeddingHttpClient:
         if not hasattr(result, "result"):
             raise EmbeddingClientError(
                 f"Invalid response structure: missing 'result' attribute "
-                f"(correlation_id={correlation_id})"
+                f"(correlation_id={correlation_id})",
+                correlation_id,
             )
 
         result_dict = result.result
         if not isinstance(result_dict, dict):
             raise EmbeddingClientError(
                 f"Invalid response: result is not a dict "
-                f"(correlation_id={correlation_id})"
+                f"(correlation_id={correlation_id})",
+                correlation_id,
             )
 
         # Check status
@@ -443,13 +466,15 @@ class EmbeddingHttpClient:
         if status != "success":
             raise EmbeddingClientError(
                 f"Request failed with status={status} "
-                f"(correlation_id={correlation_id})"
+                f"(correlation_id={correlation_id})",
+                correlation_id,
             )
 
         payload = result_dict.get("payload", {})
         if not isinstance(payload, dict):
             raise EmbeddingClientError(
-                f"Invalid payload structure (correlation_id={correlation_id})"
+                f"Invalid payload structure (correlation_id={correlation_id})",
+                correlation_id,
             )
 
         # Check HTTP status code
@@ -460,7 +485,8 @@ class EmbeddingHttpClient:
                 body.get("error", str(body)) if isinstance(body, dict) else str(body)
             )
             raise EmbeddingClientError(
-                f"HTTP {status_code}: {error_msg} (correlation_id={correlation_id})"
+                f"HTTP {status_code}: {error_msg} (correlation_id={correlation_id})",
+                correlation_id,
             )
 
         # Extract embedding from response body
@@ -520,13 +546,15 @@ class EmbeddingHttpClient:
         if embedding is None:
             raise EmbeddingClientError(
                 f"Could not extract embedding from response "
-                f"(correlation_id={correlation_id})"
+                f"(correlation_id={correlation_id})",
+                correlation_id,
             )
 
         if not isinstance(embedding, list):
             raise EmbeddingClientError(
                 f"Expected list for embedding, got {type(embedding)} "
-                f"(correlation_id={correlation_id})"
+                f"(correlation_id={correlation_id})",
+                correlation_id,
             )
 
         # Validate dimension (skip for health checks to avoid spurious warnings)
@@ -537,7 +565,7 @@ class EmbeddingHttpClient:
                     f"got {len(embedding)} (correlation_id={correlation_id})"
                 )
                 if self._config.strict_dimension_validation:
-                    raise EmbeddingClientError(msg)
+                    raise EmbeddingClientError(msg, correlation_id)
                 logger.warning(msg)
 
         return embedding
