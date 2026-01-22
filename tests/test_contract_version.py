@@ -38,6 +38,37 @@ MIGRATED_CONTRACTS: list[str] = [
 ]
 
 
+def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
+    """Discover all contracts in the nodes directory dynamically.
+
+    Scans the specified nodes directory (or NODES_DIR if not provided) for all
+    subdirectories containing a contract.yaml file and returns the list of node
+    names (parent directory names).
+
+    Args:
+        nodes_dir: Optional path to the nodes directory. Defaults to NODES_DIR.
+
+    Returns:
+        list[str]: List of node names that have contract.yaml files.
+
+    Example:
+        >>> contracts = get_all_contracts()
+        >>> print(contracts)
+        ['memory_retrieval_effect', 'memory_storage_effect', 'similarity_compute']
+    """
+    base = nodes_dir if nodes_dir is not None else NODES_DIR
+    if not base.exists():
+        return []
+
+    return sorted(
+        d.name for d in base.iterdir() if d.is_dir() and (d / "contract.yaml").exists()
+    )
+
+
+# Discover all contracts once at module load for parametrized tests
+ALL_DISCOVERED_CONTRACTS: list[str] = get_all_contracts()
+
+
 def _assert_valid_contract_version(contract_version: object, node_name: str) -> None:
     """Assert contract_version has valid structure with major, minor, patch.
 
@@ -72,33 +103,6 @@ def _assert_valid_contract_version(contract_version: object, node_name: str) -> 
         assert (
             value < 10000
         ), f"contract_version.{field} seems unreasonably large ({value}): {node_name}"
-
-
-def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
-    """Discover all contracts in the nodes directory dynamically.
-
-    Scans the specified nodes directory (or NODES_DIR if not provided) for all
-    subdirectories containing a contract.yaml file and returns the list of node
-    names (parent directory names).
-
-    Args:
-        nodes_dir: Optional path to the nodes directory. Defaults to NODES_DIR.
-
-    Returns:
-        list[str]: List of node names that have contract.yaml files.
-
-    Example:
-        >>> contracts = get_all_contracts()
-        >>> print(contracts)
-        ['memory_retrieval_effect', 'memory_storage_effect', 'similarity_compute']
-    """
-    base = nodes_dir if nodes_dir is not None else NODES_DIR
-    if not base.exists():
-        return []
-
-    return sorted(
-        d.name for d in base.iterdir() if d.is_dir() and (d / "contract.yaml").exists()
-    )
 
 
 class TestContractVersionField:
@@ -282,11 +286,11 @@ class TestAllContractsDiscovery:
                 f"but got: {contracts}"
             )
 
-    @pytest.mark.parametrize(
-        "node_name",
-        get_all_contracts(),
-        ids=str,
+    @pytest.mark.skipif(
+        not ALL_DISCOVERED_CONTRACTS,
+        reason="No contracts discovered in nodes directory",
     )
+    @pytest.mark.parametrize("node_name", ALL_DISCOVERED_CONTRACTS, ids=str)
     def test_discovered_contract_has_contract_version(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -299,11 +303,11 @@ class TestAllContractsDiscovery:
             "contract_version" in contract_data
         ), f"Contract must have 'contract_version' field: {node_name}"
 
-    @pytest.mark.parametrize(
-        "node_name",
-        get_all_contracts(),
-        ids=str,
+    @pytest.mark.skipif(
+        not ALL_DISCOVERED_CONTRACTS,
+        reason="No contracts discovered in nodes directory",
     )
+    @pytest.mark.parametrize("node_name", ALL_DISCOVERED_CONTRACTS, ids=str)
     def test_discovered_contract_version_structure(
         self, contract_data: YamlData, node_name: str
     ) -> None:
@@ -317,11 +321,11 @@ class TestAllContractsDiscovery:
         contract_version: object | None = contract_data.get("contract_version")
         _assert_valid_contract_version(contract_version, node_name)
 
-    @pytest.mark.parametrize(
-        "node_name",
-        get_all_contracts(),
-        ids=str,
+    @pytest.mark.skipif(
+        not ALL_DISCOVERED_CONTRACTS,
+        reason="No contracts discovered in nodes directory",
     )
+    @pytest.mark.parametrize("node_name", ALL_DISCOVERED_CONTRACTS, ids=str)
     def test_discovered_contract_no_legacy_version(
         self, contract_data: YamlData, node_name: str
     ) -> None:

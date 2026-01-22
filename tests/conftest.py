@@ -144,7 +144,8 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
         or "node_name" not in request.node.callspec.params
     ):
         raise ValueError(
-            "contract_data fixture requires 'node_name' parameter via @pytest.mark.parametrize"
+            f"contract_data fixture requires 'node_name' parameter via @pytest.mark.parametrize "
+            f"(test: {request.node.name})"
         )
 
     node_name: str = request.node.callspec.params["node_name"]
