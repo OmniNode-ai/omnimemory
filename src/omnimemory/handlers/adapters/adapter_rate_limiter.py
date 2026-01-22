@@ -418,5 +418,18 @@ class RateLimiterRegistry:
 
     @property
     def count(self) -> int:
-        """Get the number of registered rate limiters."""
+        """Get the approximate number of registered rate limiters.
+
+        This is a best-effort observability method that provides an approximate
+        count without acquiring the async lock. The value may be slightly stale
+        under high contention due to concurrent get_or_create() or remove() calls.
+
+        Note:
+            For most use cases (metrics, logging, debugging), the approximate
+            count is sufficient. Operations that require an exact count should
+            use async methods that acquire the lock.
+
+        Returns:
+            Approximate number of registered rate limiters.
+        """
         return len(self._limiters)
