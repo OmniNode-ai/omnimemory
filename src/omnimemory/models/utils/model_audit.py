@@ -93,5 +93,4 @@ class ModelAuditEvent(BaseModel):
         extra="forbid",
         validate_default=True,
         str_strip_whitespace=True,
-        ser_json_timedelta="iso8601",
     )

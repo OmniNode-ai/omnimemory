@@ -6,7 +6,7 @@ This module contains the configuration model for PII pattern matching.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelPIIPatternConfig",
@@ -15,6 +15,8 @@ __all__ = [
 
 class ModelPIIPatternConfig(BaseModel):
     """Strongly typed PII pattern configuration replacing Dict[str, Any]."""
+
+    model_config = ConfigDict(extra="forbid")
 
     pattern: str = Field(description="Regex pattern for PII detection")
     confidence: float = Field(

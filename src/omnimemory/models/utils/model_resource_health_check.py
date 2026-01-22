@@ -21,7 +21,7 @@ __all__ = [
 class ModelResourceHealthCheck(BaseModel):
     """Result of a resource health check."""
 
-    model_config = ConfigDict(use_enum_values=False)
+    model_config = ConfigDict(use_enum_values=False, extra="forbid")
 
     status: HealthStatus = Field(description="Health status of the resource")
     response_time: float = Field(default=0.0, description="Response time in seconds")

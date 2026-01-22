@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelRetryAttemptInfo",
@@ -18,6 +18,8 @@ __all__ = [
 
 class ModelRetryAttemptInfo(BaseModel):
     """Information about a retry attempt."""
+
+    model_config = ConfigDict(extra="forbid")
 
     attempt_number: int = Field(description="Current attempt number (1-indexed)")
     delay_ms: int = Field(description="Delay before this attempt in milliseconds")

@@ -98,7 +98,6 @@ class BaseMemoryModel(BaseModel):
         arbitrary_types_allowed=False,
         # Serialization settings
         ser_json_bytes="base64",
-        ser_json_timedelta="float",
     )
 
 

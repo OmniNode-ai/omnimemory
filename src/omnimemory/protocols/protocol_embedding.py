@@ -32,7 +32,6 @@ Example::
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -61,7 +60,6 @@ class ProtocolEmbeddingClient(Protocol):
     - Handle provider-specific response formats internally
     """
 
-    @abstractmethod
     async def get_embedding(
         self,
         text: str,
@@ -84,7 +82,6 @@ class ProtocolEmbeddingClient(Protocol):
         """
         ...
 
-    @abstractmethod
     async def get_embeddings_batch(
         self,
         texts: list[str],
@@ -106,7 +103,6 @@ class ProtocolEmbeddingClient(Protocol):
         """
         ...
 
-    @abstractmethod
     async def health_check(self, correlation_id: UUID | None = None) -> bool:
         """Check if the embedding server is reachable and responding.
 
@@ -118,7 +114,6 @@ class ProtocolEmbeddingClient(Protocol):
         """
         ...
 
-    @abstractmethod
     async def initialize(self) -> None:
         """Initialize the client and establish connections.
 
@@ -126,7 +121,6 @@ class ProtocolEmbeddingClient(Protocol):
         """
         ...
 
-    @abstractmethod
     async def shutdown(self) -> None:
         """Close connections and release resources.
 
@@ -150,7 +144,6 @@ class ProtocolRateLimiter(Protocol):
     - Graceful handling of limit exhaustion
     """
 
-    @abstractmethod
     async def acquire(
         self,
         tokens: int = 1,
@@ -172,7 +165,6 @@ class ProtocolRateLimiter(Protocol):
         """
         ...
 
-    @abstractmethod
     async def try_acquire(
         self,
         tokens: int = 1,
@@ -189,7 +181,6 @@ class ProtocolRateLimiter(Protocol):
         """
         ...
 
-    @abstractmethod
     def get_remaining(self) -> int:
         """Get remaining requests in current window.
 
@@ -198,7 +189,6 @@ class ProtocolRateLimiter(Protocol):
         """
         ...
 
-    @abstractmethod
     def get_reset_time(self) -> float:
         """Get seconds until rate limit resets.
 

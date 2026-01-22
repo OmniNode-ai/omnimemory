@@ -159,13 +159,26 @@ class EmbeddingHttpClient:
         self._rate_limiter: ProviderRateLimiter | None = None
 
         # Set up rate limiter if configured
+        # Create limiter if RPM or TPM is set (either can trigger rate limiting)
         if rate_limiter is not None:
             self._rate_limiter = rate_limiter
-        elif config.rate_limit_rpm > 0:
+        elif config.rate_limit_rpm > 0 or config.rate_limit_tpm > 0:
+            # If only TPM is set (RPM=0), use a default RPM to enable the limiter
+            # but with very high request throughput - TPM will be the real constraint
+            rpm = config.rate_limit_rpm if config.rate_limit_rpm > 0 else 10_000
+            if config.rate_limit_rpm == 0 and config.rate_limit_tpm > 0:
+                logger.info(
+                    "TPM-only rate limiting configured for %s/%s: TPM=%d. "
+                    "Using high RPM (%d) to enable limiter with TPM as primary constraint.",
+                    config.provider.value,
+                    config.model,
+                    config.rate_limit_tpm,
+                    rpm,
+                )
             limiter_config = ModelRateLimiterConfig(
                 provider=config.provider.value,
                 model=config.model,
-                requests_per_minute=config.rate_limit_rpm,
+                requests_per_minute=rpm,
                 tokens_per_minute=config.rate_limit_tpm,
             )
             self._rate_limiter = ProviderRateLimiter(limiter_config)
@@ -512,16 +525,23 @@ class EmbeddingHttpClient:
         Args:
             texts: List of texts to embed.
             correlation_id: Optional correlation ID.
-            max_concurrency: Maximum concurrent requests.
+            max_concurrency: Maximum concurrent requests. Must be positive (>= 1).
 
         Returns:
             List of embedding vectors in same order as input.
 
         Raises:
             EmbeddingClientError: If any text fails to embed.
+            ValueError: If max_concurrency is not positive.
         """
         if not texts:
             return []
+
+        # Validate max_concurrency to prevent semaphore issues
+        if max_concurrency < 1:
+            raise ValueError(
+                f"max_concurrency must be positive (>= 1), got {max_concurrency}"
+            )
 
         # Ensure initialized
         if not self._initialized:

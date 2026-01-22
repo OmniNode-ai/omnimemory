@@ -6,7 +6,7 @@ This module contains the configuration model for retry behavior.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelRetryConfig",
@@ -15,6 +15,8 @@ __all__ = [
 
 class ModelRetryConfig(BaseModel):
     """Configuration for retry behavior."""
+
+    model_config = ConfigDict(extra="forbid")
 
     max_attempts: int = Field(
         default=3, ge=1, le=10, description="Maximum number of retry attempts"

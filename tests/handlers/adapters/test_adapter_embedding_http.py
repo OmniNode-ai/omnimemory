@@ -429,6 +429,42 @@ class TestEmbeddingHttpClientBatch:
                 embeddings = await client.get_embeddings_batch([])
                 assert embeddings == []
 
+    @pytest.mark.asyncio
+    async def test_get_embeddings_batch_max_concurrency_zero_raises(
+        self,
+        local_config: ModelEmbeddingHttpClientConfig,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test batch with max_concurrency=0 raises ValueError."""
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(local_config) as client:
+                with pytest.raises(
+                    ValueError,
+                    match=r"max_concurrency must be positive",
+                ):
+                    await client.get_embeddings_batch(["test"], max_concurrency=0)
+
+    @pytest.mark.asyncio
+    async def test_get_embeddings_batch_max_concurrency_negative_raises(
+        self,
+        local_config: ModelEmbeddingHttpClientConfig,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test batch with negative max_concurrency raises ValueError."""
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(local_config) as client:
+                with pytest.raises(
+                    ValueError,
+                    match=r"max_concurrency must be positive.*got -5",
+                ):
+                    await client.get_embeddings_batch(["test"], max_concurrency=-5)
+
 
 # =============================================================================
 # Error Handling Tests
@@ -737,6 +773,64 @@ class TestEmbeddingHttpClientRateLimiting:
         ):
             client = EmbeddingHttpClient(local_config, rate_limiter=custom_limiter)
             assert client._rate_limiter is custom_limiter
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_created_from_tpm_only_config(
+        self,
+        mock_handler: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test rate limiter is created when only TPM is set (RPM=0).
+
+        When only TPM is configured, the limiter should be created with a high
+        RPM value (10,000) to enable token-based limiting as the primary constraint.
+        """
+        import logging
+
+        caplog.set_level(logging.INFO)
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost",
+            rate_limit_rpm=0,  # No RPM limit
+            rate_limit_tpm=100_000,  # Only TPM limit
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            client = EmbeddingHttpClient(config)
+
+            # Rate limiter should be created despite RPM=0
+            assert client._rate_limiter is not None
+
+            # Should use high RPM (10,000) as fallback
+            assert client._rate_limiter.config.requests_per_minute == 10_000
+
+            # Should use the configured TPM
+            assert client._rate_limiter.config.tokens_per_minute == 100_000
+
+            # Should log informational message about TPM-only config
+            assert "TPM-only rate limiting" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_not_created_when_both_rpm_and_tpm_zero(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test rate limiter is NOT created when both RPM and TPM are 0."""
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost",
+            rate_limit_rpm=0,
+            rate_limit_tpm=0,
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            client = EmbeddingHttpClient(config)
+            assert client._rate_limiter is None
 
 
 # =============================================================================

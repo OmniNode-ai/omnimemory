@@ -6,7 +6,9 @@ This module contains the ModelHealthCheckDetails class.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelHealthCheckDetails",
@@ -16,13 +18,17 @@ __all__ = [
 class ModelHealthCheckDetails(BaseModel):
     """Strongly typed health check details with rate-limit and circuit tracking."""
 
+    model_config = ConfigDict(extra="forbid")
+
     message: str | None = Field(
         default=None, description="Human-readable status message"
     )
     error: str | None = Field(default=None, description="Error message if unhealthy")
     version: str | None = Field(default=None, description="Service version")
     connection_url: str | None = Field(default=None, description="Connection URL")
-    last_check: str | None = Field(default=None, description="Last check timestamp")
+    last_check: datetime | None = Field(
+        default=None, description="Last check timestamp"
+    )
     latency_ms: float | None = Field(
         default=None, description="Latency in milliseconds"
     )

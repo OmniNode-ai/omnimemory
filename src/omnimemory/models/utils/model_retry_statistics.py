@@ -6,7 +6,7 @@ This module contains the model for collecting retry operation statistics.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelRetryStatistics",
@@ -15,6 +15,11 @@ __all__ = [
 
 class ModelRetryStatistics(BaseModel):
     """Statistics about retry operations."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     total_operations: int = Field(
         default=0, description="Total number of operations attempted"

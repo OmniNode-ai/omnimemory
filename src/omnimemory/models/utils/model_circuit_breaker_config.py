@@ -6,7 +6,7 @@ This module contains the configuration model for circuit breaker behavior.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelCircuitBreakerConfig",
@@ -15,6 +15,8 @@ __all__ = [
 
 class ModelCircuitBreakerConfig(BaseModel):
     """Configuration for circuit breaker behavior."""
+
+    model_config = ConfigDict(extra="forbid")
 
     failure_threshold: int = Field(
         default=5, description="Number of failures before opening circuit"

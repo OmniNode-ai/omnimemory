@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelPatternRecognitionResult(BaseModel):
     """Pattern recognition result following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Result identification
     result_id: UUID = Field(

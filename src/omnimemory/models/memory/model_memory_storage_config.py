@@ -18,7 +18,7 @@ MAX_BATCH_SIZE = 10000
 class ModelMemoryStorageConfig(BaseModel):
     """Configuration for memory storage systems following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Storage identification
     storage_id: str = Field(

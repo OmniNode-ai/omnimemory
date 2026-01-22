@@ -11,7 +11,9 @@ HandlerQdrantMock.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "ModelHandlerQdrantMockConfig",
@@ -34,6 +36,10 @@ class ModelHandlerQdrantMockConfig(BaseModel):
             environment variable OMNIMEMORY__EMBEDDING__SERVER_URL.
         embedding_timeout_seconds: Timeout for embedding requests in seconds.
         embedding_max_retries: Maximum retries for embedding requests.
+
+    Raises:
+        ValueError: If use_real_embeddings is True but embedding_server_url
+            is not provided or is not a valid HTTP(S) URL.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -68,3 +74,29 @@ class ModelHandlerQdrantMockConfig(BaseModel):
         le=5,
         description="Maximum retries for embedding requests",
     )
+
+    @model_validator(mode="after")
+    def validate_embedding_url_requirement(self) -> Self:
+        """Validate that embedding_server_url is provided when use_real_embeddings is True.
+
+        Cross-field validation ensures configuration consistency at model
+        construction time rather than waiting for runtime failures.
+
+        Returns:
+            Self: The validated model instance.
+
+        Raises:
+            ValueError: If use_real_embeddings is True but embedding_server_url
+                is not provided or is not a valid HTTP(S) URL.
+        """
+        if self.use_real_embeddings:
+            if not self.embedding_server_url:
+                raise ValueError(
+                    "embedding_server_url is required when use_real_embeddings is True"
+                )
+            if not self.embedding_server_url.startswith(("http://", "https://")):
+                raise ValueError(
+                    f"embedding_server_url must be a valid HTTP(S) URL, "
+                    f"got: {self.embedding_server_url!r}"
+                )
+        return self

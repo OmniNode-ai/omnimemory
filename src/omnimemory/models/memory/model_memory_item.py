@@ -15,7 +15,7 @@ from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC0
 class ModelMemoryItem(BaseModel):
     """A single memory item in the ONEX memory system."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Item identification
     item_id: UUID = Field(

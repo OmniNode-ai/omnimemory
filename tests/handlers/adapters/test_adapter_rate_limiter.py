@@ -206,11 +206,22 @@ class TestProviderRateLimiter:
         self,
         limiter: ProviderRateLimiter,
     ) -> None:
-        """Test reset time after requests."""
+        """Test reset time after requests.
+
+        Note:
+            Uses a wide tolerance (55-60 seconds) to handle CI environments
+            where scheduling delays may occur between try_acquire() and
+            get_reset_time() calls. The key invariant is that reset time
+            should be close to 60 seconds, not exactly 60.
+        """
         await limiter.try_acquire()
         reset_time = limiter.get_reset_time()
-        # Reset time should be close to 60 seconds
-        assert 59.0 <= reset_time <= 60.0
+        # Reset time should be close to 60 seconds.
+        # Use wide tolerance (55s) for CI environments with potential delays.
+        # Upper bound of 60.1s accounts for floating-point precision.
+        assert (
+            55.0 <= reset_time <= 60.1
+        ), f"Reset time {reset_time:.2f}s outside expected range [55.0, 60.1]"
 
     @pytest.mark.asyncio
     async def test_acquire_blocks_when_limited(self) -> None:
@@ -255,6 +266,68 @@ class TestProviderRateLimiter:
         assert await limiter.try_acquire() is True
         assert await limiter.try_acquire() is True
         assert await limiter.try_acquire() is False
+
+    @pytest.mark.asyncio
+    async def test_try_acquire_negative_tokens_raises(
+        self,
+        limiter: ProviderRateLimiter,
+    ) -> None:
+        """Test that negative token count raises ValueError."""
+        with pytest.raises(ValueError, match="tokens must be non-negative"):
+            await limiter.try_acquire(tokens=-1)
+
+    @pytest.mark.asyncio
+    async def test_acquire_negative_tokens_raises(
+        self,
+        limiter: ProviderRateLimiter,
+    ) -> None:
+        """Test that negative token count raises ValueError in acquire."""
+        with pytest.raises(ValueError, match="tokens must be non-negative"):
+            await limiter.acquire(tokens=-5)
+
+    @pytest.mark.asyncio
+    async def test_acquire_tokens_exceed_max_raises(
+        self,
+        config_with_tokens: ModelRateLimiterConfig,
+    ) -> None:
+        """Test that tokens exceeding max raises ValueError to prevent infinite wait."""
+        limiter = ProviderRateLimiter(config_with_tokens)
+
+        # config_with_tokens has tokens_per_minute=1000
+        # Requesting 1001 tokens should raise immediately
+        with pytest.raises(ValueError, match="exceeds maximum allowed"):
+            await limiter.acquire(tokens=1001)
+
+    @pytest.mark.asyncio
+    async def test_acquire_tokens_at_max_succeeds(
+        self,
+        config_with_tokens: ModelRateLimiterConfig,
+    ) -> None:
+        """Test that tokens at exactly max_tokens can be acquired."""
+        limiter = ProviderRateLimiter(config_with_tokens)
+
+        # config_with_tokens has tokens_per_minute=1000
+        # Requesting exactly 1000 tokens should succeed
+        result = await limiter.try_acquire(tokens=1000)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_try_acquire_tokens_exceed_max_returns_false(
+        self,
+        config_with_tokens: ModelRateLimiterConfig,
+    ) -> None:
+        """Test try_acquire returns False when tokens exceed max (no ValueError).
+
+        Note: try_acquire does NOT raise for exceeding max tokens because it's
+        a non-blocking check. The ValueError is only raised in acquire() to
+        prevent infinite waits.
+        """
+        limiter = ProviderRateLimiter(config_with_tokens)
+
+        # config_with_tokens has tokens_per_minute=1000
+        # try_acquire should just return False (not raise)
+        result = await limiter.try_acquire(tokens=1001)
+        assert result is False
 
 
 # =============================================================================

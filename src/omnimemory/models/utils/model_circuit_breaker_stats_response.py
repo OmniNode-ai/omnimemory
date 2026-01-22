@@ -6,7 +6,7 @@ This module contains the typed response model for circuit breaker statistics.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelCircuitBreakerStatsResponse",
@@ -15,6 +15,11 @@ __all__ = [
 
 class ModelCircuitBreakerStatsResponse(BaseModel):
     """Typed response model for circuit breaker statistics."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
 
     state: str = Field(description="Current circuit breaker state")
     failure_count: int = Field(description="Number of failures recorded")

@@ -6,7 +6,7 @@ This module contains models for connection pool configuration.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelConnectionPoolConfig",
@@ -15,6 +15,8 @@ __all__ = [
 
 class ModelConnectionPoolConfig(BaseModel):
     """Configuration for connection pools."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(description="Pool name")
     min_connections: int = Field(default=1, ge=0, description="Minimum connections")

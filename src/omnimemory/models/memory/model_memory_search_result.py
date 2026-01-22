@@ -12,7 +12,7 @@ from .model_memory_item import ModelMemoryItem
 class ModelMemorySearchResult(BaseModel):
     """Search result model for memory queries following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Result identification
     result_id: UUID = Field(

@@ -6,7 +6,7 @@ This module contains the configuration model for PII detection.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelPIIDetectorConfig",
@@ -15,6 +15,8 @@ __all__ = [
 
 class ModelPIIDetectorConfig(BaseModel):
     """Configuration for PII detection with extracted magic numbers."""
+
+    model_config = ConfigDict(extra="forbid")
 
     # Confidence thresholds
     high_confidence: float = Field(

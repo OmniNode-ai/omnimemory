@@ -146,7 +146,21 @@ class ProviderRateLimiter:
         Args:
             tokens: Number of tokens for this request (for TPM limiting).
             correlation_id: Optional correlation ID for logging.
+
+        Raises:
+            ValueError: If tokens is negative or exceeds maximum allowed.
         """
+        # Validate token count to prevent infinite waits
+        if tokens < 0:
+            raise ValueError(f"tokens must be non-negative, got {tokens}")
+
+        # If token limiting is enabled and request exceeds max, it can never succeed
+        if self._max_tokens > 0 and tokens > self._max_tokens:
+            raise ValueError(
+                f"tokens ({tokens}) exceeds maximum allowed ({self._max_tokens}) "
+                f"for {self._config.provider}/{self._config.model}"
+            )
+
         backoff = 0.1  # Start with 100ms
         max_backoff = 5.0  # Cap at 5 seconds
 
@@ -186,7 +200,14 @@ class ProviderRateLimiter:
 
         Returns:
             True if permission was granted, False if rate limited.
+
+        Raises:
+            ValueError: If tokens is negative.
         """
+        # Validate token count - negative tokens are always invalid
+        if tokens < 0:
+            raise ValueError(f"tokens must be non-negative, got {tokens}")
+
         async with self._lock:
             now = time.monotonic()
             self._cleanup_window(now)

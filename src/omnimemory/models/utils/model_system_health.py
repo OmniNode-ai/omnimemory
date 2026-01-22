@@ -22,7 +22,7 @@ __all__ = [
 class ModelSystemHealth(BaseModel):
     """Overall system health status."""
 
-    model_config = ConfigDict(use_enum_values=False)
+    model_config = ConfigDict(use_enum_values=False, extra="forbid")
 
     overall_status: HealthStatus = Field(description="Overall system health status")
     resource_statuses: dict[str, ModelResourceHealthCheck] = Field(
