@@ -163,7 +163,9 @@ def validate_file(filepath: Path) -> list[Violation]:
         # Exit TYPE_CHECKING block when indentation decreases
         if in_type_checking_block and stripped and not stripped.startswith("#"):
             current_indent = len(line) - len(line.lstrip())
-            if current_indent <= indent_level and not line[indent_level:].startswith(" "):
+            if current_indent <= indent_level and not line[indent_level:].startswith(
+                " "
+            ):
                 in_type_checking_block = False
 
         # Skip if in TYPE_CHECKING block

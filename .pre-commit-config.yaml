@@ -38,6 +38,7 @@
 # validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
 # validate-naming-conventions       | onex-validation          | python scripts/validation/validate_naming.py src/
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
+# validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
 #
 # IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
 #
@@ -244,6 +245,19 @@ repos:
       - id: validate-http-imports
         name: ONEX HTTP Import Boundary Enforcement
         entry: python scripts/validation/validate_http_imports.py
+        args: ['src/']
+        language: python
+        pass_filenames: false
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # Pydantic Model Location Enforcement (ONEX compliance)
+      # Ensures Pydantic models are in approved directories (models/, nodes/*/models/, protocols/)
+      # This enforces ONEX architectural patterns for model organization
+      - id: validate-model-locations
+        name: ONEX Pydantic Model Location Enforcement
+        entry: python scripts/validation/validate_model_locations.py
         args: ['src/']
         language: python
         pass_filenames: false

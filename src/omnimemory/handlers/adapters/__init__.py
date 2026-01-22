@@ -47,30 +47,32 @@ from omnimemory.handlers.adapters.adapter_embedding_http import (
     EmbeddingClientError,
     EmbeddingConnectionError,
     EmbeddingHttpClient,
-    EmbeddingProviderType,
     EmbeddingTimeoutError,
+    EnumEmbeddingProviderType,
     ModelEmbeddingHttpClientConfig,
 )
-from omnimemory.handlers.adapters.adapter_graph_memory import (
-    AdapterGraphMemory,
-    AdapterGraphMemoryConfig,
+from omnimemory.handlers.adapters.adapter_graph_memory import AdapterGraphMemory
+from omnimemory.handlers.adapters.adapter_rate_limiter import (
+    ProviderRateLimiter,
+    RateLimiterRegistry,
+)
+from omnimemory.models.adapters import (
+    AdapterGraphMemoryConfig,  # Backward compatibility alias
     ModelConnectionsResult,
+    ModelGraphMemoryConfig,
     ModelGraphMemoryHealth,
     ModelMemoryConnection,
     ModelRelatedMemory,
     ModelRelatedMemoryResult,
 )
-from omnimemory.handlers.adapters.adapter_rate_limiter import (
-    ModelRateLimiterConfig,
-    ProviderRateLimiter,
-    RateLimiterRegistry,
-)
+from omnimemory.models.config import ModelRateLimiterConfig
 
 __all__ = [
     # Graph memory adapter
     "AdapterGraphMemory",
-    "AdapterGraphMemoryConfig",
+    "AdapterGraphMemoryConfig",  # Backward compatibility alias
     "ModelConnectionsResult",
+    "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",
     "ModelMemoryConnection",
     "ModelRelatedMemory",
@@ -78,7 +80,7 @@ __all__ = [
     # Embedding HTTP client (contract boundary)
     "EmbeddingHttpClient",
     "ModelEmbeddingHttpClientConfig",
-    "EmbeddingProviderType",
+    "EnumEmbeddingProviderType",
     "EmbeddingClientError",
     "EmbeddingConnectionError",
     "EmbeddingTimeoutError",

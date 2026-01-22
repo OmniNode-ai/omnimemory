@@ -33,8 +33,11 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable
 
 import structlog
-from pydantic import BaseModel, Field
 
+from ..models.utils.model_resource_manager import (
+    CircuitBreakerConfig,
+    CircuitBreakerStatsResponse,
+)
 from .error_sanitizer import SanitizationLevel
 from .error_sanitizer import sanitize_error as _base_sanitize_error
 
@@ -66,24 +69,6 @@ class CircuitState(Enum):
     HALF_OPEN = "half_open"  # Testing if service has recovered
 
 
-class CircuitBreakerConfig(BaseModel):
-    """Configuration for circuit breaker behavior."""
-
-    failure_threshold: int = Field(
-        default=5, description="Number of failures before opening circuit"
-    )
-    recovery_timeout: int = Field(
-        default=60, description="Seconds to wait before trying half-open"
-    )
-    recovery_timeout_jitter: float = Field(
-        default=0.1, description="Jitter factor (0.0-1.0) to prevent thundering herd"
-    )
-    success_threshold: int = Field(
-        default=3, description="Successful calls needed to close circuit"
-    )
-    timeout: float = Field(default=30.0, description="Default timeout for operations")
-
-
 @dataclass
 class CircuitBreakerStats:
     """Statistics tracking for circuit breaker behavior."""
@@ -96,18 +81,6 @@ class CircuitBreakerStats:
     )
     total_calls: int = 0
     total_timeouts: int = 0
-
-
-class CircuitBreakerStatsResponse(BaseModel):
-    """Typed response model for circuit breaker statistics."""
-
-    state: str = Field(description="Current circuit breaker state")
-    failure_count: int = Field(description="Number of failures recorded")
-    success_count: int = Field(description="Number of successful calls")
-    total_calls: int = Field(description="Total number of calls attempted")
-    total_timeouts: int = Field(description="Total number of timeout failures")
-    last_failure_time: str | None = Field(description="ISO timestamp of last failure")
-    state_changed_at: str = Field(description="ISO timestamp when state last changed")
 
 
 class CircuitBreakerError(Exception):

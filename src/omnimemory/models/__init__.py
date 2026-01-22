@@ -14,14 +14,27 @@ all models at the package level following ONEX standards.
 """
 
 # Cross-domain interface - import submodules only, no star imports
-from . import container, core, foundation, intelligence, memory, service
+from . import (
+    adapters,
+    config,
+    container,
+    core,
+    foundation,
+    intelligence,
+    memory,
+    service,
+    utils,
+)
 
 # Re-export domains for direct access
 __all__ = [
+    "adapters",
+    "config",
     "container",
     "core",
     "foundation",
     "intelligence",
     "memory",
     "service",
+    "utils",
 ]

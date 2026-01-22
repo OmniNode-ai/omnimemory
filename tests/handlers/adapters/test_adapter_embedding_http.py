@@ -37,8 +37,8 @@ from omnimemory.handlers.adapters.adapter_embedding_http import (
     EmbeddingClientError,
     EmbeddingConnectionError,
     EmbeddingHttpClient,
-    EmbeddingProviderType,
     EmbeddingTimeoutError,
+    EnumEmbeddingProviderType,
     ModelEmbeddingHttpClientConfig,
 )
 from omnimemory.handlers.adapters.adapter_rate_limiter import (
@@ -55,7 +55,7 @@ from omnimemory.handlers.adapters.adapter_rate_limiter import (
 def local_config() -> ModelEmbeddingHttpClientConfig:
     """Create a local provider configuration."""
     return ModelEmbeddingHttpClientConfig(
-        provider=EmbeddingProviderType.LOCAL,
+        provider=EnumEmbeddingProviderType.LOCAL,
         base_url="http://192.168.86.201:8002",
         model="gte-qwen2",
         embedding_dimension=1024,
@@ -66,7 +66,7 @@ def local_config() -> ModelEmbeddingHttpClientConfig:
 def openai_config() -> ModelEmbeddingHttpClientConfig:
     """Create an OpenAI provider configuration."""
     return ModelEmbeddingHttpClientConfig(
-        provider=EmbeddingProviderType.OPENAI,
+        provider=EnumEmbeddingProviderType.OPENAI,
         base_url="https://api.openai.com",
         model="text-embedding-3-small",
         embedding_dimension=1536,
@@ -136,7 +136,7 @@ class TestModelEmbeddingHttpClientConfig:
         config = ModelEmbeddingHttpClientConfig(
             base_url="http://localhost:8000",
         )
-        assert config.provider == EmbeddingProviderType.LOCAL
+        assert config.provider == EnumEmbeddingProviderType.LOCAL
         assert config.model == "gte-qwen2"
         assert config.timeout_seconds == 30.0
         assert config.embedding_dimension == 1024
@@ -178,21 +178,28 @@ class TestModelEmbeddingHttpClientConfig:
             )
 
 
-class TestEmbeddingProviderType:
-    """Tests for EmbeddingProviderType enum."""
+class TestEnumEmbeddingProviderType:
+    """Tests for EnumEmbeddingProviderType enum."""
 
     def test_from_string(self) -> None:
         """Test string to enum conversion."""
-        assert EmbeddingProviderType.from_string("local") == EmbeddingProviderType.LOCAL
         assert (
-            EmbeddingProviderType.from_string("OPENAI") == EmbeddingProviderType.OPENAI
+            EnumEmbeddingProviderType.from_string("local")
+            == EnumEmbeddingProviderType.LOCAL
         )
-        assert EmbeddingProviderType.from_string("vllm") == EmbeddingProviderType.VLLM
+        assert (
+            EnumEmbeddingProviderType.from_string("OPENAI")
+            == EnumEmbeddingProviderType.OPENAI
+        )
+        assert (
+            EnumEmbeddingProviderType.from_string("vllm")
+            == EnumEmbeddingProviderType.VLLM
+        )
 
     def test_from_string_invalid(self) -> None:
         """Test invalid string raises ValueError."""
         with pytest.raises(ValueError):
-            EmbeddingProviderType.from_string("unknown")
+            EnumEmbeddingProviderType.from_string("unknown")
 
 
 # =============================================================================

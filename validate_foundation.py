@@ -45,7 +45,7 @@ def validate_protocol_imports() -> dict[str, Any]:
         return {"success": True, "protocols_count": 14}
 
     except Exception as e:
-        print(f"❌ Protocol import failed: {str(e)}")
+        print(f"❌ Protocol import failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -95,7 +95,7 @@ def validate_data_models() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Data model validation failed: {str(e)}")
+        print(f"❌ Data model validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -132,7 +132,7 @@ def validate_error_handling() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Error handling validation failed: {str(e)}")
+        print(f"❌ Error handling validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -161,7 +161,7 @@ def validate_container_creation() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ ONEX Container validation failed: {str(e)}")
+        print(f"❌ ONEX Container validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -199,7 +199,7 @@ def validate_base_implementations() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Base implementations validation failed: {str(e)}")
+        print(f"❌ Base implementations validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -229,7 +229,7 @@ async def validate_async_patterns() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Async patterns validation failed: {str(e)}")
+        print(f"❌ Async patterns validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 

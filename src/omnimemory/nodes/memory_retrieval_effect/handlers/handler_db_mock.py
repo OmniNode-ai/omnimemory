@@ -56,12 +56,12 @@ from typing import TYPE_CHECKING
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
 )
-from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from ..models import (
+    ModelHandlerDbMockConfig,
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
@@ -76,28 +76,6 @@ __all__ = [
     "HandlerDbMock",
     "ModelHandlerDbMockConfig",
 ]
-
-
-class ModelHandlerDbMockConfig(BaseModel):
-    """Configuration for the mock database handler.
-
-    Attributes:
-        simulate_latency_ms: Simulated latency for operations in milliseconds.
-            Set to 0 for instant responses.
-        case_sensitive: Whether text search is case-sensitive. Defaults to False.
-    """
-
-    model_config = ConfigDict(frozen=True, from_attributes=True)
-
-    simulate_latency_ms: int = Field(
-        default=0,
-        ge=0,
-        description="Simulated latency in milliseconds",
-    )
-    case_sensitive: bool = Field(
-        default=False,
-        description="Whether text search is case-sensitive",
-    )
 
 
 class HandlerDbMock:

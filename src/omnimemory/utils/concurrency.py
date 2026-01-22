@@ -40,11 +40,11 @@ F = TypeVar("F", bound=Callable[..., Any])
 from uuid import uuid4
 
 import structlog
-from pydantic import BaseModel, Field
 
 from ..models.foundation.model_connection_metadata import (
     ConnectionMetadata,
 )
+from ..models.utils.model_concurrency import ConnectionPoolConfig
 from .error_sanitizer import SanitizationLevel
 from .error_sanitizer import sanitize_error as _base_sanitize_error
 from .observability import (
@@ -125,30 +125,6 @@ class SemaphoreStats:
     average_hold_time: float = 0.0
     max_hold_time: float = 0.0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class ConnectionPoolConfig(BaseModel):
-    """Configuration for connection pools."""
-
-    name: str = Field(description="Pool name")
-    min_connections: int = Field(default=1, ge=0, description="Minimum connections")
-    max_connections: int = Field(
-        default=50,
-        ge=1,
-        description="Maximum connections (increased for production load)",
-    )
-    connection_timeout: float = Field(
-        default=30.0, gt=0, description="Connection timeout"
-    )
-    idle_timeout: float = Field(
-        default=300.0, gt=0, description="Idle connection timeout"
-    )
-    health_check_interval: float = Field(
-        default=60.0, gt=0, description="Health check interval"
-    )
-    retry_attempts: int = Field(
-        default=3, ge=0, description="Retry attempts for failed connections"
-    )
 
 
 @dataclass

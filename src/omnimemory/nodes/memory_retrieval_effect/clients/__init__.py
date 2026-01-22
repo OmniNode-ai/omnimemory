@@ -33,7 +33,8 @@ Example::
     Initial implementation for OMN-1387.
 """
 
-from .embedding_client import EmbeddingClient, ModelEmbeddingClientConfig
+from ..models import ModelEmbeddingClientConfig
+from .embedding_client import EmbeddingClient
 
 __all__ = [
     "EmbeddingClient",

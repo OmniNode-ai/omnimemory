@@ -42,15 +42,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-from omnimemory.handlers.adapters.adapter_rate_limiter import (
+from omnimemory.handlers.adapters.adapter_rate_limiter import ProviderRateLimiter
+from omnimemory.models.config import (
+    EnumEmbeddingProviderType,
+    ModelEmbeddingHttpClientConfig,
     ModelRateLimiterConfig,
-    ProviderRateLimiter,
 )
 
 if TYPE_CHECKING:
@@ -98,7 +97,7 @@ __all__ = [
     "EmbeddingClientError",
     "EmbeddingConnectionError",
     "EmbeddingTimeoutError",
-    "EmbeddingProviderType",
+    "EnumEmbeddingProviderType",
 ]
 
 
@@ -117,117 +116,6 @@ class EmbeddingConnectionError(EmbeddingClientError):
 
 class EmbeddingTimeoutError(EmbeddingClientError):
     """Raised when embedding request times out."""
-
-
-# =============================================================================
-# Enums
-# =============================================================================
-
-
-class EmbeddingProviderType(str, Enum):
-    """Supported embedding provider types."""
-
-    LOCAL = "local"
-    OPENAI = "openai"
-    VLLM = "vllm"
-
-    @classmethod
-    def from_string(cls, value: str) -> EmbeddingProviderType:
-        """Convert string to provider type."""
-        normalized = value.lower().strip()
-        for provider in cls:
-            if provider.value == normalized:
-                return provider
-        raise ValueError(f"Unknown provider type: {value}")
-
-
-# =============================================================================
-# Configuration
-# =============================================================================
-
-
-class ModelEmbeddingHttpClientConfig(BaseModel):
-    """Configuration for the HTTP embedding client.
-
-    Attributes:
-        provider: Provider type (local, openai, vllm).
-        base_url: Base URL of the embedding server. Required.
-        model: Model identifier for the embedding model.
-        timeout_seconds: Request timeout in seconds.
-        embedding_dimension: Expected dimension of embedding vectors.
-        strict_dimension_validation: If True, raise error on dimension mismatch;
-            if False (default), log warning only.
-        rate_limit_rpm: Requests per minute limit (0 for no limit).
-        rate_limit_tpm: Tokens per minute limit (0 for no limit).
-        auth_header: Optional authorization header value (e.g., "Bearer <token>").
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
-
-    provider: EmbeddingProviderType = Field(
-        default=EmbeddingProviderType.LOCAL,
-        description="Embedding provider type",
-    )
-    base_url: str = Field(
-        ...,
-        min_length=1,
-        description="Base URL of the embedding server (REQUIRED)",
-    )
-    model: str = Field(
-        default="gte-qwen2",
-        min_length=1,
-        description="Model identifier",
-    )
-    timeout_seconds: float = Field(
-        default=30.0,
-        gt=0,
-        le=300.0,
-        description="Request timeout in seconds",
-    )
-    embedding_dimension: int = Field(
-        default=1024,
-        gt=0,
-        le=8192,
-        description="Expected embedding vector dimension",
-    )
-    strict_dimension_validation: bool = Field(
-        default=False,
-        description="If True, raise error on dimension mismatch; if False, log warning only",
-    )
-    rate_limit_rpm: int = Field(
-        default=0,
-        ge=0,
-        le=10_000,
-        description="Requests per minute limit (0 for no limit)",
-    )
-    rate_limit_tpm: int = Field(
-        default=0,
-        ge=0,
-        le=10_000_000,
-        description="Tokens per minute limit (0 for no limit)",
-    )
-    auth_header: str | None = Field(
-        default=None,
-        description="Authorization header value (e.g., 'Bearer <token>')",
-    )
-
-    @field_validator("base_url")
-    @classmethod
-    def normalize_url(cls, v: str) -> str:
-        """Normalize URL by stripping trailing slashes."""
-        return v.rstrip("/")
-
-    @property
-    def embed_endpoint(self) -> str:
-        """Get the full URL for the embed endpoint."""
-        # Different providers have different endpoint patterns
-        if self.provider == EmbeddingProviderType.OPENAI:
-            return f"{self.base_url}/v1/embeddings"
-        # Local and vLLM use /embed
-        return f"{self.base_url}/embed"
 
 
 # =============================================================================
@@ -454,7 +342,7 @@ class EmbeddingHttpClient:
             headers["Authorization"] = self._config.auth_header
 
         # Build provider-specific request body
-        if self._config.provider == EmbeddingProviderType.OPENAI:
+        if self._config.provider == EnumEmbeddingProviderType.OPENAI:
             body = {
                 "input": text,
                 "model": self._config.model,
