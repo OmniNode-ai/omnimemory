@@ -125,7 +125,6 @@ from omnimemory.models.subscription.constants import (
     DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
     DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
     DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
-    TOPIC_PATTERN,
 )
 
 # Optional omnibase_infra imports for handler reuse
@@ -189,9 +188,12 @@ DEFAULT_RETRY_MAX_DELAY_MS = 60000  # 1 minute cap
 CIRCUIT_BREAKER_CACHE_TTL_SECONDS = 3600  # 1 hour
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def _sql_placeholders(count: int, start: int = 1) -> str:
     """Generate SQL parameter placeholders for parameterized queries.
+
+    Results are cached with LRU policy (maxsize=128) to avoid repeated string
+    generation for common query sizes.
 
     Args:
         count: Number of placeholders to generate. If <= 0, returns empty string.
@@ -308,7 +310,12 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         default=5.0,
         gt=0.0,
         le=30.0,
-        description="Webhook delivery timeout in seconds",
+        description=(
+            "Default webhook delivery timeout in seconds used during HTTP handler "
+            "initialization. Note: Per-subscription timeout_ms in "
+            "ModelSubscriptionDeliveryWebhook takes precedence when delivering "
+            "notifications. This value serves as the handler-level fallback."
+        ),
     )
     cache_ttl_seconds: int = Field(
         default=3600,
@@ -736,12 +743,6 @@ class HandlerSubscription:
             RuntimeError: If handler is not initialized.
         """
         valkey, _, _ = self._ensure_initialized()
-
-        # Validate topic format
-        if not TOPIC_PATTERN.match(topic):
-            raise ValueError(
-                f"Topic must match pattern 'memory.<entity>.<event>', got: {topic}"
-            )
 
         # Validate HTTPS requirement for webhook URLs
         if self._config.require_https:
@@ -1422,6 +1423,12 @@ class HandlerSubscription:
     ) -> ModelNotificationDeliveryAttempt:
         """Deliver notification to a single subscriber.
 
+        Timeout Precedence:
+            Per-subscription timeout (subscription.delivery.timeout_ms) takes
+            precedence over the handler-level config.http_timeout_seconds.
+            The subscription-level timeout is converted from milliseconds to
+            seconds and passed directly to the HTTP request.
+
         Args:
             subscription: The subscription to deliver to.
             event: The notification event.
@@ -1730,9 +1737,9 @@ class HandlerSubscription:
             endpoint: The webhook URL.
 
         Returns:
-            SHA256 hash of the endpoint (first 16 chars).
+            SHA256 hash of the endpoint (first 32 chars, 128 bits).
         """
-        return hashlib.sha256(endpoint.encode()).hexdigest()[:16]
+        return hashlib.sha256(endpoint.encode()).hexdigest()[:32]
 
     async def _check_circuit_breaker(self, endpoint: str) -> bool:
         """Check if a request should be allowed through circuit breaker.

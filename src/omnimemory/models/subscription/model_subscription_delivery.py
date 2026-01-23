@@ -29,15 +29,3 @@ class ModelSubscriptionDeliveryWebhook(BaseModel):
         le=30000,
         description="Request timeout in milliseconds (100ms to 30s)",
     )
-    retry_count: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="Number of retry attempts before moving to DLQ",
-    )
-    retry_delay_ms: int = Field(
-        default=1000,
-        ge=100,
-        le=60000,
-        description="Initial delay between retries in milliseconds (exponential backoff)",
-    )
