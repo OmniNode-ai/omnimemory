@@ -561,10 +561,10 @@ class TestOrchestratorNotify:
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Notify action sends to all subscribers."""
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
 
         # Subscribe
         subscribe_request = ModelAgentCoordinatorRequest(
@@ -632,10 +632,10 @@ class TestOrchestratorNotify:
         self,
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Notify action delivers to multiple subscribers."""
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
 
         # Subscribe multiple agents
         agents = [f"agent_{uuid4().hex[:8]}" for _ in range(3)]

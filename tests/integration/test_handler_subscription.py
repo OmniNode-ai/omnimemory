@@ -379,10 +379,10 @@ class TestNotify:
         subscription_handler: HandlerSubscription,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Memory changes trigger notifications to subscribers."""
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
 
         # Subscribe
         delivery = ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url)
@@ -420,10 +420,10 @@ class TestNotify:
         subscription_handler: HandlerSubscription,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Webhook includes HMAC signature when secret is provided."""
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
         secret = "test-secret-123"
 
         delivery = ModelSubscriptionDeliveryWebhook(
@@ -484,10 +484,10 @@ class TestNotify:
         self,
         subscription_handler: HandlerSubscription,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Notify delivers to all subscribers of a topic."""
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
 
         # Subscribe multiple agents
         agents = [f"agent_{uuid4().hex[:8]}" for _ in range(3)]
@@ -1322,7 +1322,7 @@ class TestCircuitBreakerStateTransitions:
         services_available: bool,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Circuit transitions from HALF_OPEN to CLOSED after success threshold.
 
@@ -1336,7 +1336,7 @@ class TestCircuitBreakerStateTransitions:
         if not services_available:
             pytest.skip("Required services (PostgreSQL, Valkey) not available")
 
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
 
         config = ModelHandlerSubscriptionConfig(
             db_dsn=test_db_dsn,
@@ -1789,7 +1789,7 @@ class TestEncryption:
         services_available: bool,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
         """Secret can be used for HMAC signing after decryption.
 
@@ -1801,7 +1801,7 @@ class TestEncryption:
 
         from cryptography.fernet import Fernet
 
-        webhook_url, received_events = webhook_server_with_events
+        webhook_url, received_events = webhook_server
         encryption_key = Fernet.generate_key().decode("utf-8")
         secret = "hmac-signing-secret"
 

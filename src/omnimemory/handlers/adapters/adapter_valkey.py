@@ -34,7 +34,6 @@ Example::
 from __future__ import annotations
 
 import asyncio
-import builtins
 import inspect
 import logging
 from collections.abc import AsyncGenerator, Awaitable
@@ -580,7 +579,7 @@ class AdapterValkey:
         )
         return int(result)
 
-    async def smembers(self, key: str) -> builtins.set[str]:
+    async def smembers(self, key: str) -> set[str]:
         """Get all members of a set.
 
         Args:

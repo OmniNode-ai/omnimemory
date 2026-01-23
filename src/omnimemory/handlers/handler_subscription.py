@@ -99,6 +99,7 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import cast
 from uuid import uuid4
 
@@ -188,6 +189,7 @@ DEFAULT_RETRY_MAX_DELAY_MS = 60000  # 1 minute cap
 CIRCUIT_BREAKER_CACHE_TTL_SECONDS = 3600  # 1 hour
 
 
+@lru_cache(maxsize=32)
 def _sql_placeholders(count: int, start: int = 1) -> str:
     """Generate SQL parameter placeholders for parameterized queries.
 
@@ -1263,28 +1265,40 @@ class HandlerSubscription:
         rows = result.result.get("payload", {}).get("rows", [])
         logger.info("Found %d active subscriptions to cache", len(rows))
 
-        for row in rows:
-            subscription = self._row_to_subscription(row)
+        if not rows:
+            logger.info("No subscriptions to cache, skipping pipeline")
+            return
 
-            # Cache subscription data
-            sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
-            await valkey.set(
-                sub_key,
-                subscription.model_dump_json(),
-                ttl=self._config.cache_ttl_seconds,
-            )
+        # Use pipeline for atomic batch update - prevents race condition where
+        # another instance could see partial cache state during rebuild.
+        # All cache operations happen in a single round-trip.
+        async with valkey.pipeline() as pipe:
+            for row in rows:
+                subscription = self._row_to_subscription(row)
 
-            # Add to topic->subscribers mapping
-            topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=subscription.topic)
-            await valkey.sadd(topic_key, subscription.id)
+                # Cache subscription data
+                sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
+                pipe.set(
+                    sub_key,
+                    subscription.model_dump_json(),
+                    ttl=self._config.cache_ttl_seconds,
+                )
 
-            # Add to agent->subscriptions mapping
-            agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
-                agent_id=subscription.agent_id
-            )
-            await valkey.sadd(agent_key, subscription.id)
+                # Add to topic->subscribers mapping
+                topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=subscription.topic)
+                pipe.sadd(topic_key, subscription.id)
 
-        logger.info("Valkey cache rebuilt with %d subscriptions", len(rows))
+                # Add to agent->subscriptions mapping
+                agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
+                    agent_id=subscription.agent_id
+                )
+                pipe.sadd(agent_key, subscription.id)
+            # Commands are executed atomically on context exit
+
+        logger.info(
+            "Valkey cache rebuilt with %d subscriptions using pipeline (atomic batch)",
+            len(rows),
+        )
 
     async def _get_subscribers_for_topic(self, topic: str) -> set[str]:
         """Get subscriber IDs for a topic.

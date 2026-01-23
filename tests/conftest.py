@@ -379,23 +379,6 @@ async def webhook_server(
 
 
 @pytest.fixture
-async def webhook_server_with_events(
-    unused_tcp_port_factory: Generator[int, None, None],
-) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
-    """Create a local HTTP server with event tracking for webhook tests.
-
-    This is an alias for webhook_server with a clearer name for tests
-    that specifically need to verify received events.
-
-    Yields:
-        Tuple of (webhook_url, received_events_list).
-    """
-    port = next(unused_tcp_port_factory)
-    async for result in _create_webhook_server(port):
-        yield result
-
-
-@pytest.fixture
 def unused_tcp_port_factory() -> Generator[int, None, None]:
     """Factory fixture to generate unused TCP ports.
 
