@@ -1839,6 +1839,12 @@ class HandlerSubscription:
 
         # Truncate endpoint if too long (VARCHAR(512) limit in DB)
         endpoint_to_query = endpoint[:512]
+        if len(endpoint) > 512:
+            logger.warning(
+                "Endpoint URL truncated from %d to 512 chars for DB query: %s...",
+                len(endpoint),
+                endpoint[:50],
+            )
 
         sql = """
             SELECT state, failure_count, success_count, last_failure_at,
@@ -2048,6 +2054,12 @@ class HandlerSubscription:
 
         # Truncate endpoint if too long (VARCHAR(512) limit)
         endpoint_to_store = endpoint[:512]
+        if len(endpoint) > 512:
+            logger.warning(
+                "Endpoint URL truncated from %d to 512 chars for DB storage: %s...",
+                len(endpoint),
+                endpoint[:50],
+            )
 
         # Parse datetime fields from ISO format strings
         last_failure_at = None

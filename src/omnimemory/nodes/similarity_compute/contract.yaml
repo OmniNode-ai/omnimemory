@@ -7,7 +7,8 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "similarity_compute"
-version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 0, minor: 1, patch: 0}
+node_version: {major: 0, minor: 1, patch: 0}
 description: "Pure compute node for vector similarity calculations. Supports cosine and euclidean distance
   metrics with optional threshold matching. No I/O operations."
 node_type: "COMPUTE"

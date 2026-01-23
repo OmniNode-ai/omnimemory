@@ -22,15 +22,15 @@ from __future__ import annotations
 import importlib
 import types
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
 
 from tests.conftest import CORE_8_NODES, NODES_DIR
 
-# Type alias for YAML data - using object instead of Any since YAML values
-# can be arbitrary types but we only read/check them
-YamlData = dict[str, object]
+if TYPE_CHECKING:
+    from omnibase_core.types import MappingResultDict
 
 
 class TestContractValidation:
@@ -57,7 +57,7 @@ class TestContractValidation:
             pytest.skip(f"File not yet implemented: {contract_path}")
 
         with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
+            data: MappingResultDict = yaml.safe_load(f)
 
         assert isinstance(data, dict), f"Contract must be a dict: {node_name}"
 
@@ -73,7 +73,7 @@ class TestContractValidation:
             pytest.skip(f"File not yet implemented: {contract_path}")
 
         with open(contract_path) as f:
-            data: YamlData = yaml.safe_load(f)
+            data: MappingResultDict = yaml.safe_load(f)
 
         # ONEX contracts must have node_type at root level (no legacy nested format)
         raw_node_type = data.get("node_type", "")

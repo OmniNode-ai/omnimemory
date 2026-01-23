@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from ...enums.enum_subscription_status import EnumCircuitBreakerState
 from .constants import (
@@ -91,6 +91,13 @@ class ModelCircuitBreakerState(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         description="When this circuit breaker was last updated",
     )
+
+    @model_validator(mode="after")
+    def validate_open_state(self) -> ModelCircuitBreakerState:
+        """Validate that open_until is set when state is OPEN."""
+        if self.state == EnumCircuitBreakerState.OPEN and self.open_until is None:
+            raise ValueError("open_until is required when state is OPEN")
+        return self
 
     def should_allow_request(self) -> bool:
         """Check if a request should be allowed through the circuit breaker."""

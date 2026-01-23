@@ -7,7 +7,8 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "memory_retrieval_effect"
-version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 0, minor: 1, patch: 0}
+node_version: {major: 0, minor: 1, patch: 0}
 description: "Memory retrieval effect node for search operations. P2A: Qdrant semantic search, PostgreSQL
   full-text search, and Graph traversal backends."
 node_type: "EFFECT"
