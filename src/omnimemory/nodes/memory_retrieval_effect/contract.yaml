@@ -113,9 +113,9 @@ performance:
   max_response_time_ms: 100
 
 # === EVENT TYPE CONFIGURATION ===
-# NOTE: Using version per ModelEventTypeSubcontract from omnibase_core
+# NOTE: Using contract_version per ModelEventTypeSubcontract from omnibase_core
 event_type:
-  version: {major: 1, minor: 0, patch: 0}
+  contract_version: {major: 1, minor: 0, patch: 0}
   primary_events: ["memory_searched", "memory_retrieved", "graph_traversed"]
   event_categories: ["memory", "effect", "retrieval", "search"]
   publish_events: true

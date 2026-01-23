@@ -19,6 +19,8 @@ class ModelCircuitBreakerStatsResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
+        strict=True,
+        from_attributes=True,
     )
 
     state: str = Field(description="Current circuit breaker state")

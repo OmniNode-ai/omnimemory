@@ -61,6 +61,8 @@ class ModelRateLimiterConfig(BaseModel):
         extra="forbid",
         validate_assignment=True,
         frozen=True,
+        strict=True,
+        from_attributes=True,
     )
 
     provider: str = Field(

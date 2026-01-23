@@ -6,7 +6,7 @@ This module contains the model for PII detection scan results.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .model_pii_match import (
     ModelPIIMatch,  # noqa: TC001 - Pydantic needs runtime access
@@ -21,7 +21,7 @@ __all__ = [
 class ModelPIIDetectionResult(BaseModel):
     """Result of PII detection scan."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     has_pii: bool = Field(description="Whether any PII was detected")
     matches: list[ModelPIIMatch] = Field(
@@ -34,3 +34,11 @@ class ModelPIIDetectionResult(BaseModel):
     scan_duration_ms: float = Field(
         ge=0, description="Time taken for the scan in milliseconds"
     )
+
+    @model_validator(mode="after")
+    def validate_consistency(self) -> ModelPIIDetectionResult:
+        """Ensure has_pii reflects actual matches or pii_types_detected."""
+        expected_has_pii = bool(self.matches) or bool(self.pii_types_detected)
+        if self.has_pii != expected_has_pii:
+            raise ValueError("has_pii must reflect matches or pii_types_detected")
+        return self
