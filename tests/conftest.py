@@ -42,7 +42,7 @@ import pytest
 import yaml
 
 if TYPE_CHECKING:
-    from tests.shared_types import YamlData
+    from omnibase_core.types import MappingResultDict
 
 # Core 8 node names - shared across node-related test modules
 CORE_8_NODES: list[str] = [
@@ -105,7 +105,7 @@ nodes_with_contracts = implemented_nodes
 
 
 @pytest.fixture
-def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
+def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> MappingResultDict:
     """Load and parse contract.yaml for a parametrized node name.
 
     This fixture reduces redundant YAML file reads across tests by loading
@@ -114,7 +114,7 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
 
     Usage:
         @pytest.mark.parametrize("node_name", ["memory_storage_effect", "similarity_compute"])
-        def test_something(self, contract_data: YamlData, node_name: str) -> None:
+        def test_something(self, contract_data: MappingResultDict, node_name: str) -> None:
             # contract_data contains the parsed YAML
             assert "name" in contract_data
 
@@ -155,7 +155,7 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> YamlData:
         pytest.skip(f"Contract file not yet implemented: {contract_path}")
 
     with open(contract_path) as f:
-        data: YamlData = yaml.safe_load(f)
+        data: MappingResultDict = yaml.safe_load(f)
 
     assert isinstance(
         data, dict
