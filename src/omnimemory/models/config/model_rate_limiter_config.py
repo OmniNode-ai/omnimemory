@@ -92,6 +92,24 @@ class ModelRateLimiterConfig(BaseModel):
         le=10.0,
         description="Burst allowance multiplier",
     )
+    initial_backoff_seconds: float = Field(
+        default=0.1,
+        ge=0.01,
+        le=10.0,
+        description="Initial backoff delay when rate limited (seconds)",
+    )
+    max_backoff_seconds: float = Field(
+        default=5.0,
+        ge=0.1,
+        le=60.0,
+        description="Maximum backoff delay between retry attempts (seconds)",
+    )
+    backoff_multiplier: float = Field(
+        default=2.0,
+        ge=1.0,
+        le=10.0,
+        description="Multiplier for exponential backoff (e.g., 2.0 = double each retry)",
+    )
 
     @field_validator("provider", "model")
     @classmethod

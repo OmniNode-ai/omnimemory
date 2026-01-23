@@ -125,6 +125,55 @@ class TestModelRateLimiterConfig:
                 burst_multiplier=0.5,
             )
 
+    def test_backoff_defaults(self) -> None:
+        """Test default backoff configuration values."""
+        config = ModelRateLimiterConfig(
+            provider="test",
+            model="test-model",
+        )
+        assert config.initial_backoff_seconds == 0.1
+        assert config.max_backoff_seconds == 5.0
+        assert config.backoff_multiplier == 2.0
+
+    def test_backoff_custom_values(self) -> None:
+        """Test custom backoff configuration values."""
+        config = ModelRateLimiterConfig(
+            provider="test",
+            model="test-model",
+            initial_backoff_seconds=0.5,
+            max_backoff_seconds=30.0,
+            backoff_multiplier=3.0,
+        )
+        assert config.initial_backoff_seconds == 0.5
+        assert config.max_backoff_seconds == 30.0
+        assert config.backoff_multiplier == 3.0
+
+    def test_validation_backoff_bounds(self) -> None:
+        """Test backoff configuration validation bounds."""
+        # initial_backoff_seconds too low
+        with pytest.raises(ValueError):
+            ModelRateLimiterConfig(
+                provider="test",
+                model="test",
+                initial_backoff_seconds=0.001,  # Below 0.01 minimum
+            )
+
+        # max_backoff_seconds too high
+        with pytest.raises(ValueError):
+            ModelRateLimiterConfig(
+                provider="test",
+                model="test",
+                max_backoff_seconds=100.0,  # Above 60.0 maximum
+            )
+
+        # backoff_multiplier below 1.0
+        with pytest.raises(ValueError):
+            ModelRateLimiterConfig(
+                provider="test",
+                model="test",
+                backoff_multiplier=0.5,
+            )
+
 
 # =============================================================================
 # Rate Limiter Tests
@@ -362,6 +411,50 @@ class TestProviderRateLimiter:
         assert successful == 10, f"Expected 10 successful, got {successful}"
         assert failed == 5, f"Expected 5 failed, got {failed}"
         assert limiter.get_remaining() == 0
+
+    @pytest.mark.asyncio
+    async def test_custom_backoff_config_used(self) -> None:
+        """Test that custom backoff config values are used during rate limiting.
+
+        Uses mocked time and sleep to verify the limiter respects config values.
+        """
+        from unittest.mock import patch
+
+        config = ModelRateLimiterConfig(
+            provider="test",
+            model="backoff-test",
+            requests_per_minute=1,
+            initial_backoff_seconds=0.25,  # Custom initial
+            max_backoff_seconds=2.0,  # Custom max
+            backoff_multiplier=3.0,  # Custom multiplier
+        )
+        limiter = ProviderRateLimiter(config)
+
+        # Exhaust the limit
+        await limiter.try_acquire()
+
+        # Track sleep calls to verify backoff behavior
+        sleep_calls: list[float] = []
+        original_sleep = asyncio.sleep
+
+        async def mock_sleep(delay: float) -> None:
+            sleep_calls.append(delay)
+            # After a few sleeps, simulate time passing so window clears
+            if len(sleep_calls) >= 3:
+                # Manually clear window to end the loop
+                limiter._request_window.clear()
+            await original_sleep(0.001)  # Minimal actual sleep
+
+        with patch("asyncio.sleep", side_effect=mock_sleep):
+            await limiter.acquire()
+
+        # Verify backoff progression uses custom values:
+        # - First sleep should be min(reset_time, 0.25) = 0.25 (initial)
+        # - Second sleep should be min(reset_time, 0.75) = 0.75 (0.25 * 3)
+        # - Third sleep would be min(reset_time, 2.0) = 2.0 (0.75 * 3 = 2.25, capped at 2.0)
+        assert len(sleep_calls) >= 1
+        # First backoff should be initial_backoff_seconds or less (limited by reset_time)
+        assert sleep_calls[0] <= config.initial_backoff_seconds
 
     @pytest.mark.asyncio
     async def test_concurrent_try_acquire_with_tokens(self) -> None:

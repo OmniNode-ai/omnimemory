@@ -161,10 +161,11 @@ class ProviderRateLimiter:
             ValueError: If tokens is negative or exceeds maximum allowed.
 
         Note:
-            Exponential backoff starts at 0.1 seconds and doubles on each
-            retry, capping at a maximum of 5.0 seconds. The actual wait time
-            is the minimum of the backoff value and the time until the oldest
-            request in the window expires.
+            Exponential backoff is controlled by config fields:
+            ``initial_backoff_seconds`` (default 0.1), ``backoff_multiplier``
+            (default 2.0), and ``max_backoff_seconds`` (default 5.0). The actual
+            wait time is the minimum of the backoff value and the time until
+            the oldest request in the window expires.
         """
         # Validate token count to prevent infinite waits
         if tokens < 0:
@@ -177,8 +178,9 @@ class ProviderRateLimiter:
                 f"for {self._config.provider}/{self._config.model}"
             )
 
-        backoff = 0.1  # Start with 100ms
-        max_backoff = 5.0  # Cap at 5 seconds
+        backoff = self._config.initial_backoff_seconds
+        max_backoff = self._config.max_backoff_seconds
+        multiplier = self._config.backoff_multiplier
         waited = False
 
         while True:
@@ -210,7 +212,7 @@ class ProviderRateLimiter:
             waited = True
 
             # Exponential backoff with cap
-            backoff = min(backoff * 2, max_backoff)
+            backoff = min(backoff * multiplier, max_backoff)
 
     async def try_acquire(
         self,
