@@ -210,6 +210,17 @@ class TestModelEmbeddingHttpClientConfig:
         """Test embed endpoint for OpenAI provider."""
         assert openai_config.embed_endpoint == "https://api.openai.com/v1/embeddings"
 
+    def test_embed_endpoint_path_normalized(self) -> None:
+        """Test embed_endpoint_path without leading slash is normalized."""
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8000",
+            embed_endpoint_path="custom/embed",
+        )
+        # Validator should prepend /
+        assert config.embed_endpoint_path == "/custom/embed"
+        # Full endpoint should be correct
+        assert config.embed_endpoint == "http://localhost:8000/custom/embed"
+
     def test_validation_timeout_bounds(self) -> None:
         """Test timeout validation bounds."""
         with pytest.raises(ValueError):
