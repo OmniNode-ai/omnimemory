@@ -43,11 +43,10 @@ class ModelRateLimiterConfig(BaseModel):
         **Constraint interaction with EmbeddingHttpClientConfig:**
 
         ModelEmbeddingHttpClientConfig allows ``rate_limit_rpm=0`` to indicate
-        "no RPM limiting." When users want TPM-only limiting (rpm=0, tpm>0),
-        EmbeddingHttpClient handles this by using a high fallback RPM value
-        (10,000) when creating the ModelRateLimiterConfig. This satisfies the
-        ``requests_per_minute >= 1`` constraint while effectively disabling
-        request-based throttling.
+        "no rate limiting." However, TPM-only configurations (rpm=0, tpm>0) are
+        rejected at validation time because ProviderRateLimiter requires a
+        positive RPM to function. Users must set ``rate_limit_rpm > 0`` when
+        using token-based rate limiting.
 
     Attributes:
         provider: Provider identifier (e.g., "openai", "local", "vllm").
