@@ -160,18 +160,29 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
     """Generate SQL parameter placeholders for parameterized queries.
 
     Args:
-        count: Number of placeholders to generate.
+        count: Number of placeholders to generate. If <= 0, returns empty string.
         start: Starting index (default 1 for PostgreSQL $1, $2, ...).
+               Must be >= 1.
 
     Returns:
         Comma-separated placeholder string (e.g., "$1, $2, $3").
+        Returns empty string if count <= 0.
+
+    Raises:
+        ValueError: If start < 1 (PostgreSQL placeholders start at $1).
 
     Example:
         >>> _sql_placeholders(3)
         '$1, $2, $3'
         >>> _sql_placeholders(2, start=5)
         '$5, $6'
+        >>> _sql_placeholders(0)
+        ''
     """
+    if start < 1:
+        raise ValueError(f"start must be >= 1 for PostgreSQL placeholders, got {start}")
+    if count <= 0:
+        return ""
     return ", ".join(f"${i}" for i in range(start, start + count))
 
 
@@ -1336,7 +1347,7 @@ class HandlerSubscription:
         # execute the retry. A separate background worker must poll the
         # delivery_attempts table for pending retries (see module docstring).
         #
-        # TODO(OMN-XXXX): Implement RetryWorker that polls delivery_attempts table
+        # TODO(OMN-1454): Implement RetryWorker that polls delivery_attempts table
         # for rows where status='failed' AND next_retry_at <= NOW() and re-invokes
         # delivery. See also: module docstring for architectural rationale.
         delay_ms = min(

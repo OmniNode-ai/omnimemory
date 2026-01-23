@@ -76,6 +76,10 @@ CREATE INDEX IF NOT EXISTS idx_delivery_attempts_event_id
 CREATE INDEX IF NOT EXISTS idx_delivery_attempts_status
     ON delivery_attempts(status);
 
+-- Index for time-based queries (delivery history, cleanup operations)
+CREATE INDEX IF NOT EXISTS idx_delivery_attempts_created_at
+    ON delivery_attempts(created_at);
+
 -- Partial index for pending retries (used by retry scheduler)
 CREATE INDEX IF NOT EXISTS idx_delivery_attempts_pending_retry
     ON delivery_attempts(next_retry_at)

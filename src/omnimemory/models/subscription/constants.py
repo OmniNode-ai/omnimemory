@@ -24,15 +24,18 @@ DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5
 DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD = 3
 """Number of consecutive successes in half_open state before closing the circuit."""
 
-DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS = 30000
-"""Cooldown period in milliseconds before transitioning from open to half_open."""
+DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS = 60000
+"""Cooldown period in milliseconds before transitioning from open to half_open.
+
+This is equivalent to DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS (60 seconds).
+Use this constant when working with millisecond-based APIs or model fields.
+"""
 
 DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS = 60
 """Cooldown period in seconds before transitioning from open to half_open.
 
-Note: This is used by HandlerSubscription for config-level defaults.
-The cooldown_ms constant (30000ms = 30s) is used by ModelCircuitBreakerState
-for model-level defaults. Applications may use either based on their unit preference.
+This is equivalent to DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS (60000 milliseconds).
+Use this constant when working with second-based configuration or APIs.
 """
 
 __all__ = [
