@@ -59,6 +59,7 @@ from uuid import uuid4
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentClassificationOutput,
+    ModelIntentDistributionResult,
     ModelIntentGraphHealth,
     ModelIntentQueryResult,
     ModelIntentRecord,
@@ -694,7 +695,7 @@ class AdapterIntentGraph:
     async def get_intent_distribution(
         self,
         time_range_hours: int = 24,
-    ) -> dict[str, int]:
+    ) -> ModelIntentDistributionResult:
         """Get intent category distribution for analytics.
 
         Returns the count of intents per category within the specified
@@ -706,19 +707,33 @@ class AdapterIntentGraph:
                 Defaults to 24 hours.
 
         Returns:
-            Dictionary mapping intent category names to counts.
-            Returns empty dict on error (errors are logged).
+            ModelIntentDistributionResult with distribution data or error status.
+            On success, includes the distribution dictionary and total count.
 
         Example::
 
-            distribution = await adapter.get_intent_distribution(time_range_hours=48)
-            # {"debugging": 150, "code_generation": 89, "explanation": 45}
+            result = await adapter.get_intent_distribution(time_range_hours=48)
+            if result.status == "success":
+                print(result.distribution)
+                # {"debugging": 150, "code_generation": 89, "explanation": 45}
+
+        Note:
+            This method never raises on business errors - it returns
+            an error status in the result model instead.
         """
+        start_time = time.perf_counter()
+
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
-            logger.warning("Cannot get intent distribution: %s", e)
-            return {}
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
+            return ModelIntentDistributionResult(
+                status="error",
+                time_range_hours=time_range_hours,
+                execution_time_ms=execution_time_ms,
+                error_message=str(e),
+            )
 
         # Calculate time boundary
         since_utc = (datetime.now(UTC) - timedelta(hours=time_range_hours)).isoformat()
@@ -738,6 +753,9 @@ class AdapterIntentGraph:
                     parameters=parameters,
                 )
 
+                end_time = time.perf_counter()
+                execution_time_ms = (end_time - start_time) * 1000
+
                 distribution: dict[str, int] = {}
                 for record in result.records:
                     category = record.get("category")
@@ -745,24 +763,46 @@ class AdapterIntentGraph:
                     if isinstance(category, str) and isinstance(count, int):
                         distribution[category] = count
 
+                total_intents = sum(distribution.values())
+
                 logger.debug(
                     "Retrieved intent distribution: %d categories, %d total intents",
                     len(distribution),
-                    sum(distribution.values()),
+                    total_intents,
                 )
 
-                return distribution
+                return ModelIntentDistributionResult(
+                    status="success",
+                    distribution=distribution,
+                    total_intents=total_intents,
+                    time_range_hours=time_range_hours,
+                    execution_time_ms=execution_time_ms,
+                )
 
         except TimeoutError:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
             logger.warning(
                 "Timeout getting intent distribution after %ss",
                 self._config.timeout_seconds,
             )
-            return {}
+            return ModelIntentDistributionResult(
+                status="error",
+                time_range_hours=time_range_hours,
+                execution_time_ms=execution_time_ms,
+                error_message=f"Query timed out after {self._config.timeout_seconds}s",
+            )
 
         except Exception as e:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
             logger.error("Error getting intent distribution: %s", e)
-            return {}
+            return ModelIntentDistributionResult(
+                status="error",
+                time_range_hours=time_range_hours,
+                execution_time_ms=execution_time_ms,
+                error_message=f"Query failed: {e}",
+            )
 
     async def health_check(self) -> ModelIntentGraphHealth:
         """Check if the graph connection is healthy.

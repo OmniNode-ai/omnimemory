@@ -1234,11 +1234,16 @@ class TestGetIntentDistribution:
 
         result = await adapter_with_mock.get_intent_distribution(time_range_hours=24)
 
-        assert result == {
+        assert result.status == "success"
+        assert result.distribution == {
             "debugging": 150,
             "code_generation": 89,
             "explanation": 45,
         }
+        assert result.total_intents == 284
+        assert result.time_range_hours == 24
+        assert result.execution_time_ms > 0
+        assert result.error_message is None
 
     @pytest.mark.asyncio
     async def test_get_intent_distribution_empty(
@@ -1251,7 +1256,9 @@ class TestGetIntentDistribution:
 
         result = await adapter_with_mock.get_intent_distribution()
 
-        assert result == {}
+        assert result.status == "success"
+        assert result.distribution == {}
+        assert result.total_intents == 0
 
     @pytest.mark.asyncio
     async def test_get_intent_distribution_custom_time_range(
@@ -1273,12 +1280,14 @@ class TestGetIntentDistribution:
         self,
         config: ModelAdapterIntentGraphConfig,
     ) -> None:
-        """Test get_intent_distribution returns empty dict when not initialized."""
+        """Test get_intent_distribution returns error when not initialized."""
         adapter = AdapterIntentGraph(config)
 
         result = await adapter.get_intent_distribution()
 
-        assert result == {}
+        assert result.status == "error"
+        assert "not initialized" in result.error_message.lower()
+        assert result.distribution == {}
 
     @pytest.mark.asyncio
     async def test_get_intent_distribution_handles_error(
@@ -1286,12 +1295,14 @@ class TestGetIntentDistribution:
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
     ) -> None:
-        """Test get_intent_distribution returns empty dict on error."""
+        """Test get_intent_distribution returns error on query failure."""
         mock_handler.execute_query.side_effect = Exception("Query failed")
 
         result = await adapter_with_mock.get_intent_distribution()
 
-        assert result == {}
+        assert result.status == "error"
+        assert "failed" in result.error_message.lower()
+        assert result.distribution == {}
 
     @pytest.mark.asyncio
     async def test_get_intent_distribution_filters_invalid_records(
@@ -1311,11 +1322,13 @@ class TestGetIntentDistribution:
 
         result = await adapter_with_mock.get_intent_distribution()
 
+        assert result.status == "success"
         # Only valid records should be included
-        assert result == {
+        assert result.distribution == {
             "debugging": 150,
             "valid": 10,
         }
+        assert result.total_intents == 160
 
 
 # =============================================================================
@@ -1522,7 +1535,8 @@ class TestErrorHandling:
         assert query_result.status == "error"
 
         distribution = await adapter_with_mock.get_intent_distribution()
-        assert distribution == {}
+        assert distribution.status == "error"
+        assert distribution.distribution == {}
 
         health = await adapter_with_mock.health_check()
         assert health.is_healthy is False

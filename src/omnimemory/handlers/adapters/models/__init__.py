@@ -14,6 +14,7 @@ from omnimemory.handlers.adapters.models.model_adapter_intent_graph_config impor
 )
 from omnimemory.handlers.adapters.models.model_intent_domain import (
     ModelIntentClassificationOutput,
+    ModelIntentDistributionResult,
     ModelIntentQueryResult,
     ModelIntentRecord,
     ModelIntentStorageResult,
@@ -25,6 +26,7 @@ from omnimemory.handlers.adapters.models.model_intent_graph_health import (
 __all__ = [
     "ModelAdapterIntentGraphConfig",
     "ModelIntentClassificationOutput",
+    "ModelIntentDistributionResult",
     "ModelIntentGraphHealth",
     "ModelIntentQueryResult",
     "ModelIntentRecord",

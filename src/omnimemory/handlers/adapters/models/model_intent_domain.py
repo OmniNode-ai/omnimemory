@@ -48,6 +48,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ModelIntentClassificationOutput",
+    "ModelIntentDistributionResult",
     "ModelIntentQueryResult",
     "ModelIntentRecord",
     "ModelIntentStorageResult",
@@ -67,10 +68,16 @@ class ModelIntentClassificationOutput(BaseModel):
             (no confidence) to 1.0 (full confidence).
         keywords: List of keywords extracted from the classified text that
             contributed to the classification decision.
-        raw_text: The original text that was classified. Optional, may be
-            omitted for privacy or storage efficiency.
+        raw_text: The original text that was classified. Pass-through field
+            for client use only; not stored in the graph database.
         metadata: Additional key-value metadata associated with the
-            classification (e.g., model version, timestamp).
+            classification. Pass-through field for client use only; not
+            stored in the graph database.
+
+    Note:
+        The ``raw_text`` and ``metadata`` fields are pass-through fields that
+        are not stored in the graph database. They can be used by clients for
+        local processing or logging but will not be persisted.
     """
 
     model_config = ConfigDict(
@@ -98,11 +105,17 @@ class ModelIntentClassificationOutput(BaseModel):
     )
     raw_text: str | None = Field(
         default=None,
-        description="Original text that was classified (may be omitted for privacy)",
+        description=(
+            "Original text that was classified. Pass-through field for client "
+            "use only; not stored in the graph database."
+        ),
     )
     metadata: dict[str, str | int | float | bool | None] = Field(
         default_factory=dict,
-        description="Additional key-value metadata (e.g., model version, timestamp)",
+        description=(
+            "Additional key-value metadata (e.g., model version, timestamp). "
+            "Pass-through field for client use only; not stored in the graph database."
+        ),
     )
 
 
@@ -242,6 +255,55 @@ class ModelIntentQueryResult(BaseModel):
         default=0,
         ge=0,
         description="Total number of intent records returned",
+    )
+    execution_time_ms: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Query execution time in milliseconds",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Error details if status is 'error'",
+    )
+
+
+class ModelIntentDistributionResult(BaseModel):
+    """Result of an intent distribution query.
+
+    Returned by AdapterIntentGraph.get_intent_distribution() to provide
+    intent category statistics for analytics.
+
+    Attributes:
+        status: Query status - "success" or "error".
+        distribution: Dictionary mapping intent categories to counts.
+        total_intents: Total number of intents across all categories.
+        time_range_hours: The time range that was queried.
+        execution_time_ms: Time taken to execute the query in milliseconds.
+        error_message: Detailed error message if status is "error".
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    status: Literal["success", "error"] = Field(
+        ...,
+        description="Query status - 'success' or 'error'",
+    )
+    distribution: dict[str, int] = Field(
+        default_factory=dict,
+        description="Intent category counts",
+    )
+    total_intents: int = Field(
+        default=0,
+        ge=0,
+        description="Total intents across all categories",
+    )
+    time_range_hours: int = Field(
+        default=24,
+        ge=1,
+        description="Time range in hours that was queried",
     )
     execution_time_ms: float = Field(
         default=0.0,

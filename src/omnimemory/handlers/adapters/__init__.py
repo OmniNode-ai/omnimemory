@@ -31,10 +31,8 @@ Example::
     await intent_adapter.initialize(connection_uri="bolt://localhost:7687")
 
 .. versionadded:: 0.1.0
-    Initial implementation for OMN-1389 (AdapterGraphMemory).
-
-.. versionadded:: 0.1.0
-    Added AdapterIntentGraph for OMN-1457.
+    Initial implementation with AdapterGraphMemory (OMN-1389) and
+    AdapterIntentGraph (OMN-1457).
 """
 
 from omnimemory.handlers.adapters.adapter_graph_memory import (
@@ -53,6 +51,7 @@ from omnimemory.handlers.adapters.adapter_intent_graph import (
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentClassificationOutput,
+    ModelIntentDistributionResult,
     ModelIntentGraphHealth,
     ModelIntentQueryResult,
     ModelIntentRecord,
@@ -68,6 +67,7 @@ __all__ = [
     "ModelConnectionsResult",
     "ModelGraphMemoryHealth",
     "ModelIntentClassificationOutput",
+    "ModelIntentDistributionResult",
     "ModelIntentGraphHealth",
     "ModelIntentQueryResult",
     "ModelIntentRecord",

@@ -18,9 +18,12 @@ from __future__ import annotations
 
 import re
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 __all__ = ["ModelAdapterIntentGraphConfig"]
+
+# Pattern for valid Cypher identifiers (labels and relationship types)
+_CYPHER_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class ModelAdapterIntentGraphConfig(BaseModel):
@@ -92,81 +95,30 @@ class ModelAdapterIntentGraphConfig(BaseModel):
         ),
     )
 
-    @field_validator("session_node_label")
+    @field_validator("session_node_label", "intent_node_label", "relationship_type")
     @classmethod
-    def validate_session_node_label(cls, v: str) -> str:
-        """Validate session_node_label is a valid Cypher identifier.
+    def validate_cypher_identifier(cls, v: str, info: ValidationInfo) -> str:
+        """Validate that the field is a valid Cypher identifier.
 
-        Cypher labels must start with a letter or underscore and contain
-        only letters, numbers, and underscores. This validation prevents
-        potential injection issues when the label is used in queries.
+        Cypher identifiers (labels and relationship types) must start with
+        a letter or underscore and contain only letters, numbers, and
+        underscores. This validation prevents potential injection issues
+        when the identifier is used in queries.
 
         Args:
-            v: The session_node_label value to validate.
+            v: The value to validate.
+            info: Pydantic validation context containing the field name.
 
         Returns:
-            The validated label if valid.
+            The validated value if valid.
 
         Raises:
-            ValueError: If the label does not match the required pattern.
+            ValueError: If the value does not match the required pattern.
         """
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", v):
+        if not _CYPHER_IDENTIFIER_PATTERN.match(v):
+            field_name = info.field_name
             msg = (
-                f"session_node_label '{v}' is not a valid Cypher identifier. "
-                "Must start with a letter or underscore, and contain only "
-                "letters, numbers, and underscores."
-            )
-            raise ValueError(msg)
-        return v
-
-    @field_validator("intent_node_label")
-    @classmethod
-    def validate_intent_node_label(cls, v: str) -> str:
-        """Validate intent_node_label is a valid Cypher identifier.
-
-        Cypher labels must start with a letter or underscore and contain
-        only letters, numbers, and underscores. This validation prevents
-        potential injection issues when the label is used in queries.
-
-        Args:
-            v: The intent_node_label value to validate.
-
-        Returns:
-            The validated label if valid.
-
-        Raises:
-            ValueError: If the label does not match the required pattern.
-        """
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", v):
-            msg = (
-                f"intent_node_label '{v}' is not a valid Cypher identifier. "
-                "Must start with a letter or underscore, and contain only "
-                "letters, numbers, and underscores."
-            )
-            raise ValueError(msg)
-        return v
-
-    @field_validator("relationship_type")
-    @classmethod
-    def validate_relationship_type(cls, v: str) -> str:
-        """Validate relationship_type is a valid Cypher identifier.
-
-        Cypher relationship types must start with a letter or underscore
-        and contain only letters, numbers, and underscores. This validation
-        prevents potential injection issues when the type is used in queries.
-
-        Args:
-            v: The relationship_type value to validate.
-
-        Returns:
-            The validated relationship type if valid.
-
-        Raises:
-            ValueError: If the type does not match the required pattern.
-        """
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", v):
-            msg = (
-                f"relationship_type '{v}' is not a valid Cypher identifier. "
+                f"{field_name} '{v}' is not a valid Cypher identifier. "
                 "Must start with a letter or underscore, and contain only "
                 "letters, numbers, and underscores."
             )
