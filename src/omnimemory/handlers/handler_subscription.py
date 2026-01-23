@@ -86,6 +86,7 @@ from omnimemory.models.subscription import (
     ModelNotificationEvent,
     ModelSubscription,
 )
+from omnimemory.models.subscription.constants import TOPIC_PATTERN
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -212,6 +213,10 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         le=86400,
         description="TTL for cached subscription data",
     )
+    kafka_notification_topic: str = Field(
+        default=KAFKA_TOPIC_MEMORY_NOTIFICATIONS,
+        description="Kafka topic for memory notification events",
+    )
 
 
 class ModelSubscriptionMetrics(BaseModel):
@@ -222,7 +227,8 @@ class ModelSubscriptionMetrics(BaseModel):
 
     Attributes:
         notifications_published: Count of notifications published to Kafka.
-        subscriptions_created: Count of subscriptions created.
+        subscriptions_created: Count of new subscriptions created.
+        subscriptions_updated: Count of existing subscriptions updated (re-subscriptions).
         subscriptions_deleted: Count of subscriptions deleted.
     """
 
@@ -240,7 +246,12 @@ class ModelSubscriptionMetrics(BaseModel):
     subscriptions_created: int = Field(
         default=0,
         ge=0,
-        description="Count of subscriptions created",
+        description="Count of new subscriptions created",
+    )
+    subscriptions_updated: int = Field(
+        default=0,
+        ge=0,
+        description="Count of existing subscriptions updated (re-subscriptions)",
     )
     subscriptions_deleted: int = Field(
         default=0,
@@ -340,11 +351,13 @@ class HandlerSubscription:
         self._valkey: AdapterValkey | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
+        self._cache_rebuild_lock = asyncio.Lock()
 
         # Metrics for observability
         self._metrics: dict[str, int] = {
             "notifications_published": 0,
             "subscriptions_created": 0,
+            "subscriptions_updated": 0,
             "subscriptions_deleted": 0,
         }
 
@@ -418,22 +431,22 @@ class HandlerSubscription:
         if self._valkey:
             try:
                 await self._valkey.shutdown()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to shutdown Valkey during cleanup: %s", e)
             self._valkey = None
 
         if self._db_handler:
             try:
                 await self._db_handler.shutdown()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to shutdown DB handler during cleanup: %s", e)
             self._db_handler = None
 
         if self._kafka_handler:
             try:
                 await self._kafka_handler.shutdown()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to shutdown Kafka handler during cleanup: %s", e)
             self._kafka_handler = None
 
     async def shutdown(self) -> None:
@@ -510,6 +523,12 @@ class HandlerSubscription:
         """
         valkey, _, _ = self._ensure_initialized()
 
+        # Validate topic format
+        if not TOPIC_PATTERN.match(topic):
+            raise ValueError(
+                f"Topic must match pattern 'memory.<entity>.<event>', got: {topic}"
+            )
+
         # Generate subscription ID
         subscription_id = str(uuid4())
         now = datetime.now(timezone.utc)
@@ -539,7 +558,10 @@ class HandlerSubscription:
 
         # Persist to PostgreSQL (source of truth)
         await self._persist_subscription(subscription, is_update=existing is not None)
-        self._metrics["subscriptions_created"] += 1
+        if existing is not None:
+            self._metrics["subscriptions_updated"] += 1
+        else:
+            self._metrics["subscriptions_created"] += 1
 
         # Update Valkey caches (best effort - DB is source of truth)
         try:
@@ -678,10 +700,11 @@ class HandlerSubscription:
 
         # Publish event to Kafka
         # Agents consume from this topic via consumer groups keyed by agent_id
+        kafka_topic = self._config.kafka_notification_topic
         envelope = {
             "operation": "kafka.produce",
             "payload": {
-                "topic": KAFKA_TOPIC_MEMORY_NOTIFICATIONS,
+                "topic": kafka_topic,
                 "key": topic,  # Partition by topic for ordering
                 "value": event.model_dump_json(),
                 "headers": {
@@ -691,7 +714,22 @@ class HandlerSubscription:
                 },
             },
         }
-        await kafka_handler.execute(envelope)
+        result = await kafka_handler.execute(envelope)
+
+        # Validate Kafka publish succeeded
+        if result is None:
+            logger.warning(
+                "Kafka publish returned None for topic %s, event %s",
+                kafka_topic,
+                event.event_id,
+            )
+        elif hasattr(result, "result") and not result.result.get("success", True):
+            logger.warning(
+                "Kafka publish may have failed for topic %s, event %s: %s",
+                kafka_topic,
+                event.event_id,
+                result.result.get("error", "unknown error"),
+            )
 
         self._metrics["notifications_published"] += 1
 
@@ -940,61 +978,66 @@ class HandlerSubscription:
 
     async def _rebuild_cache_from_db(self) -> None:
         """Cold start recovery: rebuild Valkey from Postgres."""
-        valkey, db_handler, _ = self._ensure_initialized()
+        async with self._cache_rebuild_lock:
+            valkey, db_handler, _ = self._ensure_initialized()
 
-        logger.info("Rebuilding Valkey cache from PostgreSQL...")
+            logger.info("Rebuilding Valkey cache from PostgreSQL...")
 
-        sql = """
-            SELECT id, agent_id, topic, status,
-                   created_at, updated_at, metadata
-            FROM subscriptions
-            WHERE status = $1
-        """
-        envelope = {
-            "operation": "db.query",
-            "payload": {
-                "sql": sql,
-                "parameters": [EnumSubscriptionStatus.ACTIVE.value],
-            },
-        }
-        result = await db_handler.execute(envelope)
+            sql = """
+                SELECT id, agent_id, topic, status,
+                       created_at, updated_at, metadata
+                FROM subscriptions
+                WHERE status = $1
+            """
+            envelope = {
+                "operation": "db.query",
+                "payload": {
+                    "sql": sql,
+                    "parameters": [EnumSubscriptionStatus.ACTIVE.value],
+                },
+            }
+            result = await db_handler.execute(envelope)
 
-        rows = result.result.get("payload", {}).get("rows", [])
-        logger.info("Found %d active subscriptions to cache", len(rows))
+            rows = result.result.get("payload", {}).get("rows", [])
+            logger.info("Found %d active subscriptions to cache", len(rows))
 
-        if not rows:
-            logger.info("No subscriptions to cache, skipping pipeline")
-            return
+            if not rows:
+                logger.info("No subscriptions to cache, skipping pipeline")
+                return
 
-        # Use pipeline for atomic batch update
-        async with valkey.pipeline() as pipe:
-            for row in rows:
-                subscription = self._row_to_subscription(row)
+            # Use pipeline for atomic batch update
+            async with valkey.pipeline() as pipe:
+                for row in rows:
+                    subscription = self._row_to_subscription(row)
 
-                # Cache subscription data
-                sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
-                pipe.set_key(
-                    sub_key,
-                    subscription.model_dump_json(),
-                    ttl=self._config.cache_ttl_seconds,
-                )
+                    # Cache subscription data
+                    sub_key = CACHE_KEY_SUBSCRIPTION.format(
+                        subscription_id=subscription.id
+                    )
+                    pipe.set_key(
+                        sub_key,
+                        subscription.model_dump_json(),
+                        ttl=self._config.cache_ttl_seconds,
+                    )
 
-                # Add to topic->subscribers mapping
-                topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=subscription.topic)
-                pipe.sadd(topic_key, subscription.id)
-                pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                    # Add to topic->subscribers mapping
+                    topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(
+                        topic=subscription.topic
+                    )
+                    pipe.sadd(topic_key, subscription.id)
+                    pipe.expire(topic_key, self._config.cache_ttl_seconds)
 
-                # Add to agent->subscriptions mapping
-                agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
-                    agent_id=subscription.agent_id
-                )
-                pipe.sadd(agent_key, subscription.id)
-                pipe.expire(agent_key, self._config.cache_ttl_seconds)
+                    # Add to agent->subscriptions mapping
+                    agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
+                        agent_id=subscription.agent_id
+                    )
+                    pipe.sadd(agent_key, subscription.id)
+                    pipe.expire(agent_key, self._config.cache_ttl_seconds)
 
-        logger.info(
-            "Valkey cache rebuilt with %d subscriptions using pipeline (atomic batch)",
-            len(rows),
-        )
+            logger.info(
+                "Valkey cache rebuilt with %d subscriptions using pipeline (atomic batch)",
+                len(rows),
+            )
 
     async def _get_subscribers_for_topic(self, topic: str) -> set[str]:
         """Get subscriber IDs for a topic.
