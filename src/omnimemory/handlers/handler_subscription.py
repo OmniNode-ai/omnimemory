@@ -1116,6 +1116,7 @@ class HandlerSubscription:
 
         # Load missing from database
         if missing_ids:
+            # NOTE: SQL injection safe - _sql_placeholders() generates only $N patterns
             placeholders = _sql_placeholders(len(missing_ids))
             sql = f"""
                 SELECT id, agent_id, topic, webhook_url, webhook_secret,
@@ -1218,6 +1219,8 @@ class HandlerSubscription:
                     "url": webhook_url,
                     "headers": headers,
                     "body": json.loads(payload_json),  # dict for httpx
+                    "timeout": subscription.delivery.timeout_ms
+                    / 1000.0,  # Convert ms to seconds
                 },
             }
             result = await http_handler.execute(envelope)
@@ -1495,8 +1498,8 @@ class HandlerSubscription:
                     json.dumps(state_dict),
                     ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
                 )
-                logger.debug(
-                    "Circuit breaker state for %s loaded from DB and cached",
+                logger.info(
+                    "Circuit breaker state for %s loaded from DB fallback and cached",
                     endpoint,
                 )
 
@@ -1688,6 +1691,7 @@ class HandlerSubscription:
                 ):
                     state_dict["state"] = EnumCircuitBreakerState.CLOSED.value
                     state_dict["success_count"] = 0
+                    state_dict["failure_count"] = 0  # Reset for clean state
                     logger.info("Circuit breaker CLOSED for endpoint %s", endpoint)
 
         else:
