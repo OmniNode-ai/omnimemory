@@ -6,6 +6,7 @@ This module contains the ModelCorrelationContext model for correlation tracking.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,7 +28,7 @@ class ModelCorrelationContext(BaseModel):
     )
 
     correlation_id: str = Field(
-        default_factory=lambda: str(__import__("uuid").uuid4()),
+        default_factory=lambda: str(uuid.uuid4()),
         description="Unique identifier for correlating related operations",
     )
     request_id: str | None = Field(

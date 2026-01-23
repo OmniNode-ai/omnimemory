@@ -168,8 +168,9 @@ class ProviderRateLimiter:
             the oldest request in the window expires.
         """
         # Validate token count to prevent infinite waits
-        if tokens < 0:
-            raise ValueError(f"tokens must be non-negative, got {tokens}")
+        # tokens=0 is rejected because requesting zero tokens is meaningless
+        if tokens < 1:
+            raise ValueError(f"tokens must be >= 1, got {tokens}")
 
         # If token limiting is enabled and request exceeds max, it can never succeed
         if self._max_tokens > 0 and tokens > self._max_tokens:
@@ -231,9 +232,10 @@ class ProviderRateLimiter:
         Raises:
             ValueError: If tokens is negative or exceeds maximum allowed.
         """
-        # Validate token count - negative tokens are always invalid
-        if tokens < 0:
-            raise ValueError(f"tokens must be non-negative, got {tokens}")
+        # Validate token count - zero or negative tokens are invalid
+        # tokens=0 is rejected because requesting zero tokens is meaningless
+        if tokens < 1:
+            raise ValueError(f"tokens must be >= 1, got {tokens}")
 
         # If token limiting is enabled and request exceeds max, it can never succeed
         if self._max_tokens > 0 and tokens > self._max_tokens:

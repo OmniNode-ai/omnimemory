@@ -455,8 +455,9 @@ class HealthCheckManager:
             )
 
         try:
-            # Get CPU usage
-            cpu_percent = psutil.cpu_percent(interval=0.1)
+            # Get CPU usage (use interval=None for non-blocking call that returns
+            # cached value since last call - acceptable for health checks)
+            cpu_percent = psutil.cpu_percent(interval=None)
 
             # Get memory usage
             memory = psutil.virtual_memory()

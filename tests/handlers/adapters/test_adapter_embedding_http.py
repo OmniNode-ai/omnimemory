@@ -41,6 +41,8 @@ from omnimemory.handlers.adapters.adapter_rate_limiter import (
     ProviderRateLimiter,
 )
 
+pytestmark = pytest.mark.unit
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================

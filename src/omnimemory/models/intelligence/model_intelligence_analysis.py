@@ -5,7 +5,7 @@ Intelligence analysis model following ONEX standards.
 from datetime import datetime, timezone
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...enums.enum_intelligence_operation_type import EnumIntelligenceOperationType
 
@@ -116,3 +116,12 @@ class ModelIntelligenceAnalysis(BaseModel):
         default=None,
         description="When the analysis was last accessed",
     )
+
+    @model_validator(mode="after")
+    def _validate_validation_score(self) -> "ModelIntelligenceAnalysis":
+        """Enforce consistency between validated flag and validation_score."""
+        if self.validated and self.validation_score is None:
+            raise ValueError("validation_score is required when validated is True")
+        if not self.validated and self.validation_score is not None:
+            raise ValueError("validation_score must be None when validated is False")
+        return self

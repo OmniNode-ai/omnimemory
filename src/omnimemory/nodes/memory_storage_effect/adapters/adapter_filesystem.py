@@ -71,8 +71,9 @@ except ImportError as e:
             )
 
 
+from omnimemory.models.adapters import ModelFileSystemAdapterConfig
+
 from ..models import (
-    ModelFileSystemAdapterConfig,
     ModelMemoryStorageRequest,
     ModelMemoryStorageResponse,
 )

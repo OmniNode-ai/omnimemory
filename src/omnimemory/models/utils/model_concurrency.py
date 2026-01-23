@@ -6,7 +6,7 @@ This module contains models for connection pool configuration.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "ModelConnectionPoolConfig",
@@ -16,7 +16,7 @@ __all__ = [
 class ModelConnectionPoolConfig(BaseModel):
     """Configuration for connection pools."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     name: str = Field(description="Pool name")
     min_connections: int = Field(default=1, ge=0, description="Minimum connections")
@@ -37,3 +37,13 @@ class ModelConnectionPoolConfig(BaseModel):
     retry_attempts: int = Field(
         default=3, ge=0, description="Retry attempts for failed connections"
     )
+
+    @model_validator(mode="after")
+    def validate_connection_bounds(self) -> ModelConnectionPoolConfig:
+        """Validate that max_connections >= min_connections."""
+        if self.max_connections < self.min_connections:
+            raise ValueError(
+                f"max_connections ({self.max_connections}) must be >= "
+                f"min_connections ({self.min_connections})"
+            )
+        return self

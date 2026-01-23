@@ -33,6 +33,8 @@ from omnimemory.handlers.adapters.adapter_rate_limiter import (
     RateLimiterRegistry,
 )
 
+pytestmark = pytest.mark.unit
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -331,8 +333,21 @@ class TestProviderRateLimiter:
         limiter: ProviderRateLimiter,
     ) -> None:
         """Test that negative token count raises ValueError."""
-        with pytest.raises(ValueError, match="tokens must be non-negative"):
+        with pytest.raises(ValueError, match="tokens must be >= 1"):
             await limiter.try_acquire(tokens=-1)
+
+    @pytest.mark.asyncio
+    async def test_try_acquire_zero_tokens_raises(
+        self,
+        limiter: ProviderRateLimiter,
+    ) -> None:
+        """Test that zero token count raises ValueError.
+
+        Requesting zero tokens is meaningless and should be rejected
+        to prevent invalid token accounting.
+        """
+        with pytest.raises(ValueError, match="tokens must be >= 1"):
+            await limiter.try_acquire(tokens=0)
 
     @pytest.mark.asyncio
     async def test_acquire_negative_tokens_raises(
@@ -340,8 +355,21 @@ class TestProviderRateLimiter:
         limiter: ProviderRateLimiter,
     ) -> None:
         """Test that negative token count raises ValueError in acquire."""
-        with pytest.raises(ValueError, match="tokens must be non-negative"):
+        with pytest.raises(ValueError, match="tokens must be >= 1"):
             await limiter.acquire(tokens=-5)
+
+    @pytest.mark.asyncio
+    async def test_acquire_zero_tokens_raises(
+        self,
+        limiter: ProviderRateLimiter,
+    ) -> None:
+        """Test that zero token count raises ValueError in acquire.
+
+        Requesting zero tokens is meaningless and should be rejected
+        to prevent invalid token accounting.
+        """
+        with pytest.raises(ValueError, match="tokens must be >= 1"):
+            await limiter.acquire(tokens=0)
 
     @pytest.mark.asyncio
     async def test_acquire_tokens_exceed_max_raises(

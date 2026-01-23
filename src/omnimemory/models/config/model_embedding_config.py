@@ -107,6 +107,7 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         extra="forbid",
         validate_assignment=True,
         frozen=True,
+        strict=True,
     )
 
     provider: EnumEmbeddingProviderType = Field(
@@ -197,6 +198,14 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
     def normalize_url(cls, v: str) -> str:
         """Normalize URL by stripping trailing slashes."""
         return v.rstrip("/")
+
+    @field_validator("embed_endpoint_path")
+    @classmethod
+    def validate_embed_endpoint_path(cls, v: str | None) -> str | None:
+        """Ensure embed_endpoint_path starts with '/' to prevent malformed URLs."""
+        if v is not None and not v.startswith("/"):
+            return "/" + v
+        return v
 
     @property
     def embed_endpoint(self) -> str:

@@ -115,7 +115,10 @@ class ModelRateLimiterConfig(BaseModel):
     @classmethod
     def normalize_identifier(cls, v: str) -> str:
         """Normalize identifiers to lowercase for consistent keying."""
-        return v.lower().strip()
+        v = v.lower().strip()
+        if v == "":
+            raise ValueError("identifier must not be empty after normalization")
+        return v
 
     @property
     def key(self) -> tuple[str, str]:

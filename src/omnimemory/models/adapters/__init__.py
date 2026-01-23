@@ -13,11 +13,17 @@ Graph Memory Models:
     - ModelGraphMemoryHealth: Health status for graph memory adapter
     - ModelGraphMemoryConfig: Configuration for graph memory adapter
 
+FileSystem Models:
+    - ModelFileSystemAdapterConfig: Configuration for filesystem storage adapter
+
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1389.
 """
 
 from omnimemory.models.adapters.model_connections_result import ModelConnectionsResult
+from omnimemory.models.adapters.model_filesystem_adapter_config import (
+    ModelFileSystemAdapterConfig,
+)
 from omnimemory.models.adapters.model_graph_memory_config import ModelGraphMemoryConfig
 from omnimemory.models.adapters.model_graph_memory_health import ModelGraphMemoryHealth
 from omnimemory.models.adapters.model_memory_connection import ModelMemoryConnection
@@ -31,6 +37,7 @@ from omnimemory.models.adapters.model_related_memory_result import (
 
 __all__ = [
     "ModelConnectionsResult",
+    "ModelFileSystemAdapterConfig",
     "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",
     "ModelMemoryConnection",

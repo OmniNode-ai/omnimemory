@@ -77,7 +77,9 @@ class ModelAuditEvent(BaseModel):
     user_agent: str | None = Field(default=None, description="User agent string")
 
     # Performance data
-    duration_ms: float | None = Field(default=None, description="Operation duration")
+    duration_ms: float | None = Field(
+        default=None, ge=0.0, description="Operation duration in milliseconds"
+    )
     resource_usage: ResourceUsageMetadata | None = Field(
         default=None, description="Resource usage metrics"
     )

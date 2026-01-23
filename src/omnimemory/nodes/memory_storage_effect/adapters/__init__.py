@@ -33,7 +33,8 @@ Example::
     Initial implementation for OMN-1384.
 """
 
-from ..models import ModelFileSystemAdapterConfig
+from omnimemory.models.adapters import ModelFileSystemAdapterConfig
+
 from .adapter_filesystem import (
     HandlerFileSystemAdapter,
 )
