@@ -719,7 +719,7 @@ async def create_postgresql_health_check(
         )
 
         try:
-            conn = await asyncpg.connect(connection_string, timeout=5.0)
+            conn = await asyncpg.connect(connection_string, timeout=5)
             await conn.execute("SELECT 1")
             await conn.close()
 
