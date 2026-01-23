@@ -51,6 +51,11 @@ from omnibase_infra.errors import (
 )
 from omnibase_infra.handlers.handler_http import HandlerHttpRest
 
+from omnimemory.errors.embedding_errors import (
+    EmbeddingClientError,
+    EmbeddingConnectionError,
+    EmbeddingTimeoutError,
+)
 from omnimemory.handlers.adapters.adapter_rate_limiter import ProviderRateLimiter
 from omnimemory.models.config import (
     EnumEmbeddingProviderType,
@@ -67,11 +72,14 @@ logger = logging.getLogger(__name__)
 
 # Default RPM used when only TPM is configured (i.e., rate_limit_rpm=0, rate_limit_tpm>0).
 #
+# NOTE: This constant is kept for backwards reference. The actual fallback value
+# is now configurable via ModelEmbeddingHttpClientConfig.tpm_fallback_rpm.
+#
 # The ProviderRateLimiter requires a positive RPM to function. When users want
-# token-based limiting only (TPM without RPM), we use this high RPM value as a
+# token-based limiting only (TPM without RPM), we use a high RPM value as a
 # fallback to enable the limiter while making TPM the effective constraint.
 #
-# Why 10,000?
+# Why 10,000 (default)?
 # - At 10,000 RPM, that's ~167 requests/second - effectively unlimited for
 #   most embedding workloads where network latency is the bottleneck
 # - High enough that request-per-minute won't be the limiting factor
@@ -80,6 +88,8 @@ logger = logging.getLogger(__name__)
 #
 # Example: If TPM=100,000 and average tokens/request=100, you'd hit TPM
 # after 1,000 requests. With RPM=10,000, you'd never hit the RPM limit first.
+#
+# Users can customize this value via config.tpm_fallback_rpm (range: 100-100,000).
 TPM_ONLY_DEFAULT_RPM = 10_000
 
 __all__ = [
@@ -90,41 +100,6 @@ __all__ = [
     "EmbeddingTimeoutError",
     "EnumEmbeddingProviderType",
 ]
-
-
-# =============================================================================
-# Exceptions
-# =============================================================================
-
-
-class EmbeddingClientError(Exception):
-    """Base exception for embedding client errors.
-
-    Attributes:
-        correlation_id: Optional correlation ID for distributed tracing.
-            When set, enables correlating exceptions with specific requests
-            in observability systems.
-    """
-
-    __slots__ = ("correlation_id",)
-
-    def __init__(self, message: str, correlation_id: UUID | None = None) -> None:
-        """Initialize the exception.
-
-        Args:
-            message: Human-readable error message.
-            correlation_id: Optional correlation ID for distributed tracing.
-        """
-        super().__init__(message)
-        self.correlation_id = correlation_id
-
-
-class EmbeddingConnectionError(EmbeddingClientError):
-    """Raised when connection to embedding server fails."""
-
-
-class EmbeddingTimeoutError(EmbeddingClientError):
-    """Raised when embedding request times out."""
 
 
 # =============================================================================
@@ -159,9 +134,10 @@ class EmbeddingHttpClient:
 
     3. **TPM only** (rpm=0, tpm>0):
        Limits tokens per minute. Since ProviderRateLimiter requires a
-       positive RPM to function, the client uses ``TPM_ONLY_DEFAULT_RPM``
-       (10,000) as a high fallback RPM. This makes TPM the effective
-       constraint while RPM remains practically unlimited.
+       positive RPM to function, the client uses the configurable
+       ``tpm_fallback_rpm`` (default: 10,000) as a high fallback RPM.
+       This makes TPM the effective constraint while RPM remains
+       practically unlimited.
 
     4. **Both RPM and TPM** (rpm>0, tpm>0):
        Both limits are enforced. Requests must satisfy BOTH constraints,
@@ -175,8 +151,9 @@ class EmbeddingHttpClient:
             model="text-embedding-3-small",
             rate_limit_rpm=0,      # No RPM limit desired
             rate_limit_tpm=100000, # 100K tokens/minute
+            # tpm_fallback_rpm=10000,  # Optional: customize fallback RPM
         )
-        # Internally uses RPM=10,000 to enable limiter with TPM as constraint
+        # Internally uses tpm_fallback_rpm to enable limiter with TPM as constraint
 
     Attributes:
         config: The client configuration.
@@ -210,12 +187,12 @@ class EmbeddingHttpClient:
             #
             # Handle TPM-only case (rpm=0, tpm>0):
             # ProviderRateLimiter requires positive RPM to function, so we use
-            # TPM_ONLY_DEFAULT_RPM (10,000) as a fallback. This high value means
+            # config.tpm_fallback_rpm as a fallback. This high value means
             # RPM won't be the bottleneck - TPM becomes the effective constraint.
             rpm = (
                 config.rate_limit_rpm
                 if config.rate_limit_rpm > 0
-                else TPM_ONLY_DEFAULT_RPM
+                else config.tpm_fallback_rpm
             )
 
             # Log when using TPM-only mode for transparency

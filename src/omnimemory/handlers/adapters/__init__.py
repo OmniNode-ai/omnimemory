@@ -43,11 +43,13 @@ Example::
     Added EmbeddingHttpClient and ProviderRateLimiter for OMN-1391.
 """
 
-from omnimemory.handlers.adapters.adapter_embedding_http import (
+from omnimemory.errors.embedding_errors import (
     EmbeddingClientError,
     EmbeddingConnectionError,
-    EmbeddingHttpClient,
     EmbeddingTimeoutError,
+)
+from omnimemory.handlers.adapters.adapter_embedding_http import (
+    EmbeddingHttpClient,
     EnumEmbeddingProviderType,
     ModelEmbeddingHttpClientConfig,
 )
