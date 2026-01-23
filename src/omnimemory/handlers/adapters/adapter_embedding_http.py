@@ -390,7 +390,7 @@ class EmbeddingHttpClient:
                 correlation_id,
             )
 
-        result_dict = result.result  # type: ignore[attr-defined]
+        result_dict = result.result
         if not isinstance(result_dict, dict):
             raise EmbeddingClientError(
                 f"Invalid response: result is not a dict "
