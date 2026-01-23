@@ -161,12 +161,19 @@ def _assert_valid_version_structure(
 
 
 class TestContractVersionField:
-    """Test contract fields for migrated contracts.
+    """Test migration-specific contract fields for MIGRATED_CONTRACTS.
 
-    Tests file existence, name matching, node_type values, and nested version
-    preservation for contracts in MIGRATED_CONTRACTS. For comprehensive
-    contract_version validation (existence, structure, no legacy field),
-    see TestAllContractsDiscovery which covers ALL discovered contracts.
+    This class validates migration-specific concerns:
+    - File existence for specific migrated contracts
+    - Name field matches node directory name
+    - node_type field exists and has expected values per contract
+    - Nested version fields (tool_specification.version, event_type.version) preserved
+    - Exact version values (0.1.0) set correctly during migration
+
+    For comprehensive validation of contract_version and node_version fields
+    (existence, structure, no legacy field) across ALL contracts, see
+    TestAllContractsDiscovery which dynamically discovers and validates
+    every contract in the nodes directory.
     """
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
@@ -268,6 +275,7 @@ class TestContractVersionField:
                     version, "event_type.version", node_name
                 )
 
+    @pytest.mark.migration
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_contract_version_values(
         self, contract_data: MappingResultDict, node_name: str
@@ -282,6 +290,11 @@ class TestContractVersionField:
         - Migration set consistent initial versions across all contracts
         - Future version bumps can be tracked against this baseline
         - No accidental version drift during migration
+
+        Note:
+            This test has the @pytest.mark.migration marker because it asserts
+            exact version values that will change when versions are bumped.
+            Post-release, skip with: pytest -m "not migration"
         """
         expected: dict[str, int] = {"major": 0, "minor": 1, "patch": 0}
         assert contract_data.get("contract_version") == expected, (
@@ -289,21 +302,7 @@ class TestContractVersionField:
             f"got {contract_data.get('contract_version')}"
         )
 
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
-    def test_node_version_field_exists(
-        self, contract_data: MappingResultDict, node_name: str
-    ) -> None:
-        """Verify node_version field exists and has valid structure.
-
-        ONEX contracts require both contract_version (schema version) and
-        node_version (implementation version) fields.
-        """
-        assert (
-            "node_version" in contract_data
-        ), f"Contract must have 'node_version' field: {node_name}"
-        node_version: object = contract_data.get("node_version")
-        _assert_valid_version_structure(node_version, "node_version", node_name)
-
+    @pytest.mark.migration
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_node_version_values(
         self, contract_data: MappingResultDict, node_name: str
@@ -311,6 +310,11 @@ class TestContractVersionField:
         """Verify node_version has expected initial values after migration.
 
         All contracts should have node_version 0.1.0 as their starting point.
+
+        Note:
+            This test has the @pytest.mark.migration marker because it asserts
+            exact version values that will change when versions are bumped.
+            Post-release, skip with: pytest -m "not migration"
         """
         expected: dict[str, int] = {"major": 0, "minor": 1, "patch": 0}
         assert contract_data.get("node_version") == expected, (

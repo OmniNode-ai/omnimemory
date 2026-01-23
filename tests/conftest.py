@@ -178,11 +178,12 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> MappingRes
         pytest.skip(f"Contract file not yet implemented: {contract_path}")
 
     with open(contract_path) as f:
-        data: MappingResultDict = yaml.safe_load(f)
+        data = yaml.safe_load(f)
 
-    assert isinstance(
-        data, dict
-    ), f"Contract must be a dict, got {type(data).__name__}: {contract_path}"
+    if not isinstance(data, dict):
+        pytest.fail(
+            f"Contract must be a dict, got {type(data).__name__}: {contract_path}"
+        )
     return data
 
 
@@ -227,4 +228,8 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "memgraph: marks tests as requiring Memgraph database",
+    )
+    config.addinivalue_line(
+        "markers",
+        "migration: tests specific to migration validation (may be skipped post-release)",
     )
