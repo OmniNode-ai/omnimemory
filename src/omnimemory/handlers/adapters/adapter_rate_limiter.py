@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections import deque
 from typing import TYPE_CHECKING
@@ -65,6 +66,10 @@ __all__ = [
 
 # Constants for rate limiting
 SECONDS_PER_MINUTE = 60.0
+
+# Pattern for validating provider/model identifiers
+# Allows alphanumeric characters, hyphens, underscores, periods, and forward slashes
+_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z0-9._/-]+$")
 
 
 class ProviderRateLimiter:
@@ -301,6 +306,12 @@ class ProviderRateLimiter:
             return max(0, self._max_requests - len(window_snapshot))
         except RuntimeError:
             # Deque was modified during iteration - return conservative estimate
+            logger.debug(
+                "Concurrent modification detected in get_remaining() for %s/%s, "
+                "returning conservative estimate",
+                self._config.provider,
+                self._config.model,
+            )
             return 0
 
     def get_reset_time(self) -> float:
@@ -377,8 +388,41 @@ class RateLimiterRegistry:
         self._lock = asyncio.Lock()
 
     @staticmethod
+    def _validate_identifier(value: str, field_name: str) -> None:
+        """Validate that an identifier contains only allowed characters.
+
+        Args:
+            value: The identifier value to validate.
+            field_name: Name of the field for error messages.
+
+        Raises:
+            ValueError: If the identifier is empty or contains invalid characters.
+        """
+        if not value or not value.strip():
+            raise ValueError(f"{field_name} cannot be empty")
+        if not _IDENTIFIER_PATTERN.match(value.strip()):
+            raise ValueError(
+                f"{field_name} contains invalid characters: {value!r}. "
+                "Only alphanumeric characters, hyphens, underscores, periods, "
+                "and forward slashes are allowed."
+            )
+
+    @staticmethod
     def _normalize_key(provider: str, model: str) -> tuple[str, str]:
-        """Normalize provider and model to lowercase for consistent keying."""
+        """Normalize provider and model to lowercase for consistent keying.
+
+        Args:
+            provider: Provider identifier.
+            model: Model identifier.
+
+        Returns:
+            Tuple of (normalized_provider, normalized_model).
+
+        Raises:
+            ValueError: If provider or model are empty or contain invalid characters.
+        """
+        RateLimiterRegistry._validate_identifier(provider, "provider")
+        RateLimiterRegistry._validate_identifier(model, "model")
         return (provider.lower().strip(), model.lower().strip())
 
     async def get_or_create(

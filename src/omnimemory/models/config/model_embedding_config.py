@@ -87,6 +87,8 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         rate_limit_rpm: Requests per minute limit (0 for no limit).
         rate_limit_tpm: Tokens per minute limit (0 for no limit).
         auth_header: Optional authorization header value (e.g., "Bearer <token>").
+        embed_endpoint_path: Custom embed endpoint path. If None, auto-detects
+            based on provider (OpenAI: /v1/embeddings, Local/vLLM: /embed).
     """
 
     model_config = ConfigDict(
@@ -141,6 +143,14 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         default=None,
         description="Authorization header value (e.g., 'Bearer <token>')",
     )
+    embed_endpoint_path: str | None = Field(
+        default=None,
+        description=(
+            "Custom embed endpoint path (e.g., '/v1/embeddings'). "
+            "If None, auto-detects based on provider: OpenAI uses /v1/embeddings, "
+            "Local/vLLM uses /embed."
+        ),
+    )
 
     @field_validator("base_url")
     @classmethod
@@ -152,13 +162,17 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
     def embed_endpoint(self) -> str:
         """Get the full URL for the embed endpoint.
 
-        Different providers have different endpoint patterns:
+        If ``embed_endpoint_path`` is set, uses that path directly.
+        Otherwise auto-detects based on provider:
+
         - OpenAI: /v1/embeddings
         - Local/vLLM: /embed
 
         Returns:
             The full URL for the embedding endpoint.
         """
+        if self.embed_endpoint_path is not None:
+            return f"{self.base_url}{self.embed_endpoint_path}"
         if self.provider == EnumEmbeddingProviderType.OPENAI:
             return f"{self.base_url}/v1/embeddings"
         # Local and vLLM use /embed

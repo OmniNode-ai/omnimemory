@@ -489,3 +489,72 @@ class TestRateLimiterRegistry:
 
         await registry.clear()
         assert registry.count == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_provider_raises(self, registry: RateLimiterRegistry) -> None:
+        """Test that empty provider raises ValueError."""
+        with pytest.raises(ValueError, match="provider cannot be empty"):
+            await registry.get_or_create(provider="", model="test")
+
+    @pytest.mark.asyncio
+    async def test_whitespace_provider_raises(
+        self, registry: RateLimiterRegistry
+    ) -> None:
+        """Test that whitespace-only provider raises ValueError."""
+        with pytest.raises(ValueError, match="provider cannot be empty"):
+            await registry.get_or_create(provider="   ", model="test")
+
+    @pytest.mark.asyncio
+    async def test_empty_model_raises(self, registry: RateLimiterRegistry) -> None:
+        """Test that empty model raises ValueError."""
+        with pytest.raises(ValueError, match="model cannot be empty"):
+            await registry.get_or_create(provider="openai", model="")
+
+    @pytest.mark.asyncio
+    async def test_invalid_provider_characters_raises(
+        self, registry: RateLimiterRegistry
+    ) -> None:
+        """Test that provider with invalid characters raises ValueError."""
+        with pytest.raises(ValueError, match="provider contains invalid characters"):
+            await registry.get_or_create(provider="open ai", model="test")
+
+    @pytest.mark.asyncio
+    async def test_invalid_model_characters_raises(
+        self, registry: RateLimiterRegistry
+    ) -> None:
+        """Test that model with invalid characters raises ValueError."""
+        with pytest.raises(ValueError, match="model contains invalid characters"):
+            await registry.get_or_create(provider="openai", model="test@model")
+
+    @pytest.mark.asyncio
+    async def test_special_characters_rejected(
+        self, registry: RateLimiterRegistry
+    ) -> None:
+        """Test various special characters are rejected."""
+        invalid_chars = ["@", "#", "$", "%", "^", "&", "*", "(", ")", " ", "!", "?"]
+        for char in invalid_chars:
+            with pytest.raises(ValueError, match="contains invalid characters"):
+                await registry.get_or_create(
+                    provider=f"test{char}provider", model="model"
+                )
+
+    @pytest.mark.asyncio
+    async def test_valid_identifier_patterns(
+        self, registry: RateLimiterRegistry
+    ) -> None:
+        """Test that valid identifier patterns are accepted."""
+        # Test various valid patterns
+        valid_pairs = [
+            ("openai", "text-embedding-3-small"),
+            ("local_provider", "model_v2"),
+            ("provider.name", "model.version"),
+            ("UPPERCASE", "MixedCase"),
+            ("provider-with-dashes", "model-with-dashes"),
+            ("provider_with_underscores", "model_with_underscores"),
+            ("provider123", "model456"),
+            ("local/provider", "models/gpt-4"),
+        ]
+        for provider, model in valid_pairs:
+            limiter = await registry.get_or_create(provider=provider, model=model)
+            assert limiter is not None
+        await registry.clear()
