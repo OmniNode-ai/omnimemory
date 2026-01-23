@@ -36,13 +36,9 @@ transaction_management:
   enabled: false
 
 # === NODE CONFIGURATION ===
+# NOTE: Only main_tool_class is part of canonical ModelToolSpecification from omnibase_core
 tool_specification:
-  tool_name: "node_memory_retrieval_effect"
-  version: {major: 0, minor: 1, patch: 0}
-  description: "Memory retrieval effect node for search operations"
   main_tool_class: "NodeMemoryRetrievalEffect"
-  container_injection: "ONEXContainer"
-  business_logic_pattern: "effect"
 
 # === SERVICE CONFIGURATION ===
 service_configuration:
@@ -115,8 +111,9 @@ performance:
   max_response_time_ms: 100
 
 # === EVENT TYPE CONFIGURATION ===
+# NOTE: Using schema_version per ModelEventType from omnibase_core
 event_type:
-  version: {major: 1, minor: 0, patch: 0}
+  schema_version: {major: 1, minor: 0, patch: 0}
   primary_events: ["memory_searched", "memory_retrieved", "graph_traversed"]
   event_categories: ["memory", "effect", "retrieval", "search"]
   publish_events: true
