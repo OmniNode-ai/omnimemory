@@ -1,8 +1,13 @@
 """
 Subscription domain models for OmniMemory following ONEX standards.
 
-This module provides models for agent subscriptions, notification delivery,
-and circuit breaker state management for the memory change notification system.
+This module provides models for agent subscriptions and notification events
+for the memory change notification system.
+
+Delivery Mechanism:
+    Notifications are published to Kafka. Agents consume events directly via
+    consumer groups. If webhook delivery to external systems is needed in the
+    future, implement a WebhookEmitterEffect node separately.
 
 Topic Naming Convention: memory.<entity>.<event>
 Examples:
@@ -12,43 +17,23 @@ Examples:
     - memory.collection.created
 """
 
-from ...enums.enum_subscription_status import (
-    EnumCircuitBreakerState,
-    EnumDeliveryStatus,
-    EnumSubscriptionStatus,
-)
+from ...enums.enum_subscription_status import EnumSubscriptionStatus
 from .constants import (
-    DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS,
-    DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
-    DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-    DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
     TOPIC_PATTERN,
     TOPIC_PATTERN_REGEX,
 )
-from .model_circuit_breaker_state import ModelCircuitBreakerState
-from .model_notification_delivery_attempt import ModelNotificationDeliveryAttempt
 from .model_notification_event import ModelNotificationEvent
 from .model_notification_event_payload import ModelNotificationEventPayload
 from .model_subscription import ModelSubscription
-from .model_subscription_delivery import ModelSubscriptionDeliveryWebhook
 
 __all__ = [
     # Constants
-    "DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS",
-    "DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS",
-    "DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-    "DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD",
     "TOPIC_PATTERN",
     "TOPIC_PATTERN_REGEX",
     # Enums
-    "EnumCircuitBreakerState",
-    "EnumDeliveryStatus",
     "EnumSubscriptionStatus",
     # Models
-    "ModelCircuitBreakerState",
-    "ModelNotificationDeliveryAttempt",
     "ModelNotificationEvent",
     "ModelNotificationEventPayload",
     "ModelSubscription",
-    "ModelSubscriptionDeliveryWebhook",
 ]

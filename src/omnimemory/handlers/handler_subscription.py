@@ -3,43 +3,19 @@
 This module provides the core subscription management functionality:
 - subscribe(): Register agent subscriptions to memory topics
 - unsubscribe(): Remove agent subscriptions
-- notify(): Send notifications to all subscribers of a topic
+- notify(): Publish notification events to Kafka for subscriber consumption
 - list_subscriptions(): Get all subscriptions for an agent
 
 Architecture:
 - Persistence: Valkey (fast lookups) + PostgreSQL (source of truth)
-- Delivery: Webhook only (HTTP POST with retry/DLQ)
+- Delivery: Kafka event bus (agents consume directly)
 - Topic naming: memory.<entity>.<event> convention
 
-Note on Retry Worker:
-    This handler records retry schedules (``next_retry_at`` field) and persists
-    failed delivery attempts to the ``delivery_attempts`` table, but it does NOT
-    implement the background retry worker. A separate component (e.g., a scheduled
-    task, cron job, or Kafka consumer) is responsible for polling the
-    ``delivery_attempts`` table for rows where ``status = 'failed'`` and
-    ``next_retry_at <= NOW()``, then re-invoking delivery. This separation follows
-    the single-responsibility principle: the handler manages subscriptions and
-    immediate delivery attempts, while retry orchestration is a distinct concern.
-
-IMPORTANT - Retry Worker Not Implemented:
-    This handler records retry schedules but does NOT execute retries automatically.
-    A separate background worker is required to poll the ``delivery_attempts`` table
-    and re-invoke delivery for failed attempts.
-
-    TODO(OMN-1454): Implement the RetryWorker component that:
-        1. Polls ``delivery_attempts`` for pending retries
-        2. Re-invokes delivery via this handler
-        3. Updates attempt records with new results
-        4. Handles DLQ escalation after max attempts
-
-    Query for pending retries::
-
-        SELECT da.*, s.webhook_url, s.webhook_secret, s.agent_id
-        FROM delivery_attempts da
-        JOIN subscriptions s ON da.subscription_id = s.id
-        WHERE da.status = 'failed'
-          AND da.next_retry_at <= NOW()
-        ORDER BY da.next_retry_at ASC;
+Event Bus Strategy:
+    Notifications are published to Kafka topics. Internal agents consume
+    events directly via consumer groups. If external (non-Kafka) delivery
+    is needed in the future, implement a WebhookEmitterEffect node that
+    consumes bus events and handles HTTP delivery separately.
 
 Example::
 
@@ -48,7 +24,6 @@ Example::
         ModelHandlerSubscriptionConfig,
     )
     from omnimemory.models.subscription import (
-        ModelSubscriptionDeliveryWebhook,
         ModelNotificationEvent,
         ModelNotificationEventPayload,
     )
@@ -57,22 +32,18 @@ Example::
         db_dsn="postgresql://user:pass@localhost:5432/omnimemory",
         valkey_host="localhost",
         valkey_port=6379,
+        kafka_bootstrap_servers="localhost:9092",
     )
     handler = HandlerSubscription(config)
     await handler.initialize()
 
     # Subscribe an agent
-    delivery = ModelSubscriptionDeliveryWebhook(
-        webhook_url="https://agent.example.com/webhook",
-        secret="my-hmac-secret",
-    )
     subscription = await handler.subscribe(
         agent_id="agent_123",
         topic="memory.item.created",
-        delivery=delivery,
     )
 
-    # Notify all subscribers
+    # Notify all subscribers (publishes to Kafka)
     event = ModelNotificationEvent(
         event_id="evt_456",
         topic="memory.item.created",
@@ -82,49 +53,38 @@ Example::
             action="created",
         ),
     )
-    attempts = await handler.notify("memory.item.created", event)
+    await handler.notify("memory.item.created", event)
 
     await handler.shutdown()
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1393.
+
+.. versionchanged:: 0.2.0
+    Removed webhook delivery in favor of Kafka event bus.
+    Webhook delivery moved to optional WebhookEmitterEffect node.
 """
 
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
 import json
 import logging
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import cast
 from uuid import uuid4
 
-from cryptography.fernet import Fernet, InvalidToken
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from omnimemory.enums.enum_subscription_status import (
-    EnumCircuitBreakerState,
-    EnumDeliveryStatus,
-    EnumSubscriptionStatus,
-)
+from omnimemory.enums.enum_subscription_status import EnumSubscriptionStatus
 from omnimemory.handlers.adapters.adapter_valkey import (
     AdapterValkey,
     AdapterValkeyConfig,
 )
 from omnimemory.models.subscription import (
-    ModelNotificationDeliveryAttempt,
     ModelNotificationEvent,
     ModelSubscription,
-    ModelSubscriptionDeliveryWebhook,
-)
-from omnimemory.models.subscription.constants import (
-    DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
-    DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-    DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
 )
 
 # Optional omnibase_infra imports for handler reuse
@@ -133,7 +93,7 @@ _OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
 
 try:
     from omnibase_infra.handlers.handler_db import HandlerDb
-    from omnibase_infra.handlers.handler_http import HandlerHttpRest
+    from omnibase_infra.handlers.handler_kafka import HandlerKafka
 
     _OMNIBASE_INFRA_AVAILABLE = True
 except ImportError as e:
@@ -143,8 +103,8 @@ except ImportError as e:
     class HandlerDb:  # type: ignore[no-redef]
         """Stub for HandlerDb when omnibase_infra is not installed."""
 
-    class HandlerHttpRest:  # type: ignore[no-redef]
-        """Stub for HandlerHttpRest when omnibase_infra is not installed."""
+    class HandlerKafka:  # type: ignore[no-redef]
+        """Stub for HandlerKafka when omnibase_infra is not installed."""
 
 
 logger = logging.getLogger(__name__)
@@ -160,32 +120,9 @@ __all__ = [
 CACHE_KEY_TOPIC_SUBSCRIBERS = "topic:{topic}:subscribers"
 CACHE_KEY_AGENT_SUBSCRIPTIONS = "agent:{agent_id}:subscriptions"
 CACHE_KEY_SUBSCRIPTION = "subscription:{subscription_id}"
-CACHE_KEY_CIRCUIT_BREAKER = "circuit_breaker:{endpoint_hash}"
 
-# Default retry configuration
-DEFAULT_MAX_RETRY_ATTEMPTS = 5
-DEFAULT_RETRY_BASE_DELAY_MS = 1000
-DEFAULT_RETRY_MAX_DELAY_MS = 60000  # 1 minute cap
-
-# Circuit breaker cache TTL in seconds.
-#
-# TTL Refresh Strategy:
-#   - TTL is refreshed on every state update (success/failure recording)
-#   - This ensures active circuits never expire from cache
-#   - State transitions (CLOSED -> OPEN -> HALF_OPEN) also refresh TTL
-#
-# Edge Case - Idle Endpoints:
-#   - If an endpoint goes completely idle while circuit is OPEN (no requests for >1 hour),
-#     the cache entry may expire and state would be lost from Valkey
-#   - On next request, state is recovered from PostgreSQL (durable backup)
-#   - If PostgreSQL has no record, circuit resets to CLOSED (fail-open behavior)
-#   - This is intentional: if no requests occur for an hour, the upstream endpoint
-#     may have recovered, so resetting to CLOSED allows natural recovery detection
-#
-# Recommendation: Configure monitoring/alerting for circuits in OPEN state
-# to detect endpoints that may need manual intervention or investigation.
-# Long-lived open circuits often indicate persistent upstream issues.
-CIRCUIT_BREAKER_CACHE_TTL_SECONDS = 3600  # 1 hour
+# Kafka topic for memory notifications
+KAFKA_TOPIC_MEMORY_NOTIFICATIONS = "omnimemory.memory.notification.v1"
 
 
 @lru_cache(maxsize=128)
@@ -194,18 +131,6 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
 
     Results are cached with LRU policy (maxsize=128) to avoid repeated string
     generation for common query sizes.
-
-    Cache Sizing Rationale:
-        The maxsize=128 is sufficient because:
-        - Typical batch queries use 1-50 placeholders (subscription IDs, etc.)
-        - Larger batches (50-100) are rare but still fit comfortably
-        - The key space is (count, start) pairs; with most start=1, the effective
-          unique keys are typically < 50 distinct counts
-        - Memory overhead per entry is minimal (~50-200 bytes for typical strings)
-        - 128 entries covers all practical query patterns with significant headroom
-
-        The cache prevents repeated string concatenation for frequently used patterns
-        like batch subscription lookups, circuit breaker queries, and bulk updates.
 
     Args:
         count: Number of placeholders to generate. If <= 0, returns empty string.
@@ -243,13 +168,7 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         valkey_port: Valkey server port.
         valkey_db: Valkey database index.
         valkey_password: Optional Valkey password.
-        max_retry_attempts: Maximum delivery retry attempts before DLQ.
-        retry_base_delay_ms: Base delay for exponential backoff.
-        retry_max_delay_ms: Maximum delay cap for retries.
-        circuit_breaker_threshold: Failures before circuit opens.
-        circuit_breaker_success_threshold: Successes in half_open before closing.
-        circuit_breaker_cooldown_seconds: Time before half-open transition.
-        http_timeout_seconds: Webhook delivery timeout.
+        kafka_bootstrap_servers: Kafka bootstrap servers.
         cache_ttl_seconds: TTL for cached subscription data.
     """
 
@@ -283,72 +202,15 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         default=None,
         description="Optional Valkey password",
     )
-    max_retry_attempts: int = Field(
-        default=DEFAULT_MAX_RETRY_ATTEMPTS,
-        ge=1,
-        le=10,
-        description="Maximum delivery retry attempts",
-    )
-    retry_base_delay_ms: int = Field(
-        default=DEFAULT_RETRY_BASE_DELAY_MS,
-        ge=100,
-        le=10000,
-        description="Base delay for exponential backoff (ms)",
-    )
-    retry_max_delay_ms: int = Field(
-        default=DEFAULT_RETRY_MAX_DELAY_MS,
-        ge=1000,
-        le=300000,
-        description="Maximum delay cap for retries (ms)",
-    )
-    circuit_breaker_threshold: int = Field(
-        default=DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-        ge=1,
-        le=100,
-        description="Consecutive failures before circuit opens",
-    )
-    circuit_breaker_success_threshold: int = Field(
-        default=DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
-        ge=1,
-        le=100,
-        description="Number of consecutive successes in half_open state before closing circuit",
-    )
-    circuit_breaker_cooldown_seconds: int = Field(
-        default=DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
-        ge=10,
-        le=600,
-        description="Seconds before circuit transitions to half-open",
-    )
-    http_timeout_seconds: float = Field(
-        default=5.0,
-        gt=0.0,
-        le=30.0,
-        description=(
-            "Default webhook delivery timeout in seconds used during HTTP handler "
-            "initialization. Note: Per-subscription timeout_ms in "
-            "ModelSubscriptionDeliveryWebhook takes precedence when delivering "
-            "notifications. This value serves as the handler-level fallback."
-        ),
+    kafka_bootstrap_servers: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers (comma-separated)",
     )
     cache_ttl_seconds: int = Field(
         default=3600,
         ge=60,
         le=86400,
         description="TTL for cached subscription data",
-    )
-    require_https: bool = Field(
-        default=False,
-        description="Require HTTPS for webhook URLs (recommended for production)",
-    )
-    encryption_key: SecretStr | None = Field(
-        default=None,
-        description=(
-            "Fernet encryption key for webhook secrets at rest. "
-            "Generate with: from cryptography.fernet import Fernet; Fernet.generate_key(). "
-            "When set, webhook_secret values are encrypted before storage in PostgreSQL "
-            "and decrypted when loaded. If not set, secrets are stored in plaintext "
-            "(a warning will be logged)."
-        ),
     )
 
 
@@ -359,10 +221,7 @@ class ModelSubscriptionMetrics(BaseModel):
     and observability.
 
     Attributes:
-        circuit_breaker_db_persist_success: Count of successful circuit breaker DB persistence.
-        circuit_breaker_db_persist_failure: Count of failed circuit breaker DB persistence.
-        notifications_sent: Count of successfully delivered notifications.
-        notifications_failed: Count of failed notification deliveries.
+        notifications_published: Count of notifications published to Kafka.
         subscriptions_created: Count of subscriptions created.
         subscriptions_deleted: Count of subscriptions deleted.
     """
@@ -373,25 +232,10 @@ class ModelSubscriptionMetrics(BaseModel):
         validate_assignment=True,
     )
 
-    circuit_breaker_db_persist_success: int = Field(
+    notifications_published: int = Field(
         default=0,
         ge=0,
-        description="Count of successful circuit breaker DB persistence operations",
-    )
-    circuit_breaker_db_persist_failure: int = Field(
-        default=0,
-        ge=0,
-        description="Count of failed circuit breaker DB persistence operations",
-    )
-    notifications_sent: int = Field(
-        default=0,
-        ge=0,
-        description="Count of successfully delivered notifications",
-    )
-    notifications_failed: int = Field(
-        default=0,
-        ge=0,
-        description="Count of failed notification deliveries",
+        description="Count of notifications published to Kafka",
     )
     subscriptions_created: int = Field(
         default=0,
@@ -413,7 +257,7 @@ class ModelSubscriptionHealth(BaseModel):
         initialized: Whether the handler has been initialized.
         db_healthy: Database connection health.
         valkey_healthy: Valkey connection health.
-        http_healthy: HTTP handler health.
+        kafka_healthy: Kafka connection health.
         error_message: Error details if unhealthy.
         metrics: Optional metrics for observability.
     """
@@ -440,9 +284,9 @@ class ModelSubscriptionHealth(BaseModel):
         default=None,
         description="Valkey connection health",
     )
-    http_healthy: bool | None = Field(
+    kafka_healthy: bool | None = Field(
         default=None,
-        description="HTTP handler health",
+        description="Kafka connection health",
     )
     error_message: str | None = Field(
         default=None,
@@ -457,26 +301,18 @@ class ModelSubscriptionHealth(BaseModel):
 class HandlerSubscription:
     """Handler for agent subscriptions and memory change notifications.
 
-    Manages the lifecycle of subscriptions and handles notification delivery
-    with retry logic, circuit breakers, and dead letter queue support.
+    Manages the lifecycle of subscriptions and publishes notification events
+    to Kafka for consumption by subscribing agents.
 
-    IMPORTANT - Retry Worker Not Implemented:
-        This handler only records retry schedules (``next_retry_at``) and persists
-        failed attempts to the database. It does NOT automatically execute retries.
-        A separate RetryWorker component must be implemented to poll the
-        ``delivery_attempts`` table and re-invoke delivery.
+    Architecture:
+        - Subscription store: PostgreSQL (source of truth) + Valkey (cache)
+        - Notification delivery: Kafka event bus
+        - Agents consume events directly via consumer groups
 
-        See TODO(OMN-1454) for the retry worker implementation ticket.
-
-    Persistence Strategy:
-        - Valkey: Fast lookups for topic->subscribers mapping
-        - PostgreSQL: Source of truth for subscription data and delivery history
-
-    Delivery Features:
-        - Webhook delivery with HMAC signature verification
-        - Exponential backoff retry with configurable attempts
-        - Circuit breaker per endpoint to prevent cascade failures
-        - Dead letter queue for failed deliveries
+    Note on External Delivery:
+        If webhook delivery to external systems is needed, implement a
+        WebhookEmitterEffect node that consumes Kafka events and handles
+        HTTP delivery with its own retry/circuit breaker logic.
 
     Attributes:
         config: The handler configuration.
@@ -500,17 +336,14 @@ class HandlerSubscription:
 
         self._config = config
         self._db_handler: HandlerDb | None = None
-        self._http_handler: HandlerHttpRest | None = None
+        self._kafka_handler: HandlerKafka | None = None
         self._valkey: AdapterValkey | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
         # Metrics for observability
         self._metrics: dict[str, int] = {
-            "circuit_breaker_db_persist_success": 0,
-            "circuit_breaker_db_persist_failure": 0,
-            "notifications_sent": 0,
-            "notifications_failed": 0,
+            "notifications_published": 0,
             "subscriptions_created": 0,
             "subscriptions_deleted": 0,
         }
@@ -526,7 +359,7 @@ class HandlerSubscription:
         return self._initialized
 
     async def initialize(self) -> None:
-        """Initialize DB, Valkey, and HTTP handlers.
+        """Initialize DB, Valkey, and Kafka handlers.
 
         Creates connections to all required services and optionally
         rebuilds the Valkey cache from PostgreSQL on cold start.
@@ -560,14 +393,14 @@ class HandlerSubscription:
                 )
                 logger.info("Database handler initialized")
 
-                # Initialize HTTP handler
-                self._http_handler = HandlerHttpRest()
-                await self._http_handler.initialize(
+                # Initialize Kafka handler
+                self._kafka_handler = HandlerKafka()
+                await self._kafka_handler.initialize(
                     {
-                        "timeout": self._config.http_timeout_seconds,
+                        "bootstrap_servers": self._config.kafka_bootstrap_servers,
                     }
                 )
-                logger.info("HTTP handler initialized")
+                logger.info("Kafka handler initialized")
 
                 # Rebuild cache from DB on cold start
                 await self._rebuild_cache_from_db()
@@ -596,12 +429,12 @@ class HandlerSubscription:
                 pass
             self._db_handler = None
 
-        if self._http_handler:
+        if self._kafka_handler:
             try:
-                await self._http_handler.shutdown()
+                await self._kafka_handler.shutdown()
             except Exception:
                 pass
-            self._http_handler = None
+            self._kafka_handler = None
 
     async def shutdown(self) -> None:
         """Cleanup all resources."""
@@ -617,18 +450,18 @@ class HandlerSubscription:
                 await self._db_handler.shutdown()
                 self._db_handler = None
 
-            if self._http_handler:
-                await self._http_handler.shutdown()
-                self._http_handler = None
+            if self._kafka_handler:
+                await self._kafka_handler.shutdown()
+                self._kafka_handler = None
 
             self._initialized = False
             logger.info("HandlerSubscription shutdown complete")
 
-    def _ensure_initialized(self) -> tuple[AdapterValkey, HandlerDb, HandlerHttpRest]:
+    def _ensure_initialized(self) -> tuple[AdapterValkey, HandlerDb, HandlerKafka]:
         """Ensure handler is initialized and return components.
 
         Returns:
-            Tuple of (valkey, db_handler, http_handler).
+            Tuple of (valkey, db_handler, kafka_handler).
 
         Raises:
             RuntimeError: If handler is not initialized.
@@ -637,90 +470,12 @@ class HandlerSubscription:
             not self._initialized
             or self._valkey is None
             or self._db_handler is None
-            or self._http_handler is None
+            or self._kafka_handler is None
         ):
             raise RuntimeError(
                 "HandlerSubscription not initialized. Call initialize() first."
             )
-        return self._valkey, self._db_handler, self._http_handler
-
-    # =========================================================================
-    # Internal Helpers - Encryption at Rest
-    # =========================================================================
-    # Webhook secrets are encrypted using Fernet (AES-128-CBC with HMAC-SHA256).
-    # Encryption is applied before storing in PostgreSQL and decrypted when loading.
-    # This protects secrets at rest in case of database compromise.
-    #
-    # The encryption key must be a valid Fernet key (32 bytes, base64-encoded).
-    # Generate with: from cryptography.fernet import Fernet; Fernet.generate_key()
-
-    def _encrypt_secret(self, plaintext: str) -> str:
-        """Encrypt a webhook secret for storage in the database.
-
-        Uses Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256) for
-        encryption at rest. If no encryption key is configured, returns
-        the plaintext and logs a warning.
-
-        Args:
-            plaintext: The secret to encrypt.
-
-        Returns:
-            Base64-encoded ciphertext, or plaintext if encryption is disabled.
-        """
-        if not self._config.encryption_key:
-            logger.warning(
-                "encryption_key not configured - storing webhook_secret in plaintext. "
-                "Set encryption_key in config for encryption at rest."
-            )
-            return plaintext
-
-        try:
-            key_bytes = self._config.encryption_key.get_secret_value().encode("utf-8")
-            fernet = Fernet(key_bytes)
-            ciphertext = fernet.encrypt(plaintext.encode("utf-8"))
-            return ciphertext.decode("utf-8")
-        except Exception as e:
-            logger.error("Failed to encrypt webhook secret: %s", e)
-            raise ValueError(f"Encryption failed: {e}") from e
-
-    def _decrypt_secret(self, ciphertext: str) -> str:
-        """Decrypt a webhook secret loaded from the database.
-
-        Uses Fernet symmetric encryption for decryption. If no encryption key
-        is configured, assumes the value is plaintext and returns it as-is.
-        If decryption fails (e.g., wrong key or corrupted data), logs a warning
-        and returns the ciphertext as-is (backwards compatibility for migration).
-
-        Args:
-            ciphertext: The encrypted secret from the database.
-
-        Returns:
-            Decrypted plaintext secret.
-        """
-        if not self._config.encryption_key:
-            # No encryption configured - assume plaintext (backwards compatibility)
-            return ciphertext
-
-        try:
-            key_bytes = self._config.encryption_key.get_secret_value().encode("utf-8")
-            fernet = Fernet(key_bytes)
-            plaintext = fernet.decrypt(ciphertext.encode("utf-8"))
-            return plaintext.decode("utf-8")
-        except InvalidToken:
-            # Decryption failed - could be plaintext from before encryption was enabled
-            # or wrong key. Log warning and return as-is for backwards compatibility.
-            logger.warning(
-                "Failed to decrypt webhook_secret (may be plaintext from before "
-                "encryption was enabled). Returning as-is for backwards compatibility."
-            )
-            return ciphertext
-        except Exception as e:
-            logger.warning(
-                "Unexpected error decrypting webhook_secret: %s. "
-                "Returning as-is for backwards compatibility.",
-                e,
-            )
-            return ciphertext
+        return self._valkey, self._db_handler, self._kafka_handler
 
     # =========================================================================
     # Core Operations
@@ -730,43 +485,30 @@ class HandlerSubscription:
         self,
         agent_id: str,
         topic: str,
-        delivery: ModelSubscriptionDeliveryWebhook,
         metadata: dict[str, str] | None = None,
     ) -> ModelSubscription:
         """Register a new subscription.
 
         Workflow:
             1. Validate topic format (memory.<entity>.<event>)
-            2. Validate webhook URL is HTTPS (if require_https=True)
-            3. Check for existing subscription (upsert behavior)
-            4. Create/update subscription record in Postgres
-            5. Add to Valkey cache: topic:subscribers -> subscription_id
-            6. Add to Valkey cache: agent:subscriptions -> subscription_id
+            2. Check for existing subscription (upsert behavior)
+            3. Create/update subscription record in Postgres
+            4. Add to Valkey cache: topic:subscribers -> subscription_id
+            5. Add to Valkey cache: agent:subscriptions -> subscription_id
 
         Args:
             agent_id: The subscribing agent's identifier.
             topic: Topic pattern (format: memory.<entity>.<event>).
-            delivery: Webhook delivery configuration.
             metadata: Optional subscription metadata.
 
         Returns:
             The created or updated subscription.
 
         Raises:
-            ValueError: If topic format is invalid or if HTTP URL is provided
-                when require_https is True.
+            ValueError: If topic format is invalid.
             RuntimeError: If handler is not initialized.
         """
         valkey, _, _ = self._ensure_initialized()
-
-        # Validate HTTPS requirement for webhook URLs
-        if self._config.require_https:
-            webhook_url = str(delivery.webhook_url)
-            if not webhook_url.startswith("https://"):
-                raise ValueError(
-                    f"HTTPS is required for webhook URLs (require_https=True). "
-                    f"Got: {webhook_url}"
-                )
 
         # Generate subscription ID
         subscription_id = str(uuid4())
@@ -789,7 +531,6 @@ class HandlerSubscription:
             id=subscription_id,
             agent_id=agent_id,
             topic=topic,
-            delivery=delivery,
             status=EnumSubscriptionStatus.ACTIVE,
             created_at=existing.created_at if existing else now,
             updated_at=now,
@@ -801,7 +542,6 @@ class HandlerSubscription:
         self._metrics["subscriptions_created"] += 1
 
         # Update Valkey caches (best effort - DB is source of truth)
-        # Uses pipeline for atomic batch update (single round-trip instead of 3)
         try:
             topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
             agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
@@ -815,7 +555,6 @@ class HandlerSubscription:
                     subscription.model_dump_json(),
                     ttl=self._config.cache_ttl_seconds,
                 )
-                # Commands are executed atomically on context exit
         except Exception as e:
             logger.warning(
                 "Failed to update cache for subscription %s (DB persisted successfully): %s",
@@ -899,30 +638,25 @@ class HandlerSubscription:
         self,
         topic: str,
         event: ModelNotificationEvent,
-    ) -> list[ModelNotificationDeliveryAttempt]:
-        """Send notification to all subscribers.
+    ) -> int:
+        """Publish notification event to Kafka for subscriber consumption.
 
-        Workflow:
-            1. Get subscribers from Valkey cache (fallback to Postgres)
-            2. For each active subscriber:
-               a. Check circuit breaker state
-               b. If closed/half-open: attempt delivery via HandlerHttpRest
-               c. Record delivery attempt
-               d. On failure: schedule retry with exponential backoff
-            3. Return list of delivery attempts
+        Agents subscribe to Kafka topics and consume events via consumer groups.
+        This method publishes the event to the event bus - actual delivery to
+        agents happens through their Kafka consumers.
 
         Args:
             topic: The topic to notify (format: memory.<entity>.<event>).
-            event: The notification event to send.
+            event: The notification event to publish.
 
         Returns:
-            List of delivery attempt records.
+            Number of active subscribers for this topic.
 
         Raises:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
         """
-        self._ensure_initialized()
+        _, _, kafka_handler = self._ensure_initialized()
 
         # Validate that event topic matches the topic argument
         if event.topic != topic:
@@ -932,36 +666,41 @@ class HandlerSubscription:
                 f"correct topic."
             )
 
-        # Get subscribers for topic
+        # Get subscriber count for metrics/logging
         subscriber_ids = await self._get_subscribers_for_topic(topic)
-        if not subscriber_ids:
+        subscriber_count = len(subscriber_ids)
+
+        if subscriber_count == 0:
             logger.debug("No subscribers for topic %s", topic)
-            return []
+            return 0
 
-        # Load subscription details
-        subscriptions = await self._load_subscriptions(subscriber_ids)
-        active_subscriptions = [
-            s for s in subscriptions if s.status == EnumSubscriptionStatus.ACTIVE
-        ]
+        # Publish event to Kafka
+        # Agents consume from this topic via consumer groups keyed by agent_id
+        envelope = {
+            "operation": "kafka.produce",
+            "payload": {
+                "topic": KAFKA_TOPIC_MEMORY_NOTIFICATIONS,
+                "key": topic,  # Partition by topic for ordering
+                "value": event.model_dump_json(),
+                "headers": {
+                    "event_id": event.event_id,
+                    "topic": topic,
+                    "subscriber_count": str(subscriber_count),
+                },
+            },
+        }
+        await kafka_handler.execute(envelope)
 
-        if not active_subscriptions:
-            logger.debug("No active subscribers for topic %s", topic)
-            return []
-
-        # Deliver to each subscriber
-        attempts: list[ModelNotificationDeliveryAttempt] = []
-        for subscription in active_subscriptions:
-            attempt = await self._deliver_notification(subscription, event)
-            attempts.append(attempt)
+        self._metrics["notifications_published"] += 1
 
         logger.info(
-            "Notification sent to %d subscribers for topic %s, event %s",
-            len(attempts),
+            "Published notification for topic %s, event %s, %d subscribers",
             topic,
             event.event_id,
+            subscriber_count,
         )
 
-        return attempts
+        return subscriber_count
 
     async def list_subscriptions(
         self,
@@ -1005,40 +744,21 @@ class HandlerSubscription:
     ) -> None:
         """Persist subscription to PostgreSQL.
 
-        The webhook_secret is encrypted at rest using Fernet encryption if
-        encryption_key is configured. This protects secrets in case of database
-        compromise.
-
         Args:
             subscription: The subscription to persist.
             is_update: Whether this is an update (upsert).
         """
         _, db_handler, _ = self._ensure_initialized()
 
-        # Encrypt webhook secret before storage (if configured and secret exists)
-        encrypted_secret: str | None = None
-        if subscription.delivery.secret is not None:
-            encrypted_secret = self._encrypt_secret(subscription.delivery.secret)
-
         if is_update:
             sql = """
                 UPDATE subscriptions SET
-                    webhook_url = $1,
-                    webhook_secret = $2,
-                    webhook_headers = $3,
-                    webhook_timeout_ms = $4,
-                    status = $5,
-                    updated_at = $6,
-                    metadata = $7
-                WHERE id = $8
+                    status = $1,
+                    updated_at = $2,
+                    metadata = $3
+                WHERE id = $4
             """
             params = [
-                str(subscription.delivery.webhook_url),
-                encrypted_secret,
-                json.dumps(subscription.delivery.headers)
-                if subscription.delivery.headers
-                else None,
-                subscription.delivery.timeout_ms,
                 subscription.status.value,
                 subscription.updated_at.isoformat(),
                 json.dumps(subscription.metadata) if subscription.metadata else None,
@@ -1047,15 +767,10 @@ class HandlerSubscription:
         else:
             sql = """
                 INSERT INTO subscriptions (
-                    id, agent_id, topic, webhook_url, webhook_secret,
-                    webhook_headers, webhook_timeout_ms, status,
+                    id, agent_id, topic, status,
                     created_at, updated_at, metadata
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT (agent_id, topic) DO UPDATE SET
-                    webhook_url = EXCLUDED.webhook_url,
-                    webhook_secret = EXCLUDED.webhook_secret,
-                    webhook_headers = EXCLUDED.webhook_headers,
-                    webhook_timeout_ms = EXCLUDED.webhook_timeout_ms,
                     status = EXCLUDED.status,
                     updated_at = EXCLUDED.updated_at,
                     metadata = EXCLUDED.metadata
@@ -1064,12 +779,6 @@ class HandlerSubscription:
                 subscription.id,
                 subscription.agent_id,
                 subscription.topic,
-                str(subscription.delivery.webhook_url),
-                encrypted_secret,
-                json.dumps(subscription.delivery.headers)
-                if subscription.delivery.headers
-                else None,
-                subscription.delivery.timeout_ms,
                 subscription.status.value,
                 subscription.created_at.isoformat(),
                 subscription.updated_at.isoformat(),
@@ -1128,8 +837,7 @@ class HandlerSubscription:
         _, db_handler, _ = self._ensure_initialized()
 
         sql = """
-            SELECT id, agent_id, topic, webhook_url, webhook_secret,
-                   webhook_headers, webhook_timeout_ms, status,
+            SELECT id, agent_id, topic, status,
                    created_at, updated_at, metadata
             FROM subscriptions
             WHERE agent_id = $1 AND topic = $2 AND status != $3
@@ -1164,8 +872,7 @@ class HandlerSubscription:
         _, db_handler, _ = self._ensure_initialized()
 
         sql = """
-            SELECT id, agent_id, topic, webhook_url, webhook_secret,
-                   webhook_headers, webhook_timeout_ms, status,
+            SELECT id, agent_id, topic, status,
                    created_at, updated_at, metadata
             FROM subscriptions
             WHERE agent_id = $1 AND status = $2
@@ -1193,11 +900,6 @@ class HandlerSubscription:
             ModelSubscription instance.
         """
         # Parse JSON fields
-        headers = None
-        webhook_headers_raw = row.get("webhook_headers")
-        if webhook_headers_raw:
-            headers = json.loads(str(webhook_headers_raw))
-
         metadata = None
         metadata_raw = row.get("metadata")
         if metadata_raw:
@@ -1220,32 +922,10 @@ class HandlerSubscription:
         else:
             updated_at_parsed = cast(datetime, updated_at_raw)
 
-        # Extract webhook secret with proper typing and decrypt if encrypted
-        # The secret may be encrypted at rest using Fernet - decrypt it here.
-        # If decryption fails (e.g., plaintext from before encryption was enabled),
-        # _decrypt_secret() handles backwards compatibility gracefully.
-        webhook_secret_raw = row.get("webhook_secret")
-        webhook_secret: str | None = None
-        if webhook_secret_raw is not None:
-            encrypted_value = str(webhook_secret_raw)
-            webhook_secret = self._decrypt_secret(encrypted_value)
-
-        # Extract timeout with proper typing
-        timeout_raw = row.get("webhook_timeout_ms")
-        timeout_ms: int = int(str(timeout_raw)) if timeout_raw is not None else 5000
-
-        delivery = ModelSubscriptionDeliveryWebhook(
-            webhook_url=HttpUrl(str(row["webhook_url"])),
-            secret=webhook_secret,
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
         return ModelSubscription(
             id=str(row["id"]),
             agent_id=str(row["agent_id"]),
             topic=str(row["topic"]),
-            delivery=delivery,
             status=EnumSubscriptionStatus(str(row["status"])),
             created_at=created_at_parsed,
             updated_at=updated_at_parsed,
@@ -1263,8 +943,7 @@ class HandlerSubscription:
         logger.info("Rebuilding Valkey cache from PostgreSQL...")
 
         sql = """
-            SELECT id, agent_id, topic, webhook_url, webhook_secret,
-                   webhook_headers, webhook_timeout_ms, status,
+            SELECT id, agent_id, topic, status,
                    created_at, updated_at, metadata
             FROM subscriptions
             WHERE status = $1
@@ -1285,9 +964,7 @@ class HandlerSubscription:
             logger.info("No subscriptions to cache, skipping pipeline")
             return
 
-        # Use pipeline for atomic batch update - prevents race condition where
-        # another instance could see partial cache state during rebuild.
-        # All cache operations happen in a single round-trip.
+        # Use pipeline for atomic batch update
         async with valkey.pipeline() as pipe:
             for row in rows:
                 subscription = self._row_to_subscription(row)
@@ -1309,7 +986,6 @@ class HandlerSubscription:
                     agent_id=subscription.agent_id
                 )
                 pipe.sadd(agent_key, subscription.id)
-            # Commands are executed atomically on context exit
 
         logger.info(
             "Valkey cache rebuilt with %d subscriptions using pipeline (atomic batch)",
@@ -1394,11 +1070,9 @@ class HandlerSubscription:
 
         # Load missing from database
         if missing_ids:
-            # NOTE: SQL injection safe - _sql_placeholders() generates only $N patterns
             placeholders = _sql_placeholders(len(missing_ids))
             sql = f"""
-                SELECT id, agent_id, topic, webhook_url, webhook_secret,
-                       webhook_headers, webhook_timeout_ms, status,
+                SELECT id, agent_id, topic, status,
                        created_at, updated_at, metadata
                 FROM subscriptions
                 WHERE id IN ({placeholders})
@@ -1426,788 +1100,6 @@ class HandlerSubscription:
                 )
 
         return subscriptions
-
-    # =========================================================================
-    # Internal Helpers - Delivery
-    # =========================================================================
-
-    async def _deliver_notification(
-        self,
-        subscription: ModelSubscription,
-        event: ModelNotificationEvent,
-    ) -> ModelNotificationDeliveryAttempt:
-        """Deliver notification to a single subscriber.
-
-        Timeout Precedence:
-            Per-subscription timeout (subscription.delivery.timeout_ms) takes
-            precedence over the handler-level config.http_timeout_seconds.
-            The subscription-level timeout is converted from milliseconds to
-            seconds and passed directly to the HTTP request.
-
-        Args:
-            subscription: The subscription to deliver to.
-            event: The notification event.
-
-        Returns:
-            Delivery attempt record.
-        """
-        _, _, http_handler = self._ensure_initialized()
-
-        delivery_id = str(uuid4())
-        webhook_url = str(subscription.delivery.webhook_url)
-        start_time = time.perf_counter()
-
-        # Check circuit breaker
-        circuit_allowed = await self._check_circuit_breaker(webhook_url)
-        if not circuit_allowed:
-            logger.warning(
-                "Circuit breaker OPEN for endpoint %s, skipping delivery",
-                webhook_url,
-            )
-            self._metrics["notifications_failed"] += 1
-            return ModelNotificationDeliveryAttempt(
-                delivery_id=delivery_id,
-                subscription_id=subscription.id,
-                event_id=event.event_id,
-                attempt_number=1,
-                status=EnumDeliveryStatus.FAILED,
-                error_message="Circuit breaker open - endpoint temporarily unavailable",
-                created_at=datetime.now(timezone.utc),
-            )
-
-        # Build request payload
-        payload_json = event.model_dump_json()
-
-        # Build headers
-        headers: dict[str, str] = {
-            "Content-Type": "application/json",
-            "X-Event-ID": event.event_id,
-            "X-Subscription-ID": subscription.id,
-        }
-
-        # Add custom headers from subscription
-        if subscription.delivery.headers:
-            headers.update(subscription.delivery.headers)
-
-        # Add HMAC signature if secret is configured
-        if subscription.delivery.secret:
-            signature = self._compute_hmac_signature(
-                payload_json, subscription.delivery.secret
-            )
-            headers["X-Signature-256"] = signature
-
-        # Execute webhook delivery
-        try:
-            envelope = {
-                "operation": "http.post",
-                "payload": {
-                    "url": webhook_url,
-                    "headers": headers,
-                    "body": json.loads(payload_json),  # dict for httpx
-                    "timeout": subscription.delivery.timeout_ms
-                    / 1000.0,  # Convert ms to seconds
-                },
-            }
-            result = await http_handler.execute(envelope)
-
-            end_time = time.perf_counter()
-            latency_ms = int((end_time - start_time) * 1000)
-
-            # Parse response
-            response_payload = result.result.get("payload", {})
-            status_code = response_payload.get("status_code", 0)
-            response_body = response_payload.get("body", "")
-
-            # Determine success (2xx status codes)
-            is_success = 200 <= status_code < 300
-
-            # Update circuit breaker (pass error message on failure)
-            error_msg = None if is_success else f"HTTP {status_code}"
-            await self._update_circuit_breaker(
-                webhook_url, success=is_success, error_message=error_msg
-            )
-
-            if is_success:
-                self._metrics["notifications_sent"] += 1
-                attempt = ModelNotificationDeliveryAttempt(
-                    delivery_id=delivery_id,
-                    subscription_id=subscription.id,
-                    event_id=event.event_id,
-                    attempt_number=1,
-                    status=EnumDeliveryStatus.SUCCESS,
-                    status_code=status_code,
-                    response_body=str(response_body)[:4096] if response_body else None,
-                    latency_ms=latency_ms,
-                    created_at=datetime.now(timezone.utc),
-                    completed_at=datetime.now(timezone.utc),
-                )
-            else:
-                # Schedule retry
-                self._metrics["notifications_failed"] += 1
-                attempt = await self._handle_delivery_failure(
-                    delivery_id=delivery_id,
-                    subscription=subscription,
-                    event=event,
-                    attempt_number=1,
-                    status_code=status_code,
-                    error_message=f"HTTP {status_code}",
-                    response_body=str(response_body)[:4096] if response_body else None,
-                    latency_ms=latency_ms,
-                )
-
-            # Persist delivery attempt
-            await self._persist_delivery_attempt(attempt)
-
-            return attempt
-
-        except Exception as e:
-            end_time = time.perf_counter()
-            latency_ms = int((end_time - start_time) * 1000)
-
-            # Update circuit breaker on failure with error message
-            self._metrics["notifications_failed"] += 1
-            await self._update_circuit_breaker(
-                webhook_url, success=False, error_message=str(e)[:2048]
-            )
-
-            attempt = await self._handle_delivery_failure(
-                delivery_id=delivery_id,
-                subscription=subscription,
-                event=event,
-                attempt_number=1,
-                status_code=None,
-                error_message=str(e)[:2048],
-                response_body=None,
-                latency_ms=latency_ms,
-            )
-
-            await self._persist_delivery_attempt(attempt)
-
-            return attempt
-
-    async def _handle_delivery_failure(
-        self,
-        delivery_id: str,
-        subscription: ModelSubscription,
-        event: ModelNotificationEvent,
-        attempt_number: int,
-        status_code: int | None,
-        error_message: str,
-        response_body: str | None,
-        latency_ms: int,
-    ) -> ModelNotificationDeliveryAttempt:
-        """Handle a failed delivery attempt.
-
-        Schedules retry with exponential backoff or moves to DLQ.
-
-        WARNING - Retry Scheduling Only:
-            This method only RECORDS the scheduled retry time (``next_retry_at``)
-            in the ``delivery_attempts`` table. It does NOT execute the retry.
-            A separate background worker (TODO: OMN-1454) must poll the table
-            and re-invoke delivery for pending retries.
-
-        Args:
-            delivery_id: The delivery attempt ID.
-            subscription: The subscription.
-            event: The notification event.
-            attempt_number: Current attempt number.
-            status_code: HTTP status code (if available).
-            error_message: Error message.
-            response_body: Response body (if available).
-            latency_ms: Request latency.
-
-        Returns:
-            Delivery attempt record.
-        """
-        if attempt_number >= self._config.max_retry_attempts:
-            # Move to DLQ
-            logger.warning(
-                "Delivery to %s failed after %d attempts, moving to DLQ",
-                subscription.delivery.webhook_url,
-                attempt_number,
-            )
-            return ModelNotificationDeliveryAttempt(
-                delivery_id=delivery_id,
-                subscription_id=subscription.id,
-                event_id=event.event_id,
-                attempt_number=attempt_number,
-                status=EnumDeliveryStatus.DLQ,
-                status_code=status_code,
-                error_message=error_message,
-                response_body=response_body,
-                latency_ms=latency_ms,
-                created_at=datetime.now(timezone.utc),
-            )
-
-        # Calculate next retry time with exponential backoff.
-        # NOTE: This handler only records the scheduled retry time; it does NOT
-        # execute the retry. A separate background worker must poll the
-        # delivery_attempts table for pending retries (see module docstring).
-        #
-        # TODO(OMN-1454): Implement RetryWorker that polls delivery_attempts table
-        # for rows where status='failed' AND next_retry_at <= NOW() and re-invokes
-        # delivery. See also: module docstring for architectural rationale.
-        delay_ms = min(
-            self._config.retry_base_delay_ms * (2 ** (attempt_number - 1)),
-            self._config.retry_max_delay_ms,
-        )
-        next_retry_at = datetime.now(timezone.utc) + timedelta(milliseconds=delay_ms)
-
-        logger.info(
-            "Scheduling retry for subscription %s, attempt %d in %d ms",
-            subscription.id,
-            attempt_number + 1,
-            delay_ms,
-        )
-
-        return ModelNotificationDeliveryAttempt(
-            delivery_id=delivery_id,
-            subscription_id=subscription.id,
-            event_id=event.event_id,
-            attempt_number=attempt_number,
-            status=EnumDeliveryStatus.FAILED,
-            status_code=status_code,
-            error_message=error_message,
-            response_body=response_body,
-            latency_ms=latency_ms,
-            next_retry_at=next_retry_at,
-            created_at=datetime.now(timezone.utc),
-        )
-
-    async def _persist_delivery_attempt(
-        self,
-        attempt: ModelNotificationDeliveryAttempt,
-    ) -> None:
-        """Persist delivery attempt to database.
-
-        Args:
-            attempt: The delivery attempt to persist.
-        """
-        _, db_handler, _ = self._ensure_initialized()
-
-        sql = """
-            INSERT INTO delivery_attempts (
-                id, subscription_id, event_id, attempt_number, status,
-                status_code, error_message, response_body, latency_ms,
-                next_retry_at, created_at, completed_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (subscription_id, event_id, attempt_number) DO UPDATE SET
-                status = EXCLUDED.status,
-                status_code = EXCLUDED.status_code,
-                error_message = EXCLUDED.error_message,
-                response_body = EXCLUDED.response_body,
-                latency_ms = EXCLUDED.latency_ms,
-                next_retry_at = EXCLUDED.next_retry_at,
-                completed_at = EXCLUDED.completed_at
-        """
-        envelope = {
-            "operation": "db.execute",
-            "payload": {
-                "sql": sql,
-                "parameters": [
-                    attempt.delivery_id,
-                    attempt.subscription_id,
-                    attempt.event_id,
-                    attempt.attempt_number,
-                    attempt.status.value,
-                    attempt.status_code,
-                    attempt.error_message,
-                    attempt.response_body,
-                    attempt.latency_ms,
-                    attempt.next_retry_at.isoformat()
-                    if attempt.next_retry_at
-                    else None,
-                    attempt.created_at.isoformat(),
-                    attempt.completed_at.isoformat() if attempt.completed_at else None,
-                ],
-            },
-        }
-        await db_handler.execute(envelope)
-
-    def _compute_hmac_signature(self, payload: str, secret: str) -> str:
-        """Compute HMAC-SHA256 signature for webhook payload.
-
-        Args:
-            payload: The JSON payload string.
-            secret: The shared secret.
-
-        Returns:
-            Hex-encoded signature with "sha256=" prefix.
-        """
-        signature = hmac.new(
-            secret.encode("utf-8"),
-            payload.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-        return f"sha256={signature}"
-
-    # =========================================================================
-    # Internal Helpers - Circuit Breaker
-    # =========================================================================
-
-    def _endpoint_hash(self, endpoint: str) -> str:
-        """Generate hash for endpoint to use as cache key.
-
-        Uses SHA256 truncated to 128 bits (32 hex chars) for cache key generation.
-        This provides strong collision resistance while keeping keys compact.
-
-        Collision Resistance:
-            With 128 bits (2^128 possible values), the birthday paradox gives us
-            approximately 2^64 operations before a 50% collision probability. For
-            practical purposes with thousands of endpoints, collision risk is
-            negligible (less than 1 in 10^30 for 10,000 endpoints).
-
-        Note:
-            This hash is used for Valkey cache keys. The database currently uses
-            truncated endpoint URLs (512 chars) as the primary key, which creates
-            a potential inconsistency. See _load_circuit_breaker_from_db() for
-            documentation on this limitation.
-
-        Args:
-            endpoint: The webhook URL.
-
-        Returns:
-            SHA256 hash of the endpoint (first 32 hex chars, 128 bits).
-        """
-        return hashlib.sha256(endpoint.encode()).hexdigest()[:32]
-
-    async def _check_circuit_breaker(self, endpoint: str) -> bool:
-        """Check if a request should be allowed through circuit breaker.
-
-        Tries Valkey cache first for speed, falls back to PostgreSQL if cache misses.
-        On DB fallback, repopulates the Valkey cache for subsequent requests.
-
-        Args:
-            endpoint: The webhook endpoint URL.
-
-        Returns:
-            True if request should proceed, False if circuit is open.
-        """
-        valkey, _, _ = self._ensure_initialized()
-
-        endpoint_hash = self._endpoint_hash(endpoint)
-        cb_key = CACHE_KEY_CIRCUIT_BREAKER.format(endpoint_hash=endpoint_hash)
-
-        # Try Valkey cache first
-        cached = await valkey.get(cb_key)
-        state_dict: dict[str, object] | None = None
-
-        if cached:
-            try:
-                state_dict = json.loads(cached)
-            except Exception as e:
-                logger.warning("Failed to parse cached circuit breaker state: %s", e)
-                state_dict = None
-
-        # Fallback to PostgreSQL if Valkey misses
-        if state_dict is None:
-            state_dict = await self._load_circuit_breaker_from_db(endpoint)
-            if state_dict:
-                # Repopulate Valkey cache from DB with TTL refresh
-                await valkey.set_key(
-                    cb_key,
-                    json.dumps(state_dict),
-                    ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
-                )
-                logger.info(
-                    "Circuit breaker state for %s loaded from DB fallback and cached",
-                    endpoint,
-                )
-
-        if not state_dict:
-            # No circuit breaker state = allow (first request to this endpoint)
-            return True
-
-        try:
-            state = EnumCircuitBreakerState(state_dict.get("state", "closed"))
-
-            if state == EnumCircuitBreakerState.CLOSED:
-                return True
-
-            if state == EnumCircuitBreakerState.OPEN:
-                # Check if cooldown has passed
-                open_until = state_dict.get("open_until")
-                if open_until:
-                    open_until_str = str(open_until)
-                    open_until_dt = datetime.fromisoformat(
-                        open_until_str.replace("Z", "+00:00")
-                    )
-                    if datetime.now(timezone.utc) >= open_until_dt:
-                        # Transition to half-open state. TTL is refreshed to prevent
-                        # state loss during the half-open testing period.
-                        state_dict["state"] = EnumCircuitBreakerState.HALF_OPEN.value
-                        await valkey.set_key(
-                            cb_key,
-                            json.dumps(state_dict),
-                            ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
-                        )
-                        # Also persist the state transition to DB
-                        await self._persist_circuit_breaker_to_db(endpoint, state_dict)
-                        return True
-                return False
-
-            # HALF_OPEN: allow request for testing
-            return True
-
-        except Exception as e:
-            logger.warning("Failed to check circuit breaker: %s", e)
-            return True  # Fail open
-
-    async def _load_circuit_breaker_from_db(
-        self,
-        endpoint: str,
-    ) -> dict[str, object] | None:
-        """Load circuit breaker state from PostgreSQL.
-
-        Known Limitation - Cache/DB Key Inconsistency:
-            The Valkey cache uses _endpoint_hash() (32-char SHA256 hash of the FULL
-            endpoint) as the key, while the database uses the truncated endpoint URL
-            (max 512 chars) as the primary key. This creates a potential inconsistency:
-
-            - Cache key: Hash of FULL endpoint URL (collision-resistant)
-            - DB key: First 512 chars of endpoint URL (truncation-based)
-
-            If two different long URLs (>512 chars) share the same first 512 characters
-            but differ afterward, they would:
-            - Have DIFFERENT cache keys (correct behavior)
-            - Have the SAME database key (collision/overwrite)
-
-            This is unlikely in practice since most webhook URLs are well under 512
-            chars, and URLs that exceed this typically differ in the path/query
-            portion which appears early in the URL. However, the limitation exists.
-
-            TODO: Future migration should add an endpoint_hash column to the
-            circuit_breaker_states table and use it as the primary key, storing
-            the full endpoint URL in a separate TEXT column for debugging.
-            See: OMN-1393 follow-up ticket needed for this schema migration.
-
-        Args:
-            endpoint: The webhook endpoint URL.
-
-        Returns:
-            Circuit breaker state dict if found, None otherwise.
-        """
-        _, db_handler, _ = self._ensure_initialized()
-
-        # Truncate endpoint if too long (VARCHAR(512) limit in DB)
-        # WARNING: This truncation can cause key collisions for long URLs.
-        # See docstring above for full explanation of this limitation.
-        endpoint_to_query = endpoint[:512]
-        if len(endpoint) > 512:
-            logger.warning(
-                "Endpoint URL truncated from %d to 512 chars for DB query. "
-                "COLLISION RISK: If another endpoint shares the same first 512 chars, "
-                "circuit breaker states may be incorrectly shared. Endpoint prefix: %s...",
-                len(endpoint),
-                endpoint[:50],
-            )
-
-        sql = """
-            SELECT state, failure_count, success_count, last_failure_at,
-                   last_success_at, last_error_message, open_until,
-                   total_requests, total_failures, updated_at
-            FROM circuit_breaker_states
-            WHERE endpoint = $1
-        """
-        envelope = {
-            "operation": "db.query",
-            "payload": {
-                "sql": sql,
-                "parameters": [endpoint_to_query],
-            },
-        }
-
-        try:
-            result = await db_handler.execute(envelope)
-            rows = result.result.get("payload", {}).get("rows", [])
-
-            if not rows:
-                return None
-
-            row = rows[0]
-
-            # Convert DB row to state dict format used by Valkey
-            state_dict: dict[str, object] = {
-                "state": row.get("state", "closed"),
-                "failure_count": row.get("failure_count", 0),
-                "success_count": row.get("success_count", 0),
-                "total_requests": row.get("total_requests", 0),
-                "total_failures": row.get("total_failures", 0),
-            }
-
-            # Handle nullable datetime fields
-            if row.get("last_failure_at"):
-                last_failure = row["last_failure_at"]
-                if isinstance(last_failure, datetime):
-                    state_dict["last_failure_at"] = last_failure.isoformat()
-                else:
-                    state_dict["last_failure_at"] = str(last_failure)
-
-            if row.get("last_success_at"):
-                last_success = row["last_success_at"]
-                if isinstance(last_success, datetime):
-                    state_dict["last_success_at"] = last_success.isoformat()
-                else:
-                    state_dict["last_success_at"] = str(last_success)
-
-            if row.get("open_until"):
-                open_until = row["open_until"]
-                if isinstance(open_until, datetime):
-                    state_dict["open_until"] = open_until.isoformat()
-                else:
-                    state_dict["open_until"] = str(open_until)
-
-            if row.get("last_error_message"):
-                state_dict["last_error_message"] = row["last_error_message"]
-
-            if row.get("updated_at"):
-                updated_at = row["updated_at"]
-                if isinstance(updated_at, datetime):
-                    state_dict["updated_at"] = updated_at.isoformat()
-                else:
-                    state_dict["updated_at"] = str(updated_at)
-
-            return state_dict
-
-        except Exception as e:
-            logger.warning("Failed to load circuit breaker from DB: %s", e)
-            return None
-
-    async def _update_circuit_breaker(
-        self,
-        endpoint: str,
-        success: bool,
-        error_message: str | None = None,
-    ) -> None:
-        """Update circuit breaker state after a delivery attempt.
-
-        Persists state to both Valkey (primary cache) and PostgreSQL (durable backup).
-
-        Args:
-            endpoint: The webhook endpoint URL.
-            success: Whether the delivery was successful.
-            error_message: Error message if delivery failed (optional).
-        """
-        valkey, _, _ = self._ensure_initialized()
-
-        endpoint_hash = self._endpoint_hash(endpoint)
-        cb_key = CACHE_KEY_CIRCUIT_BREAKER.format(endpoint_hash=endpoint_hash)
-
-        cached = await valkey.get(cb_key)
-        now = datetime.now(timezone.utc)
-
-        if cached:
-            try:
-                state_dict = json.loads(cached)
-            except Exception:
-                state_dict = {
-                    "state": "closed",
-                    "failure_count": 0,
-                    "success_count": 0,
-                    "total_requests": 0,
-                    "total_failures": 0,
-                }
-        else:
-            # Try to load from DB if not in cache
-            state_dict = await self._load_circuit_breaker_from_db(endpoint)
-            if not state_dict:
-                state_dict = {
-                    "state": "closed",
-                    "failure_count": 0,
-                    "success_count": 0,
-                    "total_requests": 0,
-                    "total_failures": 0,
-                }
-
-        current_state = EnumCircuitBreakerState(state_dict.get("state", "closed"))
-
-        # Update total requests counter
-        state_dict["total_requests"] = state_dict.get("total_requests", 0) + 1
-
-        if success:
-            state_dict["success_count"] = state_dict.get("success_count", 0) + 1
-            state_dict["failure_count"] = 0
-            state_dict["last_success_at"] = now.isoformat()
-
-            if current_state == EnumCircuitBreakerState.HALF_OPEN:
-                # Successful test - close the circuit
-                if (
-                    state_dict["success_count"]
-                    >= self._config.circuit_breaker_success_threshold
-                ):
-                    state_dict["state"] = EnumCircuitBreakerState.CLOSED.value
-                    state_dict["success_count"] = 0
-                    state_dict["failure_count"] = 0  # Reset for clean state
-                    logger.info("Circuit breaker CLOSED for endpoint %s", endpoint)
-
-        else:
-            state_dict["failure_count"] = state_dict.get("failure_count", 0) + 1
-            state_dict["success_count"] = 0
-            state_dict["last_failure_at"] = now.isoformat()
-            state_dict["total_failures"] = state_dict.get("total_failures", 0) + 1
-
-            # Store the error message for debugging
-            if error_message:
-                state_dict["last_error_message"] = error_message[:2048]
-
-            if current_state == EnumCircuitBreakerState.CLOSED:
-                if (
-                    state_dict["failure_count"]
-                    >= self._config.circuit_breaker_threshold
-                ):
-                    state_dict["state"] = EnumCircuitBreakerState.OPEN.value
-                    open_until = now + timedelta(
-                        seconds=self._config.circuit_breaker_cooldown_seconds
-                    )
-                    state_dict["open_until"] = open_until.isoformat()
-                    logger.warning(
-                        "Circuit breaker OPEN for endpoint %s until %s",
-                        endpoint,
-                        open_until.isoformat(),
-                    )
-
-            elif current_state == EnumCircuitBreakerState.HALF_OPEN:
-                # Failed test - reopen the circuit
-                state_dict["state"] = EnumCircuitBreakerState.OPEN.value
-                open_until = now + timedelta(
-                    seconds=self._config.circuit_breaker_cooldown_seconds
-                )
-                state_dict["open_until"] = open_until.isoformat()
-                logger.warning(
-                    "Circuit breaker reopened (HALF_OPEN -> OPEN) for endpoint %s",
-                    endpoint,
-                )
-
-        state_dict["updated_at"] = now.isoformat()
-
-        # Persist to Valkey (primary cache).
-        # TTL is refreshed on every update to prevent state loss for long-lived circuits.
-        # This ensures that actively-used circuits never expire from cache.
-        await valkey.set_key(
-            cb_key,
-            json.dumps(state_dict),
-            ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
-        )
-
-        # Persist to PostgreSQL (durable backup)
-        await self._persist_circuit_breaker_to_db(endpoint, state_dict)
-
-    async def _persist_circuit_breaker_to_db(
-        self,
-        endpoint: str,
-        state_dict: dict[str, object],
-    ) -> None:
-        """Persist circuit breaker state to PostgreSQL for durability.
-
-        Uses UPSERT pattern (ON CONFLICT ... DO UPDATE) since endpoint is the
-        primary key.
-
-        Known Limitation:
-            See _load_circuit_breaker_from_db() docstring for details on the
-            cache/DB key inconsistency when endpoints exceed 512 characters.
-
-        Args:
-            endpoint: The webhook endpoint URL (primary key, max 512 chars).
-            state_dict: Circuit breaker state dictionary.
-        """
-        _, db_handler, _ = self._ensure_initialized()
-
-        # Truncate endpoint if too long (VARCHAR(512) limit)
-        # WARNING: This truncation can cause key collisions for long URLs.
-        # See _load_circuit_breaker_from_db() docstring for full explanation.
-        endpoint_to_store = endpoint[:512]
-        if len(endpoint) > 512:
-            logger.warning(
-                "Endpoint URL truncated from %d to 512 chars for DB storage. "
-                "COLLISION RISK: If another endpoint shares the same first 512 chars, "
-                "circuit breaker states may overwrite each other. Endpoint prefix: %s...",
-                len(endpoint),
-                endpoint[:50],
-            )
-
-        # Parse datetime fields from ISO format strings
-        last_failure_at = None
-        if state_dict.get("last_failure_at"):
-            try:
-                last_failure_str = str(state_dict["last_failure_at"])
-                last_failure_at = datetime.fromisoformat(
-                    last_failure_str.replace("Z", "+00:00")
-                ).isoformat()
-            except (ValueError, TypeError):
-                pass
-
-        last_success_at = None
-        if state_dict.get("last_success_at"):
-            try:
-                last_success_str = str(state_dict["last_success_at"])
-                last_success_at = datetime.fromisoformat(
-                    last_success_str.replace("Z", "+00:00")
-                ).isoformat()
-            except (ValueError, TypeError):
-                pass
-
-        open_until = None
-        if state_dict.get("open_until"):
-            try:
-                open_until_str = str(state_dict["open_until"])
-                open_until = datetime.fromisoformat(
-                    open_until_str.replace("Z", "+00:00")
-                ).isoformat()
-            except (ValueError, TypeError):
-                pass
-
-        sql = """
-            INSERT INTO circuit_breaker_states (
-                endpoint, state, failure_count, success_count,
-                last_failure_at, last_success_at, last_error_message,
-                open_until, total_requests, total_failures
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (endpoint) DO UPDATE SET
-                state = EXCLUDED.state,
-                failure_count = EXCLUDED.failure_count,
-                success_count = EXCLUDED.success_count,
-                last_failure_at = EXCLUDED.last_failure_at,
-                last_success_at = EXCLUDED.last_success_at,
-                last_error_message = EXCLUDED.last_error_message,
-                open_until = EXCLUDED.open_until,
-                total_requests = EXCLUDED.total_requests,
-                total_failures = EXCLUDED.total_failures
-        """
-
-        envelope = {
-            "operation": "db.execute",
-            "payload": {
-                "sql": sql,
-                "parameters": [
-                    endpoint_to_store,
-                    state_dict.get("state", "closed"),
-                    state_dict.get("failure_count", 0),
-                    state_dict.get("success_count", 0),
-                    last_failure_at,
-                    last_success_at,
-                    state_dict.get("last_error_message"),
-                    open_until,
-                    state_dict.get("total_requests", 0),
-                    state_dict.get("total_failures", 0),
-                ],
-            },
-        }
-
-        try:
-            await db_handler.execute(envelope)
-            self._metrics["circuit_breaker_db_persist_success"] += 1
-            logger.debug(
-                "Circuit breaker state persisted to DB for endpoint %s",
-                endpoint_to_store,
-            )
-        except Exception as e:
-            # Log but don't fail - Valkey is the primary cache
-            self._metrics["circuit_breaker_db_persist_failure"] += 1
-            logger.warning(
-                "Failed to persist circuit breaker to DB for endpoint %s: %s",
-                endpoint_to_store,
-                e,
-            )
 
     # =========================================================================
     # Metrics
@@ -2258,7 +1150,6 @@ class HandlerSubscription:
         db_healthy = False
         if self._db_handler:
             try:
-                # Simple query to test connection
                 envelope = {
                     "operation": "db.query",
                     "payload": {
@@ -2271,17 +1162,23 @@ class HandlerSubscription:
             except Exception as e:
                 errors.append(f"Database check failed: {e}")
 
-        # HTTP handler doesn't have a health check, assume healthy if initialized
-        http_healthy = self._http_handler is not None
+        # Check Kafka
+        kafka_healthy = False
+        if self._kafka_handler:
+            try:
+                # Simple health check - Kafka handler should have a health method
+                kafka_healthy = True  # Assume healthy if initialized
+            except Exception as e:
+                errors.append(f"Kafka check failed: {e}")
 
-        is_healthy = valkey_healthy and db_healthy and http_healthy
+        is_healthy = valkey_healthy and db_healthy and kafka_healthy
 
         return ModelSubscriptionHealth(
             is_healthy=is_healthy,
             initialized=True,
             db_healthy=db_healthy,
             valkey_healthy=valkey_healthy,
-            http_healthy=http_healthy,
+            kafka_healthy=kafka_healthy,
             error_message="; ".join(errors) if errors else None,
             metrics=self.get_metrics(),
         )

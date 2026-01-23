@@ -6,23 +6,26 @@ This module defines the request envelope used by the agent_coordinator_orchestra
 node to perform subscription and notification operations for cross-agent memory
 coordination.
 
+Delivery Mechanism:
+    Notifications are published to Kafka. Agents consume events directly via
+    consumer groups. No webhook delivery configuration is needed.
+
 Example:
     >>> from omnimemory.nodes.agent_coordinator_orchestrator.models import (
     ...     ModelAgentCoordinatorRequest,
     ...     EnumAgentCoordinatorAction,
     ... )
-    >>> from omnimemory.models.subscription import ModelSubscriptionDeliveryWebhook
     >>> request = ModelAgentCoordinatorRequest(
     ...     action=EnumAgentCoordinatorAction.SUBSCRIBE,
     ...     agent_id="agent_alpha",
     ...     topic="memory.item.created",
-    ...     delivery=ModelSubscriptionDeliveryWebhook(
-    ...         webhook_url="https://example.com/webhook"
-    ...     ),
     ... )
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1393.
+
+.. versionchanged:: 0.2.0
+    Removed webhook delivery configuration. Notifications now use Kafka.
 """
 
 from __future__ import annotations
@@ -36,9 +39,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ....models.subscription.model_notification_event import (
     ModelNotificationEvent,  # noqa: TC001 - runtime import for Pydantic field type
 )
-from ....models.subscription.model_subscription_delivery import (
-    ModelSubscriptionDeliveryWebhook,  # noqa: TC001 - runtime import for Pydantic field type
-)
 
 __all__ = ["EnumAgentCoordinatorAction", "ModelAgentCoordinatorRequest"]
 
@@ -50,7 +50,7 @@ class EnumAgentCoordinatorAction(str, Enum):
         SUBSCRIBE: Register an agent's subscription to a memory topic.
         UNSUBSCRIBE: Remove an agent's subscription from a topic.
         LIST_SUBSCRIPTIONS: List all subscriptions for an agent.
-        NOTIFY: Notify all subscribers of a memory change event.
+        NOTIFY: Publish notification event to Kafka for subscriber consumption.
     """
 
     SUBSCRIBE = "subscribe"
@@ -68,7 +68,7 @@ class ModelAgentCoordinatorRequest(BaseModel):
     provide context-specific data for that operation.
 
     Validation rules per action:
-        - subscribe: Requires agent_id, topic, delivery
+        - subscribe: Requires agent_id, topic
         - unsubscribe: Requires agent_id, topic
         - list_subscriptions: Requires agent_id
         - notify: Requires topic, event
@@ -79,8 +79,8 @@ class ModelAgentCoordinatorRequest(BaseModel):
             unsubscribe/list_subscriptions).
         topic: Memory topic pattern in format memory.<entity>.<event>
             (required for subscribe/unsubscribe/notify).
-        delivery: Webhook delivery configuration (required for subscribe).
-        event: Notification event to deliver (required for notify).
+        event: Notification event to publish (required for notify).
+        metadata: Optional metadata for the subscription (for subscribe).
         correlation_id: Request correlation ID for tracing.
 
     Example:
@@ -89,12 +89,9 @@ class ModelAgentCoordinatorRequest(BaseModel):
         ...     action=EnumAgentCoordinatorAction.SUBSCRIBE,
         ...     agent_id="agent_alpha",
         ...     topic="memory.item.created",
-        ...     delivery=ModelSubscriptionDeliveryWebhook(
-        ...         webhook_url="https://example.com/webhook"
-        ...     ),
         ... )
         >>>
-        >>> # Notify subscribers of a change
+        >>> # Notify subscribers of a change (publishes to Kafka)
         >>> notify_request = ModelAgentCoordinatorRequest(
         ...     action=EnumAgentCoordinatorAction.NOTIFY,
         ...     topic="memory.item.created",
@@ -128,14 +125,14 @@ class ModelAgentCoordinatorRequest(BaseModel):
         description="Topic pattern (required for subscribe/unsubscribe/notify)",
     )
 
-    delivery: ModelSubscriptionDeliveryWebhook | None = Field(
-        default=None,
-        description="Webhook delivery configuration (required for subscribe)",
-    )
-
     event: ModelNotificationEvent | None = Field(
         default=None,
-        description="Notification event to deliver (required for notify)",
+        description="Notification event to publish to Kafka (required for notify)",
+    )
+
+    metadata: dict[str, str] | None = Field(
+        default=None,
+        description="Optional metadata for the subscription (for subscribe)",
     )
 
     correlation_id: UUID = Field(
@@ -148,7 +145,7 @@ class ModelAgentCoordinatorRequest(BaseModel):
         """Validate that required fields are present for each action type.
 
         Validation rules:
-            - subscribe: requires agent_id, topic, delivery
+            - subscribe: requires agent_id, topic
             - unsubscribe: requires agent_id, topic
             - list_subscriptions: requires agent_id
             - notify: requires topic, event
@@ -165,8 +162,6 @@ class ModelAgentCoordinatorRequest(BaseModel):
                 missing.append("agent_id")
             if self.topic is None:
                 missing.append("topic")
-            if self.delivery is None:
-                missing.append("delivery")
             if missing:
                 raise ValueError(
                     f"'subscribe' action requires fields: {', '.join(missing)}"

@@ -4,13 +4,13 @@
 
 # Agent Coordinator ORCHESTRATOR - ONEX Contract
 # Orchestrator node for cross-agent memory coordination.
-# Manages subscriptions and notifications for memory change events.
+# Manages subscriptions and publishes notification events to Kafka.
 
 # === REQUIRED ROOT FIELDS ===
 name: "agent_coordinator_orchestrator"
-version: {major: 0, minor: 1, patch: 0}
-description: "Orchestrator node for cross-agent memory coordination. Manages subscriptions and notifications
-  for memory change events."
+version: {major: 0, minor: 2, patch: 0}
+description: "Orchestrator node for cross-agent memory coordination. Manages subscriptions and publishes
+  notification events to Kafka for subscriber consumption."
 node_type: "ORCHESTRATOR"
 input_model: "ModelAgentCoordinatorRequest"
 output_model: "ModelAgentCoordinatorResponse"
@@ -26,9 +26,9 @@ dependencies:
     dependency_type: service
     description: Database handler for subscription persistence
     required: true
-  - name: HandlerHttpRest
+  - name: HandlerKafka
     dependency_type: service
-    description: HTTP handler for webhook delivery
+    description: Kafka handler for event publishing
     required: true
 
   # Service Dependencies (Adapters)
@@ -41,10 +41,6 @@ dependencies:
   - name: ProtocolSubscriptionManager
     dependency_type: protocol
     description: Subscription lifecycle management protocol
-    required: true
-  - name: ProtocolNotificationDelivery
-    dependency_type: protocol
-    description: Notification delivery protocol
     required: true
 
 # === PERFORMANCE ===
@@ -61,7 +57,6 @@ validation_rules:
     action: "Literal['subscribe', 'unsubscribe', 'list_subscriptions', 'notify']"
     agent_id: "string type for agent identifier"
     topic: "string matching memory.<entity>.<event> pattern"
-    delivery: "ModelSubscriptionDeliveryWebhook for webhook configuration"
     event: "ModelNotificationEvent for notification payload"
 
 # === TAGS ===
@@ -71,5 +66,5 @@ tags:
   - notification
   - orchestrator
   - cross-agent
-  - webhook
+  - kafka
   - coordination

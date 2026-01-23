@@ -5,6 +5,11 @@
 This module defines the response envelope used by the agent_coordinator_orchestrator
 node to return results from subscription and notification operations.
 
+Delivery Mechanism:
+    Notifications are published to Kafka. The response includes the number of
+    active subscribers but not individual delivery attempts (agents consume
+    directly from Kafka).
+
 Example:
     >>> from omnimemory.nodes.agent_coordinator_orchestrator.models import (
     ...     ModelAgentCoordinatorResponse,
@@ -19,6 +24,10 @@ Example:
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1393.
+
+.. versionchanged:: 0.2.0
+    Removed delivery_attempts field. Notifications now use Kafka.
+    Added subscriber_count for notify responses.
 """
 
 from __future__ import annotations
@@ -27,9 +36,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ....models.subscription.model_notification_delivery_attempt import (
-    ModelNotificationDeliveryAttempt,  # noqa: TC001 - runtime import for Pydantic field type
-)
 from ....models.subscription.model_subscription import (
     ModelSubscription,  # noqa: TC001 - runtime import for Pydantic field type
 )
@@ -54,9 +60,7 @@ class ModelAgentCoordinatorResponse(BaseModel):
         correlation_id: Request correlation ID for tracing.
         subscription: Created or matched subscription (for subscribe action).
         subscriptions: List of agent subscriptions (for list_subscriptions action).
-        delivery_attempts: Record of all delivery attempts (for notify action).
-        success_count: Number of successful deliveries (for notify action).
-        failure_count: Number of failed deliveries (for notify action).
+        subscriber_count: Number of active subscribers (for notify action).
         error_message: Detailed error information when success is False.
         error_code: Machine-readable error code for programmatic handling.
 
@@ -69,14 +73,12 @@ class ModelAgentCoordinatorResponse(BaseModel):
         ...     subscription=created_subscription,
         ... )
         >>>
-        >>> # Successful notify response
+        >>> # Successful notify response (event published to Kafka)
         >>> notify_response = ModelAgentCoordinatorResponse(
         ...     success=True,
         ...     action=EnumAgentCoordinatorAction.NOTIFY,
         ...     correlation_id=request.correlation_id,
-        ...     delivery_attempts=attempts,
-        ...     success_count=5,
-        ...     failure_count=1,
+        ...     subscriber_count=5,
         ... )
         >>>
         >>> # Error response
@@ -119,21 +121,10 @@ class ModelAgentCoordinatorResponse(BaseModel):
     )
 
     # For notify action
-    delivery_attempts: list[ModelNotificationDeliveryAttempt] | None = Field(
-        default=None,
-        description="Record of all delivery attempts (for notify action)",
-    )
-
-    success_count: int | None = Field(
+    subscriber_count: int | None = Field(
         default=None,
         ge=0,
-        description="Number of successful deliveries (for notify action)",
-    )
-
-    failure_count: int | None = Field(
-        default=None,
-        ge=0,
-        description="Number of failed deliveries (for notify action)",
+        description="Number of active subscribers notified (for notify action)",
     )
 
     # Error handling

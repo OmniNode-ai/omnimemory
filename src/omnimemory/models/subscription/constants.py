@@ -1,8 +1,25 @@
 """
-Shared constants for subscription models following ONEX standards.
+Constants for subscription domain models following ONEX standards.
 
-This module provides shared constants used across subscription-related models
-to ensure consistency and avoid duplication.
+Topic Naming Convention:
+    Topics follow the pattern: memory.<entity>.<event>
+
+    Entity types:
+        - item: Individual memory items
+        - collection: Memory collections/groups
+        - index: Search indexes
+
+    Event types:
+        - created: New entity created
+        - updated: Entity modified
+        - deleted: Entity removed
+        - archived: Entity archived
+        - promoted: Entity promoted (e.g., from cache to persistent)
+
+Examples:
+    - memory.item.created
+    - memory.collection.updated
+    - memory.index.deleted
 """
 
 from __future__ import annotations
@@ -16,35 +33,7 @@ TOPIC_PATTERN_REGEX = r"^memory\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$"
 # Compiled topic pattern for validation
 TOPIC_PATTERN = re.compile(TOPIC_PATTERN_REGEX)
 
-# Circuit breaker default configuration
-# These values are used by both ModelCircuitBreakerState and HandlerSubscription
-DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5
-"""Number of consecutive failures before the circuit opens."""
-
-DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD = 3
-"""Number of consecutive successes in half_open state before closing the circuit."""
-
-DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS = 60000
-"""Cooldown period in milliseconds before transitioning from open to half_open.
-
-This is equivalent to DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS (60 seconds).
-Use this constant when working with millisecond-based APIs or model fields.
-"""
-
-DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS = 60
-"""Cooldown period in seconds before transitioning from open to half_open.
-
-This is equivalent to DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS (60000 milliseconds).
-Use this constant when working with second-based configuration or APIs.
-"""
-
 __all__ = [
-    # Topic patterns
     "TOPIC_PATTERN",
     "TOPIC_PATTERN_REGEX",
-    # Circuit breaker defaults
-    "DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-    "DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD",
-    "DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS",
-    "DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS",
 ]
