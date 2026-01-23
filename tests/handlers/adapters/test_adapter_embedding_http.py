@@ -221,6 +221,15 @@ class TestModelEmbeddingHttpClientConfig:
         # Full endpoint should be correct
         assert config.embed_endpoint == "http://localhost:8000/custom/embed"
 
+    def test_embed_endpoint_path_just_slash(self) -> None:
+        """Test embed_endpoint_path handles just '/' correctly."""
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8000",
+            embed_endpoint_path="/",
+        )
+        assert config.embed_endpoint_path == "/"
+        assert config.embed_endpoint == "http://localhost:8000/"
+
     def test_validation_timeout_bounds(self) -> None:
         """Test timeout validation bounds."""
         with pytest.raises(ValueError):

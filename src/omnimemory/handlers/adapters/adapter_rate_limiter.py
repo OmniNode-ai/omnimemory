@@ -68,6 +68,10 @@ __all__ = [
 # Constants for rate limiting
 SECONDS_PER_MINUTE = 60.0
 
+# Safety ceiling multiplier for deque maxlen to prevent runaway memory in edge cases.
+# The deque maxlen is set to max_requests * this multiplier.
+DEQUE_SAFETY_CEILING_MULTIPLIER = 2
+
 # Pattern for validating provider/model identifiers
 # Allows alphanumeric characters, hyphens, underscores, periods, and forward slashes
 _IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z0-9._/-]+$")
@@ -109,9 +113,8 @@ class ProviderRateLimiter:
         )
 
         # Sliding window: deque of (timestamp, tokens) tuples
-        # Safety ceiling: 2x burst capacity to prevent runaway memory in edge cases
         self._request_window: deque[tuple[float, int]] = deque(
-            maxlen=self._max_requests * 2
+            maxlen=self._max_requests * DEQUE_SAFETY_CEILING_MULTIPLIER
         )
 
         logger.debug(
