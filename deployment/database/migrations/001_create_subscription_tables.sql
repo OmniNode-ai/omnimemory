@@ -90,6 +90,11 @@ CREATE INDEX IF NOT EXISTS idx_delivery_attempts_dlq
     ON delivery_attempts(subscription_id, created_at)
     WHERE status = 'dlq';
 
+-- Composite index for querying delivery status by subscription
+-- Used by: retry worker, subscription health checks, delivery history
+CREATE INDEX IF NOT EXISTS idx_delivery_attempts_sub_status
+    ON delivery_attempts(subscription_id, status);
+
 -- ============================================================================
 -- Circuit Breaker States Table
 -- ============================================================================

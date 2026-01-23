@@ -42,6 +42,9 @@ pinecone-client = "^4.1.0"
 # Environment variable management
 python-dotenv = "^1.0.1"
 
+# Cryptography for encryption at rest (webhook secrets)
+cryptography = "^44.0.0"
+
 # Async support
 asyncio-mqtt = "^0.16.0"
 

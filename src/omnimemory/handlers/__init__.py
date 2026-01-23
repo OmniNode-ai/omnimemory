@@ -43,6 +43,7 @@ from omnimemory.handlers.handler_subscription import (
     HandlerSubscription,
     ModelHandlerSubscriptionConfig,
     ModelSubscriptionHealth,
+    ModelSubscriptionMetrics,
 )
 
 __all__ = [
@@ -50,6 +51,7 @@ __all__ = [
     "HandlerSubscription",
     "ModelHandlerSubscriptionConfig",
     "ModelSubscriptionHealth",
+    "ModelSubscriptionMetrics",
     # Graph Memory Adapter
     "AdapterGraphMemory",
     "AdapterGraphMemoryConfig",

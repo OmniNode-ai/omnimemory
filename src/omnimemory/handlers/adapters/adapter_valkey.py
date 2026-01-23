@@ -36,9 +36,11 @@ Example::
 from __future__ import annotations
 
 import asyncio
+import builtins
 import inspect
 import logging
-from collections.abc import Awaitable
+from collections.abc import AsyncGenerator, Awaitable
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
@@ -50,10 +52,13 @@ _T = TypeVar("_T")
 # Note: redis.asyncio.Redis doesn't support generic type parameters in stubs
 if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
+    from redis.asyncio.client import Pipeline
 
     RedisClientType = AsyncRedis
+    PipelineType = Pipeline
 else:
     RedisClientType = object
+    PipelineType = object
 
 _REDIS_AVAILABLE = False
 _REDIS_IMPORT_ERROR: str | None = None
@@ -73,6 +78,7 @@ __all__ = [
     "AdapterValkey",
     "AdapterValkeyConfig",
     "ModelValkeyHealth",
+    "ValkeyPipeline",
 ]
 
 
@@ -180,6 +186,126 @@ class ModelValkeyHealth(BaseModel):
         default=None,
         description="Error details if unhealthy",
     )
+
+
+class ValkeyPipeline:
+    """Wrapper around Redis pipeline that handles key prefixing.
+
+    This class wraps a Redis pipeline and provides the same interface as
+    AdapterValkey methods, automatically applying the key prefix to all keys.
+    Pipeline commands are queued and executed atomically when the context
+    manager exits.
+
+    Example::
+
+        async with adapter.pipeline() as pipe:
+            pipe.sadd("topic:memory.item.created", "sub_123")
+            pipe.set("subscription:sub_123", data, ttl=3600)
+            # Commands are executed atomically on context exit
+
+    Note:
+        Pipeline methods are synchronous (they queue commands). The actual
+        execution happens asynchronously when the context manager exits.
+    """
+
+    def __init__(self, pipe: PipelineType, key_prefix: str) -> None:
+        """Initialize the pipeline wrapper.
+
+        Args:
+            pipe: The underlying Redis pipeline.
+            key_prefix: The key prefix to apply to all keys.
+        """
+        self._pipe = pipe
+        self._key_prefix = key_prefix
+
+    def _prefixed_key(self, key: str) -> str:
+        """Add namespace prefix to key.
+
+        Args:
+            key: The raw key.
+
+        Returns:
+            The prefixed key.
+        """
+        return f"{self._key_prefix}{key}"
+
+    def sadd(self, key: str, *members: str) -> ValkeyPipeline:
+        """Queue SADD command to add members to a set.
+
+        Args:
+            key: The set key.
+            *members: Members to add to the set.
+
+        Returns:
+            Self for method chaining.
+        """
+        if members:
+            self._pipe.sadd(self._prefixed_key(key), *members)
+        return self
+
+    def srem(self, key: str, *members: str) -> ValkeyPipeline:
+        """Queue SREM command to remove members from a set.
+
+        Args:
+            key: The set key.
+            *members: Members to remove from the set.
+
+        Returns:
+            Self for method chaining.
+        """
+        if members:
+            self._pipe.srem(self._prefixed_key(key), *members)
+        return self
+
+    def set(self, key: str, value: str, ttl: int | None = None) -> ValkeyPipeline:
+        """Queue SET/SETEX command to set a key value.
+
+        Args:
+            key: The key to set.
+            value: The value to store.
+            ttl: Optional time-to-live in seconds.
+
+        Returns:
+            Self for method chaining.
+        """
+        if ttl is not None:
+            self._pipe.setex(self._prefixed_key(key), ttl, value)
+        else:
+            self._pipe.set(self._prefixed_key(key), value)
+        return self
+
+    def delete(self, key: str) -> ValkeyPipeline:
+        """Queue DELETE command to delete a key.
+
+        Args:
+            key: The key to delete.
+
+        Returns:
+            Self for method chaining.
+        """
+        self._pipe.delete(self._prefixed_key(key))
+        return self
+
+    def expire(self, key: str, ttl: int) -> ValkeyPipeline:
+        """Queue EXPIRE command to set expiration on a key.
+
+        Args:
+            key: The key to set expiration for.
+            ttl: Time-to-live in seconds.
+
+        Returns:
+            Self for method chaining.
+        """
+        self._pipe.expire(self._prefixed_key(key), ttl)
+        return self
+
+    async def execute(self) -> list[object]:
+        """Execute all queued commands atomically.
+
+        Returns:
+            List of results from each command.
+        """
+        return await self._pipe.execute()
 
 
 class AdapterValkey:
@@ -456,7 +582,7 @@ class AdapterValkey:
         )
         return int(result)
 
-    async def smembers(self, key: str) -> set[str]:
+    async def smembers(self, key: str) -> builtins.set[str]:
         """Get all members of a set.
 
         Args:
@@ -604,6 +730,53 @@ class AdapterValkey:
                 ping_success=False,
                 error_message=f"PING failed: {e}",
             )
+
+    # =========================================================================
+    # Pipeline Operations
+    # =========================================================================
+
+    @asynccontextmanager
+    async def pipeline(self) -> AsyncGenerator[ValkeyPipeline, None]:
+        """Create a Redis pipeline for batching commands atomically.
+
+        Pipelines allow multiple commands to be sent in a single round-trip,
+        improving performance and providing atomicity. Commands are queued
+        and executed when the context manager exits.
+
+        The pipeline wrapper automatically handles key prefixing, matching
+        the behavior of individual adapter methods.
+
+        Usage::
+
+            async with adapter.pipeline() as pipe:
+                pipe.sadd("topic:memory.item.created", "sub_123")
+                pipe.sadd("agent:agent_456:subscriptions", "sub_123")
+                pipe.set("subscription:sub_123", data_json, ttl=3600)
+                # All commands are executed atomically on context exit
+
+        Yields:
+            ValkeyPipeline wrapper with prefixed key operations.
+
+        Raises:
+            RuntimeError: If adapter is not initialized.
+
+        Note:
+            - Pipeline commands are synchronous (they queue commands)
+            - Execution happens asynchronously on context exit
+            - If any command fails, subsequent commands may still execute
+              (Redis pipelines are not transactions)
+            - For true transactions, use MULTI/EXEC via the raw client
+        """
+        client = self._ensure_initialized()
+        pipe = client.pipeline()
+        wrapper = ValkeyPipeline(pipe, self._config.key_prefix)
+        try:
+            yield wrapper
+            await pipe.execute()
+        finally:
+            # Reset releases pipeline resources
+            # Note: reset() is untyped in redis-py stubs
+            await pipe.reset()  # type: ignore[no-untyped-call]
 
     # =========================================================================
     # Utility Methods

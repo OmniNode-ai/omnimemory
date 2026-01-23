@@ -23,6 +23,26 @@ Note on Retry Worker:
     the single-responsibility principle: the handler manages subscriptions and
     immediate delivery attempts, while retry orchestration is a distinct concern.
 
+IMPORTANT - Retry Worker Not Implemented:
+    This handler records retry schedules but does NOT execute retries automatically.
+    A separate background worker is required to poll the ``delivery_attempts`` table
+    and re-invoke delivery for failed attempts.
+
+    TODO(OMN-1454): Implement the RetryWorker component that:
+        1. Polls ``delivery_attempts`` for pending retries
+        2. Re-invokes delivery via this handler
+        3. Updates attempt records with new results
+        4. Handles DLQ escalation after max attempts
+
+    Query for pending retries::
+
+        SELECT da.*, s.webhook_url, s.webhook_secret, s.agent_id
+        FROM delivery_attempts da
+        JOIN subscriptions s ON da.subscription_id = s.id
+        WHERE da.status = 'failed'
+          AND da.next_retry_at <= NOW()
+        ORDER BY da.next_retry_at ASC;
+
 Example::
 
     from omnimemory.handlers import (
@@ -84,6 +104,7 @@ from datetime import datetime, timedelta, timezone
 from typing import cast
 from uuid import uuid4
 
+from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr
 
 from omnimemory.enums.enum_subscription_status import (
@@ -134,6 +155,7 @@ __all__ = [
     "HandlerSubscription",
     "ModelHandlerSubscriptionConfig",
     "ModelSubscriptionHealth",
+    "ModelSubscriptionMetrics",
 ]
 
 # Cache key patterns
@@ -282,6 +304,72 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         le=86400,
         description="TTL for cached subscription data",
     )
+    require_https: bool = Field(
+        default=False,
+        description="Require HTTPS for webhook URLs (recommended for production)",
+    )
+    encryption_key: SecretStr | None = Field(
+        default=None,
+        description=(
+            "Fernet encryption key for webhook secrets at rest. "
+            "Generate with: from cryptography.fernet import Fernet; Fernet.generate_key(). "
+            "When set, webhook_secret values are encrypted before storage in PostgreSQL "
+            "and decrypted when loaded. If not set, secrets are stored in plaintext "
+            "(a warning will be logged)."
+        ),
+    )
+
+
+class ModelSubscriptionMetrics(BaseModel):
+    """Metrics for the Subscription Handler.
+
+    Tracks counters for various operations to enable production monitoring
+    and observability.
+
+    Attributes:
+        circuit_breaker_db_persist_success: Count of successful circuit breaker DB persistence.
+        circuit_breaker_db_persist_failure: Count of failed circuit breaker DB persistence.
+        notifications_sent: Count of successfully delivered notifications.
+        notifications_failed: Count of failed notification deliveries.
+        subscriptions_created: Count of subscriptions created.
+        subscriptions_deleted: Count of subscriptions deleted.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    circuit_breaker_db_persist_success: int = Field(
+        default=0,
+        ge=0,
+        description="Count of successful circuit breaker DB persistence operations",
+    )
+    circuit_breaker_db_persist_failure: int = Field(
+        default=0,
+        ge=0,
+        description="Count of failed circuit breaker DB persistence operations",
+    )
+    notifications_sent: int = Field(
+        default=0,
+        ge=0,
+        description="Count of successfully delivered notifications",
+    )
+    notifications_failed: int = Field(
+        default=0,
+        ge=0,
+        description="Count of failed notification deliveries",
+    )
+    subscriptions_created: int = Field(
+        default=0,
+        ge=0,
+        description="Count of subscriptions created",
+    )
+    subscriptions_deleted: int = Field(
+        default=0,
+        ge=0,
+        description="Count of subscriptions deleted",
+    )
 
 
 class ModelSubscriptionHealth(BaseModel):
@@ -294,6 +382,7 @@ class ModelSubscriptionHealth(BaseModel):
         valkey_healthy: Valkey connection health.
         http_healthy: HTTP handler health.
         error_message: Error details if unhealthy.
+        metrics: Optional metrics for observability.
     """
 
     model_config = ConfigDict(
@@ -325,6 +414,10 @@ class ModelSubscriptionHealth(BaseModel):
         default=None,
         description="Error details if unhealthy",
     )
+    metrics: ModelSubscriptionMetrics | None = Field(
+        default=None,
+        description="Handler metrics for observability",
+    )
 
 
 class HandlerSubscription:
@@ -332,6 +425,14 @@ class HandlerSubscription:
 
     Manages the lifecycle of subscriptions and handles notification delivery
     with retry logic, circuit breakers, and dead letter queue support.
+
+    IMPORTANT - Retry Worker Not Implemented:
+        This handler only records retry schedules (``next_retry_at``) and persists
+        failed attempts to the database. It does NOT automatically execute retries.
+        A separate RetryWorker component must be implemented to poll the
+        ``delivery_attempts`` table and re-invoke delivery.
+
+        See TODO(OMN-1454) for the retry worker implementation ticket.
 
     Persistence Strategy:
         - Valkey: Fast lookups for topic->subscribers mapping
@@ -369,6 +470,16 @@ class HandlerSubscription:
         self._valkey: AdapterValkey | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
+
+        # Metrics for observability
+        self._metrics: dict[str, int] = {
+            "circuit_breaker_db_persist_success": 0,
+            "circuit_breaker_db_persist_failure": 0,
+            "notifications_sent": 0,
+            "notifications_failed": 0,
+            "subscriptions_created": 0,
+            "subscriptions_deleted": 0,
+        }
 
     @property
     def config(self) -> ModelHandlerSubscriptionConfig:
@@ -496,6 +607,84 @@ class HandlerSubscription:
         return self._valkey, self._db_handler, self._http_handler
 
     # =========================================================================
+    # Internal Helpers - Encryption at Rest
+    # =========================================================================
+    # Webhook secrets are encrypted using Fernet (AES-128-CBC with HMAC-SHA256).
+    # Encryption is applied before storing in PostgreSQL and decrypted when loading.
+    # This protects secrets at rest in case of database compromise.
+    #
+    # The encryption key must be a valid Fernet key (32 bytes, base64-encoded).
+    # Generate with: from cryptography.fernet import Fernet; Fernet.generate_key()
+
+    def _encrypt_secret(self, plaintext: str) -> str:
+        """Encrypt a webhook secret for storage in the database.
+
+        Uses Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256) for
+        encryption at rest. If no encryption key is configured, returns
+        the plaintext and logs a warning.
+
+        Args:
+            plaintext: The secret to encrypt.
+
+        Returns:
+            Base64-encoded ciphertext, or plaintext if encryption is disabled.
+        """
+        if not self._config.encryption_key:
+            logger.warning(
+                "encryption_key not configured - storing webhook_secret in plaintext. "
+                "Set encryption_key in config for encryption at rest."
+            )
+            return plaintext
+
+        try:
+            key_bytes = self._config.encryption_key.get_secret_value().encode("utf-8")
+            fernet = Fernet(key_bytes)
+            ciphertext = fernet.encrypt(plaintext.encode("utf-8"))
+            return ciphertext.decode("utf-8")
+        except Exception as e:
+            logger.error("Failed to encrypt webhook secret: %s", e)
+            raise ValueError(f"Encryption failed: {e}") from e
+
+    def _decrypt_secret(self, ciphertext: str) -> str:
+        """Decrypt a webhook secret loaded from the database.
+
+        Uses Fernet symmetric encryption for decryption. If no encryption key
+        is configured, assumes the value is plaintext and returns it as-is.
+        If decryption fails (e.g., wrong key or corrupted data), logs a warning
+        and returns the ciphertext as-is (backwards compatibility for migration).
+
+        Args:
+            ciphertext: The encrypted secret from the database.
+
+        Returns:
+            Decrypted plaintext secret.
+        """
+        if not self._config.encryption_key:
+            # No encryption configured - assume plaintext (backwards compatibility)
+            return ciphertext
+
+        try:
+            key_bytes = self._config.encryption_key.get_secret_value().encode("utf-8")
+            fernet = Fernet(key_bytes)
+            plaintext = fernet.decrypt(ciphertext.encode("utf-8"))
+            return plaintext.decode("utf-8")
+        except InvalidToken:
+            # Decryption failed - could be plaintext from before encryption was enabled
+            # or wrong key. Log warning and return as-is for backwards compatibility.
+            logger.warning(
+                "Failed to decrypt webhook_secret (may be plaintext from before "
+                "encryption was enabled). Returning as-is for backwards compatibility."
+            )
+            return ciphertext
+        except Exception as e:
+            logger.warning(
+                "Unexpected error decrypting webhook_secret: %s. "
+                "Returning as-is for backwards compatibility.",
+                e,
+            )
+            return ciphertext
+
+    # =========================================================================
     # Core Operations
     # =========================================================================
 
@@ -510,10 +699,11 @@ class HandlerSubscription:
 
         Workflow:
             1. Validate topic format (memory.<entity>.<event>)
-            2. Check for existing subscription (upsert behavior)
-            3. Create/update subscription record in Postgres
-            4. Add to Valkey cache: topic:subscribers -> subscription_id
-            5. Add to Valkey cache: agent:subscriptions -> subscription_id
+            2. Validate webhook URL is HTTPS (if require_https=True)
+            3. Check for existing subscription (upsert behavior)
+            4. Create/update subscription record in Postgres
+            5. Add to Valkey cache: topic:subscribers -> subscription_id
+            6. Add to Valkey cache: agent:subscriptions -> subscription_id
 
         Args:
             agent_id: The subscribing agent's identifier.
@@ -525,7 +715,8 @@ class HandlerSubscription:
             The created or updated subscription.
 
         Raises:
-            ValueError: If topic format is invalid.
+            ValueError: If topic format is invalid or if HTTP URL is provided
+                when require_https is True.
             RuntimeError: If handler is not initialized.
         """
         valkey, _, _ = self._ensure_initialized()
@@ -535,6 +726,15 @@ class HandlerSubscription:
             raise ValueError(
                 f"Topic must match pattern 'memory.<entity>.<event>', got: {topic}"
             )
+
+        # Validate HTTPS requirement for webhook URLs
+        if self._config.require_https:
+            webhook_url = str(delivery.webhook_url)
+            if not webhook_url.startswith("https://"):
+                raise ValueError(
+                    f"HTTPS is required for webhook URLs (require_https=True). "
+                    f"Got: {webhook_url}"
+                )
 
         # Generate subscription ID
         subscription_id = str(uuid4())
@@ -566,20 +766,24 @@ class HandlerSubscription:
 
         # Persist to PostgreSQL (source of truth)
         await self._persist_subscription(subscription, is_update=existing is not None)
+        self._metrics["subscriptions_created"] += 1
 
         # Update Valkey caches (best effort - DB is source of truth)
+        # Uses pipeline for atomic batch update (single round-trip instead of 3)
         try:
             topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
             agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
             sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription_id)
 
-            await valkey.sadd(topic_key, subscription_id)
-            await valkey.sadd(agent_key, subscription_id)
-            await valkey.set(
-                sub_key,
-                subscription.model_dump_json(),
-                ttl=self._config.cache_ttl_seconds,
-            )
+            async with valkey.pipeline() as pipe:
+                pipe.sadd(topic_key, subscription_id)
+                pipe.sadd(agent_key, subscription_id)
+                pipe.set(
+                    sub_key,
+                    subscription.model_dump_json(),
+                    ttl=self._config.cache_ttl_seconds,
+                )
+                # Commands are executed atomically on context exit
         except Exception as e:
             logger.warning(
                 "Failed to update cache for subscription %s (DB persisted successfully): %s",
@@ -632,6 +836,7 @@ class HandlerSubscription:
 
         # Soft delete in PostgreSQL
         await self._soft_delete_subscription(subscription.id)
+        self._metrics["subscriptions_deleted"] += 1
 
         # Remove from Valkey caches
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
@@ -752,11 +957,20 @@ class HandlerSubscription:
     ) -> None:
         """Persist subscription to PostgreSQL.
 
+        The webhook_secret is encrypted at rest using Fernet encryption if
+        encryption_key is configured. This protects secrets in case of database
+        compromise.
+
         Args:
             subscription: The subscription to persist.
             is_update: Whether this is an update (upsert).
         """
         _, db_handler, _ = self._ensure_initialized()
+
+        # Encrypt webhook secret before storage (if configured and secret exists)
+        encrypted_secret: str | None = None
+        if subscription.delivery.secret is not None:
+            encrypted_secret = self._encrypt_secret(subscription.delivery.secret)
 
         if is_update:
             sql = """
@@ -772,7 +986,7 @@ class HandlerSubscription:
             """
             params = [
                 str(subscription.delivery.webhook_url),
-                subscription.delivery.secret,
+                encrypted_secret,
                 json.dumps(subscription.delivery.headers)
                 if subscription.delivery.headers
                 else None,
@@ -803,7 +1017,7 @@ class HandlerSubscription:
                 subscription.agent_id,
                 subscription.topic,
                 str(subscription.delivery.webhook_url),
-                subscription.delivery.secret,
+                encrypted_secret,
                 json.dumps(subscription.delivery.headers)
                 if subscription.delivery.headers
                 else None,
@@ -958,11 +1172,15 @@ class HandlerSubscription:
         else:
             updated_at_parsed = cast(datetime, updated_at_raw)
 
-        # Extract webhook secret with proper typing
+        # Extract webhook secret with proper typing and decrypt if encrypted
+        # The secret may be encrypted at rest using Fernet - decrypt it here.
+        # If decryption fails (e.g., plaintext from before encryption was enabled),
+        # _decrypt_secret() handles backwards compatibility gracefully.
         webhook_secret_raw = row.get("webhook_secret")
-        webhook_secret: str | None = (
-            str(webhook_secret_raw) if webhook_secret_raw is not None else None
-        )
+        webhook_secret: str | None = None
+        if webhook_secret_raw is not None:
+            encrypted_value = str(webhook_secret_raw)
+            webhook_secret = self._decrypt_secret(encrypted_value)
 
         # Extract timeout with proper typing
         timeout_raw = row.get("webhook_timeout_ms")
@@ -1180,6 +1398,7 @@ class HandlerSubscription:
                 "Circuit breaker OPEN for endpoint %s, skipping delivery",
                 webhook_url,
             )
+            self._metrics["notifications_failed"] += 1
             return ModelNotificationDeliveryAttempt(
                 delivery_id=delivery_id,
                 subscription_id=subscription.id,
@@ -1243,6 +1462,7 @@ class HandlerSubscription:
             )
 
             if is_success:
+                self._metrics["notifications_sent"] += 1
                 attempt = ModelNotificationDeliveryAttempt(
                     delivery_id=delivery_id,
                     subscription_id=subscription.id,
@@ -1257,6 +1477,7 @@ class HandlerSubscription:
                 )
             else:
                 # Schedule retry
+                self._metrics["notifications_failed"] += 1
                 attempt = await self._handle_delivery_failure(
                     delivery_id=delivery_id,
                     subscription=subscription,
@@ -1278,6 +1499,7 @@ class HandlerSubscription:
             latency_ms = int((end_time - start_time) * 1000)
 
             # Update circuit breaker on failure with error message
+            self._metrics["notifications_failed"] += 1
             await self._update_circuit_breaker(
                 webhook_url, success=False, error_message=str(e)[:2048]
             )
@@ -1311,6 +1533,12 @@ class HandlerSubscription:
         """Handle a failed delivery attempt.
 
         Schedules retry with exponential backoff or moves to DLQ.
+
+        WARNING - Retry Scheduling Only:
+            This method only RECORDS the scheduled retry time (``next_retry_at``)
+            in the ``delivery_attempts`` table. It does NOT execute the retry.
+            A separate background worker (TODO: OMN-1454) must poll the table
+            and re-invoke delivery for pending retries.
 
         Args:
             delivery_id: The delivery attempt ID.
@@ -1835,17 +2063,34 @@ class HandlerSubscription:
 
         try:
             await db_handler.execute(envelope)
+            self._metrics["circuit_breaker_db_persist_success"] += 1
             logger.debug(
                 "Circuit breaker state persisted to DB for endpoint %s",
                 endpoint_to_store,
             )
         except Exception as e:
             # Log but don't fail - Valkey is the primary cache
+            self._metrics["circuit_breaker_db_persist_failure"] += 1
             logger.warning(
                 "Failed to persist circuit breaker to DB for endpoint %s: %s",
                 endpoint_to_store,
                 e,
             )
+
+    # =========================================================================
+    # Metrics
+    # =========================================================================
+
+    def get_metrics(self) -> ModelSubscriptionMetrics:
+        """Get handler metrics for observability.
+
+        Returns a copy of current metrics as a Pydantic model for production
+        monitoring and alerting.
+
+        Returns:
+            ModelSubscriptionMetrics with current counter values.
+        """
+        return ModelSubscriptionMetrics(**self._metrics)
 
     # =========================================================================
     # Health Check
@@ -1906,4 +2151,5 @@ class HandlerSubscription:
             valkey_healthy=valkey_healthy,
             http_healthy=http_healthy,
             error_message="; ".join(errors) if errors else None,
+            metrics=self.get_metrics(),
         )
