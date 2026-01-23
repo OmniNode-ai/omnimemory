@@ -36,8 +36,13 @@ what implementations are pending.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+import yaml
+
+if TYPE_CHECKING:
+    from omnibase_core.types import MappingResultDict
 
 # Core 8 node names - shared across node-related test modules
 CORE_8_NODES: list[str] = [
@@ -99,6 +104,89 @@ def implemented_nodes(nodes_dir: Path) -> list[str]:
 nodes_with_contracts = implemented_nodes
 
 
+@pytest.fixture
+def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> MappingResultDict:
+    """Load and parse contract.yaml for a parametrized node name.
+
+    This fixture reduces redundant YAML file reads across tests by loading
+    the contract data once per test. Use with pytest.mark.parametrize to
+    specify the node_name.
+
+    Usage:
+        @pytest.mark.parametrize("node_name", ["memory_storage_effect", "similarity_compute"])
+        def test_something(self, contract_data: MappingResultDict, node_name: str) -> None:
+            # contract_data contains the parsed YAML
+            assert "name" in contract_data
+
+    When to Use:
+        - Parametrized tests that iterate over multiple contracts
+        - Tests that need the same contract data in multiple assertions
+        - Test classes that validate contract structure across nodes
+
+    When NOT to Use:
+        - Single-contract tests: Load YAML directly with yaml.safe_load()
+        - Non-parametrized tests: Fixture requires @pytest.mark.parametrize
+        - Tests that only need one specific contract: Direct loading is simpler
+
+    Note:
+        The fixture accesses node_name from request.node.callspec.params,
+        so tests MUST have a 'node_name' parameter defined via parametrize.
+
+    Args:
+        request: Pytest fixture request object for accessing test parameters
+        nodes_dir: Path to the nodes directory (injected fixture)
+
+    Returns:
+        Parsed YAML data as a dictionary
+
+    Raises:
+        pytest.skip: If the contract file does not exist
+        ValueError: If the test is not parametrized with 'node_name'
+    """
+    # Extract node_name from parametrize - provide helpful error if missing
+    if not hasattr(request.node, "callspec"):
+        raise ValueError(
+            f"contract_data fixture requires @pytest.mark.parametrize decorator.\n\n"
+            f"Test '{request.node.name}' is not parametrized.\n\n"
+            f"Required usage:\n"
+            f"    @pytest.mark.parametrize('node_name', ['memory_storage_effect'])\n"
+            f"    def test_example(self, contract_data: MappingResultDict, node_name: str) -> None:\n"
+            f"        assert 'name' in contract_data\n\n"
+            f"For multiple nodes:\n"
+            f"    @pytest.mark.parametrize('node_name', CORE_8_NODES)\n"
+            f"    def test_all_nodes(self, contract_data: MappingResultDict, node_name: str) -> None:\n"
+            f"        ...\n\n"
+            f"See fixture docstring for complete documentation."
+        )
+
+    if "node_name" not in request.node.callspec.params:
+        available_params = list(request.node.callspec.params.keys())
+        raise ValueError(
+            f"contract_data fixture requires 'node_name' parameter in @pytest.mark.parametrize.\n\n"
+            f"Test '{request.node.name}' has parametrize but missing 'node_name'.\n"
+            f"Available parameters: {available_params}\n\n"
+            f"Required pattern:\n"
+            f"    @pytest.mark.parametrize('node_name', [...])\n"
+            f"    def test_example(self, contract_data, node_name: str) -> None:\n\n"
+            f"If you have multiple parametrize decorators, ensure one includes 'node_name'."
+        )
+
+    node_name: str = request.node.callspec.params["node_name"]
+    contract_path: Path = nodes_dir / node_name / "contract.yaml"
+
+    if not contract_path.exists():
+        pytest.skip(f"Contract file not yet implemented: {contract_path}")
+
+    with open(contract_path) as f:
+        data = yaml.safe_load(f)
+
+    if not isinstance(data, dict):
+        pytest.fail(
+            f"Contract must be a dict, got {type(data).__name__}: {contract_path}"
+        )
+    return data
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers for test categorization."""
     config.addinivalue_line(
@@ -140,4 +228,8 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "memgraph: marks tests as requiring Memgraph database",
+    )
+    config.addinivalue_line(
+        "markers",
+        "migration: tests specific to migration validation (may be skipped post-release)",
     )

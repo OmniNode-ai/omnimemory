@@ -2,20 +2,29 @@
 # ============================================================================
 # OmniMemory - Infrastructure Services
 # ============================================================================
-# Purpose: Data layer services for memory operations (graph DB, vector DB)
+# Purpose: Data layer services for memory operations (graph DB, vector DB, cache)
 # Usage: docker compose up -d
 #
 # Services:
-# - qdrant: Vector database for semantic memory (6333/6334)
-# - memgraph: Graph database for relationship queries (7687/7444)
+# - qdrant: Vector database for semantic memory (configurable ports via env)
+# - memgraph: Graph database for relationship queries (configurable ports via env)
+# - valkey: In-memory cache/data store (configurable port via env)
+#
+# Authentication:
+# All services support optional authentication via environment variables.
+# When auth env vars are NOT set, services run without authentication (dev mode).
+#
+# To enable authentication, set these in your .env file:
+# - Qdrant: QDRANT_API_KEY=your-api-key
+# - Valkey: VALKEY_PASSWORD=your-password
+# - Memgraph: Use docker-compose.prod.yml overlay (Memgraph fails on empty credentials)
 #
 # SECURITY WARNING (Non-Local Deployments):
-# - Qdrant and Memgraph are configured WITHOUT authentication by default
-# - For production/non-local deployments, enable authentication:
-#   - Qdrant: Set QDRANT__SERVICE__API_KEY environment variable
-#   - Memgraph: Add --auth-module-mappings and --auth-password-strength-regex
+# - For production/non-local deployments, ALWAYS enable authentication
 # - Consider network isolation and TLS for external access
 #
+# Port Configuration:
+# All ports are configurable via environment variables. See .env.example for details.
 # ============================================================================
 name: omnimemory
 services:
@@ -24,23 +33,26 @@ services:
     image: qdrant/qdrant:${QDRANT_VERSION:-v1.16.3}
     container_name: omnimemory-qdrant
     ports:
-      - "${QDRANT_PORT:-6333}:6333"  # REST API
-      - "${QDRANT_GRPC_PORT:-6334}:6334"  # gRPC
+      - "${QDRANT_HTTP_PORT:-6333}:${QDRANT_HTTP_PORT:-6333}"  # REST API
+      - "${QDRANT_GRPC_PORT:-6334}:${QDRANT_GRPC_PORT:-6334}"  # gRPC
     environment:
-      QDRANT__SERVICE__HTTP_PORT: 6333
-      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__HTTP_PORT: ${QDRANT_HTTP_PORT:-6333}
+      QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
       QDRANT__SERVICE__HOST: 0.0.0.0
       QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
       QDRANT__STORAGE__ON_DISK_PAYLOAD: true
       QDRANT__LOG_LEVEL: INFO
+      # Authentication (optional - set QDRANT_API_KEY in .env to enable)
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
     volumes:
       - qdrant_data:/qdrant/storage
       - qdrant_snapshots:/qdrant/snapshots
     networks:
       - omnimemory-network
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && echo -e 'GET /readyz HTTP/1.1\\r\\nHost:
-          localhost:6333\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q 'ready'"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/${QDRANT_HTTP_PORT:-6333} && echo -e 'GET
+          /readyz HTTP/1.1\\r\\nHost: localhost:${QDRANT_HTTP_PORT:-6333}\\r\\n\\r\\n' >&3 && timeout
+          2 cat <&3 | grep -q 'ready'"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -48,35 +60,40 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
+          cpus: '${QDRANT_CPU_LIMIT:-2.0}'
+          memory: ${QDRANT_MEMORY_LIMIT:-2G}
         reservations:
-          cpus: '0.25'
-          memory: 512M
+          cpus: '${QDRANT_CPU_RESERVATION:-0.25}'
+          memory: ${QDRANT_MEMORY_RESERVATION:-512M}
     restart: unless-stopped
+
   # Memgraph Database (Graph Memory / Relationship Queries)
   memgraph:
     image: memgraph/memgraph:${MEMGRAPH_VERSION:-2.18.1}
     container_name: omnimemory-memgraph
     ports:
-      - "${MEMGRAPH_BOLT_PORT:-7687}:7687"  # Bolt protocol
-      - "${MEMGRAPH_HTTP_PORT:-7444}:7444"  # HTTP
+      - "${MEMGRAPH_BOLT_PORT:-7687}:${MEMGRAPH_BOLT_PORT:-7687}"  # Bolt protocol
+      - "${MEMGRAPH_HTTP_PORT:-7444}:${MEMGRAPH_HTTP_PORT:-7444}"  # HTTP
     environment:
-      MEMGRAPH_BOLT_PORT: 7687
-      MEMGRAPH_HTTP_PORT: 7444
-      MEMGRAPH_MEMORY_LIMIT: 4096
+      MEMGRAPH_BOLT_PORT: ${MEMGRAPH_BOLT_PORT:-7687}
+      MEMGRAPH_HTTP_PORT: ${MEMGRAPH_HTTP_PORT:-7444}
+      MEMGRAPH_MEMORY_LIMIT: ${MEMGRAPH_MEMORY_LIMIT_MB:-4096}
+      # Note: Memgraph auth configured via docker-compose.prod.yml overlay
+      # (Memgraph fails on empty MEMGRAPH_USER, unlike Qdrant/Valkey)
     command:
       - --storage-snapshot-retention-count=2
       - --storage-wal-enabled=true
       - --storage-snapshot-interval-sec=3600
+      - --bolt-port=${MEMGRAPH_BOLT_PORT:-7687}
     volumes:
       - memgraph_data:/var/lib/memgraph
     networks:
       - omnimemory-network
     healthcheck:
       # Uses mgconsole to verify database is ready to accept Cypher queries
-      # (TCP-only check would pass even if database isn't query-ready)
-      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port 7687 || exit 1"]
+      # (Auth-aware health check is in docker-compose.prod.yml)
+      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port ${MEMGRAPH_BOLT_PORT:-7687}
+          || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -84,20 +101,55 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 4G
+          cpus: '${MEMGRAPH_CPU_LIMIT:-2.0}'
+          memory: ${MEMGRAPH_CONTAINER_MEMORY:-4G}
         reservations:
-          cpus: '0.25'
-          memory: 512M
+          cpus: '${MEMGRAPH_CPU_RESERVATION:-0.25}'
+          memory: ${MEMGRAPH_MEMORY_RESERVATION:-512M}
     restart: unless-stopped
+
+  # Valkey In-Memory Data Store (Cache / Session Storage)
+  valkey:
+    image: valkey/valkey:${VALKEY_VERSION:-8}
+    container_name: omnimemory-valkey
+    ports:
+      - "${VALKEY_PORT:-6379}:${VALKEY_PORT:-6379}"
+    command: >
+      valkey-server --port ${VALKEY_PORT:-6379} --appendonly yes ${VALKEY_PASSWORD:+--requirepass ${VALKEY_PASSWORD}}
+    volumes:
+      - valkey_data:/data
+    networks:
+      - omnimemory-network
+    healthcheck:
+      # Auth-aware ping (works with or without VALKEY_PASSWORD set)
+      # Uses REDISCLI_AUTH env var to avoid exposing password in process listing
+      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=${VALKEY_PASSWORD:-} valkey-cli -p ${VALKEY_PORT:-6379}
+          ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '${VALKEY_CPU_LIMIT:-1.0}'
+          memory: ${VALKEY_MEMORY_LIMIT:-1G}
+        reservations:
+          cpus: '${VALKEY_CPU_RESERVATION:-0.1}'
+          memory: ${VALKEY_MEMORY_RESERVATION:-128M}
+    restart: unless-stopped
+
 networks:
   omnimemory-network:
     driver: bridge
     name: omnimemory-network
+
 volumes:
   memgraph_data:
     driver: local
   qdrant_data:
     driver: local
   qdrant_snapshots:
+    driver: local
+  valkey_data:
     driver: local

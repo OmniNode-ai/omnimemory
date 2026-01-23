@@ -1,0 +1,170 @@
+---
+# ============================================================================
+# OmniMemory - Production Configuration
+# ============================================================================
+# Purpose: Secure production deployment with authentication REQUIRED
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# REQUIRED ENVIRONMENT VARIABLES:
+# - QDRANT_API_KEY: API key for Qdrant access (min 32 characters recommended)
+# - MEMGRAPH_USER: Username for Memgraph authentication
+# - MEMGRAPH_PASSWORD: Password for Memgraph authentication (min 8 characters)
+# - VALKEY_PASSWORD: Password for Valkey access
+#
+# Without these variables, services will FAIL to start.
+#
+# SECURITY NOTES:
+# - Ports are NOT exposed on host - services communicate via internal network
+# - All services require authentication
+# - Health checks are more aggressive for faster failure detection
+# - Resource limits are tighter for production workloads
+#
+# VERSION REQUIREMENT:
+# - Requires Docker Compose v2.20.0+ (uses !override YAML tag to clear ports)
+# - Check version: docker compose version
+# ============================================================================
+name: omnimemory-prod
+
+services:
+  # Qdrant Vector Database - Production Configuration
+  qdrant:
+    container_name: omnimemory-prod-qdrant
+    # Remove host port exposure - internal network only
+    # Services should connect via omnimemory-network using service name
+    ports: !override []
+    expose:
+      - "${QDRANT_HTTP_PORT:-6333}"
+      - "${QDRANT_GRPC_PORT:-6334}"
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: ${QDRANT_HTTP_PORT:-6333}
+      QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
+      QDRANT__SERVICE__HOST: 0.0.0.0
+      QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
+      QDRANT__STORAGE__ON_DISK_PAYLOAD: true
+      QDRANT__LOG_LEVEL: WARN
+      # REQUIRED - service will fail without this
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?QDRANT_API_KEY is required for production}
+    # Health check note: The /readyz endpoint is a Kubernetes-style readiness probe
+    # that is typically accessible WITHOUT authentication in Qdrant. If your Qdrant
+    # version requires auth for /readyz, add the api-key header to the health check:
+    #   'GET /readyz HTTP/1.1\r\nHost: ...\r\napi-key: ${QDRANT_API_KEY}\r\n\r\n'
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/${QDRANT_HTTP_PORT:-6333} && echo -e 'GET
+          /readyz HTTP/1.1\\r\\nHost: localhost:${QDRANT_HTTP_PORT:-6333}\\r\\n\\r\\n' >&3 && timeout
+          2 cat <&3 | grep -q 'ready'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '${QDRANT_PROD_CPU_LIMIT:-4.0}'
+          memory: ${QDRANT_PROD_MEMORY_LIMIT:-4G}
+        reservations:
+          cpus: '${QDRANT_PROD_CPU_RESERVATION:-0.5}'
+          memory: ${QDRANT_PROD_MEMORY_RESERVATION:-1G}
+    restart: always
+
+  # Memgraph Database - Production Configuration
+  memgraph:
+    container_name: omnimemory-prod-memgraph
+    # Remove host port exposure - internal network only
+    ports: !override []
+    expose:
+      - "${MEMGRAPH_BOLT_PORT:-7687}"
+      - "${MEMGRAPH_HTTP_PORT:-7444}"
+    environment:
+      MEMGRAPH_BOLT_PORT: ${MEMGRAPH_BOLT_PORT:-7687}
+      MEMGRAPH_HTTP_PORT: ${MEMGRAPH_HTTP_PORT:-7444}
+      MEMGRAPH_MEMORY_LIMIT: ${MEMGRAPH_PROD_MEMORY_LIMIT_MB:-8192}
+      # REQUIRED - service will fail without these
+      MEMGRAPH_USER: ${MEMGRAPH_USER:?MEMGRAPH_USER is required for production}
+      MEMGRAPH_PASSWORD: ${MEMGRAPH_PASSWORD:?MEMGRAPH_PASSWORD is required for production}
+    command:
+      - --storage-snapshot-retention-count=3
+      - --storage-wal-enabled=true
+      - --storage-snapshot-interval-sec=1800
+      - --bolt-port=${MEMGRAPH_BOLT_PORT:-7687}
+      # Production performance tuning
+      - --log-level=WARNING
+      - --query-execution-timeout-sec=${MEMGRAPH_QUERY_TIMEOUT_SEC:-600}
+      # Authentication enforcement
+      - --auth-user-or-role-regex=.+
+    healthcheck:
+      # Production health check with authentication
+      test: ["CMD", "bash", "-c", "echo 'RETURN 1;' | mgconsole --host localhost --port ${MEMGRAPH_BOLT_PORT:-7687}
+          --username $MEMGRAPH_USER --password $MEMGRAPH_PASSWORD || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '${MEMGRAPH_PROD_CPU_LIMIT:-4.0}'
+          memory: ${MEMGRAPH_PROD_CONTAINER_MEMORY:-8G}
+        reservations:
+          cpus: '${MEMGRAPH_PROD_CPU_RESERVATION:-0.5}'
+          memory: ${MEMGRAPH_PROD_MEMORY_RESERVATION:-1G}
+    restart: always
+
+  # Valkey In-Memory Data Store - Production Configuration
+  valkey:
+    container_name: omnimemory-prod-valkey
+    # Remove host port exposure - internal network only
+    ports: !override []
+    expose:
+      - "${VALKEY_PORT:-6379}"
+    command: >
+      valkey-server --port ${VALKEY_PORT:-6379} --appendonly yes --requirepass ${VALKEY_PASSWORD:?VALKEY_PASSWORD
+      is required for production}
+    healthcheck:
+      # Ping with authentication (password passed via env var to avoid exposure in process listing)
+      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=$VALKEY_PASSWORD valkey-cli -p ${VALKEY_PORT:-6379} ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '${VALKEY_PROD_CPU_LIMIT:-2.0}'
+          memory: ${VALKEY_PROD_MEMORY_LIMIT:-2G}
+        reservations:
+          cpus: '${VALKEY_PROD_CPU_RESERVATION:-0.25}'
+          memory: ${VALKEY_PROD_MEMORY_RESERVATION:-256M}
+    restart: always
+
+networks:
+  omnimemory-network:
+    driver: bridge
+    name: omnimemory-prod-network
+    # =========================================================================
+    # Network Isolation Setting (internal)
+    # =========================================================================
+    # Controls whether containers can access networks outside this bridge.
+    #
+    # INTERNAL: TRUE (Maximum Isolation)
+    #   - Containers can ONLY communicate with each other on this network
+    #   - NO access to host network, external networks, or internet
+    #   - NO outbound connections (cannot reach external APIs, registries, etc.)
+    #   - Use when: Services are fully self-contained and don't need external
+    #     connectivity (air-gapped environments, strict security requirements)
+    #
+    # INTERNAL: FALSE (Default - External Access Allowed)
+    #   - Containers can communicate with each other AND external networks
+    #   - Required for: Reverse proxy access (nginx/traefik), external API calls,
+    #     pulling updates, connecting to external databases
+    #   - Use when: You need to expose services via load balancer or services
+    #     must reach external endpoints
+    #
+    # SECURITY IMPLICATIONS:
+    #   - true:  Stronger isolation, but services cannot fetch external data
+    #   - false: More flexible, but containers can make outbound connections
+    #   - Note: Even with internal:false, services are NOT exposed to host
+    #     unless ports are explicitly published (ports: vs expose:)
+    #
+    # Override via environment: NETWORK_INTERNAL=true docker compose up
+    # =========================================================================
+    internal: ${NETWORK_INTERNAL:-false}
