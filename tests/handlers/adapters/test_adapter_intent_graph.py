@@ -944,6 +944,131 @@ class TestLifecycle:
 
 
 # =============================================================================
+# Context Manager Tests
+# =============================================================================
+
+
+class TestContextManager:
+    """Tests for async context manager protocol."""
+
+    @pytest.mark.asyncio
+    async def test_context_manager_returns_self(
+        self,
+        config: ModelAdapterIntentGraphConfig,
+    ) -> None:
+        """Test that async context manager returns the adapter instance."""
+        adapter = AdapterIntentGraph(config)
+
+        async with adapter as ctx:
+            assert ctx is adapter
+
+    @pytest.mark.asyncio
+    async def test_context_manager_calls_shutdown_on_exit(
+        self,
+        adapter_with_mock: AdapterIntentGraph,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that shutdown is called automatically on context exit."""
+        assert adapter_with_mock.is_initialized
+
+        async with adapter_with_mock:
+            # Do some work
+            pass
+
+        # shutdown should have been called
+        mock_handler.shutdown.assert_called_once()
+        assert not adapter_with_mock.is_initialized
+
+    @pytest.mark.asyncio
+    async def test_context_manager_calls_shutdown_on_exception(
+        self,
+        adapter_with_mock: AdapterIntentGraph,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that shutdown is called even when exception occurs inside context."""
+        assert adapter_with_mock.is_initialized
+
+        with pytest.raises(ValueError, match="test error"):
+            async with adapter_with_mock:
+                raise ValueError("test error")
+
+        # shutdown should still have been called despite the exception
+        mock_handler.shutdown.assert_called_once()
+        assert not adapter_with_mock.is_initialized
+
+    @pytest.mark.asyncio
+    async def test_context_manager_full_lifecycle(
+        self,
+        config: ModelAdapterIntentGraphConfig,
+    ) -> None:
+        """Test full lifecycle with context manager: create, initialize, use, shutdown."""
+        with patch(
+            "omnimemory.handlers.adapters.adapter_intent_graph.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            mock_instance.shutdown = AsyncMock()
+            mock_instance.execute_query = AsyncMock(
+                return_value=MagicMock(
+                    records=[{"intent_id": "test_id", "was_created": True}]
+                )
+            )
+            MockHandler.return_value = mock_instance
+
+            with patch("omnibase_core.container.ModelONEXContainer"):
+                async with AdapterIntentGraph(config) as adapter:
+                    await adapter.initialize(
+                        connection_uri="bolt://localhost:7687",
+                    )
+                    assert adapter.is_initialized
+
+                    # Store an intent
+                    result = await adapter.store_intent(
+                        session_id="session_123",
+                        intent_data=ModelIntentClassificationOutput(
+                            intent_category="debugging",
+                            confidence=0.9,
+                        ),
+                        correlation_id="corr_abc",
+                    )
+                    assert result.status == "success"
+
+                # After context exit, shutdown should be called
+                mock_instance.shutdown.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_context_manager_shutdown_idempotent(
+        self,
+        adapter_with_mock: AdapterIntentGraph,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that context manager shutdown is safe if shutdown was already called."""
+        async with adapter_with_mock:
+            # Manually call shutdown inside the context
+            await adapter_with_mock.shutdown()
+            mock_handler.shutdown.assert_called_once()
+
+        # Context manager exit should not fail even though shutdown was already called
+        # shutdown should still only have been called once (idempotent behavior)
+        mock_handler.shutdown.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_context_manager_without_initialize(
+        self,
+        config: ModelAdapterIntentGraphConfig,
+    ) -> None:
+        """Test context manager works even if initialize was never called."""
+        adapter = AdapterIntentGraph(config)
+
+        # Should not raise, even without initialization
+        async with adapter:
+            assert not adapter.is_initialized
+
+        # shutdown on uninitialized adapter is a no-op
+        assert not adapter.is_initialized
+
+
+# =============================================================================
 # store_intent Tests
 # =============================================================================
 
@@ -1076,6 +1201,35 @@ class TestStoreIntent:
         call_args = mock_handler.execute_query.call_args
         params = call_args[1]["parameters"]
         assert params["user_context"] == "Python developer debugging async code"
+
+    @pytest.mark.asyncio
+    async def test_store_intent_rejects_empty_session_id(
+        self,
+        adapter_with_mock: AdapterIntentGraph,
+        sample_intent_classification: ModelIntentClassificationOutput,
+    ) -> None:
+        """Test store_intent returns error for empty or whitespace-only session_id."""
+        # Test empty string
+        result = await adapter_with_mock.store_intent(
+            session_id="",
+            intent_data=sample_intent_classification,
+            correlation_id="corr_abc",
+        )
+
+        assert result.status == "error"
+        assert result.session_id == ""
+        assert "session_id cannot be empty" in result.error_message
+
+        # Test whitespace-only string
+        result_whitespace = await adapter_with_mock.store_intent(
+            session_id="   ",
+            intent_data=sample_intent_classification,
+            correlation_id="corr_xyz",
+        )
+
+        assert result_whitespace.status == "error"
+        assert result_whitespace.session_id == "   "
+        assert "session_id cannot be empty" in result_whitespace.error_message
 
 
 # =============================================================================

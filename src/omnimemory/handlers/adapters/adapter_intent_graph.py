@@ -52,6 +52,7 @@ import logging
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from types import TracebackType
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -261,6 +262,32 @@ class AdapterIntentGraph:
         self._handler: HandlerGraph | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
+
+    async def __aenter__(self) -> AdapterIntentGraph:
+        """Enter async context manager.
+
+        Note: initialize() must still be called separately as it requires
+        connection parameters.
+
+        Returns:
+            Self for use in async with statement.
+        """
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exit async context manager, ensuring shutdown is called.
+
+        Args:
+            exc_type: Exception type if an exception was raised.
+            exc_val: Exception value if an exception was raised.
+            exc_tb: Traceback if an exception was raised.
+        """
+        await self.shutdown()
 
     @property
     def config(self) -> ModelAdapterIntentGraphConfig:
@@ -495,6 +522,14 @@ class AdapterIntentGraph:
             This method never raises on business errors - it returns
             an error status in the result model instead.
         """
+        # Validate session_id is non-empty
+        if not session_id or not session_id.strip():
+            return ModelIntentStorageResult(
+                status="error",
+                session_id=session_id,
+                error_message="session_id cannot be empty",
+            )
+
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
