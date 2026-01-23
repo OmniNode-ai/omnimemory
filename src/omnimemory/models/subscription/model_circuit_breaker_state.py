@@ -9,6 +9,11 @@ from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 from ...enums.enum_subscription_status import EnumCircuitBreakerState
+from .constants import (
+    DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS,
+    DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+    DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+)
 
 
 class ModelCircuitBreakerState(BaseModel):
@@ -34,13 +39,13 @@ class ModelCircuitBreakerState(BaseModel):
         description="Number of consecutive successes (for half_open state)",
     )
     failure_threshold: int = Field(
-        default=5,
+        default=DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
         ge=1,
         le=100,
         description="Number of failures before circuit opens",
     )
     success_threshold: int = Field(
-        default=3,
+        default=DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
         ge=1,
         le=100,
         description="Number of successes in half_open before closing",
@@ -58,7 +63,7 @@ class ModelCircuitBreakerState(BaseModel):
         description="When the circuit breaker will transition to half_open",
     )
     cooldown_ms: int = Field(
-        default=30000,
+        default=DEFAULT_CIRCUIT_BREAKER_COOLDOWN_MS,
         ge=1000,
         le=300000,
         description="Cooldown period in milliseconds before transitioning to half_open",

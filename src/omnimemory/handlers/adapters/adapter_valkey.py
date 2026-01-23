@@ -38,12 +38,20 @@ from __future__ import annotations
 import asyncio
 import builtins
 import logging
-from typing import Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 # redis-py is compatible with both Redis and Valkey
-# Note: redis-py async type stubs are incomplete, so we use Any for the client type
+# Type alias for Redis client - provides IDE support while handling incomplete stubs
+# Note: redis.asyncio.Redis doesn't support generic type parameters in stubs
+if TYPE_CHECKING:
+    from redis.asyncio import Redis as AsyncRedis
+
+    RedisClientType = AsyncRedis
+else:
+    RedisClientType = object
+
 _REDIS_AVAILABLE = False
 _REDIS_IMPORT_ERROR: str | None = None
 
@@ -212,7 +220,7 @@ class AdapterValkey:
             )
 
         self._config = config
-        self._client: Any = None  # aioredis.Redis - type stubs incomplete
+        self._client: RedisClientType | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
@@ -292,11 +300,11 @@ class AdapterValkey:
         self._initialized = False
         logger.info("AdapterValkey shutdown complete")
 
-    def _ensure_initialized(self) -> Any:
+    def _ensure_initialized(self) -> RedisClientType:
         """Ensure adapter is initialized and return client.
 
         Returns:
-            The initialized Redis client (aioredis.Redis).
+            The initialized Redis client.
 
         Raises:
             RuntimeError: If adapter is not initialized.

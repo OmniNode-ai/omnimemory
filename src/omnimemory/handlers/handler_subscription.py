@@ -100,7 +100,12 @@ from omnimemory.models.subscription import (
     ModelSubscription,
     ModelSubscriptionDeliveryWebhook,
 )
-from omnimemory.models.subscription.constants import TOPIC_PATTERN
+from omnimemory.models.subscription.constants import (
+    DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
+    DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+    DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+    TOPIC_PATTERN,
+)
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -141,9 +146,32 @@ DEFAULT_MAX_RETRY_ATTEMPTS = 5
 DEFAULT_RETRY_BASE_DELAY_MS = 1000
 DEFAULT_RETRY_MAX_DELAY_MS = 60000  # 1 minute cap
 
-# Default circuit breaker configuration
-DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 5
-DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS = 60
+# Circuit breaker cache TTL in seconds.
+# TTL Refresh Strategy: This TTL is refreshed on every state update to prevent state
+# loss for long-lived circuits. If a circuit stays open/half-open beyond this TTL
+# without any updates, the state would be lost and the circuit would reset to closed.
+# By refreshing on every update, we ensure state persists as long as the circuit is
+# actively being used. PostgreSQL serves as durable backup if cache expires.
+CIRCUIT_BREAKER_CACHE_TTL_SECONDS = 3600  # 1 hour
+
+
+def _sql_placeholders(count: int, start: int = 1) -> str:
+    """Generate SQL parameter placeholders for parameterized queries.
+
+    Args:
+        count: Number of placeholders to generate.
+        start: Starting index (default 1 for PostgreSQL $1, $2, ...).
+
+    Returns:
+        Comma-separated placeholder string (e.g., "$1, $2, $3").
+
+    Example:
+        >>> _sql_placeholders(3)
+        '$1, $2, $3'
+        >>> _sql_placeholders(2, start=5)
+        '$5, $6'
+    """
+    return ", ".join(f"${i}" for i in range(start, start + count))
 
 
 class ModelHandlerSubscriptionConfig(BaseModel):
@@ -213,13 +241,13 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         description="Maximum delay cap for retries (ms)",
     )
     circuit_breaker_threshold: int = Field(
-        default=DEFAULT_CIRCUIT_BREAKER_THRESHOLD,
+        default=DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
         ge=1,
         le=100,
         description="Consecutive failures before circuit opens",
     )
     circuit_breaker_success_threshold: int = Field(
-        default=3,
+        default=DEFAULT_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
         ge=1,
         le=100,
         description="Number of consecutive successes in half_open state before closing circuit",
@@ -524,21 +552,28 @@ class HandlerSubscription:
             metadata=metadata,
         )
 
-        # Persist to PostgreSQL
+        # Persist to PostgreSQL (source of truth)
         await self._persist_subscription(subscription, is_update=existing is not None)
 
-        # Update Valkey caches
-        topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
-        agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
-        sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription_id)
+        # Update Valkey caches (best effort - DB is source of truth)
+        try:
+            topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
+            agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
+            sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription_id)
 
-        await valkey.sadd(topic_key, subscription_id)
-        await valkey.sadd(agent_key, subscription_id)
-        await valkey.set(
-            sub_key,
-            subscription.model_dump_json(),
-            ttl=self._config.cache_ttl_seconds,
-        )
+            await valkey.sadd(topic_key, subscription_id)
+            await valkey.sadd(agent_key, subscription_id)
+            await valkey.set(
+                sub_key,
+                subscription.model_dump_json(),
+                ttl=self._config.cache_ttl_seconds,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to update cache for subscription %s (DB persisted successfully): %s",
+                subscription_id,
+                e,
+            )
 
         logger.info(
             "Subscription %s created/updated for agent %s on topic %s",
@@ -1051,7 +1086,7 @@ class HandlerSubscription:
 
         # Load missing from database
         if missing_ids:
-            placeholders = ", ".join(f"${i+1}" for i in range(len(missing_ids)))
+            placeholders = _sql_placeholders(len(missing_ids))
             sql = f"""
                 SELECT id, agent_id, topic, webhook_url, webhook_secret,
                        webhook_headers, webhook_timeout_ms, status,
@@ -1281,6 +1316,10 @@ class HandlerSubscription:
         # NOTE: This handler only records the scheduled retry time; it does NOT
         # execute the retry. A separate background worker must poll the
         # delivery_attempts table for pending retries (see module docstring).
+        #
+        # TODO(OMN-XXXX): Implement RetryWorker that polls delivery_attempts table
+        # for rows where status='failed' AND next_retry_at <= NOW() and re-invokes
+        # delivery. See also: module docstring for architectural rationale.
         delay_ms = min(
             self._config.retry_base_delay_ms * (2 ** (attempt_number - 1)),
             self._config.retry_max_delay_ms,
@@ -1420,8 +1459,12 @@ class HandlerSubscription:
         if state_dict is None:
             state_dict = await self._load_circuit_breaker_from_db(endpoint)
             if state_dict:
-                # Repopulate Valkey cache from DB
-                await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)
+                # Repopulate Valkey cache from DB with TTL refresh
+                await valkey.set(
+                    cb_key,
+                    json.dumps(state_dict),
+                    ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
+                )
                 logger.debug(
                     "Circuit breaker state for %s loaded from DB and cached",
                     endpoint,
@@ -1446,9 +1489,14 @@ class HandlerSubscription:
                         open_until_str.replace("Z", "+00:00")
                     )
                     if datetime.now(timezone.utc) >= open_until_dt:
-                        # Transition to half-open
+                        # Transition to half-open state. TTL is refreshed to prevent
+                        # state loss during the half-open testing period.
                         state_dict["state"] = EnumCircuitBreakerState.HALF_OPEN.value
-                        await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)
+                        await valkey.set(
+                            cb_key,
+                            json.dumps(state_dict),
+                            ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
+                        )
                         # Also persist the state transition to DB
                         await self._persist_circuit_breaker_to_db(endpoint, state_dict)
                         return True
@@ -1652,8 +1700,14 @@ class HandlerSubscription:
 
         state_dict["updated_at"] = now.isoformat()
 
-        # Persist to Valkey (primary cache)
-        await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)  # 1 hour TTL
+        # Persist to Valkey (primary cache).
+        # TTL is refreshed on every update to prevent state loss for long-lived circuits.
+        # This ensures that actively-used circuits never expire from cache.
+        await valkey.set(
+            cb_key,
+            json.dumps(state_dict),
+            ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
+        )
 
         # Persist to PostgreSQL (durable backup)
         await self._persist_circuit_breaker_to_db(endpoint, state_dict)
