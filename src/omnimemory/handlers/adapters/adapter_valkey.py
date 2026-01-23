@@ -37,10 +37,14 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import inspect
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import Awaitable
+from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
+
+_T = TypeVar("_T")
 
 # redis-py is compatible with both Redis and Valkey
 # Type alias for Redis client - provides IDE support while handling incomplete stubs
@@ -245,6 +249,22 @@ class AdapterValkey:
         """
         return f"{self._config.key_prefix}{key}"
 
+    async def _ensure_awaited(self, result: _T | Awaitable[_T]) -> _T:
+        """Ensure result is awaited if it's awaitable.
+
+        Redis methods can return either sync or async results depending on
+        the client configuration. This helper handles both cases.
+
+        Args:
+            result: The result from a Redis operation.
+
+        Returns:
+            The resolved value.
+        """
+        if inspect.isawaitable(result):
+            return await result
+        return result
+
     async def initialize(self) -> None:
         """Initialize the Valkey connection.
 
@@ -261,6 +281,10 @@ class AdapterValkey:
                 password = None
                 if self._config.password:
                     password = self._config.password.get_secret_value()
+
+                # aioredis is guaranteed to be available here because
+                # __init__ raises ImportError if _REDIS_AVAILABLE is False
+                assert aioredis is not None, "aioredis module not available"
 
                 self._client = aioredis.Redis(
                     host=self._config.host,
@@ -410,7 +434,9 @@ class AdapterValkey:
         if not members:
             return 0
         client = self._ensure_initialized()
-        result = await client.sadd(self._prefixed_key(key), *members)
+        result = await self._ensure_awaited(
+            client.sadd(self._prefixed_key(key), *members)
+        )
         return int(result)
 
     async def srem(self, key: str, *members: str) -> int:
@@ -426,7 +452,9 @@ class AdapterValkey:
         if not members:
             return 0
         client = self._ensure_initialized()
-        result = await client.srem(self._prefixed_key(key), *members)
+        result = await self._ensure_awaited(
+            client.srem(self._prefixed_key(key), *members)
+        )
         return int(result)
 
     async def smembers(self, key: str) -> builtins.set[str]:
@@ -439,7 +467,7 @@ class AdapterValkey:
             Set of members (empty set if key does not exist).
         """
         client = self._ensure_initialized()
-        result = await client.smembers(self._prefixed_key(key))
+        result = await self._ensure_awaited(client.smembers(self._prefixed_key(key)))
         return {str(m) for m in result}
 
     async def sismember(self, key: str, member: str) -> bool:
@@ -453,7 +481,9 @@ class AdapterValkey:
             True if member is in the set, False otherwise.
         """
         client = self._ensure_initialized()
-        result = await client.sismember(self._prefixed_key(key), member)
+        result = await self._ensure_awaited(
+            client.sismember(self._prefixed_key(key), member)
+        )
         return bool(result)
 
     async def scard(self, key: str) -> int:
@@ -466,7 +496,7 @@ class AdapterValkey:
             Number of members (0 if key does not exist).
         """
         client = self._ensure_initialized()
-        result = await client.scard(self._prefixed_key(key))
+        result = await self._ensure_awaited(client.scard(self._prefixed_key(key)))
         return int(result)
 
     # =========================================================================
@@ -490,7 +520,9 @@ class AdapterValkey:
         if not mapping:
             return 0
         client = self._ensure_initialized()
-        result = await client.hset(self._prefixed_key(key), mapping=mapping)
+        result = await self._ensure_awaited(
+            client.hset(self._prefixed_key(key), mapping=mapping)
+        )
         return int(result)
 
     async def hget(self, key: str, field: str) -> str | None:
@@ -504,7 +536,7 @@ class AdapterValkey:
             The field value if found, None otherwise.
         """
         client = self._ensure_initialized()
-        result = await client.hget(self._prefixed_key(key), field)
+        result = await self._ensure_awaited(client.hget(self._prefixed_key(key), field))
         if result is None:
             return None
         return str(result) if not isinstance(result, str) else result
@@ -519,7 +551,7 @@ class AdapterValkey:
             Dictionary of field->value pairs (empty dict if key does not exist).
         """
         client = self._ensure_initialized()
-        result = await client.hgetall(self._prefixed_key(key))
+        result = await self._ensure_awaited(client.hgetall(self._prefixed_key(key)))
         return {str(k): str(v) for k, v in result.items()}
 
     async def hdel(self, key: str, *fields: str) -> int:
@@ -535,7 +567,9 @@ class AdapterValkey:
         if not fields:
             return 0
         client = self._ensure_initialized()
-        result = await client.hdel(self._prefixed_key(key), *fields)
+        result = await self._ensure_awaited(
+            client.hdel(self._prefixed_key(key), *fields)
+        )
         return int(result)
 
     # =========================================================================

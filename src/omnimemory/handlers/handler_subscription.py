@@ -81,9 +81,10 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+from typing import cast
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr
 
 from omnimemory.enums.enum_subscription_status import (
     EnumCircuitBreakerState,
@@ -516,7 +517,7 @@ class HandlerSubscription:
             ValueError: If topic format is invalid.
             RuntimeError: If handler is not initialized.
         """
-        valkey, db_handler, _ = self._ensure_initialized()
+        valkey, _, _ = self._ensure_initialized()
 
         # Validate topic format
         if not TOPIC_PATTERN.match(topic):
@@ -606,7 +607,7 @@ class HandlerSubscription:
         Raises:
             RuntimeError: If handler is not initialized.
         """
-        valkey, db_handler, _ = self._ensure_initialized()
+        valkey, _, _ = self._ensure_initialized()
 
         # Find existing subscription
         subscription = await self._get_subscription_by_agent_and_topic(agent_id, topic)
@@ -665,7 +666,7 @@ class HandlerSubscription:
         Raises:
             RuntimeError: If handler is not initialized.
         """
-        valkey, db_handler, http_handler = self._ensure_initialized()
+        self._ensure_initialized()
 
         # Get subscribers for topic
         subscriber_ids = await self._get_subscribers_for_topic(topic)
@@ -713,7 +714,7 @@ class HandlerSubscription:
         Raises:
             RuntimeError: If handler is not initialized.
         """
-        valkey, db_handler, _ = self._ensure_initialized()
+        valkey, _, _ = self._ensure_initialized()
 
         # Try Valkey cache first
         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
@@ -929,30 +930,48 @@ class HandlerSubscription:
         if metadata_raw:
             metadata = json.loads(str(metadata_raw))
 
-        # Parse datetime fields
-        created_at = row["created_at"]
-        if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        # Parse datetime fields with proper type handling
+        created_at_raw = row["created_at"]
+        if isinstance(created_at_raw, str):
+            created_at_parsed = datetime.fromisoformat(
+                created_at_raw.replace("Z", "+00:00")
+            )
+        else:
+            created_at_parsed = cast(datetime, created_at_raw)
 
-        updated_at = row["updated_at"]
-        if isinstance(updated_at, str):
-            updated_at = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        updated_at_raw = row["updated_at"]
+        if isinstance(updated_at_raw, str):
+            updated_at_parsed = datetime.fromisoformat(
+                updated_at_raw.replace("Z", "+00:00")
+            )
+        else:
+            updated_at_parsed = cast(datetime, updated_at_raw)
+
+        # Extract webhook secret with proper typing
+        webhook_secret_raw = row.get("webhook_secret")
+        webhook_secret: str | None = (
+            str(webhook_secret_raw) if webhook_secret_raw is not None else None
+        )
+
+        # Extract timeout with proper typing
+        timeout_raw = row.get("webhook_timeout_ms")
+        timeout_ms: int = int(str(timeout_raw)) if timeout_raw is not None else 5000
 
         delivery = ModelSubscriptionDeliveryWebhook(
-            webhook_url=row["webhook_url"],
-            secret=row.get("webhook_secret"),
+            webhook_url=HttpUrl(str(row["webhook_url"])),
+            secret=webhook_secret,
             headers=headers,
-            timeout_ms=row.get("webhook_timeout_ms", 5000),
+            timeout_ms=timeout_ms,
         )
 
         return ModelSubscription(
-            id=row["id"],
-            agent_id=row["agent_id"],
-            topic=row["topic"],
+            id=str(row["id"]),
+            agent_id=str(row["agent_id"]),
+            topic=str(row["topic"]),
             delivery=delivery,
-            status=EnumSubscriptionStatus(row["status"]),
-            created_at=created_at,
-            updated_at=updated_at,
+            status=EnumSubscriptionStatus(str(row["status"])),
+            created_at=created_at_parsed,
+            updated_at=updated_at_parsed,
             metadata=metadata,
         )
 
@@ -1439,7 +1458,7 @@ class HandlerSubscription:
         Returns:
             True if request should proceed, False if circuit is open.
         """
-        valkey, db_handler, _ = self._ensure_initialized()
+        valkey, _, _ = self._ensure_initialized()
 
         endpoint_hash = self._endpoint_hash(endpoint)
         cb_key = CACHE_KEY_CIRCUIT_BREAKER.format(endpoint_hash=endpoint_hash)
