@@ -56,6 +56,7 @@ try:
     from omnimemory.models.subscription import (
         ModelNotificationEvent,
         ModelNotificationEventPayload,
+        ModelSubscription,
         ModelSubscriptionDeliveryWebhook,
     )
 
@@ -629,6 +630,338 @@ class TestSurviveRestart:
         assert returned_topics == set(topics)
 
         await handler2.shutdown()
+
+
+# =============================================================================
+# Cache Miss Fallback Tests
+# =============================================================================
+
+
+class TestCacheMissFallback:
+    """Tests for cache-miss to database fallback behavior.
+
+    The HandlerSubscription implements a cache-first strategy where it:
+    1. Tries Valkey cache first for fast lookups
+    2. Falls back to PostgreSQL if cache misses
+    3. Repopulates the cache after loading from database
+
+    These tests verify that this fallback mechanism works correctly
+    by explicitly clearing cache entries and verifying data recovery.
+    """
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_fallback_list_subscriptions(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        webhook_url: str,
+    ) -> None:
+        """list_subscriptions falls back to database when cache is empty.
+
+        This test:
+        1. Creates subscriptions (populates both DB and cache)
+        2. Manually clears the Valkey cache for the agent's subscriptions
+        3. Calls list_subscriptions() which should hit cache-miss path
+        4. Verifies data is correctly loaded from the database
+        5. Verifies the cache is repopulated after the fallback
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Step 1: Create multiple subscriptions
+            topics = [
+                f"memory.fallback_{uuid4().hex[:8]}.created",
+                f"memory.fallback_{uuid4().hex[:8]}.updated",
+            ]
+            delivery = ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url)
+
+            subscription_ids: list[str] = []
+            for topic in topics:
+                sub = await handler.subscribe(
+                    agent_id=unique_agent_id,
+                    topic=topic,
+                    delivery=delivery,
+                )
+                subscription_ids.append(sub.id)
+
+            # Verify subscriptions exist in cache initially
+            subs_before_clear = await handler.list_subscriptions(unique_agent_id)
+            assert len(subs_before_clear) == 2
+
+            # Step 2: Manually clear the Valkey cache for this agent
+            # Access internal valkey adapter to clear cache
+            valkey = handler._valkey
+            assert valkey is not None
+
+            # Clear agent subscriptions set
+            agent_key = f"agent:{unique_agent_id}:subscriptions"
+            await valkey.delete(agent_key)
+
+            # Clear individual subscription entries
+            for sub_id in subscription_ids:
+                sub_key = f"subscription:{sub_id}"
+                await valkey.delete(sub_key)
+
+            # Verify cache is cleared
+            agent_sub_ids = await valkey.smembers(agent_key)
+            assert len(agent_sub_ids) == 0, "Cache should be cleared"
+
+            # Step 3: Call list_subscriptions - should trigger DB fallback
+            subs_after_clear = await handler.list_subscriptions(unique_agent_id)
+
+            # Step 4: Verify data was recovered from database
+            assert len(subs_after_clear) == 2
+            returned_topics = {s.topic for s in subs_after_clear}
+            assert returned_topics == set(topics)
+
+            # Verify subscription details are intact
+            for sub in subs_after_clear:
+                assert sub.agent_id == unique_agent_id
+                assert sub.status == EnumSubscriptionStatus.ACTIVE
+                assert str(sub.delivery.webhook_url) == webhook_url
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_fallback_notify_repopulates_cache(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        webhook_url: str,
+    ) -> None:
+        """notify() falls back to database and repopulates cache on miss.
+
+        This test verifies that when the topic->subscribers cache is cleared,
+        the notify operation:
+        1. Falls back to database to find subscribers
+        2. Repopulates the topic cache after fallback
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Create subscription
+            agent_id = f"agent_{uuid4().hex[:8]}"
+            topic = f"memory.notify_fallback_{uuid4().hex[:8]}.created"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=webhook_url,
+                timeout_ms=100,  # Short timeout since webhook won't respond
+            )
+
+            sub = await handler.subscribe(
+                agent_id=agent_id,
+                topic=topic,
+                delivery=delivery,
+            )
+
+            # Clear topic->subscribers cache
+            valkey = handler._valkey
+            assert valkey is not None
+
+            topic_key = f"topic:{topic}:subscribers"
+            await valkey.delete(topic_key)
+
+            # Verify cache is cleared
+            cached_subs = await valkey.smembers(topic_key)
+            assert len(cached_subs) == 0, "Topic cache should be cleared"
+
+            # Call notify - should trigger DB fallback
+            event = ModelNotificationEvent(
+                event_id=str(uuid4()),
+                topic=topic,
+                payload=ModelNotificationEventPayload(
+                    entity_type="test_item",
+                    entity_id="item_123",
+                    action="created",
+                ),
+            )
+
+            # Note: The actual delivery may fail (no server), but the fallback
+            # should still work and find the subscriber from DB
+            attempts = await handler.notify(topic=topic, event=event)
+
+            # Should have found the subscriber via DB fallback
+            assert len(attempts) == 1
+            assert attempts[0].subscription_id == sub.id
+
+            # Verify cache was repopulated
+            cached_subs_after = await valkey.smembers(topic_key)
+            assert len(cached_subs_after) == 1
+            assert sub.id in cached_subs_after
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_individual_subscription_fallback(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        webhook_url: str,
+    ) -> None:
+        """Individual subscription cache miss triggers DB fallback and repopulation.
+
+        When the subscription:{id} cache entry is missing but the set membership
+        exists, _load_subscriptions should fall back to DB and repopulate.
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Create subscription
+            agent_id = f"agent_{uuid4().hex[:8]}"
+            topic = f"memory.individual_{uuid4().hex[:8]}.created"
+            delivery = ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url)
+
+            sub = await handler.subscribe(
+                agent_id=agent_id,
+                topic=topic,
+                delivery=delivery,
+            )
+
+            # Clear only the individual subscription cache (not the set)
+            valkey = handler._valkey
+            assert valkey is not None
+
+            sub_key = f"subscription:{sub.id}"
+            await valkey.delete(sub_key)
+
+            # Verify individual cache is cleared but set membership exists
+            cached_data = await valkey.get(sub_key)
+            assert (
+                cached_data is None
+            ), "Individual subscription cache should be cleared"
+
+            agent_key = f"agent:{agent_id}:subscriptions"
+            set_members = await valkey.smembers(agent_key)
+            assert sub.id in set_members, "Set membership should still exist"
+
+            # Call list_subscriptions - should trigger DB fallback for the subscription
+            subs = await handler.list_subscriptions(agent_id)
+
+            # Should recover the subscription
+            assert len(subs) == 1
+            assert subs[0].id == sub.id
+            assert subs[0].topic == topic
+
+            # Verify individual cache was repopulated
+            cached_data_after = await valkey.get(sub_key)
+            assert cached_data_after is not None, "Cache should be repopulated"
+
+            # Verify the cached data is valid JSON and correct
+            repopulated_sub = ModelSubscription.model_validate_json(cached_data_after)
+            assert repopulated_sub.id == sub.id
+            assert repopulated_sub.agent_id == agent_id
+            assert repopulated_sub.topic == topic
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_partial_subscriptions_fallback(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        webhook_url: str,
+    ) -> None:
+        """Mixed cache state: some subscriptions cached, some missing.
+
+        Tests the scenario where some individual subscription entries are
+        cached but others are missing, requiring partial DB fallback.
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Create multiple subscriptions
+            agent_id = f"agent_{uuid4().hex[:8]}"
+            topics = [
+                f"memory.partial_{uuid4().hex[:8]}.created",
+                f"memory.partial_{uuid4().hex[:8]}.updated",
+                f"memory.partial_{uuid4().hex[:8]}.deleted",
+            ]
+            delivery = ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url)
+
+            subscription_ids: list[str] = []
+            for topic in topics:
+                sub = await handler.subscribe(
+                    agent_id=agent_id,
+                    topic=topic,
+                    delivery=delivery,
+                )
+                subscription_ids.append(sub.id)
+
+            # Clear cache for only the first and third subscriptions
+            # Leave the second one cached
+            valkey = handler._valkey
+            assert valkey is not None
+
+            await valkey.delete(f"subscription:{subscription_ids[0]}")
+            await valkey.delete(f"subscription:{subscription_ids[2]}")
+
+            # Verify partial cache state
+            assert await valkey.get(f"subscription:{subscription_ids[0]}") is None
+            assert await valkey.get(f"subscription:{subscription_ids[1]}") is not None
+            assert await valkey.get(f"subscription:{subscription_ids[2]}") is None
+
+            # Call list_subscriptions - should load all 3 subscriptions
+            subs = await handler.list_subscriptions(agent_id)
+
+            # All subscriptions should be recovered
+            assert len(subs) == 3
+            returned_ids = {s.id for s in subs}
+            assert returned_ids == set(subscription_ids)
+
+            # Verify all caches are now populated
+            for sub_id in subscription_ids:
+                cached = await valkey.get(f"subscription:{sub_id}")
+                assert cached is not None, f"Cache for {sub_id} should be repopulated"
+
+        finally:
+            await handler.shutdown()
 
 
 # =============================================================================

@@ -17,6 +17,7 @@ from ...enums.enum_subscription_status import (
     EnumDeliveryStatus,
     EnumSubscriptionStatus,
 )
+from .constants import TOPIC_PATTERN, TOPIC_PATTERN_REGEX
 from .model_circuit_breaker_state import ModelCircuitBreakerState
 from .model_notification_delivery_attempt import ModelNotificationDeliveryAttempt
 from .model_notification_event import ModelNotificationEvent
@@ -25,6 +26,9 @@ from .model_subscription import ModelSubscription
 from .model_subscription_delivery import ModelSubscriptionDeliveryWebhook
 
 __all__ = [
+    # Constants
+    "TOPIC_PATTERN",
+    "TOPIC_PATTERN_REGEX",
     # Enums
     "EnumCircuitBreakerState",
     "EnumDeliveryStatus",

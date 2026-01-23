@@ -4,20 +4,16 @@ Subscription model following ONEX standards.
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...enums.enum_subscription_status import EnumSubscriptionStatus
+from .constants import TOPIC_PATTERN
 from .model_subscription_delivery import (
     ModelSubscriptionDeliveryWebhook,  # noqa: TC001 - runtime import for Pydantic field type
 )
-
-# Topic pattern: memory.<entity>.<event>
-# Examples: memory.item.created, memory.item.updated, memory.item.deleted
-TOPIC_PATTERN = re.compile(r"^memory\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 
 
 class ModelSubscription(BaseModel):

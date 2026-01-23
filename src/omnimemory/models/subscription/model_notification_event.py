@@ -4,18 +4,15 @@ Notification event model following ONEX standards.
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .constants import TOPIC_PATTERN
 from .model_notification_event_payload import (
     ModelNotificationEventPayload,  # noqa: TC001 - runtime import for Pydantic field type
 )
-
-# Topic pattern: memory.<entity>.<event>
-TOPIC_PATTERN = re.compile(r"^memory\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 
 
 class ModelNotificationEvent(BaseModel):

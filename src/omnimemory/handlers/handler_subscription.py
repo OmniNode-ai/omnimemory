@@ -13,6 +13,16 @@ Architecture:
 - Delivery: Webhook only (HTTP POST with retry/DLQ)
 - Topic naming: memory.<entity>.<event> convention
 
+Note on Retry Worker:
+    This handler records retry schedules (``next_retry_at`` field) and persists
+    failed delivery attempts to the ``delivery_attempts`` table, but it does NOT
+    implement the background retry worker. A separate component (e.g., a scheduled
+    task, cron job, or Kafka consumer) is responsible for polling the
+    ``delivery_attempts`` table for rows where ``status = 'failed'`` and
+    ``next_retry_at <= NOW()``, then re-invoking delivery. This separation follows
+    the single-responsibility principle: the handler manages subscriptions and
+    immediate delivery attempts, while retry orchestration is a distinct concern.
+
 Example::
 
     from omnimemory.handlers import (
@@ -69,7 +79,6 @@ import hashlib
 import hmac
 import json
 import logging
-import re
 import time
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -91,6 +100,7 @@ from omnimemory.models.subscription import (
     ModelSubscription,
     ModelSubscriptionDeliveryWebhook,
 )
+from omnimemory.models.subscription.constants import TOPIC_PATTERN
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -119,9 +129,6 @@ __all__ = [
     "ModelHandlerSubscriptionConfig",
     "ModelSubscriptionHealth",
 ]
-
-# Topic pattern validation: memory.<entity>.<event>
-TOPIC_PATTERN = re.compile(r"^memory\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 
 # Cache key patterns
 CACHE_KEY_TOPIC_SUBSCRIBERS = "topic:{topic}:subscribers"
@@ -152,6 +159,7 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         retry_base_delay_ms: Base delay for exponential backoff.
         retry_max_delay_ms: Maximum delay cap for retries.
         circuit_breaker_threshold: Failures before circuit opens.
+        circuit_breaker_success_threshold: Successes in half_open before closing.
         circuit_breaker_cooldown_seconds: Time before half-open transition.
         http_timeout_seconds: Webhook delivery timeout.
         cache_ttl_seconds: TTL for cached subscription data.
@@ -209,6 +217,12 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         ge=1,
         le=100,
         description="Consecutive failures before circuit opens",
+    )
+    circuit_breaker_success_threshold: int = Field(
+        default=3,
+        ge=1,
+        le=100,
+        description="Number of consecutive successes in half_open state before closing circuit",
     )
     circuit_breaker_cooldown_seconds: int = Field(
         default=DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
@@ -1154,8 +1168,11 @@ class HandlerSubscription:
             # Determine success (2xx status codes)
             is_success = 200 <= status_code < 300
 
-            # Update circuit breaker
-            await self._update_circuit_breaker(webhook_url, success=is_success)
+            # Update circuit breaker (pass error message on failure)
+            error_msg = None if is_success else f"HTTP {status_code}"
+            await self._update_circuit_breaker(
+                webhook_url, success=is_success, error_message=error_msg
+            )
 
             if is_success:
                 attempt = ModelNotificationDeliveryAttempt(
@@ -1192,8 +1209,10 @@ class HandlerSubscription:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
 
-            # Update circuit breaker on failure
-            await self._update_circuit_breaker(webhook_url, success=False)
+            # Update circuit breaker on failure with error message
+            await self._update_circuit_breaker(
+                webhook_url, success=False, error_message=str(e)[:2048]
+            )
 
             attempt = await self._handle_delivery_failure(
                 delivery_id=delivery_id,
@@ -1258,7 +1277,10 @@ class HandlerSubscription:
                 created_at=datetime.now(timezone.utc),
             )
 
-        # Calculate next retry time with exponential backoff
+        # Calculate next retry time with exponential backoff.
+        # NOTE: This handler only records the scheduled retry time; it does NOT
+        # execute the retry. A separate background worker must poll the
+        # delivery_attempts table for pending retries (see module docstring).
         delay_ms = min(
             self._config.retry_base_delay_ms * (2 ** (attempt_number - 1)),
             self._config.retry_max_delay_ms,
@@ -1369,24 +1391,47 @@ class HandlerSubscription:
     async def _check_circuit_breaker(self, endpoint: str) -> bool:
         """Check if a request should be allowed through circuit breaker.
 
+        Tries Valkey cache first for speed, falls back to PostgreSQL if cache misses.
+        On DB fallback, repopulates the Valkey cache for subsequent requests.
+
         Args:
             endpoint: The webhook endpoint URL.
 
         Returns:
             True if request should proceed, False if circuit is open.
         """
-        valkey, _, _ = self._ensure_initialized()
+        valkey, db_handler, _ = self._ensure_initialized()
 
         endpoint_hash = self._endpoint_hash(endpoint)
         cb_key = CACHE_KEY_CIRCUIT_BREAKER.format(endpoint_hash=endpoint_hash)
 
+        # Try Valkey cache first
         cached = await valkey.get(cb_key)
-        if not cached:
-            # No circuit breaker state = allow
+        state_dict: dict[str, object] | None = None
+
+        if cached:
+            try:
+                state_dict = json.loads(cached)
+            except Exception as e:
+                logger.warning("Failed to parse cached circuit breaker state: %s", e)
+                state_dict = None
+
+        # Fallback to PostgreSQL if Valkey misses
+        if state_dict is None:
+            state_dict = await self._load_circuit_breaker_from_db(endpoint)
+            if state_dict:
+                # Repopulate Valkey cache from DB
+                await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)
+                logger.debug(
+                    "Circuit breaker state for %s loaded from DB and cached",
+                    endpoint,
+                )
+
+        if not state_dict:
+            # No circuit breaker state = allow (first request to this endpoint)
             return True
 
         try:
-            state_dict = json.loads(cached)
             state = EnumCircuitBreakerState(state_dict.get("state", "closed"))
 
             if state == EnumCircuitBreakerState.CLOSED:
@@ -1396,13 +1441,16 @@ class HandlerSubscription:
                 # Check if cooldown has passed
                 open_until = state_dict.get("open_until")
                 if open_until:
+                    open_until_str = str(open_until)
                     open_until_dt = datetime.fromisoformat(
-                        open_until.replace("Z", "+00:00")
+                        open_until_str.replace("Z", "+00:00")
                     )
                     if datetime.now(timezone.utc) >= open_until_dt:
                         # Transition to half-open
                         state_dict["state"] = EnumCircuitBreakerState.HALF_OPEN.value
-                        await valkey.set(cb_key, json.dumps(state_dict))
+                        await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)
+                        # Also persist the state transition to DB
+                        await self._persist_circuit_breaker_to_db(endpoint, state_dict)
                         return True
                 return False
 
@@ -1413,16 +1461,105 @@ class HandlerSubscription:
             logger.warning("Failed to check circuit breaker: %s", e)
             return True  # Fail open
 
+    async def _load_circuit_breaker_from_db(
+        self,
+        endpoint: str,
+    ) -> dict[str, object] | None:
+        """Load circuit breaker state from PostgreSQL.
+
+        Args:
+            endpoint: The webhook endpoint URL.
+
+        Returns:
+            Circuit breaker state dict if found, None otherwise.
+        """
+        _, db_handler, _ = self._ensure_initialized()
+
+        sql = """
+            SELECT state, failure_count, success_count, last_failure_at,
+                   last_success_at, last_error_message, open_until,
+                   total_requests, total_failures, updated_at
+            FROM circuit_breaker_states
+            WHERE endpoint = $1
+        """
+        envelope = {
+            "operation": "db.query",
+            "payload": {
+                "sql": sql,
+                "parameters": [endpoint],
+            },
+        }
+
+        try:
+            result = await db_handler.execute(envelope)
+            rows = result.result.get("payload", {}).get("rows", [])
+
+            if not rows:
+                return None
+
+            row = rows[0]
+
+            # Convert DB row to state dict format used by Valkey
+            state_dict: dict[str, object] = {
+                "state": row.get("state", "closed"),
+                "failure_count": row.get("failure_count", 0),
+                "success_count": row.get("success_count", 0),
+                "total_requests": row.get("total_requests", 0),
+                "total_failures": row.get("total_failures", 0),
+            }
+
+            # Handle nullable datetime fields
+            if row.get("last_failure_at"):
+                last_failure = row["last_failure_at"]
+                if isinstance(last_failure, datetime):
+                    state_dict["last_failure_at"] = last_failure.isoformat()
+                else:
+                    state_dict["last_failure_at"] = str(last_failure)
+
+            if row.get("last_success_at"):
+                last_success = row["last_success_at"]
+                if isinstance(last_success, datetime):
+                    state_dict["last_success_at"] = last_success.isoformat()
+                else:
+                    state_dict["last_success_at"] = str(last_success)
+
+            if row.get("open_until"):
+                open_until = row["open_until"]
+                if isinstance(open_until, datetime):
+                    state_dict["open_until"] = open_until.isoformat()
+                else:
+                    state_dict["open_until"] = str(open_until)
+
+            if row.get("last_error_message"):
+                state_dict["last_error_message"] = row["last_error_message"]
+
+            if row.get("updated_at"):
+                updated_at = row["updated_at"]
+                if isinstance(updated_at, datetime):
+                    state_dict["updated_at"] = updated_at.isoformat()
+                else:
+                    state_dict["updated_at"] = str(updated_at)
+
+            return state_dict
+
+        except Exception as e:
+            logger.warning("Failed to load circuit breaker from DB: %s", e)
+            return None
+
     async def _update_circuit_breaker(
         self,
         endpoint: str,
         success: bool,
+        error_message: str | None = None,
     ) -> None:
         """Update circuit breaker state after a delivery attempt.
+
+        Persists state to both Valkey (primary cache) and PostgreSQL (durable backup).
 
         Args:
             endpoint: The webhook endpoint URL.
             success: Whether the delivery was successful.
+            error_message: Error message if delivery failed (optional).
         """
         valkey, _, _ = self._ensure_initialized()
 
@@ -1436,11 +1573,29 @@ class HandlerSubscription:
             try:
                 state_dict = json.loads(cached)
             except Exception:
-                state_dict = {"state": "closed", "failure_count": 0, "success_count": 0}
+                state_dict = {
+                    "state": "closed",
+                    "failure_count": 0,
+                    "success_count": 0,
+                    "total_requests": 0,
+                    "total_failures": 0,
+                }
         else:
-            state_dict = {"state": "closed", "failure_count": 0, "success_count": 0}
+            # Try to load from DB if not in cache
+            state_dict = await self._load_circuit_breaker_from_db(endpoint)
+            if not state_dict:
+                state_dict = {
+                    "state": "closed",
+                    "failure_count": 0,
+                    "success_count": 0,
+                    "total_requests": 0,
+                    "total_failures": 0,
+                }
 
         current_state = EnumCircuitBreakerState(state_dict.get("state", "closed"))
+
+        # Update total requests counter
+        state_dict["total_requests"] = state_dict.get("total_requests", 0) + 1
 
         if success:
             state_dict["success_count"] = state_dict.get("success_count", 0) + 1
@@ -1449,8 +1604,10 @@ class HandlerSubscription:
 
             if current_state == EnumCircuitBreakerState.HALF_OPEN:
                 # Successful test - close the circuit
-                success_threshold = 3  # Configurable
-                if state_dict["success_count"] >= success_threshold:
+                if (
+                    state_dict["success_count"]
+                    >= self._config.circuit_breaker_success_threshold
+                ):
                     state_dict["state"] = EnumCircuitBreakerState.CLOSED.value
                     state_dict["success_count"] = 0
                     logger.info("Circuit breaker CLOSED for endpoint %s", endpoint)
@@ -1459,6 +1616,11 @@ class HandlerSubscription:
             state_dict["failure_count"] = state_dict.get("failure_count", 0) + 1
             state_dict["success_count"] = 0
             state_dict["last_failure_at"] = now.isoformat()
+            state_dict["total_failures"] = state_dict.get("total_failures", 0) + 1
+
+            # Store the error message for debugging
+            if error_message:
+                state_dict["last_error_message"] = error_message[:2048]
 
             if current_state == EnumCircuitBreakerState.CLOSED:
                 if (
@@ -1489,7 +1651,113 @@ class HandlerSubscription:
                 )
 
         state_dict["updated_at"] = now.isoformat()
+
+        # Persist to Valkey (primary cache)
         await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)  # 1 hour TTL
+
+        # Persist to PostgreSQL (durable backup)
+        await self._persist_circuit_breaker_to_db(endpoint, state_dict)
+
+    async def _persist_circuit_breaker_to_db(
+        self,
+        endpoint: str,
+        state_dict: dict[str, object],
+    ) -> None:
+        """Persist circuit breaker state to PostgreSQL for durability.
+
+        Uses UPSERT pattern (ON CONFLICT ... DO UPDATE) since endpoint is the
+        primary key.
+
+        Args:
+            endpoint: The webhook endpoint URL (primary key, max 512 chars).
+            state_dict: Circuit breaker state dictionary.
+        """
+        _, db_handler, _ = self._ensure_initialized()
+
+        # Truncate endpoint if too long (VARCHAR(512) limit)
+        endpoint_to_store = endpoint[:512]
+
+        # Parse datetime fields from ISO format strings
+        last_failure_at = None
+        if state_dict.get("last_failure_at"):
+            try:
+                last_failure_str = str(state_dict["last_failure_at"])
+                last_failure_at = datetime.fromisoformat(
+                    last_failure_str.replace("Z", "+00:00")
+                ).isoformat()
+            except (ValueError, TypeError):
+                pass
+
+        last_success_at = None
+        if state_dict.get("last_success_at"):
+            try:
+                last_success_str = str(state_dict["last_success_at"])
+                last_success_at = datetime.fromisoformat(
+                    last_success_str.replace("Z", "+00:00")
+                ).isoformat()
+            except (ValueError, TypeError):
+                pass
+
+        open_until = None
+        if state_dict.get("open_until"):
+            try:
+                open_until_str = str(state_dict["open_until"])
+                open_until = datetime.fromisoformat(
+                    open_until_str.replace("Z", "+00:00")
+                ).isoformat()
+            except (ValueError, TypeError):
+                pass
+
+        sql = """
+            INSERT INTO circuit_breaker_states (
+                endpoint, state, failure_count, success_count,
+                last_failure_at, last_success_at, last_error_message,
+                open_until, total_requests, total_failures
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT (endpoint) DO UPDATE SET
+                state = EXCLUDED.state,
+                failure_count = EXCLUDED.failure_count,
+                success_count = EXCLUDED.success_count,
+                last_failure_at = EXCLUDED.last_failure_at,
+                last_success_at = EXCLUDED.last_success_at,
+                last_error_message = EXCLUDED.last_error_message,
+                open_until = EXCLUDED.open_until,
+                total_requests = EXCLUDED.total_requests,
+                total_failures = EXCLUDED.total_failures
+        """
+
+        envelope = {
+            "operation": "db.execute",
+            "payload": {
+                "sql": sql,
+                "parameters": [
+                    endpoint_to_store,
+                    state_dict.get("state", "closed"),
+                    state_dict.get("failure_count", 0),
+                    state_dict.get("success_count", 0),
+                    last_failure_at,
+                    last_success_at,
+                    state_dict.get("last_error_message"),
+                    open_until,
+                    state_dict.get("total_requests", 0),
+                    state_dict.get("total_failures", 0),
+                ],
+            },
+        }
+
+        try:
+            await db_handler.execute(envelope)
+            logger.debug(
+                "Circuit breaker state persisted to DB for endpoint %s",
+                endpoint_to_store,
+            )
+        except Exception as e:
+            # Log but don't fail - Valkey is the primary cache
+            logger.warning(
+                "Failed to persist circuit breaker to DB for endpoint %s: %s",
+                endpoint_to_store,
+                e,
+            )
 
     # =========================================================================
     # Health Check
