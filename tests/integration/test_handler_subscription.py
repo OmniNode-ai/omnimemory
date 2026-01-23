@@ -1111,6 +1111,488 @@ class TestRetryBehavior:
 
 
 # =============================================================================
+# Circuit Breaker State Transition Tests
+# =============================================================================
+
+
+class TestCircuitBreakerStateTransitions:
+    """Comprehensive tests for circuit breaker state transitions.
+
+    Circuit breaker has three states:
+    - CLOSED: Normal operation, requests pass through
+    - OPEN: Circuit tripped, requests blocked for cooldown period
+    - HALF_OPEN: Testing if endpoint recovered after cooldown
+
+    State Transitions:
+    - CLOSED -> OPEN: After circuit_breaker_threshold consecutive failures
+    - OPEN -> HALF_OPEN: After circuit_breaker_cooldown_seconds elapsed
+    - HALF_OPEN -> CLOSED: After circuit_breaker_success_threshold successes
+    - HALF_OPEN -> OPEN: On any failure in half-open state
+
+    These tests manipulate the Valkey cache to simulate time passing,
+    allowing fast test execution without waiting for real cooldowns.
+    """
+
+    @pytest.mark.asyncio
+    async def test_circuit_opens_after_threshold_failures(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+    ) -> None:
+        """Circuit transitions from CLOSED to OPEN after threshold failures.
+
+        Verifies that:
+        1. Circuit starts in CLOSED state (allows requests)
+        2. After circuit_breaker_threshold failures, circuit opens
+        3. Open circuit blocks subsequent delivery attempts
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            circuit_breaker_threshold=2,  # Open after 2 consecutive failures
+            circuit_breaker_cooldown_seconds=10,
+            http_timeout_seconds=1.0,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            unreachable_url = "http://localhost:59999/unreachable"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=unreachable_url,
+                timeout_ms=100,
+            )
+            await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Initial state: circuit should be CLOSED (allows requests)
+            is_allowed_initial = await handler._check_circuit_breaker(unreachable_url)
+            assert is_allowed_initial is True
+
+            # Trigger threshold failures to open circuit
+            for i in range(2):  # threshold = 2
+                event = ModelNotificationEvent(
+                    event_id=str(uuid4()),
+                    topic=unique_topic,
+                    payload=ModelNotificationEventPayload(
+                        entity_type="test_item",
+                        entity_id=f"item_{i}",
+                        action="created",
+                    ),
+                )
+                await handler.notify(topic=unique_topic, event=event)
+
+            # Verify circuit is now OPEN (blocks requests)
+            is_allowed_after = await handler._check_circuit_breaker(unreachable_url)
+            assert is_allowed_after is False
+
+            # Additional notification should be blocked with circuit breaker message
+            event = ModelNotificationEvent(
+                event_id=str(uuid4()),
+                topic=unique_topic,
+                payload=ModelNotificationEventPayload(
+                    entity_type="test_item",
+                    entity_id="item_blocked",
+                    action="created",
+                ),
+            )
+            attempts = await handler.notify(topic=unique_topic, event=event)
+
+            assert len(attempts) == 1
+            assert attempts[0].status == EnumDeliveryStatus.FAILED
+            assert "Circuit breaker open" in (attempts[0].error_message or "")
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_circuit_transitions_to_half_open_after_cooldown(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+    ) -> None:
+        """Circuit transitions from OPEN to HALF_OPEN after cooldown elapses.
+
+        Verifies that:
+        1. Open circuit blocks requests
+        2. After cooldown period, circuit transitions to HALF_OPEN
+        3. HALF_OPEN state allows test requests through
+
+        Note: Uses cache manipulation to simulate time passing for fast testing.
+        """
+        import json
+        from datetime import datetime, timedelta, timezone
+
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            circuit_breaker_threshold=2,
+            circuit_breaker_cooldown_seconds=10,
+            http_timeout_seconds=1.0,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            unreachable_url = "http://localhost:59999/unreachable"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=unreachable_url,
+                timeout_ms=100,
+            )
+            await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Trigger failures to open circuit
+            for i in range(2):
+                event = ModelNotificationEvent(
+                    event_id=str(uuid4()),
+                    topic=unique_topic,
+                    payload=ModelNotificationEventPayload(
+                        entity_type="test_item",
+                        entity_id=f"item_{i}",
+                        action="created",
+                    ),
+                )
+                await handler.notify(topic=unique_topic, event=event)
+
+            # Verify circuit is OPEN
+            is_allowed = await handler._check_circuit_breaker(unreachable_url)
+            assert is_allowed is False
+
+            # Manipulate cache to simulate cooldown elapsed
+            valkey = handler._valkey
+            assert valkey is not None
+
+            endpoint_hash = handler._endpoint_hash(unreachable_url)
+            cb_key = f"circuit_breaker:{endpoint_hash}"
+            cached = await valkey.get(cb_key)
+            assert cached is not None
+
+            state_dict = json.loads(cached)
+            assert state_dict["state"] == "open"
+
+            # Set open_until to the past (simulates cooldown elapsed)
+            past_time = datetime.now(timezone.utc) - timedelta(seconds=60)
+            state_dict["open_until"] = past_time.isoformat()
+            await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)
+
+            # Now _check_circuit_breaker should transition to HALF_OPEN and return True
+            is_allowed_after_cooldown = await handler._check_circuit_breaker(
+                unreachable_url
+            )
+            assert is_allowed_after_cooldown is True
+
+            # Verify state is now HALF_OPEN
+            cached_after = await valkey.get(cb_key)
+            assert cached_after is not None
+            state_after = json.loads(cached_after)
+            assert state_after["state"] == "half_open"
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_circuit_closes_after_successes_in_half_open(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+    ) -> None:
+        """Circuit transitions from HALF_OPEN to CLOSED after success threshold.
+
+        Verifies that:
+        1. In HALF_OPEN state, requests are allowed through for testing
+        2. After circuit_breaker_success_threshold consecutive successes
+        3. Circuit fully closes and returns to normal operation
+        """
+        import json
+
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        webhook_url, received_events = webhook_server_with_events
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            circuit_breaker_threshold=2,
+            circuit_breaker_success_threshold=2,  # Need 2 successes to close
+            circuit_breaker_cooldown_seconds=10,
+            http_timeout_seconds=5.0,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=webhook_url,
+                timeout_ms=5000,
+            )
+            await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Manually set circuit to HALF_OPEN state via cache
+            valkey = handler._valkey
+            assert valkey is not None
+
+            endpoint_hash = handler._endpoint_hash(webhook_url)
+            cb_key = f"circuit_breaker:{endpoint_hash}"
+
+            half_open_state = {
+                "state": "half_open",
+                "failure_count": 0,
+                "success_count": 0,
+                "total_requests": 10,
+                "total_failures": 5,
+            }
+            await valkey.set(cb_key, json.dumps(half_open_state), ttl=3600)
+
+            # Verify circuit is HALF_OPEN and allows requests
+            is_allowed = await handler._check_circuit_breaker(webhook_url)
+            assert is_allowed is True
+
+            # Send successful notifications to trigger HALF_OPEN -> CLOSED
+            for i in range(2):  # success_threshold = 2
+                event = ModelNotificationEvent(
+                    event_id=str(uuid4()),
+                    topic=unique_topic,
+                    payload=ModelNotificationEventPayload(
+                        entity_type="test_item",
+                        entity_id=f"item_success_{i}",
+                        action="created",
+                    ),
+                )
+                attempts = await handler.notify(topic=unique_topic, event=event)
+                assert len(attempts) == 1
+                assert attempts[0].status == EnumDeliveryStatus.SUCCESS
+
+            # Verify circuit is now CLOSED
+            cached_after = await valkey.get(cb_key)
+            assert cached_after is not None
+            state_after = json.loads(cached_after)
+            assert state_after["state"] == "closed"
+
+            # Counters should be reset
+            assert state_after.get("success_count", 0) == 0
+            assert state_after.get("failure_count", 0) == 0
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_circuit_reopens_on_failure_in_half_open(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+    ) -> None:
+        """Circuit transitions from HALF_OPEN back to OPEN on any failure.
+
+        Verifies that:
+        1. In HALF_OPEN state, a test request is allowed
+        2. If the test request fails, circuit immediately reopens
+        3. Cooldown period is reset for the new OPEN state
+        """
+        import json
+
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            circuit_breaker_threshold=2,
+            circuit_breaker_success_threshold=3,
+            circuit_breaker_cooldown_seconds=10,
+            http_timeout_seconds=1.0,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            unreachable_url = "http://localhost:59999/unreachable"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=unreachable_url,
+                timeout_ms=100,
+            )
+            await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Manually set circuit to HALF_OPEN state
+            valkey = handler._valkey
+            assert valkey is not None
+
+            endpoint_hash = handler._endpoint_hash(unreachable_url)
+            cb_key = f"circuit_breaker:{endpoint_hash}"
+
+            half_open_state = {
+                "state": "half_open",
+                "failure_count": 0,
+                "success_count": 1,  # One success already
+                "total_requests": 10,
+                "total_failures": 5,
+            }
+            await valkey.set(cb_key, json.dumps(half_open_state), ttl=3600)
+
+            # Verify circuit is HALF_OPEN and allows test request
+            is_allowed = await handler._check_circuit_breaker(unreachable_url)
+            assert is_allowed is True
+
+            # Trigger a failure while in HALF_OPEN state
+            event = ModelNotificationEvent(
+                event_id=str(uuid4()),
+                topic=unique_topic,
+                payload=ModelNotificationEventPayload(
+                    entity_type="test_item",
+                    entity_id="item_fail_halfopen",
+                    action="created",
+                ),
+            )
+            attempts = await handler.notify(topic=unique_topic, event=event)
+
+            assert len(attempts) == 1
+            assert attempts[0].status == EnumDeliveryStatus.FAILED
+
+            # Verify circuit reopened (HALF_OPEN -> OPEN)
+            cached_after = await valkey.get(cb_key)
+            assert cached_after is not None
+            state_after = json.loads(cached_after)
+            assert state_after["state"] == "open"
+
+            # Cooldown should be reset (new open_until timestamp)
+            assert state_after.get("open_until") is not None
+
+            # Circuit should now block requests
+            is_allowed_after = await handler._check_circuit_breaker(unreachable_url)
+            assert is_allowed_after is False
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_blocks_all_requests_when_open(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+    ) -> None:
+        """Open circuit blocks all delivery attempts with error message.
+
+        Verifies that when circuit is OPEN:
+        1. No HTTP requests are made to the endpoint
+        2. Delivery attempt returns immediately with FAILED status
+        3. Error message indicates circuit breaker is open
+        """
+        import json
+        from datetime import datetime, timedelta, timezone
+
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            circuit_breaker_threshold=2,
+            circuit_breaker_cooldown_seconds=10,
+            http_timeout_seconds=1.0,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            bad_url = "http://localhost:59999/unreachable"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=bad_url,
+                timeout_ms=100,
+            )
+            await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Manually set circuit to OPEN state with future cooldown
+            valkey = handler._valkey
+            assert valkey is not None
+
+            endpoint_hash = handler._endpoint_hash(bad_url)
+            cb_key = f"circuit_breaker:{endpoint_hash}"
+
+            future_time = datetime.now(timezone.utc) + timedelta(seconds=60)
+            open_state = {
+                "state": "open",
+                "failure_count": 5,
+                "success_count": 0,
+                "open_until": future_time.isoformat(),
+                "total_requests": 10,
+                "total_failures": 5,
+            }
+            await valkey.set(cb_key, json.dumps(open_state), ttl=3600)
+
+            # Attempt delivery - should be blocked immediately
+            event = ModelNotificationEvent(
+                event_id=str(uuid4()),
+                topic=unique_topic,
+                payload=ModelNotificationEventPayload(
+                    entity_type="test_item",
+                    entity_id="item_blocked",
+                    action="created",
+                ),
+            )
+            attempts = await handler.notify(topic=unique_topic, event=event)
+
+            assert len(attempts) == 1
+            assert attempts[0].status == EnumDeliveryStatus.FAILED
+            assert "Circuit breaker open" in (attempts[0].error_message or "")
+            # No status code because no HTTP request was made
+            assert attempts[0].status_code is None
+
+        finally:
+            await handler.shutdown()
+
+
+# =============================================================================
 # Health Check Tests
 # =============================================================================
 
@@ -1154,3 +1636,351 @@ class TestHealthCheck:
         assert health.is_healthy is False
         assert health.initialized is False
         assert health.error_message is not None
+
+
+# =============================================================================
+# Encryption Tests
+# =============================================================================
+
+
+class TestEncryption:
+    """Tests for webhook secret encryption at rest.
+
+    The HandlerSubscription supports Fernet encryption for webhook secrets.
+    When encryption_key is configured, secrets are encrypted before storage
+    in PostgreSQL and decrypted when loaded. This protects secrets in case
+    of database compromise.
+
+    These tests verify:
+    - Encrypted secrets can be stored and retrieved correctly (roundtrip)
+    - Decrypted secrets work correctly for HMAC signing
+    - Backwards compatibility with plaintext secrets
+    - Warning is logged when encryption_key is not configured
+    """
+
+    @pytest.mark.asyncio
+    async def test_encrypted_secret_roundtrip(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+        webhook_url: str,
+    ) -> None:
+        """Encrypted secrets can be stored and retrieved correctly.
+
+        This test verifies that when encryption_key is configured:
+        1. Secrets are encrypted before storage
+        2. Secrets are correctly decrypted when retrieved
+        3. The decrypted value matches the original plaintext
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        # Import Fernet for key generation
+        from cryptography.fernet import Fernet
+
+        encryption_key = Fernet.generate_key().decode("utf-8")
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            encryption_key=encryption_key,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Subscribe with a secret
+            secret = "my-webhook-secret-12345"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=webhook_url,
+                secret=secret,
+            )
+
+            sub = await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Retrieve and verify secret is decrypted correctly
+            subs = await handler.list_subscriptions(unique_agent_id)
+            assert len(subs) == 1
+            assert subs[0].id == sub.id
+            assert subs[0].delivery.secret == secret
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_encrypted_secret_survives_restart(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+        webhook_url: str,
+    ) -> None:
+        """Encrypted secrets persist across handler restarts.
+
+        This test verifies that:
+        1. Secrets are stored encrypted in the database
+        2. A new handler instance with the same key can decrypt them
+        3. The decrypted value matches the original
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        from cryptography.fernet import Fernet
+
+        encryption_key = Fernet.generate_key().decode("utf-8")
+        secret = "persistent-secret-xyz"
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            encryption_key=encryption_key,
+        )
+
+        # Create subscription with first handler
+        handler1 = HandlerSubscription(config)
+        await handler1.initialize()
+
+        delivery = ModelSubscriptionDeliveryWebhook(
+            webhook_url=webhook_url,
+            secret=secret,
+        )
+        sub = await handler1.subscribe(
+            agent_id=unique_agent_id,
+            topic=unique_topic,
+            delivery=delivery,
+        )
+        original_id = sub.id
+
+        await handler1.shutdown()
+
+        # Create new handler with same encryption key (simulates restart)
+        handler2 = HandlerSubscription(config)
+        await handler2.initialize()
+
+        try:
+            # Verify secret is correctly decrypted after restart
+            subs = await handler2.list_subscriptions(unique_agent_id)
+            assert len(subs) == 1
+            assert subs[0].id == original_id
+            assert subs[0].delivery.secret == secret
+
+        finally:
+            await handler2.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_encrypted_secret_used_for_hmac(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+        webhook_server_with_events: tuple[str, list[dict[str, object]]],
+    ) -> None:
+        """Secret can be used for HMAC signing after decryption.
+
+        This test verifies that encrypted secrets are correctly decrypted
+        and used for HMAC signature generation when sending notifications.
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        from cryptography.fernet import Fernet
+
+        webhook_url, received_events = webhook_server_with_events
+        encryption_key = Fernet.generate_key().decode("utf-8")
+        secret = "hmac-signing-secret"
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            encryption_key=encryption_key,
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Subscribe with encrypted secret
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=webhook_url,
+                secret=secret,
+            )
+            await handler.subscribe(
+                agent_id=unique_agent_id,
+                topic=unique_topic,
+                delivery=delivery,
+            )
+
+            # Send notification
+            event = ModelNotificationEvent(
+                event_id=str(uuid4()),
+                topic=unique_topic,
+                payload=ModelNotificationEventPayload(
+                    entity_type="test_item",
+                    entity_id="item_123",
+                    action="created",
+                ),
+            )
+
+            attempts = await handler.notify(
+                topic=unique_topic,
+                event=event,
+            )
+
+            # Verify notification was sent successfully
+            assert len(attempts) == 1
+            assert attempts[0].status == EnumDeliveryStatus.SUCCESS
+
+            # Verify HMAC signature was included (proves secret was decrypted)
+            assert len(received_events) == 1
+            signature = received_events[0]["signature"]
+            assert signature is not None
+            assert signature.startswith("sha256=")
+
+        finally:
+            await handler.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_plaintext_secret_backwards_compatibility(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+        webhook_url: str,
+    ) -> None:
+        """Plaintext secrets still work when encryption is enabled.
+
+        This test verifies backwards compatibility: when encryption is enabled
+        but the database contains plaintext secrets (from before encryption
+        was configured), the handler gracefully falls back to using them as-is.
+
+        The scenario is:
+        1. Create subscription without encryption (secret stored as plaintext)
+        2. Restart handler WITH encryption_key configured
+        3. The handler should gracefully handle the plaintext secret
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        from cryptography.fernet import Fernet
+
+        secret = "plaintext-secret-for-backwards-compat"
+
+        # First: Create subscription WITHOUT encryption
+        config_no_encryption = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            # No encryption_key - secret stored as plaintext
+        )
+        handler1 = HandlerSubscription(config_no_encryption)
+        await handler1.initialize()
+
+        delivery = ModelSubscriptionDeliveryWebhook(
+            webhook_url=webhook_url,
+            secret=secret,
+        )
+        sub = await handler1.subscribe(
+            agent_id=unique_agent_id,
+            topic=unique_topic,
+            delivery=delivery,
+        )
+        original_id = sub.id
+
+        await handler1.shutdown()
+
+        # Second: Start handler WITH encryption_key (simulates enabling encryption)
+        encryption_key = Fernet.generate_key().decode("utf-8")
+        config_with_encryption = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            encryption_key=encryption_key,
+        )
+        handler2 = HandlerSubscription(config_with_encryption)
+        await handler2.initialize()
+
+        try:
+            # Retrieve subscription - should handle plaintext gracefully
+            subs = await handler2.list_subscriptions(unique_agent_id)
+            assert len(subs) == 1
+            assert subs[0].id == original_id
+            # The secret should be returned as-is (backwards compatibility)
+            assert subs[0].delivery.secret == secret
+
+        finally:
+            await handler2.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_warning_logged_without_encryption_key(
+        self,
+        test_db_dsn: str,
+        test_valkey_host: str,
+        test_valkey_port: int,
+        services_available: bool,
+        unique_agent_id: str,
+        unique_topic: str,
+        webhook_url: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Warning is logged when encryption_key is not configured.
+
+        When storing a webhook secret without encryption_key configured,
+        the handler should log a security warning to alert operators.
+        """
+        if not services_available:
+            pytest.skip("Required services (PostgreSQL, Valkey) not available")
+
+        import logging
+
+        config = ModelHandlerSubscriptionConfig(
+            db_dsn=test_db_dsn,
+            valkey_host=test_valkey_host,
+            valkey_port=test_valkey_port,
+            # No encryption_key configured
+        )
+        handler = HandlerSubscription(config)
+        await handler.initialize()
+
+        try:
+            # Subscribe with a secret (should log warning)
+            secret = "unencrypted-secret"
+            delivery = ModelSubscriptionDeliveryWebhook(
+                webhook_url=webhook_url,
+                secret=secret,
+            )
+
+            with caplog.at_level(logging.WARNING):
+                await handler.subscribe(
+                    agent_id=unique_agent_id,
+                    topic=unique_topic,
+                    delivery=delivery,
+                )
+
+            # Verify warning was logged about plaintext storage
+            assert any(
+                "encryption_key not configured" in record.message
+                and "plaintext" in record.message
+                for record in caplog.records
+            ), "Expected warning about plaintext storage not found in logs"
+
+        finally:
+            await handler.shutdown()

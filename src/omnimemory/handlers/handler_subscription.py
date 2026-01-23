@@ -170,11 +170,23 @@ DEFAULT_RETRY_BASE_DELAY_MS = 1000
 DEFAULT_RETRY_MAX_DELAY_MS = 60000  # 1 minute cap
 
 # Circuit breaker cache TTL in seconds.
-# TTL Refresh Strategy: This TTL is refreshed on every state update to prevent state
-# loss for long-lived circuits. If a circuit stays open/half-open beyond this TTL
-# without any updates, the state would be lost and the circuit would reset to closed.
-# By refreshing on every update, we ensure state persists as long as the circuit is
-# actively being used. PostgreSQL serves as durable backup if cache expires.
+#
+# TTL Refresh Strategy:
+#   - TTL is refreshed on every state update (success/failure recording)
+#   - This ensures active circuits never expire from cache
+#   - State transitions (CLOSED -> OPEN -> HALF_OPEN) also refresh TTL
+#
+# Edge Case - Idle Endpoints:
+#   - If an endpoint goes completely idle while circuit is OPEN (no requests for >1 hour),
+#     the cache entry may expire and state would be lost from Valkey
+#   - On next request, state is recovered from PostgreSQL (durable backup)
+#   - If PostgreSQL has no record, circuit resets to CLOSED (fail-open behavior)
+#   - This is intentional: if no requests occur for an hour, the upstream endpoint
+#     may have recovered, so resetting to CLOSED allows natural recovery detection
+#
+# Recommendation: Configure monitoring/alerting for circuits in OPEN state
+# to detect endpoints that may need manual intervention or investigation.
+# Long-lived open circuits often indicate persistent upstream issues.
 CIRCUIT_BREAKER_CACHE_TTL_SECONDS = 3600  # 1 hour
 
 

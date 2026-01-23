@@ -95,6 +95,12 @@ CREATE INDEX IF NOT EXISTS idx_delivery_attempts_dlq
 CREATE INDEX IF NOT EXISTS idx_delivery_attempts_sub_status
     ON delivery_attempts(subscription_id, status);
 
+-- Partial index for cleanup/retention operations
+-- Used by: retention jobs to find completed deliveries older than retention period
+CREATE INDEX IF NOT EXISTS idx_delivery_attempts_completed_at
+    ON delivery_attempts(completed_at)
+    WHERE completed_at IS NOT NULL;
+
 -- ============================================================================
 -- Circuit Breaker States Table
 -- ============================================================================

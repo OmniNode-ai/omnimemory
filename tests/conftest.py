@@ -309,17 +309,16 @@ def webhook_url() -> str:
     return "http://localhost:8080/webhook"
 
 
-@pytest.fixture
-async def webhook_server(
-    unused_tcp_port: int,
+async def _create_webhook_server(
+    port: int,
 ) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
-    """Create a local HTTP server to receive webhook notifications.
+    """Shared webhook server creation logic.
 
-    This fixture creates an aiohttp server that receives and records
-    webhook POST requests for verification in tests.
+    Creates an aiohttp server that receives and records webhook POST
+    requests for verification in tests.
 
     Args:
-        unused_tcp_port: An unused TCP port provided by pytest-asyncio.
+        port: TCP port to bind the server to.
 
     Yields:
         Tuple of (webhook_url, received_events_list).
@@ -328,57 +327,6 @@ async def webhook_server(
         from aiohttp import web
     except ImportError:
         pytest.skip("aiohttp not installed - required for webhook server tests")
-
-    received_events: list[dict[str, object]] = []
-
-    async def webhook_handler(request: web.Request) -> web.Response:
-        """Handle incoming webhook requests."""
-        body = await request.json()
-        signature = request.headers.get("X-Signature-256")
-        received_events.append(
-            {
-                "body": body,
-                "signature": signature,
-                "headers": dict(request.headers),
-            }
-        )
-        return web.json_response({"status": "received"})
-
-    app = web.Application()
-    app.router.add_post("/webhook", webhook_handler)
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-
-    site = web.TCPSite(runner, "localhost", unused_tcp_port)
-    await site.start()
-
-    webhook_url = f"http://localhost:{unused_tcp_port}/webhook"
-
-    yield webhook_url, received_events
-
-    await runner.cleanup()
-
-
-@pytest.fixture
-async def webhook_server_with_events(
-    unused_tcp_port_factory: Generator[int, None, None],
-) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
-    """Create a local HTTP server with event tracking for webhook tests.
-
-    This is an alias for webhook_server with a clearer name for tests
-    that specifically need to verify received events.
-
-    Yields:
-        Tuple of (webhook_url, received_events_list).
-    """
-    try:
-        from aiohttp import web
-    except ImportError:
-        pytest.skip("aiohttp not installed - required for webhook server tests")
-
-    # Get an unused port
-    port = next(unused_tcp_port_factory)
 
     received_events: list[dict[str, object]] = []
 
@@ -409,6 +357,42 @@ async def webhook_server_with_events(
     yield webhook_url, received_events
 
     await runner.cleanup()
+
+
+@pytest.fixture
+async def webhook_server(
+    unused_tcp_port: int,
+) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
+    """Create a local HTTP server to receive webhook notifications.
+
+    This fixture creates an aiohttp server that receives and records
+    webhook POST requests for verification in tests.
+
+    Args:
+        unused_tcp_port: An unused TCP port provided by pytest-asyncio.
+
+    Yields:
+        Tuple of (webhook_url, received_events_list).
+    """
+    async for result in _create_webhook_server(unused_tcp_port):
+        yield result
+
+
+@pytest.fixture
+async def webhook_server_with_events(
+    unused_tcp_port_factory: Generator[int, None, None],
+) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
+    """Create a local HTTP server with event tracking for webhook tests.
+
+    This is an alias for webhook_server with a clearer name for tests
+    that specifically need to verify received events.
+
+    Yields:
+        Tuple of (webhook_url, received_events_list).
+    """
+    port = next(unused_tcp_port_factory)
+    async for result in _create_webhook_server(port):
+        yield result
 
 
 @pytest.fixture
