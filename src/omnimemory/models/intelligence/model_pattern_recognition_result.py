@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class ModelPatternRecognitionResult(BaseModel):
     """Pattern recognition result following ONEX standards."""
@@ -92,8 +94,8 @@ class ModelPatternRecognitionResult(BaseModel):
     algorithm_used: str = Field(
         description="Algorithm used for pattern recognition",
     )
-    model_version: str = Field(
-        description="Version of the pattern recognition model",
+    model_version: ModelSemVer = Field(
+        description="Semantic version of the pattern recognition model",
     )
     processing_time_ms: int = Field(
         description="Time taken for pattern recognition",

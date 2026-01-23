@@ -6,7 +6,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..foundation.model_typed_collections import ModelConfiguration, ModelMetadata
+from omnimemory.models.foundation.model_semver import ModelSemVer
+from omnimemory.models.foundation.model_typed_collections import (
+    ModelConfiguration,
+    ModelMetadata,
+)
 
 
 class ModelOperationMetadata(BaseModel):
@@ -18,8 +22,9 @@ class ModelOperationMetadata(BaseModel):
     operation_type: str = Field(
         description="Type of operation (e.g., 'memory_store', 'semantic_search')"
     )
-    operation_version: str = Field(
-        default="1.0.0", description="Version of the operation implementation"
+    operation_version: ModelSemVer = Field(
+        default_factory=lambda: ModelSemVer(major=1, minor=0, patch=0),
+        description="Semantic version of the operation implementation",
     )
 
     # Request context
@@ -35,8 +40,8 @@ class ModelOperationMetadata(BaseModel):
 
     # Source information
     source_component: str = Field(description="Component that initiated the operation")
-    source_version: str | None = Field(
-        default=None, description="Version of the source component"
+    source_version: ModelSemVer | None = Field(
+        default=None, description="Semantic version of the source component"
     )
 
     # Configuration

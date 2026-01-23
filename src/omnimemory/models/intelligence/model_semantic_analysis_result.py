@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class ModelSemanticAnalysisResult(BaseModel):
     """Semantic analysis result following ONEX standards."""
@@ -102,8 +104,8 @@ class ModelSemanticAnalysisResult(BaseModel):
     model_name: str = Field(
         description="Name of the semantic model used",
     )
-    model_version: str = Field(
-        description="Version of the semantic model",
+    model_version: ModelSemVer = Field(
+        description="Semantic version of the semantic model",
     )
     processing_time_ms: int = Field(
         description="Time taken for semantic analysis",

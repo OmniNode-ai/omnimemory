@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class ModelProvenanceEntry(BaseModel):
     """Single provenance entry following ONEX standards."""
@@ -25,9 +27,9 @@ class ModelProvenanceEntry(BaseModel):
     source_component: str = Field(
         description="Component that performed the operation (e.g., memory_manager)",
     )
-    source_version: str | None = Field(
+    source_version: ModelSemVer | None = Field(
         default=None,
-        description="Version of the source component that performed the operation",
+        description="Semantic version of the source component that performed the operation",
     )
 
     # Actor identification

@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -264,8 +266,9 @@ class ModelStructuredData(BaseModel):
         default_factory=list,
         description="List of structured fields with type information",
     )
-    schema_version: str = Field(
-        default="1.0", description="Schema version for compatibility tracking"
+    schema_version: ModelSemVer = Field(
+        default_factory=lambda: ModelSemVer(major=1, minor=0, patch=0),
+        description="Semantic schema version for compatibility tracking",
     )
 
     def get_field_value(self, name: str) -> str | None:

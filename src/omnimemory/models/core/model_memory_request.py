@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
 from ..foundation.model_contract_version import DEFAULT_CONTRACT_VERSION
 from ..foundation.model_memory_data import ModelMemoryRequestData
+from ..foundation.model_semver import ModelSemVer
 from .model_memory_context import ModelMemoryContext
 from .model_memory_parameters import ModelMemoryOptions, ModelMemoryParameters
 
@@ -19,9 +20,9 @@ class ModelMemoryRequest(BaseModel):
     model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Contract version for schema tracking
-    contract_version: str = Field(
+    contract_version: ModelSemVer = Field(
         default=DEFAULT_CONTRACT_VERSION,
-        description="Schema version for this request contract (semver format)",
+        description="Schema version for this request contract as ModelSemVer",
     )
 
     # Request identification

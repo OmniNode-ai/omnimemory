@@ -2,16 +2,79 @@
 
 **Status**: Active Development | **Architecture**: ONEX 4.0 Compliant | **Performance Target**: Sub-100ms Operations
 
-## 🚫 CRITICAL POLICY: NO BACKWARDS COMPATIBILITY
+---
 
-**NEVER KEEP BACKWARDS COMPATIBILITY EVER EVER EVER**
+## 🚫🚫🚫 CRITICAL POLICY: NO BACKWARDS COMPATIBILITY 🚫🚫🚫
 
-This project follows a **ZERO BACKWARDS COMPATIBILITY** policy:
-- **Breaking changes are always acceptable**
-- **No deprecated code maintenance**
-- **All models MUST conform to current protocols**
-- **Clean, modern architecture only**
-- **Remove old patterns immediately**
+---
+
+### **NEVER KEEP BACKWARDS COMPATIBILITY EVER EVER EVER**
+
+---
+
+This project follows a **ZERO BACKWARDS COMPATIBILITY** policy. This is **NON-NEGOTIABLE**.
+
+**Core Principles:**
+- **Breaking changes are always acceptable** - break whatever needs breaking
+- **No deprecated code maintenance** - delete old code, never deprecate
+- **All models MUST conform to current protocols** - no legacy support
+- **Clean, modern architecture only** - no compatibility shims
+- **Remove old patterns immediately** - the moment something is outdated, delete it
+
+---
+
+### Version Fields: ModelSemVer ONLY
+
+**ALL version fields in ALL models MUST use `ModelSemVer` directly.**
+
+**FORBIDDEN PATTERNS** (never do these):
+
+```python
+# WRONG - Union types for backwards compatibility
+version: ModelSemVer | str  # NEVER DO THIS
+
+# WRONG - Optional string fallback
+version: ModelSemVer | None = None  # NEVER when accommodating strings
+
+# WRONG - Helper methods to convert strings
+def get_semver(self) -> ModelSemVer:
+    if isinstance(self.version, str):
+        return ModelSemVer.from_str(self.version)
+    return self.version
+
+# WRONG - Accepting strings in validators for "convenience"
+@field_validator("version", mode="before")
+def convert_string(cls, v):
+    if isinstance(v, str):
+        return ModelSemVer.from_str(v)
+    return v
+```
+
+**REQUIRED PATTERN** (always do this):
+
+```python
+# CORRECT - ModelSemVer only, no exceptions
+version: ModelSemVer = Field(..., description="Semantic version")
+contract_version: ModelSemVer = Field(..., description="Contract version")
+
+# Callers convert BEFORE calling - that's THEIR responsibility
+config = MyConfig(
+    version=ModelSemVer.from_str("1.0.0"),  # Caller converts
+)
+```
+
+**The Rule:** If callers have strings, they convert to `ModelSemVer` BEFORE passing to models. Models NEVER accept strings. No exceptions. No "convenience" methods. No union types.
+
+---
+
+### When You See Old Code
+
+1. **DELETE IT** - Do not refactor, do not deprecate, delete
+2. **No migration path** - Callers update or they break
+3. **No compatibility layer** - Clean break every time
+4. **No "just in case"** - If it's not the current pattern, it's gone
+
+---
 
 ## Project Overview
 

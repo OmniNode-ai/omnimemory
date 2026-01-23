@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.models.foundation.model_semver import ModelSemVer
+from omnimemory.models.foundation.model_semver import ModelSemVer  # noqa: TC001
 
 
 class ModelDependencyStatus(BaseModel):
@@ -70,23 +70,8 @@ class ModelHealthResponse(BaseModel):
         default_factory=list, description="Status of system dependencies"
     )
     uptime_seconds: int = Field(ge=0, description="System uptime in seconds")
-    version: ModelSemVer | str = Field(
-        description="System version information (ModelSemVer or string)"
-    )
+    version: ModelSemVer = Field(description="System version information")
     environment: str = Field(description="Deployment environment")
-
-    def get_semver(self) -> ModelSemVer:
-        """Get version as ModelSemVer, parsing if string.
-
-        Returns:
-            ModelSemVer: The parsed semantic version.
-
-        Raises:
-            ValueError: If the version string is not a valid semantic version.
-        """
-        if isinstance(self.version, ModelSemVer):
-            return self.version
-        return ModelSemVer.from_string(self.version)
 
 
 class ModelCircuitBreakerStats(BaseModel):
