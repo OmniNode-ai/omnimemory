@@ -70,8 +70,42 @@ def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
     )
 
 
-# Discover all contracts once at module load for parametrized tests
+# Discover all contracts once at module load for parametrized tests.
+#
+# DESIGN DECISION: Module-level discovery is intentional and acceptable here because:
+# 1. pytest.mark.parametrize requires the list at collection time (before fixtures run)
+# 2. Contract files are static YAML - they don't change during test execution
+# 3. Collection-time discovery matches pytest's parametrize model correctly
+#
+# For tests that need fresh runtime discovery (e.g., validating this constant hasn't
+# gone stale, or testing with dynamically created contracts), use the `all_contracts`
+# fixture which calls get_all_contracts() at test runtime.
+#
+# The test_module_constant_matches_runtime_discovery() test ensures this constant
+# stays synchronized with runtime discovery - if contracts are added/removed between
+# collection and execution (rare but possible in CI), that test will catch it.
 ALL_DISCOVERED_CONTRACTS: list[str] = get_all_contracts()
+
+
+@pytest.fixture
+def all_contracts() -> list[str]:
+    """Fixture providing fresh contract discovery at test runtime.
+
+    Use this fixture when you need contracts discovered at test execution time
+    rather than collection time. This is useful for:
+    - Tests that validate the module-level constant hasn't gone stale
+    - Tests that create/modify contracts during the test session
+    - Integration tests that need to verify discovery behavior
+
+    Returns:
+        list[str]: Freshly discovered list of node names with contract.yaml files.
+
+    Example:
+        def test_new_contract_discovered(all_contracts: list[str]) -> None:
+            # all_contracts is discovered fresh when this test runs
+            assert "my_new_contract" in all_contracts
+    """
+    return get_all_contracts()
 
 
 def _assert_valid_version_structure(
@@ -84,6 +118,9 @@ def _assert_valid_version_structure(
     - Is a dict
     - Contains major, minor, patch fields
     - All version fields are non-negative integers
+    - All version fields are within reasonable bounds
+
+    Uses pytest.fail() for better error reporting and diff output in test failures.
 
     Args:
         version: The version value from the YAML contract.
@@ -91,24 +128,36 @@ def _assert_valid_version_structure(
         node_name: Name of the node for error messages.
 
     Raises:
-        AssertionError: If any validation fails.
+        pytest.fail.Exception: If any validation fails.
     """
-    assert version is not None, f"{field_name} field is None: {node_name}"
-    assert isinstance(
-        version, dict
-    ), f"{field_name} must be a dict with major/minor/patch: {node_name}"
+    if version is None:
+        pytest.fail(f"{field_name} field is None: {node_name}")
+    if not isinstance(version, dict):
+        pytest.fail(
+            f"{field_name} must be a dict with major/minor/patch, "
+            f"got {type(version).__name__}: {node_name}"
+        )
+
+    # Type narrowing: version is now known to be a dict
+    version_dict: dict[str, object] = version
 
     for field in ("major", "minor", "patch"):
-        assert field in version, f"{field_name} missing '{field}' field: {node_name}"
-        value: object = version[field]
-        assert isinstance(value, int), (
-            f"{field_name}.{field} must be an integer, "
-            f"got {type(value).__name__}: {node_name}"
-        )
-        assert value >= 0, f"{field_name}.{field} must be non-negative: {node_name}"
-        assert (
-            value < MAX_REASONABLE_VERSION_COMPONENT
-        ), f"{field_name}.{field} seems unreasonably large ({value}): {node_name}"
+        if field not in version_dict:
+            pytest.fail(f"{field_name} missing '{field}' field: {node_name}")
+        value: object = version_dict[field]
+        if not isinstance(value, int):
+            pytest.fail(
+                f"{field_name}.{field} must be an integer, "
+                f"got {type(value).__name__}: {node_name}"
+            )
+        if value < 0:
+            pytest.fail(
+                f"{field_name}.{field} must be non-negative (got {value}): {node_name}"
+            )
+        if value >= MAX_REASONABLE_VERSION_COMPONENT:
+            pytest.fail(
+                f"{field_name}.{field} seems unreasonably large ({value}): {node_name}"
+            )
 
 
 class TestContractVersionField:
@@ -376,3 +425,31 @@ class TestAllContractsDiscovery:
         """Verify get_all_contracts returns empty list for nonexistent dir."""
         result = get_all_contracts(tmp_path / "nonexistent")
         assert result == []
+
+    def test_module_constant_matches_runtime_discovery(
+        self, all_contracts: list[str]
+    ) -> None:
+        """Verify ALL_DISCOVERED_CONTRACTS matches fresh runtime discovery.
+
+        This test catches staleness issues where:
+        - Contracts were added after module import but before test execution
+        - Contracts were removed after module import but before test execution
+        - Collection-time state diverged from execution-time state (rare in CI)
+
+        The test validates that our module-level constant (used for parametrize)
+        remains synchronized with runtime discovery. If this test fails:
+        1. Check if contracts were added/removed during the test session
+        2. Verify NODES_DIR path is consistent between collection and execution
+        3. Consider if test isolation is affecting filesystem state
+
+        Note: In normal operation, this should always pass because contract files
+        are static YAML that don't change during test runs. Failure indicates
+        either a test environment issue or unexpected filesystem changes.
+        """
+        assert all_contracts == ALL_DISCOVERED_CONTRACTS, (
+            f"Module-level ALL_DISCOVERED_CONTRACTS doesn't match runtime discovery.\n"
+            f"Runtime discovery: {all_contracts}\n"
+            f"Module constant: {ALL_DISCOVERED_CONTRACTS}\n"
+            f"Missing from constant: {set(all_contracts) - set(ALL_DISCOVERED_CONTRACTS)}\n"
+            f"Extra in constant: {set(ALL_DISCOVERED_CONTRACTS) - set(all_contracts)}"
+        )

@@ -143,14 +143,32 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> MappingRes
         pytest.skip: If the contract file does not exist
         ValueError: If the test is not parametrized with 'node_name'
     """
-    # Extract node_name from parametrize
-    if (
-        not hasattr(request.node, "callspec")
-        or "node_name" not in request.node.callspec.params
-    ):
+    # Extract node_name from parametrize - provide helpful error if missing
+    if not hasattr(request.node, "callspec"):
         raise ValueError(
-            f"contract_data fixture requires 'node_name' parameter via @pytest.mark.parametrize "
-            f"(test: {request.node.name})"
+            f"contract_data fixture requires @pytest.mark.parametrize decorator.\n\n"
+            f"Test '{request.node.name}' is not parametrized.\n\n"
+            f"Required usage:\n"
+            f"    @pytest.mark.parametrize('node_name', ['memory_storage_effect'])\n"
+            f"    def test_example(self, contract_data: MappingResultDict, node_name: str) -> None:\n"
+            f"        assert 'name' in contract_data\n\n"
+            f"For multiple nodes:\n"
+            f"    @pytest.mark.parametrize('node_name', CORE_8_NODES)\n"
+            f"    def test_all_nodes(self, contract_data: MappingResultDict, node_name: str) -> None:\n"
+            f"        ...\n\n"
+            f"See fixture docstring for complete documentation."
+        )
+
+    if "node_name" not in request.node.callspec.params:
+        available_params = list(request.node.callspec.params.keys())
+        raise ValueError(
+            f"contract_data fixture requires 'node_name' parameter in @pytest.mark.parametrize.\n\n"
+            f"Test '{request.node.name}' has parametrize but missing 'node_name'.\n"
+            f"Available parameters: {available_params}\n\n"
+            f"Required pattern:\n"
+            f"    @pytest.mark.parametrize('node_name', [...])\n"
+            f"    def test_example(self, contract_data, node_name: str) -> None:\n\n"
+            f"If you have multiple parametrize decorators, ensure one includes 'node_name'."
         )
 
     node_name: str = request.node.callspec.params["node_name"]
