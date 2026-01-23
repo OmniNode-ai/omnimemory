@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import os
 import socket
-from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -57,9 +56,6 @@ import yaml
 
 if TYPE_CHECKING:
     from omnibase_core.types import MappingResultDict
-
-if TYPE_CHECKING:
-    from aiohttp import web
 
 # Core 8 node names - shared across node-related test modules
 CORE_8_NODES: list[str] = [
@@ -386,117 +382,3 @@ async def services_available() -> bool:
         True if PostgreSQL and Valkey are available.
     """
     return await check_services_available()
-
-
-@pytest.fixture
-def webhook_url() -> str:
-    """Provide a default webhook URL for tests.
-
-    This is a dummy URL for tests that don't need actual delivery.
-
-    Returns:
-        Default webhook URL string.
-    """
-    return "http://localhost:8080/webhook"
-
-
-async def _create_webhook_server(
-    port: int,
-) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
-    """Shared webhook server creation logic.
-
-    Creates an aiohttp server that receives and records webhook POST
-    requests for verification in tests.
-
-    Args:
-        port: TCP port to bind the server to.
-
-    Yields:
-        Tuple of (webhook_url, received_events_list).
-    """
-    try:
-        from aiohttp import web
-    except ImportError:
-        pytest.skip("aiohttp not installed - required for webhook server tests")
-
-    received_events: list[dict[str, object]] = []
-
-    async def webhook_handler(request: web.Request) -> web.Response:
-        """Handle incoming webhook requests."""
-        body = await request.json()
-        signature = request.headers.get("X-Signature-256")
-        received_events.append(
-            {
-                "body": body,
-                "signature": signature,
-                "headers": dict(request.headers),
-            }
-        )
-        return web.json_response({"status": "received"})
-
-    app = web.Application()
-    app.router.add_post("/webhook", webhook_handler)
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-
-    site = web.TCPSite(runner, "localhost", port)
-    await site.start()
-
-    webhook_url = f"http://localhost:{port}/webhook"
-
-    yield webhook_url, received_events
-
-    await runner.cleanup()
-
-
-@pytest.fixture
-async def webhook_server(
-    unused_tcp_port: int,
-) -> AsyncGenerator[tuple[str, list[dict[str, object]]], None]:
-    """Create a local HTTP server to receive webhook notifications.
-
-    This fixture creates an aiohttp server that receives and records
-    webhook POST requests for verification in tests.
-
-    Args:
-        unused_tcp_port: An unused TCP port provided by pytest-asyncio.
-
-    Yields:
-        Tuple of (webhook_url, received_events_list).
-    """
-    async for result in _create_webhook_server(unused_tcp_port):
-        yield result
-
-
-@pytest.fixture
-def unused_tcp_port_factory() -> Generator[int, None, None]:
-    """Factory fixture to generate unused TCP ports.
-
-    Yields:
-        Generator that produces unused TCP port numbers.
-    """
-
-    def _get_unused_port() -> int:
-        """Find an unused TCP port."""
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("localhost", 0))
-            s.listen(1)
-            port = s.getsockname()[1]
-        return port
-
-    while True:
-        yield _get_unused_port()
-
-
-@pytest.fixture
-def unused_tcp_port(unused_tcp_port_factory: Generator[int, None, None]) -> int:
-    """Get a single unused TCP port.
-
-    Args:
-        unused_tcp_port_factory: Factory fixture for generating ports.
-
-    Returns:
-        An unused TCP port number.
-    """
-    return next(unused_tcp_port_factory)

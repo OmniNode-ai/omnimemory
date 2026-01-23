@@ -549,7 +549,9 @@ class HandlerSubscription:
 
             async with valkey.pipeline() as pipe:
                 pipe.sadd(topic_key, subscription_id)
+                pipe.expire(topic_key, self._config.cache_ttl_seconds)
                 pipe.sadd(agent_key, subscription_id)
+                pipe.expire(agent_key, self._config.cache_ttl_seconds)
                 pipe.set_key(
                     sub_key,
                     subscription.model_dump_json(),
@@ -980,12 +982,14 @@ class HandlerSubscription:
                 # Add to topic->subscribers mapping
                 topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=subscription.topic)
                 pipe.sadd(topic_key, subscription.id)
+                pipe.expire(topic_key, self._config.cache_ttl_seconds)
 
                 # Add to agent->subscriptions mapping
                 agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
                     agent_id=subscription.agent_id
                 )
                 pipe.sadd(agent_key, subscription.id)
+                pipe.expire(agent_key, self._config.cache_ttl_seconds)
 
         logger.info(
             "Valkey cache rebuilt with %d subscriptions using pipeline (atomic batch)",
@@ -1166,8 +1170,19 @@ class HandlerSubscription:
         kafka_healthy = False
         if self._kafka_handler:
             try:
-                # Simple health check - Kafka handler should have a health method
-                kafka_healthy = True  # Assume healthy if initialized
+                # Call health_check if available (EventBusKafka has this method)
+                if hasattr(self._kafka_handler, "health_check"):
+                    health_result = await self._kafka_handler.health_check()
+                    # EventBusKafka.health_check returns dict with 'healthy' key
+                    kafka_healthy = bool(health_result.get("healthy", False))
+                    if not kafka_healthy:
+                        circuit_state = health_result.get("circuit_state", "unknown")
+                        errors.append(
+                            f"Kafka: unhealthy (circuit_state={circuit_state})"
+                        )
+                else:
+                    # Fallback: assume healthy if handler exists and is started
+                    kafka_healthy = True
             except Exception as e:
                 errors.append(f"Kafka check failed: {e}")
 

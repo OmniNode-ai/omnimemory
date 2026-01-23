@@ -49,10 +49,7 @@ _DEPENDENCIES_AVAILABLE = False
 _SKIP_REASON = "Required dependencies not installed"
 
 try:
-    from omnimemory.enums.enum_subscription_status import (
-        EnumDeliveryStatus,
-        EnumSubscriptionStatus,
-    )
+    from omnimemory.enums.enum_subscription_status import EnumSubscriptionStatus
     from omnimemory.handlers import (
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,
@@ -60,7 +57,6 @@ try:
     from omnimemory.models.subscription import (
         ModelNotificationEvent,
         ModelNotificationEventPayload,
-        ModelSubscriptionDeliveryWebhook,
     )
     from omnimemory.nodes.agent_coordinator_orchestrator import (
         EnumAgentCoordinatorAction,
@@ -196,12 +192,11 @@ class NodeAgentCoordinatorOrchestrator:
         assert self._handler is not None
         assert request.agent_id is not None
         assert request.topic is not None
-        assert request.delivery is not None
 
         subscription = await self._handler.subscribe(
             agent_id=request.agent_id,
             topic=request.topic,
-            delivery=request.delivery,
+            metadata=request.metadata,
         )
 
         return ModelAgentCoordinatorResponse(
@@ -266,23 +261,16 @@ class NodeAgentCoordinatorOrchestrator:
         assert request.topic is not None
         assert request.event is not None
 
-        attempts = await self._handler.notify(
+        subscriber_count = await self._handler.notify(
             topic=request.topic,
             event=request.event,
         )
-
-        success_count = sum(
-            1 for a in attempts if a.status == EnumDeliveryStatus.SUCCESS
-        )
-        failure_count = len(attempts) - success_count
 
         return ModelAgentCoordinatorResponse(
             success=True,
             action=request.action,
             correlation_id=request.correlation_id,
-            delivery_attempts=attempts,
-            success_count=success_count,
-            failure_count=failure_count,
+            subscriber_count=subscriber_count,
         )
 
 
@@ -355,16 +343,12 @@ class TestOrchestratorSubscribe:
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_url: str,
     ) -> None:
         """Subscribe action creates subscription."""
         request = ModelAgentCoordinatorRequest(
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic=unique_topic,
-            delivery=ModelSubscriptionDeliveryWebhook(
-                webhook_url=webhook_url,
-            ),
         )
 
         response = await orchestrator_node.execute(request)
@@ -377,45 +361,37 @@ class TestOrchestratorSubscribe:
         assert response.subscription.status == EnumSubscriptionStatus.ACTIVE
 
     @pytest.mark.asyncio
-    async def test_subscribe_action_with_secret(
+    async def test_subscribe_action_with_metadata(
         self,
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_url: str,
     ) -> None:
-        """Subscribe action with webhook secret."""
+        """Subscribe action with metadata."""
         request = ModelAgentCoordinatorRequest(
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic=unique_topic,
-            delivery=ModelSubscriptionDeliveryWebhook(
-                webhook_url=webhook_url,
-                secret="my-webhook-secret",  # noqa: S106 - test fixture
-            ),
+            metadata={"source": "test", "version": "1.0"},
         )
 
         response = await orchestrator_node.execute(request)
 
         assert response.success is True
         assert response.subscription is not None
-        assert response.subscription.delivery.secret == "my-webhook-secret"
+        assert response.subscription.metadata == {"source": "test", "version": "1.0"}
 
     @pytest.mark.asyncio
     async def test_subscribe_action_invalid_topic_fails(
         self,
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
-        webhook_url: str,
     ) -> None:
         """Subscribe action with invalid topic fails."""
         request = ModelAgentCoordinatorRequest(
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic="invalid-topic-format",
-            delivery=ModelSubscriptionDeliveryWebhook(
-                webhook_url=webhook_url,
-            ),
         )
 
         response = await orchestrator_node.execute(request)
@@ -439,7 +415,6 @@ class TestOrchestratorUnsubscribe:
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_url: str,
     ) -> None:
         """Unsubscribe action removes subscription."""
         # First subscribe
@@ -447,7 +422,6 @@ class TestOrchestratorUnsubscribe:
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic=unique_topic,
-            delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
         )
         await orchestrator_node.execute(subscribe_request)
 
@@ -495,7 +469,6 @@ class TestOrchestratorListSubscriptions:
         self,
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
-        webhook_url: str,
     ) -> None:
         """List subscriptions returns all agent subscriptions."""
         # Create subscriptions
@@ -509,7 +482,6 @@ class TestOrchestratorListSubscriptions:
                 action=EnumAgentCoordinatorAction.SUBSCRIBE,
                 agent_id=unique_agent_id,
                 topic=topic,
-                delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
             )
             await orchestrator_node.execute(request)
 
@@ -553,7 +525,12 @@ class TestOrchestratorListSubscriptions:
 
 
 class TestOrchestratorNotify:
-    """Tests for orchestrator notify action."""
+    """Tests for orchestrator notify action.
+
+    Note: Notifications are published to Kafka. These tests verify
+    the subscriber count is returned correctly. Actual event consumption
+    by agents happens via Kafka consumer groups.
+    """
 
     @pytest.mark.asyncio
     async def test_notify_action(
@@ -561,17 +538,13 @@ class TestOrchestratorNotify:
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
-        """Notify action sends to all subscribers."""
-        webhook_url, received_events = webhook_server
-
+        """Notify action publishes to Kafka and returns subscriber count."""
         # Subscribe
         subscribe_request = ModelAgentCoordinatorRequest(
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic=unique_topic,
-            delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
         )
         await orchestrator_node.execute(subscribe_request)
 
@@ -594,17 +567,14 @@ class TestOrchestratorNotify:
         response = await orchestrator_node.execute(notify_request)
 
         assert response.success is True
-        assert response.success_count == 1
-        assert response.failure_count == 0
-        assert len(received_events) == 1
-        assert received_events[0]["body"]["event_id"] == event_id
+        assert response.subscriber_count == 1
 
     @pytest.mark.asyncio
     async def test_notify_action_no_subscribers(
         self,
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
     ) -> None:
-        """Notify action with no subscribers succeeds with zero counts."""
+        """Notify action with no subscribers succeeds with zero count."""
         request = ModelAgentCoordinatorRequest(
             action=EnumAgentCoordinatorAction.NOTIFY,
             topic="memory.orphan.topic",
@@ -622,21 +592,15 @@ class TestOrchestratorNotify:
         response = await orchestrator_node.execute(request)
 
         assert response.success is True
-        assert response.success_count == 0
-        assert response.failure_count == 0
-        assert response.delivery_attempts is not None
-        assert len(response.delivery_attempts) == 0
+        assert response.subscriber_count == 0
 
     @pytest.mark.asyncio
     async def test_notify_action_multiple_subscribers(
         self,
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_topic: str,
-        webhook_server: tuple[str, list[dict[str, object]]],
     ) -> None:
-        """Notify action delivers to multiple subscribers."""
-        webhook_url, received_events = webhook_server
-
+        """Notify action reports correct subscriber count for multiple subscribers."""
         # Subscribe multiple agents
         agents = [f"agent_{uuid4().hex[:8]}" for _ in range(3)]
         for agent_id in agents:
@@ -644,7 +608,6 @@ class TestOrchestratorNotify:
                 action=EnumAgentCoordinatorAction.SUBSCRIBE,
                 agent_id=agent_id,
                 topic=unique_topic,
-                delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
             )
             await orchestrator_node.execute(subscribe_request)
 
@@ -666,9 +629,7 @@ class TestOrchestratorNotify:
         response = await orchestrator_node.execute(notify_request)
 
         assert response.success is True
-        assert response.success_count == 3
-        assert response.failure_count == 0
-        assert len(received_events) == 3
+        assert response.subscriber_count == 3
 
 
 # =============================================================================
@@ -679,38 +640,23 @@ class TestOrchestratorNotify:
 class TestRequestValidation:
     """Tests for request validation via Pydantic."""
 
-    def test_subscribe_requires_agent_id(self, webhook_url: str) -> None:
+    def test_subscribe_requires_agent_id(self) -> None:
         """Subscribe action requires agent_id."""
         with pytest.raises(ValueError, match="agent_id"):
             ModelAgentCoordinatorRequest(
                 action=EnumAgentCoordinatorAction.SUBSCRIBE,
                 topic="memory.item.created",
-                delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
             )
 
     def test_subscribe_requires_topic(
         self,
         unique_agent_id: str,
-        webhook_url: str,
     ) -> None:
         """Subscribe action requires topic."""
         with pytest.raises(ValueError, match="topic"):
             ModelAgentCoordinatorRequest(
                 action=EnumAgentCoordinatorAction.SUBSCRIBE,
                 agent_id=unique_agent_id,
-                delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
-            )
-
-    def test_subscribe_requires_delivery(
-        self,
-        unique_agent_id: str,
-    ) -> None:
-        """Subscribe action requires delivery."""
-        with pytest.raises(ValueError, match="delivery"):
-            ModelAgentCoordinatorRequest(
-                action=EnumAgentCoordinatorAction.SUBSCRIBE,
-                agent_id=unique_agent_id,
-                topic="memory.item.created",
             )
 
     def test_notify_requires_topic(self) -> None:
@@ -761,7 +707,6 @@ class TestOrchestratorErrorHandling:
         test_valkey_port: int,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_url: str,
     ) -> None:
         """Execute before initialize raises RuntimeError."""
         config = ModelHandlerSubscriptionConfig(
@@ -775,7 +720,6 @@ class TestOrchestratorErrorHandling:
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic=unique_topic,
-            delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
         )
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -787,7 +731,6 @@ class TestOrchestratorErrorHandling:
         orchestrator_node: NodeAgentCoordinatorOrchestrator,
         unique_agent_id: str,
         unique_topic: str,
-        webhook_url: str,
     ) -> None:
         """Correlation ID from request is preserved in response."""
         from uuid import UUID
@@ -796,7 +739,6 @@ class TestOrchestratorErrorHandling:
             action=EnumAgentCoordinatorAction.SUBSCRIBE,
             agent_id=unique_agent_id,
             topic=unique_topic,
-            delivery=ModelSubscriptionDeliveryWebhook(webhook_url=webhook_url),
         )
 
         response = await orchestrator_node.execute(request)
