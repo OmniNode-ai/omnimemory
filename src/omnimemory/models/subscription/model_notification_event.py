@@ -18,10 +18,10 @@ from .model_notification_event_payload import (
 class ModelNotificationEvent(BaseModel):
     """Notification event for memory changes following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False, extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid", strict=True)
 
     event_id: str = Field(
-        description="Unique event ID (UUID format)",
+        description="Unique event identifier (non-empty string)",
     )
     topic: Annotated[str, Field(min_length=1, max_length=256)] = Field(
         description="Topic this event belongs to (format: memory.<entity>.<event>)",

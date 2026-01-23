@@ -19,10 +19,10 @@ from .model_subscription_delivery import (
 class ModelSubscription(BaseModel):
     """Agent subscription for memory change notifications following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False, extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid", strict=True)
 
     id: str = Field(
-        description="Unique subscription ID (UUID format)",
+        description="Unique subscription identifier (non-empty string)",
     )
     agent_id: str = Field(
         description="Agent that owns this subscription",

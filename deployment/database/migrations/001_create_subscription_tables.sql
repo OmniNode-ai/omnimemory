@@ -1,6 +1,6 @@
 -- Migration: 001_create_subscription_tables
 -- Description: Create tables for agent subscriptions and notification delivery tracking
--- Created: 2025-01-22
+-- Created: 2026-01-22
 -- Ticket: OMN-1393
 
 -- ============================================================================
@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     suspended_reason TEXT,
     metadata JSONB,
-    CONSTRAINT uq_subscriptions_agent_topic UNIQUE(agent_id, topic)
+    CONSTRAINT uq_subscriptions_agent_topic UNIQUE(agent_id, topic),
+    CONSTRAINT chk_subscriptions_status CHECK (status IN ('active', 'suspended', 'deleted'))
 );
 
 -- Indexes for common query patterns
@@ -63,7 +64,9 @@ CREATE TABLE IF NOT EXISTS delivery_attempts (
     next_retry_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
-    CONSTRAINT uq_delivery_attempt UNIQUE(subscription_id, event_id, attempt_number)
+    CONSTRAINT uq_delivery_attempt UNIQUE(subscription_id, event_id, attempt_number),
+    CONSTRAINT chk_delivery_attempt_number CHECK (attempt_number >= 1),
+    CONSTRAINT chk_delivery_attempt_status CHECK (status IN ('pending', 'success', 'failed', 'dlq'))
 );
 
 -- Indexes for common query patterns
@@ -119,7 +122,12 @@ CREATE TABLE IF NOT EXISTS circuit_breaker_states (
     total_requests INTEGER DEFAULT 0,
     total_failures INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT chk_circuit_breaker_state CHECK (state IN ('closed', 'open', 'half_open')),
+    CONSTRAINT chk_circuit_breaker_counts CHECK (
+        failure_count >= 0 AND success_count >= 0 AND
+        total_requests >= 0 AND total_failures >= 0
+    )
 );
 
 -- Index for open/half_open circuits (for monitoring dashboards)

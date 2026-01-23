@@ -19,7 +19,7 @@ from .constants import (
 class ModelCircuitBreakerState(BaseModel):
     """Circuit breaker state for a webhook endpoint following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False, extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid", strict=True)
 
     endpoint: HttpUrl = Field(
         description="Webhook endpoint URL being monitored",
@@ -97,10 +97,14 @@ class ModelCircuitBreakerState(BaseModel):
         if self.state == EnumCircuitBreakerState.CLOSED:
             return True
         if self.state == EnumCircuitBreakerState.OPEN:
-            # Allow if cooldown has passed (transition to half_open)
-            return bool(
-                self.open_until and datetime.now(timezone.utc) >= self.open_until
-            )
+            # Check if cooldown has passed
+            if self.open_until and datetime.now(timezone.utc) >= self.open_until:
+                # Transition to half_open and allow the test request
+                self.state = EnumCircuitBreakerState.HALF_OPEN
+                self.success_count = 0  # Reset for half_open tracking
+                self.updated_at = datetime.now(timezone.utc)
+                return True
+            return False
         # HALF_OPEN: allow limited requests for testing
         return True
 

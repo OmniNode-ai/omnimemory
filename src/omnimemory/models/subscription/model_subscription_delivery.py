@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 class ModelSubscriptionDeliveryWebhook(BaseModel):
     """Webhook delivery configuration for subscriptions following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False, extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid", strict=True)
 
     webhook_url: HttpUrl = Field(
         description="URL to POST notifications to (must be HTTPS in production)",

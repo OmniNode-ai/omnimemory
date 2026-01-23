@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: MIT
-# Copyright (c) 2025 OmniNode Team
 """Subscription Handler for agent subscriptions and memory change notifications.
 
 This module provides the core subscription management functionality:
@@ -583,20 +581,24 @@ class HandlerSubscription:
 
     async def shutdown(self) -> None:
         """Cleanup all resources."""
-        if self._valkey:
-            await self._valkey.shutdown()
-            self._valkey = None
+        async with self._init_lock:
+            if not self._initialized:
+                return
 
-        if self._db_handler:
-            await self._db_handler.shutdown()
-            self._db_handler = None
+            if self._valkey:
+                await self._valkey.shutdown()
+                self._valkey = None
 
-        if self._http_handler:
-            await self._http_handler.shutdown()
-            self._http_handler = None
+            if self._db_handler:
+                await self._db_handler.shutdown()
+                self._db_handler = None
 
-        self._initialized = False
-        logger.info("HandlerSubscription shutdown complete")
+            if self._http_handler:
+                await self._http_handler.shutdown()
+                self._http_handler = None
+
+            self._initialized = False
+            logger.info("HandlerSubscription shutdown complete")
 
     def _ensure_initialized(self) -> tuple[AdapterValkey, HandlerDb, HandlerHttpRest]:
         """Ensure handler is initialized and return components.
@@ -850,14 +852,21 @@ class HandlerSubscription:
         await self._soft_delete_subscription(subscription.id)
         self._metrics["subscriptions_deleted"] += 1
 
-        # Remove from Valkey caches
+        # Remove from Valkey caches (best effort - DB is source of truth)
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
         sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
 
-        await valkey.srem(topic_key, subscription.id)
-        await valkey.srem(agent_key, subscription.id)
-        await valkey.delete(sub_key)
+        try:
+            await valkey.srem(topic_key, subscription.id)
+            await valkey.srem(agent_key, subscription.id)
+            await valkey.delete(sub_key)
+        except Exception as e:
+            logger.warning(
+                "Failed to evict cache for subscription %s (DB delete succeeded): %s",
+                subscription.id,
+                e,
+            )
 
         logger.info(
             "Subscription %s removed for agent %s on topic %s",
@@ -893,8 +902,17 @@ class HandlerSubscription:
 
         Raises:
             RuntimeError: If handler is not initialized.
+            ValueError: If event.topic does not match the topic argument.
         """
         self._ensure_initialized()
+
+        # Validate that event topic matches the topic argument
+        if event.topic != topic:
+            raise ValueError(
+                f"Event topic mismatch: event.topic='{event.topic}' does not match "
+                f"topic argument='{topic}'. Ensure the event is being sent to the "
+                f"correct topic."
+            )
 
         # Get subscribers for topic
         subscriber_ids = await self._get_subscribers_for_topic(topic)
@@ -1303,7 +1321,7 @@ class HandlerSubscription:
         result = await db_handler.execute(envelope)
 
         rows = result.result.get("payload", {}).get("rows", [])
-        subscription_ids = {row["id"] for row in rows}
+        subscription_ids = {str(row["id"]) for row in rows}
 
         # Rebuild cache for this topic
         if subscription_ids:
@@ -1635,15 +1653,16 @@ class HandlerSubscription:
             INSERT INTO delivery_attempts (
                 id, subscription_id, event_id, attempt_number, status,
                 status_code, error_message, response_body, latency_ms,
-                next_retry_at, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                next_retry_at, created_at, completed_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (subscription_id, event_id, attempt_number) DO UPDATE SET
                 status = EXCLUDED.status,
                 status_code = EXCLUDED.status_code,
                 error_message = EXCLUDED.error_message,
                 response_body = EXCLUDED.response_body,
                 latency_ms = EXCLUDED.latency_ms,
-                next_retry_at = EXCLUDED.next_retry_at
+                next_retry_at = EXCLUDED.next_retry_at,
+                completed_at = EXCLUDED.completed_at
         """
         envelope = {
             "operation": "db.execute",
@@ -1663,6 +1682,7 @@ class HandlerSubscription:
                     if attempt.next_retry_at
                     else None,
                     attempt.created_at.isoformat(),
+                    attempt.completed_at.isoformat() if attempt.completed_at else None,
                 ],
             },
         }
@@ -1796,6 +1816,9 @@ class HandlerSubscription:
         """
         _, db_handler, _ = self._ensure_initialized()
 
+        # Truncate endpoint if too long (VARCHAR(512) limit in DB)
+        endpoint_to_query = endpoint[:512]
+
         sql = """
             SELECT state, failure_count, success_count, last_failure_at,
                    last_success_at, last_error_message, open_until,
@@ -1807,7 +1830,7 @@ class HandlerSubscription:
             "operation": "db.query",
             "payload": {
                 "sql": sql,
-                "parameters": [endpoint],
+                "parameters": [endpoint_to_query],
             },
         }
 

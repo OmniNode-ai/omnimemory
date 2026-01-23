@@ -16,10 +16,10 @@ from ...enums.enum_subscription_status import (
 class ModelNotificationDeliveryAttempt(BaseModel):
     """Record of a notification delivery attempt following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False, extra="forbid")
+    model_config = ConfigDict(frozen=False, extra="forbid", strict=True)
 
     delivery_id: str = Field(
-        description="Unique delivery attempt ID (UUID format)",
+        description="Unique delivery attempt identifier (non-empty string)",
     )
     subscription_id: str = Field(
         description="Target subscription ID",
