@@ -188,6 +188,7 @@ class TestModelEmbeddingHttpClientConfig:
         assert config.strict_dimension_validation is False
         assert config.rate_limit_rpm == 0
         assert config.auth_header is None
+        assert config.health_check_text == "health"
 
     def test_url_normalization(self) -> None:
         """Test URL trailing slash is stripped."""
@@ -220,6 +221,29 @@ class TestModelEmbeddingHttpClientConfig:
             ModelEmbeddingHttpClientConfig(
                 base_url="http://localhost",
                 timeout_seconds=500,
+            )
+
+    def test_health_check_text_validation(self) -> None:
+        """Test health_check_text validation constraints."""
+        # Valid custom text
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost",
+            health_check_text="custom health check phrase",
+        )
+        assert config.health_check_text == "custom health check phrase"
+
+        # Empty text should fail (min_length=1)
+        with pytest.raises(ValueError):
+            ModelEmbeddingHttpClientConfig(
+                base_url="http://localhost",
+                health_check_text="",
+            )
+
+        # Text exceeding max_length=100 should fail
+        with pytest.raises(ValueError):
+            ModelEmbeddingHttpClientConfig(
+                base_url="http://localhost",
+                health_check_text="x" * 101,
             )
 
 
@@ -985,13 +1009,13 @@ class TestEmbeddingHttpClientHealthCheck:
             await client.shutdown()
 
     @pytest.mark.asyncio
-    async def test_health_check_uses_minimal_test_text(
+    async def test_health_check_uses_default_test_text(
         self,
         local_config: ModelEmbeddingHttpClientConfig,
         mock_handler: MagicMock,
         mock_handler_result: MagicMock,
     ) -> None:
-        """Test health check uses a minimal test phrase."""
+        """Test health check uses default test phrase when not configured."""
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
@@ -1001,9 +1025,40 @@ class TestEmbeddingHttpClientHealthCheck:
             async with EmbeddingHttpClient(local_config) as client:
                 await client.health_check()
 
-                # Verify the request used "health" as the test text
+                # Verify the request used "health" as the default test text
                 call_args = mock_handler.execute.call_args[0][0]
                 assert call_args["payload"]["body"] == {"text": "health"}
+
+    @pytest.mark.asyncio
+    async def test_health_check_uses_custom_configured_text(
+        self,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test health check uses custom text from config.
+
+        Some embedding providers may reject very short text like "health".
+        This test verifies that the health_check_text config option allows
+        users to customize the test phrase.
+        """
+        custom_text = "ping test for server health verification"
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            embedding_dimension=1024,
+            health_check_text=custom_text,
+        )
+        mock_handler.execute.return_value = mock_handler_result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                await client.health_check()
+
+                # Verify the request used the custom configured text
+                call_args = mock_handler.execute.call_args[0][0]
+                assert call_args["payload"]["body"] == {"text": custom_text}
 
     @pytest.mark.asyncio
     async def test_health_check_skips_dimension_validation(

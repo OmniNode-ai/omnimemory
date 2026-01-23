@@ -35,10 +35,24 @@ DEFAULT_REQUESTS_PER_MINUTE = 60
 class ModelRateLimiterConfig(BaseModel):
     """Configuration for provider-scoped rate limiting.
 
+    This config is used by ProviderRateLimiter instances which require at least
+    1 request per minute to function. The ``requests_per_minute`` field enforces
+    ``ge=1`` to ensure valid rate limiter operation.
+
+    Note:
+        **Constraint interaction with EmbeddingHttpClientConfig:**
+
+        ModelEmbeddingHttpClientConfig allows ``rate_limit_rpm=0`` to indicate
+        "no RPM limiting." When users want TPM-only limiting (rpm=0, tpm>0),
+        EmbeddingHttpClient handles this by using a high fallback RPM value
+        (10,000) when creating the ModelRateLimiterConfig. This satisfies the
+        ``requests_per_minute >= 1`` constraint while effectively disabling
+        request-based throttling.
+
     Attributes:
         provider: Provider identifier (e.g., "openai", "local", "vllm").
         model: Model identifier (e.g., "text-embedding-3-small").
-        requests_per_minute: Maximum requests per minute (RPM).
+        requests_per_minute: Maximum requests per minute (RPM). Must be >= 1.
         tokens_per_minute: Maximum tokens per minute (TPM). Set to 0 to disable.
         burst_multiplier: Allow burst up to this multiple of the rate limit.
             A multiplier of 1.0 means strict rate limiting.

@@ -397,7 +397,11 @@ class EmbeddingHttpClient:
             correlation_id: Correlation ID for the request.
 
         Returns:
-            Envelope dictionary for HandlerHttp.execute().
+            Envelope dictionary for HandlerHttp.execute() containing:
+                - operation: The HTTP operation ("http.post")
+                - payload: Request details (url, headers, body)
+                - correlation_id: For grouping related operations in distributed tracing
+                - envelope_id: For causality tracking (links response to this request)
         """
         headers: dict[str, str] = {
             "Content-Type": "application/json",
@@ -423,6 +427,9 @@ class EmbeddingHttpClient:
                 "body": body,
             },
             "correlation_id": correlation_id,
+            # envelope_id enables causality tracking in HandlerHttpRest: the response's
+            # input_envelope_id field will match this value, allowing observability
+            # systems to pair requests with their responses across async boundaries.
             "envelope_id": uuid4(),
         }
 
@@ -643,11 +650,11 @@ class EmbeddingHttpClient:
         cid = correlation_id or uuid4()
 
         try:
-            # Use a minimal test phrase for health check
+            # Use configured test phrase for health check (default: "health")
             # Bypasses rate limiter by calling internal method directly
             # Skips dimension validation to avoid warnings from test text
             await self._execute_embedding_request(
-                "health", cid, skip_dimension_validation=True
+                self._config.health_check_text, cid, skip_dimension_validation=True
             )
             return True
         except EmbeddingClientError:

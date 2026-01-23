@@ -89,6 +89,17 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         auth_header: Optional authorization header value (e.g., "Bearer <token>").
         embed_endpoint_path: Custom embed endpoint path. If None, auto-detects
             based on provider (OpenAI: /v1/embeddings, Local/vLLM: /embed).
+
+    Note:
+        **Rate limiting configuration interaction:**
+
+        - ``rpm=0, tpm=0``: No rate limiting applied.
+        - ``rpm>0, tpm=0``: RPM-only limiting.
+        - ``rpm>0, tpm>0``: Both RPM and TPM limiting.
+        - ``rpm=0, tpm>0``: TPM-only limiting. Internally, EmbeddingHttpClient
+          uses a high fallback RPM (10,000) to satisfy ModelRateLimiterConfig's
+          ``requests_per_minute >= 1`` constraint while effectively disabling
+          request-based throttling.
     """
 
     model_config = ConfigDict(
@@ -131,13 +142,20 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         default=0,
         ge=0,
         le=10_000,
-        description="Requests per minute limit (0 for no limit)",
+        description=(
+            "Requests per minute limit. Set to 0 to disable RPM limiting. "
+            "When rpm=0 but tpm>0, EmbeddingHttpClient uses an internal high RPM "
+            "(10,000) to enable token-based limiting without request throttling."
+        ),
     )
     rate_limit_tpm: int = Field(
         default=0,
         ge=0,
         le=10_000_000,
-        description="Tokens per minute limit (0 for no limit)",
+        description=(
+            "Tokens per minute limit. Set to 0 to disable TPM limiting. "
+            "Can be used alone (with rpm=0) for token-only rate limiting."
+        ),
     )
     auth_header: str | None = Field(
         default=None,
@@ -149,6 +167,15 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
             "Custom embed endpoint path (e.g., '/v1/embeddings'). "
             "If None, auto-detects based on provider: OpenAI uses /v1/embeddings, "
             "Local/vLLM uses /embed."
+        ),
+    )
+    health_check_text: str = Field(
+        default="health",
+        min_length=1,
+        max_length=100,
+        description=(
+            "Text to send for health check requests. Short text recommended "
+            "to minimize token usage. Some providers may reject very short text."
         ),
     )
 
