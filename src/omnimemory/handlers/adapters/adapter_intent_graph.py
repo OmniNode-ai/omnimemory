@@ -52,9 +52,11 @@ import logging
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 from uuid import uuid4
+
+from omnibase_core.types.type_json import JsonType
 
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
@@ -68,22 +70,29 @@ from omnimemory.handlers.adapters.models import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
-
-_OMNIBASE_INFRA_AVAILABLE = False
-try:
     from omnibase_infra.handlers.handler_graph import HandlerGraph
 
-    _OMNIBASE_INFRA_AVAILABLE = True
-except ImportError:
+# Runtime conditional import - omnibase_infra is a dev dependency
+_OMNIBASE_INFRA_AVAILABLE: bool = False
+_OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
 
-    class HandlerGraph:  # type: ignore[no-redef]
-        """Stub for HandlerGraph when omnibase_infra is not installed."""
+if not TYPE_CHECKING:
+    try:
+        from omnibase_infra.handlers.handler_graph import HandlerGraph
 
-        def __init__(self, container: object) -> None:
-            raise ImportError(
-                "omnibase_infra is required for AdapterIntentGraph. "
-                "Install with: pip install omnibase_infra"
-            )
+        _OMNIBASE_INFRA_AVAILABLE = True
+    except ImportError as e:
+        _OMNIBASE_INFRA_IMPORT_ERROR = str(e)
+
+        class HandlerGraph:  # type: ignore[no-redef]
+            """Stub for HandlerGraph when omnibase_infra is not installed."""
+
+            def __init__(self, container: object) -> None:
+                raise ImportError(
+                    f"omnibase_infra is required for AdapterIntentGraph. "
+                    f"Install it with: poetry install --with dev. "
+                    f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
+                )
 
 
 __all__ = ["AdapterIntentGraph", "IntentCypherTemplates"]
@@ -150,12 +159,17 @@ class IntentCypherTemplates:
 
     @staticmethod
     def create_indexes_queries(session_label: str, intent_label: str) -> list[str]:
-        """Generate index creation queries for intent graph schema."""
+        """Generate index creation queries for intent graph schema.
+
+        Uses ``CREATE INDEX IF NOT EXISTS`` syntax (Memgraph 2.0+) to ensure
+        idempotent index creation without relying on error handling for
+        duplicate index detection.
+        """
         return [
-            f"CREATE INDEX ON :{session_label}(session_id);",
-            f"CREATE INDEX ON :{intent_label}(intent_id);",
-            f"CREATE INDEX ON :{intent_label}(intent_category);",
-            f"CREATE INDEX ON :{intent_label}(created_at_utc);",
+            f"CREATE INDEX IF NOT EXISTS ON :{session_label}(session_id);",
+            f"CREATE INDEX IF NOT EXISTS ON :{intent_label}(intent_id);",
+            f"CREATE INDEX IF NOT EXISTS ON :{intent_label}(intent_category);",
+            f"CREATE INDEX IF NOT EXISTS ON :{intent_label}(created_at_utc);",
         ]
 
     @staticmethod
@@ -326,11 +340,11 @@ class AdapterIntentGraph:
 
                         self._handler = HandlerGraph(self._container)
 
-                        init_options: dict[str, object] = {
+                        init_options: dict[str, JsonType] = {
                             "timeout_seconds": self._config.timeout_seconds,
                         }
                         if options:
-                            init_options.update(options)
+                            init_options.update(cast(Mapping[str, JsonType], options))
 
                         await self._handler.initialize(
                             connection_uri=connection_uri,
@@ -372,9 +386,22 @@ class AdapterIntentGraph:
     async def _ensure_indexes(self) -> None:
         """Create indexes for optimal query performance.
 
-        Index creation is idempotent - existing indexes are ignored.
+        Index creation is idempotent via ``CREATE INDEX IF NOT EXISTS`` syntax
+        (Memgraph 2.0+). This method is safe to call multiple times.
+
+        The method respects the ``auto_create_indexes`` config option - if set
+        to False, index creation is skipped entirely. This is useful for:
+        - Testing environments where indexes are not needed
+        - Deployments where indexes are managed externally (e.g., migrations)
+        - Databases that don't support the IF NOT EXISTS syntax
         """
         if self._handler is None:
+            return
+
+        if not self._config.auto_create_indexes:
+            logger.debug(
+                "Skipping automatic index creation (auto_create_indexes=False)"
+            )
             return
 
         index_queries = IntentCypherTemplates.create_indexes_queries(
@@ -382,19 +409,35 @@ class AdapterIntentGraph:
             intent_label=self._config.intent_node_label,
         )
 
+        successful = 0
+        failed = 0
+
         for query in index_queries:
             try:
                 await self._handler.execute_query(query=query, parameters={})
-                logger.debug("Created or verified index: %s", query.strip()[:50])
+                successful += 1
+                logger.debug("Index ensured: %s", query.strip()[:60])
             except Exception as e:
-                error_msg = str(e).lower()
-                if "already exists" in error_msg or "duplicate" in error_msg:
-                    logger.debug("Index already exists: %s", query.strip()[:50])
-                else:
-                    # Log warning but don't fail initialization
-                    logger.warning(
-                        "Index creation may have failed: %s - %s", query.strip()[:50], e
-                    )
+                failed += 1
+                # Log warning but don't fail initialization - indexes improve
+                # performance but are not required for correctness
+                logger.warning(
+                    "Index creation failed (non-fatal): query=%s error=%s",
+                    query.strip()[:60],
+                    e,
+                )
+
+        if failed > 0:
+            logger.warning(
+                "Index creation completed with errors: %d successful, %d failed",
+                successful,
+                failed,
+            )
+        else:
+            logger.info(
+                "All %d indexes created or verified successfully",
+                successful,
+            )
 
     async def shutdown(self) -> None:
         """Shutdown the adapter and release resources.
@@ -473,14 +516,14 @@ class AdapterIntentGraph:
                     rel_type=self._config.relationship_type,
                 )
 
-                parameters: dict[str, object] = {
+                parameters: dict[str, JsonType] = {
                     "session_id": session_id,
                     "started_at_utc": timestamp_utc,
                     "user_context": user_context,
                     "intent_id": intent_id,
                     "intent_category": intent_data.intent_category,
                     "confidence": intent_data.confidence,
-                    "keywords": intent_data.keywords,
+                    "keywords": cast(list[JsonType], intent_data.keywords),
                     "created_at_utc": timestamp_utc,
                     "timestamp_utc": timestamp_utc,
                     "correlation_id": correlation_id,
@@ -612,7 +655,7 @@ class AdapterIntentGraph:
                     rel_type=self._config.relationship_type,
                 )
 
-                parameters: dict[str, object] = {
+                parameters: dict[str, JsonType] = {
                     "session_id": session_id,
                     "min_confidence": effective_min_confidence,
                     "limit": effective_limit,
@@ -642,18 +685,36 @@ class AdapterIntentGraph:
                         continue
 
                     keywords_raw = record.get("keywords", [])
-                    keywords = (
-                        list(keywords_raw) if isinstance(keywords_raw, list) else []
+                    keywords: list[str] = (
+                        [str(k) for k in keywords_raw]
+                        if isinstance(keywords_raw, list)
+                        else []
+                    )
+
+                    # Extract and validate confidence (defaults to 0.0 if not a number)
+                    confidence_raw = record.get("confidence", 0.0)
+                    confidence_val = (
+                        float(confidence_raw)
+                        if isinstance(confidence_raw, int | float)
+                        else 0.0
+                    )
+
+                    # Extract correlation_id with proper type narrowing
+                    correlation_id_raw = record.get("correlation_id")
+                    correlation_id = (
+                        str(correlation_id_raw)
+                        if correlation_id_raw is not None
+                        else None
                     )
 
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
                             intent_category=str(record.get("intent_category", "")),
-                            confidence=float(record.get("confidence", 0.0)),
+                            confidence=confidence_val,
                             keywords=keywords,
                             created_at_utc=str(record.get("created_at_utc", "")),
-                            correlation_id=record.get("correlation_id"),
+                            correlation_id=correlation_id,
                         )
                     )
 
@@ -744,7 +805,7 @@ class AdapterIntentGraph:
                     intent_label=self._config.intent_node_label,
                 )
 
-                parameters: dict[str, object] = {
+                parameters: dict[str, JsonType] = {
                     "since_utc": since_utc,
                 }
 

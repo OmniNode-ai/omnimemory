@@ -135,6 +135,7 @@ class TestModelAdapterIntentGraphConfig:
         assert config.relationship_type == "HAD_INTENT"
         assert config.max_intents_per_session == 100
         assert config.default_confidence_threshold == 0.0
+        assert config.auto_create_indexes is True
 
     def test_custom_config(self) -> None:
         """Test custom configuration values."""
@@ -262,6 +263,20 @@ class TestModelAdapterIntentGraphConfig:
         # Invalid relationship types
         with pytest.raises(ValidationError, match="valid Cypher identifier"):
             ModelAdapterIntentGraphConfig(relationship_type="has-dash")
+
+    def test_auto_create_indexes_option(self) -> None:
+        """Test auto_create_indexes configuration option."""
+        # Default is True
+        config_default = ModelAdapterIntentGraphConfig()
+        assert config_default.auto_create_indexes is True
+
+        # Can be set to False
+        config_disabled = ModelAdapterIntentGraphConfig(auto_create_indexes=False)
+        assert config_disabled.auto_create_indexes is False
+
+        # Can be set to True explicitly
+        config_enabled = ModelAdapterIntentGraphConfig(auto_create_indexes=True)
+        assert config_enabled.auto_create_indexes is True
 
     def test_extra_fields_forbidden(self) -> None:
         """Test that extra fields are rejected (ConfigDict extra='forbid')."""
@@ -641,6 +656,10 @@ class TestIntentCypherTemplates:
         assert any("intent_category" in q for q in queries)
         assert any("created_at_utc" in q for q in queries)
 
+        # Verify IF NOT EXISTS syntax is used for idempotent index creation
+        for query in queries:
+            assert "IF NOT EXISTS" in query, f"Query missing IF NOT EXISTS: {query}"
+
     def test_create_indexes_queries_uses_configured_labels(self) -> None:
         """Test create_indexes_queries uses the configured labels."""
         queries = IntentCypherTemplates.create_indexes_queries(
@@ -868,11 +887,16 @@ class TestLifecycle:
             assert mock_instance.execute_query.call_count == 4
 
     @pytest.mark.asyncio
-    async def test_initialize_handles_index_already_exists(
+    async def test_initialize_handles_index_creation_errors(
         self,
         config: ModelAdapterIntentGraphConfig,
     ) -> None:
-        """Test that index creation error (e.g., already exists) doesn't fail init."""
+        """Test that index creation errors don't fail initialization.
+
+        Index creation errors are non-fatal since indexes improve performance
+        but are not required for correctness. This test verifies the adapter
+        gracefully handles index creation failures.
+        """
         adapter = AdapterIntentGraph(config)
 
         with patch(
@@ -880,9 +904,9 @@ class TestLifecycle:
         ) as MockHandler:
             mock_instance = MagicMock()
             mock_instance.initialize = AsyncMock()
-            # Simulate index already exists error
+            # Simulate index creation error (e.g., permission denied, syntax error)
             mock_instance.execute_query = AsyncMock(
-                side_effect=Exception("Index already exists")
+                side_effect=Exception("Index creation failed: permission denied")
             )
             MockHandler.return_value = mock_instance
 
@@ -894,6 +918,29 @@ class TestLifecycle:
 
             # Adapter should still be initialized despite index error
             assert adapter.is_initialized
+
+    @pytest.mark.asyncio
+    async def test_initialize_skips_indexes_when_disabled(self) -> None:
+        """Test that index creation is skipped when auto_create_indexes=False."""
+        config = ModelAdapterIntentGraphConfig(auto_create_indexes=False)
+        adapter = AdapterIntentGraph(config)
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_intent_graph.HandlerGraph"
+        ) as MockHandler:
+            mock_instance = MagicMock()
+            mock_instance.initialize = AsyncMock()
+            mock_instance.execute_query = AsyncMock()
+            MockHandler.return_value = mock_instance
+
+            with patch("omnibase_core.container.ModelONEXContainer"):
+                await adapter.initialize(
+                    connection_uri="bolt://localhost:7687",
+                )
+
+            assert adapter.is_initialized
+            # execute_query should NOT have been called for index creation
+            mock_instance.execute_query.assert_not_called()
 
 
 # =============================================================================

@@ -94,6 +94,13 @@ class ModelAdapterIntentGraphConfig(BaseModel):
             "Range: 0.0-1.0 where 0.0 means no filtering."
         ),
     )
+    auto_create_indexes: bool = Field(
+        default=True,
+        description=(
+            "Whether to automatically create indexes during initialization. "
+            "Set to False if indexes are managed externally or for testing."
+        ),
+    )
 
     @field_validator("session_node_label", "intent_node_label", "relationship_type")
     @classmethod

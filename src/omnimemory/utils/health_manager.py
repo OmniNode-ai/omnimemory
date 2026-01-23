@@ -40,6 +40,7 @@ from ..models.foundation.model_health_response import (
     ModelCircuitBreakerStatsCollection,
     ModelRateLimitedHealthCheckResponse,
 )
+from ..models.foundation.model_semver import ModelSemVer
 from .error_sanitizer import SanitizationLevel, sanitize_error
 
 # === RATE LIMITING ===
@@ -106,17 +107,23 @@ def _sanitize_error(error: Exception) -> str:
     )
 
 
-def _get_package_version() -> str:
-    """Get package version from metadata or fallback to default."""
+def _get_package_version() -> ModelSemVer:
+    """Get package version from metadata or fallback to default.
+
+    Returns:
+        ModelSemVer: Package version as strongly-typed semver model.
+    """
+    fallback_version = ModelSemVer(major=0, minor=1, patch=0)
     try:
         # Try to get version from package metadata
         from importlib.metadata import PackageNotFoundError, version
 
-        return version("omnimemory")
+        version_str = version("omnimemory")
+        return ModelSemVer.from_string(version_str)
     except PackageNotFoundError:
-        return "0.1.0"  # Fallback version when package not installed
+        return fallback_version
     except Exception:
-        return "0.1.0"  # Fallback version for any other error
+        return fallback_version
 
 
 def _get_environment() -> str:
