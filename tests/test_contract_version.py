@@ -2,12 +2,13 @@
 # Copyright (c) 2025 OmniNode Team
 """Contract version field validation tests (OMN-1436).
 
-Tests that YAML contracts use the new `contract_version` field structure
-after migration from the legacy root-level `version` field.
+Tests that YAML contracts use the new `contract_version` and `node_version`
+field structures after migration from the legacy root-level `version` field.
 
 This test module verifies:
 - contract_version field exists in each contract
-- contract_version has correct structure (major, minor, patch integers)
+- node_version field exists in each contract
+- Both version fields have correct structure (major, minor, patch integers)
 - No legacy root-level 'version' field exists
 - name field matches expected node name
 - node_type field exists
@@ -73,40 +74,41 @@ def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
 ALL_DISCOVERED_CONTRACTS: list[str] = get_all_contracts()
 
 
-def _assert_valid_contract_version(contract_version: object, node_name: str) -> None:
-    """Assert contract_version has valid structure with major, minor, patch.
+def _assert_valid_version_structure(
+    version: object, field_name: str, node_name: str
+) -> None:
+    """Assert version field has valid structure with major, minor, patch.
 
-    Validates that the contract_version field:
+    Validates that a version field (contract_version or node_version):
     - Is not None
     - Is a dict
     - Contains major, minor, patch fields
     - All version fields are non-negative integers
 
     Args:
-        contract_version: The contract_version value from the YAML contract.
+        version: The version value from the YAML contract.
+        field_name: Name of the version field (e.g., "contract_version", "node_version").
         node_name: Name of the node for error messages.
 
     Raises:
         AssertionError: If any validation fails.
     """
-    assert contract_version is not None, f"contract_version field is None: {node_name}"
+    assert version is not None, f"{field_name} field is None: {node_name}"
     assert isinstance(
-        contract_version, dict
-    ), f"contract_version must be a dict with major/minor/patch: {node_name}"
+        version, dict
+    ), f"{field_name} must be a dict with major/minor/patch: {node_name}"
 
     for field in ("major", "minor", "patch"):
-        assert (
-            field in contract_version
-        ), f"contract_version missing '{field}' field: {node_name}"
-        value: object = contract_version[field]
+        assert field in version, f"{field_name} missing '{field}' field: {node_name}"
+        value: object = version[field]
         assert isinstance(value, int), (
-            f"contract_version.{field} must be an integer, "
+            f"{field_name}.{field} must be an integer, "
             f"got {type(value).__name__}: {node_name}"
         )
-        assert value >= 0, f"contract_version.{field} must be non-negative: {node_name}"
+        assert value >= 0, f"{field_name}.{field} must be non-negative: {node_name}"
         assert (
             value < MAX_REASONABLE_VERSION_COMPONENT
-        ), f"contract_version.{field} seems unreasonably large ({value}): {node_name}"
+        ), f"{field_name}.{field} seems unreasonably large ({value}): {node_name}"
 
 
 class TestContractVersionField:
@@ -200,8 +202,8 @@ class TestContractVersionField:
                 version, str | dict
             ), f"tool_specification.version should be a string or dict: {node_name}"
             if isinstance(version, dict):
-                _assert_valid_contract_version(
-                    version, f"{node_name}/tool_specification"
+                _assert_valid_version_structure(
+                    version, "tool_specification.version", node_name
                 )
 
         # Check event_type.version if present (should be preserved)
@@ -213,7 +215,9 @@ class TestContractVersionField:
                 version, str | dict
             ), f"event_type.version should be a string or dict: {node_name}"
             if isinstance(version, dict):
-                _assert_valid_contract_version(version, f"{node_name}/event_type")
+                _assert_valid_version_structure(
+                    version, "event_type.version", node_name
+                )
 
     @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
     def test_contract_version_values(
@@ -234,6 +238,35 @@ class TestContractVersionField:
         assert contract_data.get("contract_version") == expected, (
             f"Expected contract_version {expected} for {node_name}, "
             f"got {contract_data.get('contract_version')}"
+        )
+
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
+    def test_node_version_field_exists(
+        self, contract_data: MappingResultDict, node_name: str
+    ) -> None:
+        """Verify node_version field exists and has valid structure.
+
+        ONEX contracts require both contract_version (schema version) and
+        node_version (implementation version) fields.
+        """
+        assert (
+            "node_version" in contract_data
+        ), f"Contract must have 'node_version' field: {node_name}"
+        node_version: object = contract_data.get("node_version")
+        _assert_valid_version_structure(node_version, "node_version", node_name)
+
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
+    def test_node_version_values(
+        self, contract_data: MappingResultDict, node_name: str
+    ) -> None:
+        """Verify node_version has expected initial values after migration.
+
+        All contracts should have node_version 0.1.0 as their starting point.
+        """
+        expected: dict[str, int] = {"major": 0, "minor": 1, "patch": 0}
+        assert contract_data.get("node_version") == expected, (
+            f"Expected node_version {expected} for {node_name}, "
+            f"got {contract_data.get('node_version')}"
         )
 
 
@@ -289,7 +322,7 @@ class TestAllContractsDiscovery:
         - patch: int (non-negative)
         """
         contract_version: object | None = contract_data.get("contract_version")
-        _assert_valid_contract_version(contract_version, node_name)
+        _assert_valid_version_structure(contract_version, "contract_version", node_name)
 
     @pytest.mark.skipif(
         not ALL_DISCOVERED_CONTRACTS,
@@ -304,6 +337,40 @@ class TestAllContractsDiscovery:
             f"Contract has legacy 'version' field - "
             f"should use 'contract_version': {node_name}"
         )
+
+    @pytest.mark.skipif(
+        not ALL_DISCOVERED_CONTRACTS,
+        reason="No contracts discovered in nodes directory",
+    )
+    @pytest.mark.parametrize("node_name", ALL_DISCOVERED_CONTRACTS, ids=str)
+    def test_discovered_contract_has_node_version(
+        self, contract_data: MappingResultDict, node_name: str
+    ) -> None:
+        """Verify all discovered contracts have node_version field.
+
+        ONEX contracts require both contract_version and node_version fields.
+        """
+        assert (
+            "node_version" in contract_data
+        ), f"Contract must have 'node_version' field: {node_name}"
+
+    @pytest.mark.skipif(
+        not ALL_DISCOVERED_CONTRACTS,
+        reason="No contracts discovered in nodes directory",
+    )
+    @pytest.mark.parametrize("node_name", ALL_DISCOVERED_CONTRACTS, ids=str)
+    def test_discovered_node_version_structure(
+        self, contract_data: MappingResultDict, node_name: str
+    ) -> None:
+        """Verify all discovered contracts have valid node_version structure.
+
+        The node_version field must be a dict with:
+        - major: int (non-negative)
+        - minor: int (non-negative)
+        - patch: int (non-negative)
+        """
+        node_version: object | None = contract_data.get("node_version")
+        _assert_valid_version_structure(node_version, "node_version", node_name)
 
     def test_get_all_contracts_nonexistent_dir(self, tmp_path: Path) -> None:
         """Verify get_all_contracts returns empty list for nonexistent dir."""
