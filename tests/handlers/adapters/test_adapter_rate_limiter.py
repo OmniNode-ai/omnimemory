@@ -370,22 +370,21 @@ class TestProviderRateLimiter:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_try_acquire_tokens_exceed_max_returns_false(
+    async def test_try_acquire_tokens_exceed_max_raises(
         self,
         config_with_tokens: ModelRateLimiterConfig,
     ) -> None:
-        """Test try_acquire returns False when tokens exceed max (no ValueError).
+        """Test try_acquire raises ValueError when tokens exceed max.
 
-        Note: try_acquire does NOT raise for exceeding max tokens because it's
-        a non-blocking check. The ValueError is only raised in acquire() to
-        prevent infinite waits.
+        This ensures consistency with acquire() - both methods validate
+        that the requested tokens don't exceed the maximum allowed.
         """
         limiter = ProviderRateLimiter(config_with_tokens)
 
         # config_with_tokens has tokens_per_minute=1000
-        # try_acquire should just return False (not raise)
-        result = await limiter.try_acquire(tokens=1001)
-        assert result is False
+        # try_acquire should raise ValueError for tokens > max
+        with pytest.raises(ValueError, match="tokens.*exceeds maximum allowed"):
+            await limiter.try_acquire(tokens=1001)
 
     @pytest.mark.asyncio
     async def test_concurrent_try_acquire(self) -> None:

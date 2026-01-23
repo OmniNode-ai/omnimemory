@@ -229,11 +229,18 @@ class ProviderRateLimiter:
             True if permission was granted, False if rate limited.
 
         Raises:
-            ValueError: If tokens is negative.
+            ValueError: If tokens is negative or exceeds maximum allowed.
         """
         # Validate token count - negative tokens are always invalid
         if tokens < 0:
             raise ValueError(f"tokens must be non-negative, got {tokens}")
+
+        # If token limiting is enabled and request exceeds max, it can never succeed
+        if self._max_tokens > 0 and tokens > self._max_tokens:
+            raise ValueError(
+                f"tokens ({tokens}) exceeds maximum allowed ({self._max_tokens}) "
+                f"for {self._config.provider}/{self._config.model}"
+            )
 
         async with self._lock:
             now = time.monotonic()
@@ -520,9 +527,30 @@ class RateLimiterRegistry:
         Note:
             For most use cases (metrics, logging, debugging), the approximate
             count is sufficient. Operations that require an exact count should
-            use async methods that acquire the lock.
+            use :meth:`count_exact` which acquires the lock.
 
         Returns:
             Approximate number of registered rate limiters.
         """
         return len(self._limiters)
+
+    async def count_exact(self) -> int:
+        """Get the exact number of registered rate limiters.
+
+        Unlike the :attr:`count` property which returns an approximate value
+        without locking, this method acquires the lock to provide an exact count.
+        Use this when accurate count is required, such as:
+
+        - Capacity planning decisions
+        - Alert threshold evaluation
+        - Audit logging
+        - Test assertions
+
+        For most observability use cases (metrics dashboards, debug logging),
+        the :attr:`count` property is preferred as it avoids lock contention.
+
+        Returns:
+            Exact number of registered rate limiters.
+        """
+        async with self._lock:
+            return len(self._limiters)

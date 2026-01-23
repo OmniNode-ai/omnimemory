@@ -186,7 +186,9 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         max_length=100,
         description=(
             "Text to send for health check requests. Short text recommended "
-            "to minimize token usage. Some providers may reject very short text."
+            "to minimize token usage. Default 'health' (6 chars) chosen to work "
+            "with most providers; some have minimum length requirements (e.g., "
+            "certain providers reject text under 3-5 characters)."
         ),
     )
 
