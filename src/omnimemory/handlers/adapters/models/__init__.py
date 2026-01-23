@@ -3,6 +3,13 @@
 This package contains Pydantic models used by various adapters in the
 handlers.adapters module for health checks, configuration, and responses.
 
+.. note::
+    **Implementation models (omnimemory internal).**
+
+    These are NOT SPI contract models. Canonical contract types will live in
+    ``omnibase_spi.protocols`` with ``*Request``/``*Response`` naming conventions.
+    Do not reuse these names in SPI. See OMN-1479 for the protocol definition work.
+
 Available modules:
     model_adapter_intent_graph_config: Configuration for AdapterIntentGraph.
     model_intent_graph_health: Health check result models.

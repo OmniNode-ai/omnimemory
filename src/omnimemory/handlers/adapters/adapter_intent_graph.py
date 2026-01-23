@@ -26,6 +26,7 @@ Example::
         )
 
         # Store an intent
+        from uuid import uuid4
         classification = ModelIntentClassificationOutput(
             intent_category="debugging",
             confidence=0.92,
@@ -34,7 +35,7 @@ Example::
         result = await adapter.store_intent(
             session_id="session_123",
             intent_data=classification,
-            correlation_id="corr_abc",
+            correlation_id=uuid4(),
         )
         if result.status == "success":
             print(f"Stored intent: {result.intent_id}")
@@ -55,7 +56,7 @@ from datetime import UTC, datetime, timedelta
 from types import TracebackType
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from omnibase_core.types.type_json import JsonType
 
@@ -222,6 +223,7 @@ class AdapterIntentGraph:
             )
 
             # Store intent classification
+            from uuid import uuid4
             result = await adapter.store_intent(
                 session_id="sess_123",
                 intent_data=ModelIntentClassificationOutput(
@@ -229,7 +231,7 @@ class AdapterIntentGraph:
                     confidence=0.95,
                     keywords=["python", "function"],
                 ),
-                correlation_id="corr_abc",
+                correlation_id=uuid4(),
             )
 
             # Query intents for session
@@ -497,7 +499,7 @@ class AdapterIntentGraph:
         self,
         session_id: str,
         intent_data: ModelIntentClassificationOutput,
-        correlation_id: str,
+        correlation_id: UUID,
         *,
         user_context: str = "",
     ) -> ModelIntentStorageResult:
@@ -540,8 +542,8 @@ class AdapterIntentGraph:
             )
 
         start_time = time.perf_counter()
-        intent_id = str(uuid4())
-        timestamp_utc = datetime.now(UTC).isoformat()
+        intent_id = uuid4()
+        timestamp_utc = datetime.now(UTC)
 
         try:
             async with asyncio.timeout(self._config.timeout_seconds):
@@ -551,17 +553,19 @@ class AdapterIntentGraph:
                     rel_type=self._config.relationship_type,
                 )
 
+                # Convert UUID/datetime to strings for database storage
+                timestamp_utc_str = timestamp_utc.isoformat()
                 parameters: dict[str, JsonType] = {
                     "session_id": session_id,
-                    "started_at_utc": timestamp_utc,
+                    "started_at_utc": timestamp_utc_str,
                     "user_context": user_context,
-                    "intent_id": intent_id,
+                    "intent_id": str(intent_id),
                     "intent_category": intent_data.intent_category,
                     "confidence": intent_data.confidence,
                     "keywords": cast(list[JsonType], intent_data.keywords),
-                    "created_at_utc": timestamp_utc,
-                    "timestamp_utc": timestamp_utc,
-                    "correlation_id": correlation_id,
+                    "created_at_utc": timestamp_utc_str,
+                    "timestamp_utc": timestamp_utc_str,
+                    "correlation_id": str(correlation_id),
                 }
 
                 result = await handler.execute_query(
@@ -574,11 +578,17 @@ class AdapterIntentGraph:
 
                 # Determine if this was a create or merge operation
                 was_created = False
-                returned_intent_id = intent_id
+                returned_intent_id: UUID = intent_id
                 if result.records:
                     record = result.records[0]
                     was_created = bool(record.get("was_created", False))
-                    returned_intent_id = str(record.get("intent_id", intent_id))
+                    # Parse UUID from database string, fallback to generated UUID
+                    db_intent_id = record.get("intent_id")
+                    if isinstance(db_intent_id, str):
+                        try:
+                            returned_intent_id = UUID(db_intent_id)
+                        except ValueError:
+                            returned_intent_id = intent_id
 
                 logger.info(
                     "Stored intent for session %s: category=%s, confidence=%.2f, created=%s",
@@ -715,8 +725,15 @@ class AdapterIntentGraph:
                 # Convert records to intent models
                 intents: list[ModelIntentRecord] = []
                 for record in result.records:
-                    intent_id = record.get("intent_id")
-                    if not isinstance(intent_id, str):
+                    intent_id_raw = record.get("intent_id")
+                    if not isinstance(intent_id_raw, str):
+                        continue
+
+                    # Parse UUID from database string
+                    try:
+                        intent_id = UUID(intent_id_raw)
+                    except ValueError:
+                        logger.warning("Invalid intent_id UUID: %s", intent_id_raw)
                         continue
 
                     keywords_raw = record.get("keywords", [])
@@ -734,13 +751,24 @@ class AdapterIntentGraph:
                         else 0.0
                     )
 
-                    # Extract correlation_id with proper type narrowing
+                    # Parse correlation_id UUID from database string
                     correlation_id_raw = record.get("correlation_id")
-                    correlation_id = (
-                        str(correlation_id_raw)
-                        if correlation_id_raw is not None
-                        else None
-                    )
+                    correlation_id: UUID | None = None
+                    if correlation_id_raw is not None:
+                        try:
+                            correlation_id = UUID(str(correlation_id_raw))
+                        except ValueError:
+                            logger.warning(
+                                "Invalid correlation_id UUID: %s", correlation_id_raw
+                            )
+
+                    # Parse datetime from ISO string
+                    created_at_raw = record.get("created_at_utc", "")
+                    try:
+                        created_at_utc = datetime.fromisoformat(str(created_at_raw))
+                    except ValueError:
+                        logger.warning("Invalid created_at_utc: %s", created_at_raw)
+                        created_at_utc = datetime.now(UTC)
 
                     intents.append(
                         ModelIntentRecord(
@@ -748,7 +776,7 @@ class AdapterIntentGraph:
                             intent_category=str(record.get("intent_category", "")),
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at_utc=str(record.get("created_at_utc", "")),
+                            created_at_utc=created_at_utc,
                             correlation_id=correlation_id,
                         )
                     )

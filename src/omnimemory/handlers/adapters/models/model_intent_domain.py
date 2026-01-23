@@ -28,9 +28,10 @@ Example::
     )
 
     # Receive storage result
+    from uuid import UUID
     result = ModelIntentStorageResult(
         status="success",
-        intent_id="intent_abc123",
+        intent_id=UUID("12345678-1234-5678-1234-567812345678"),
         session_id="session_xyz789",
         created=True,
         execution_time_ms=12.5,
@@ -42,7 +43,9 @@ Example::
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -147,7 +150,7 @@ class ModelIntentStorageResult(BaseModel):
         ...,
         description="Operation status - 'success' or 'error'",
     )
-    intent_id: str | None = Field(
+    intent_id: UUID | None = Field(
         default=None,
         description="Unique identifier of the created/updated intent node",
     )
@@ -177,12 +180,12 @@ class ModelIntentRecord(BaseModel):
     graph database, including its metadata and timestamps.
 
     Attributes:
-        intent_id: Unique identifier for the intent node in the graph.
+        intent_id: Unique identifier (UUID) for the intent node in the graph.
         intent_category: The classified intent category.
         confidence: Confidence score from the original classification.
         keywords: Keywords associated with this intent.
-        created_at_utc: ISO 8601 timestamp when the intent was created.
-        correlation_id: Optional correlation ID linking this intent to
+        created_at_utc: UTC datetime when the intent was created.
+        correlation_id: Optional correlation ID (UUID) linking this intent to
             a specific request or conversation turn.
     """
 
@@ -191,7 +194,7 @@ class ModelIntentRecord(BaseModel):
         validate_assignment=True,
     )
 
-    intent_id: str = Field(
+    intent_id: UUID = Field(
         ...,
         description="Unique identifier for the intent node",
     )
@@ -209,11 +212,11 @@ class ModelIntentRecord(BaseModel):
         default_factory=list,
         description="Keywords associated with this intent",
     )
-    created_at_utc: str = Field(
+    created_at_utc: datetime = Field(
         ...,
-        description="ISO 8601 timestamp when the intent was created",
+        description="UTC timestamp when the intent was created",
     )
-    correlation_id: str | None = Field(
+    correlation_id: UUID | None = Field(
         default=None,
         description="Correlation ID linking to a specific request",
     )

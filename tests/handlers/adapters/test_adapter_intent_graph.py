@@ -27,9 +27,22 @@ Usage:
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
+
+# Test UUIDs for consistent test data
+TEST_INTENT_ID_1 = UUID("11111111-1111-1111-1111-111111111111")
+TEST_INTENT_ID_2 = UUID("22222222-2222-2222-2222-222222222222")
+TEST_INTENT_ID_EXISTING = UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+TEST_CORRELATION_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+TEST_CORRELATION_ID_2 = UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
+
+# Test datetimes for consistent test data
+TEST_CREATED_AT_1 = datetime(2025, 1, 22, 10, 30, 0, tzinfo=UTC)
+TEST_CREATED_AT_2 = datetime(2025, 1, 22, 10, 25, 0, tzinfo=UTC)
 
 # Skip all tests in this module if omnibase_infra is not installed
 pytest.importorskip(
@@ -353,14 +366,14 @@ class TestModels:
         """Test ModelIntentStorageResult success case."""
         result = ModelIntentStorageResult(
             status="success",
-            intent_id="intent_abc123",
+            intent_id=TEST_INTENT_ID_1,
             session_id="session_xyz789",
             created=True,
             execution_time_ms=15.5,
         )
 
         assert result.status == "success"
-        assert result.intent_id == "intent_abc123"
+        assert result.intent_id == TEST_INTENT_ID_1
         assert result.session_id == "session_xyz789"
         assert result.created is True
         assert result.execution_time_ms == 15.5
@@ -383,7 +396,7 @@ class TestModels:
         """Test ModelIntentStorageResult when intent was merged (not created)."""
         result = ModelIntentStorageResult(
             status="success",
-            intent_id="intent_existing",
+            intent_id=TEST_INTENT_ID_EXISTING,
             session_id="session_xyz789",
             created=False,  # Merged with existing
             execution_time_ms=12.0,
@@ -395,28 +408,28 @@ class TestModels:
     def test_intent_record_model(self) -> None:
         """Test ModelIntentRecord creation."""
         record = ModelIntentRecord(
-            intent_id="intent_abc123",
+            intent_id=TEST_INTENT_ID_1,
             intent_category="debugging",
             confidence=0.92,
             keywords=["error", "fix"],
-            created_at_utc="2025-01-22T10:30:00Z",
-            correlation_id="corr_xyz789",
+            created_at_utc=TEST_CREATED_AT_1,
+            correlation_id=TEST_CORRELATION_ID,
         )
 
-        assert record.intent_id == "intent_abc123"
+        assert record.intent_id == TEST_INTENT_ID_1
         assert record.intent_category == "debugging"
         assert record.confidence == 0.92
         assert record.keywords == ["error", "fix"]
-        assert record.created_at_utc == "2025-01-22T10:30:00Z"
-        assert record.correlation_id == "corr_xyz789"
+        assert record.created_at_utc == TEST_CREATED_AT_1
+        assert record.correlation_id == TEST_CORRELATION_ID
 
     def test_intent_record_defaults(self) -> None:
         """Test ModelIntentRecord default values."""
         record = ModelIntentRecord(
-            intent_id="intent_abc",
+            intent_id=TEST_INTENT_ID_1,
             intent_category="test",
             confidence=0.5,
-            created_at_utc="2025-01-22T10:30:00Z",
+            created_at_utc=TEST_CREATED_AT_1,
         )
 
         assert record.keywords == []
@@ -426,16 +439,16 @@ class TestModels:
         """Test ModelIntentQueryResult success case with results."""
         intents = [
             ModelIntentRecord(
-                intent_id="intent_1",
+                intent_id=TEST_INTENT_ID_1,
                 intent_category="debugging",
                 confidence=0.9,
-                created_at_utc="2025-01-22T10:30:00Z",
+                created_at_utc=TEST_CREATED_AT_1,
             ),
             ModelIntentRecord(
-                intent_id="intent_2",
+                intent_id=TEST_INTENT_ID_2,
                 intent_category="code_generation",
                 confidence=0.85,
-                created_at_utc="2025-01-22T10:25:00Z",
+                created_at_utc=TEST_CREATED_AT_2,
             ),
         ]
 
@@ -1010,7 +1023,7 @@ class TestContextManager:
             mock_instance.shutdown = AsyncMock()
             mock_instance.execute_query = AsyncMock(
                 return_value=MagicMock(
-                    records=[{"intent_id": "test_id", "was_created": True}]
+                    records=[{"intent_id": str(TEST_INTENT_ID_1), "was_created": True}]
                 )
             )
             MockHandler.return_value = mock_instance
@@ -1029,7 +1042,7 @@ class TestContextManager:
                             intent_category="debugging",
                             confidence=0.9,
                         ),
-                        correlation_id="corr_abc",
+                        correlation_id=TEST_CORRELATION_ID,
                     )
                     assert result.status == "success"
 
@@ -1087,7 +1100,7 @@ class TestStoreIntent:
         mock_handler.execute_query.return_value = MagicMock(
             records=[
                 {
-                    "intent_id": "intent_abc123",
+                    "intent_id": str(TEST_INTENT_ID_1),
                     "was_created": True,
                 }
             ]
@@ -1096,11 +1109,12 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="session_xyz789",
             intent_data=sample_intent_classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
 
         assert result.status == "success"
         assert result.session_id == "session_xyz789"
+        assert result.intent_id == TEST_INTENT_ID_1
         assert result.created is True
         assert result.execution_time_ms > 0
         assert result.error_message is None
@@ -1112,7 +1126,7 @@ class TestStoreIntent:
         assert params["intent_category"] == "debugging"
         assert params["confidence"] == 0.92
         assert params["keywords"] == ["error", "traceback", "fix"]
-        assert params["correlation_id"] == "corr_abc"
+        assert params["correlation_id"] == str(TEST_CORRELATION_ID)
 
     @pytest.mark.asyncio
     async def test_store_intent_merged_existing(
@@ -1125,7 +1139,7 @@ class TestStoreIntent:
         mock_handler.execute_query.return_value = MagicMock(
             records=[
                 {
-                    "intent_id": "intent_existing",
+                    "intent_id": str(TEST_INTENT_ID_EXISTING),
                     "was_created": False,  # Merged, not created
                 }
             ]
@@ -1134,12 +1148,12 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="session_xyz789",
             intent_data=sample_intent_classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
 
         assert result.status == "success"
         assert result.created is False
-        assert result.intent_id == "intent_existing"
+        assert result.intent_id == TEST_INTENT_ID_EXISTING
 
     @pytest.mark.asyncio
     async def test_store_intent_not_initialized(
@@ -1153,7 +1167,7 @@ class TestStoreIntent:
         result = await adapter.store_intent(
             session_id="session_123",
             intent_data=sample_intent_classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
 
         assert result.status == "error"
@@ -1172,7 +1186,7 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=sample_intent_classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
 
         assert result.status == "error"
@@ -1188,13 +1202,13 @@ class TestStoreIntent:
     ) -> None:
         """Test store_intent with user context."""
         mock_handler.execute_query.return_value = MagicMock(
-            records=[{"intent_id": "intent_abc", "was_created": True}]
+            records=[{"intent_id": str(TEST_INTENT_ID_1), "was_created": True}]
         )
 
         await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=sample_intent_classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
             user_context="Python developer debugging async code",
         )
 
@@ -1213,7 +1227,7 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="",
             intent_data=sample_intent_classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
 
         assert result.status == "error"
@@ -1224,7 +1238,7 @@ class TestStoreIntent:
         result_whitespace = await adapter_with_mock.store_intent(
             session_id="   ",
             intent_data=sample_intent_classification,
-            correlation_id="corr_xyz",
+            correlation_id=TEST_CORRELATION_ID_2,
         )
 
         assert result_whitespace.status == "error"
@@ -1250,20 +1264,20 @@ class TestGetSessionIntents:
         mock_handler.execute_query.return_value = MagicMock(
             records=[
                 {
-                    "intent_id": "intent_1",
+                    "intent_id": str(TEST_INTENT_ID_1),
                     "intent_category": "debugging",
                     "confidence": 0.92,
                     "keywords": ["error", "fix"],
-                    "created_at_utc": "2025-01-22T10:30:00Z",
-                    "correlation_id": "corr_1",
+                    "created_at_utc": TEST_CREATED_AT_1.isoformat(),
+                    "correlation_id": str(TEST_CORRELATION_ID),
                 },
                 {
-                    "intent_id": "intent_2",
+                    "intent_id": str(TEST_INTENT_ID_2),
                     "intent_category": "explanation",
                     "confidence": 0.85,
                     "keywords": ["why", "how"],
-                    "created_at_utc": "2025-01-22T10:25:00Z",
-                    "correlation_id": "corr_2",
+                    "created_at_utc": TEST_CREATED_AT_2.isoformat(),
+                    "correlation_id": str(TEST_CORRELATION_ID_2),
                 },
             ]
         )
@@ -1278,7 +1292,7 @@ class TestGetSessionIntents:
         assert result.execution_time_ms > 0
 
         # Verify first intent
-        assert result.intents[0].intent_id == "intent_1"
+        assert result.intents[0].intent_id == TEST_INTENT_ID_1
         assert result.intents[0].intent_category == "debugging"
         assert result.intents[0].confidence == 0.92
         assert result.intents[0].keywords == ["error", "fix"]
@@ -1666,7 +1680,7 @@ class TestErrorHandling:
         result = await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
 
         assert result.status == "error"
@@ -1682,11 +1696,11 @@ class TestErrorHandling:
         mock_handler.execute_query.return_value = MagicMock(
             records=[
                 {
-                    "intent_id": "intent_1",
+                    "intent_id": str(TEST_INTENT_ID_1),  # Valid UUID
                     "intent_category": "debugging",
                     "confidence": 0.9,
                     "keywords": ["test"],
-                    "created_at_utc": "2025-01-22T10:30:00Z",
+                    "created_at_utc": TEST_CREATED_AT_1.isoformat(),
                 },
                 {
                     # Missing intent_id - should be skipped
@@ -1698,15 +1712,21 @@ class TestErrorHandling:
                     "intent_category": "test",
                     "confidence": 0.7,
                 },
+                {
+                    "intent_id": "not-a-valid-uuid",  # Invalid UUID - should be skipped
+                    "intent_category": "test",
+                    "confidence": 0.6,
+                    "created_at_utc": TEST_CREATED_AT_1.isoformat(),
+                },
             ]
         )
 
         result = await adapter_with_mock.get_session_intents(session_id="session_123")
 
         assert result.status == "success"
-        # Only the valid record should be included
+        # Only the valid record with proper UUID should be included
         assert len(result.intents) == 1
-        assert result.intents[0].intent_id == "intent_1"
+        assert result.intents[0].intent_id == TEST_INTENT_ID_1
 
     @pytest.mark.asyncio
     async def test_operations_after_shutdown(
@@ -1726,7 +1746,7 @@ class TestErrorHandling:
         store_result = await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=classification,
-            correlation_id="corr_abc",
+            correlation_id=TEST_CORRELATION_ID,
         )
         assert store_result.status == "error"
 
