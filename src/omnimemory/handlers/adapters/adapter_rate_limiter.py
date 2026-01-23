@@ -524,13 +524,29 @@ class RateLimiterRegistry:
         count without acquiring the async lock. The value may be slightly stale
         under high contention due to concurrent get_or_create() or remove() calls.
 
+        Use Cases:
+            This property is ideal for non-critical observability scenarios:
+
+            - **Metrics dashboards**: Displaying current limiter count
+            - **Debug logging**: Recording registry state in log messages
+            - **Health checks**: Quick status checks where approximate is acceptable
+            - **Monitoring**: Tracking trends over time (minor variance is tolerable)
+
+        When to Use :meth:`count_exact` Instead:
+            If your use case requires guaranteed accuracy (e.g., capacity planning,
+            alert threshold evaluation, test assertions, or audit logging), use
+            the async :meth:`count_exact` method which acquires the lock.
+
         Note:
-            For most use cases (metrics, logging, debugging), the approximate
-            count is sufficient. Operations that require an exact count should
-            use :meth:`count_exact` which acquires the lock.
+            Under typical usage patterns with low contention, this property
+            returns accurate values. Staleness only occurs when concurrent
+            modifications happen during the dict length read.
 
         Returns:
             Approximate number of registered rate limiters.
+
+        See Also:
+            :meth:`count_exact`: Async method for exact count with locking.
         """
         return len(self._limiters)
 
@@ -539,18 +555,36 @@ class RateLimiterRegistry:
 
         Unlike the :attr:`count` property which returns an approximate value
         without locking, this method acquires the lock to provide an exact count.
-        Use this when accurate count is required, such as:
 
-        - Capacity planning decisions
-        - Alert threshold evaluation
-        - Audit logging
-        - Test assertions
+        When Precision Matters:
+            Use this method when accuracy is critical:
 
-        For most observability use cases (metrics dashboards, debug logging),
-        the :attr:`count` property is preferred as it avoids lock contention.
+            - **Capacity planning**: Deciding whether to create new limiters
+            - **Alert thresholds**: Triggering alerts based on exact limiter count
+            - **Audit logging**: Recording precise state for compliance/forensics
+            - **Test assertions**: Verifying exact registry state in unit tests
+            - **Conditional logic**: Making decisions based on limiter count
+
+        When :attr:`count` Is Sufficient:
+            For most observability scenarios, the non-locking :attr:`count`
+            property is preferred as it avoids lock contention:
+
+            - Metrics dashboards (trend visualization)
+            - Debug logging (informational output)
+            - Health check endpoints (approximate status)
+            - Monitoring systems (variance is tolerable)
+
+        Performance Note:
+            This method acquires the registry's async lock, which may cause
+            brief contention if called frequently alongside get_or_create()
+            or remove() operations. For high-frequency polling, prefer
+            :attr:`count` unless exact accuracy is required.
 
         Returns:
             Exact number of registered rate limiters.
+
+        See Also:
+            :attr:`count`: Non-locking property for approximate count.
         """
         async with self._lock:
             return len(self._limiters)

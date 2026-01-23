@@ -34,8 +34,9 @@ io_operations:
     validation_enabled: true
 
 # === NODE CONFIGURATION ===
-# NOTE: Only main_tool_class is part of canonical ModelToolSpecification from omnibase_core
+# NOTE: tool_name and main_tool_class are required per ModelContractEffect validation
 tool_specification:
+  tool_name: "memory_storage_effect"
   main_tool_class: "NodeMemoryStorageEffect"
 
 # === SERVICE CONFIGURATION ===
@@ -125,9 +126,9 @@ performance:
   max_response_time_ms: 100
 
 # === EVENT TYPE CONFIGURATION ===
-# NOTE: Using schema_version per ModelEventType from omnibase_core
+# NOTE: Using version per ModelEventTypeSubcontract from omnibase_core
 event_type:
-  schema_version: {major: 1, minor: 0, patch: 0}
+  version: {major: 1, minor: 0, patch: 0}
   primary_events: ["memory_stored", "memory_retrieved", "memory_updated", "memory_deleted"]
   event_categories: ["memory", "effect", "storage"]
   publish_events: true
