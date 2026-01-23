@@ -1296,7 +1296,7 @@ class TestCircuitBreakerStateTransitions:
             # Set open_until to the past (simulates cooldown elapsed)
             past_time = datetime.now(timezone.utc) - timedelta(seconds=60)
             state_dict["open_until"] = past_time.isoformat()
-            await valkey.set(cb_key, json.dumps(state_dict), ttl=3600)
+            await valkey.set_key(cb_key, json.dumps(state_dict), ttl=3600)
 
             # Now _check_circuit_breaker should transition to HALF_OPEN and return True
             is_allowed_after_cooldown = await handler._check_circuit_breaker(
@@ -1375,7 +1375,7 @@ class TestCircuitBreakerStateTransitions:
                 "total_requests": 10,
                 "total_failures": 5,
             }
-            await valkey.set(cb_key, json.dumps(half_open_state), ttl=3600)
+            await valkey.set_key(cb_key, json.dumps(half_open_state), ttl=3600)
 
             # Verify circuit is HALF_OPEN and allows requests
             is_allowed = await handler._check_circuit_breaker(webhook_url)
@@ -1469,7 +1469,7 @@ class TestCircuitBreakerStateTransitions:
                 "total_requests": 10,
                 "total_failures": 5,
             }
-            await valkey.set(cb_key, json.dumps(half_open_state), ttl=3600)
+            await valkey.set_key(cb_key, json.dumps(half_open_state), ttl=3600)
 
             # Verify circuit is HALF_OPEN and allows test request
             is_allowed = await handler._check_circuit_breaker(unreachable_url)
@@ -1568,7 +1568,7 @@ class TestCircuitBreakerStateTransitions:
                 "total_requests": 10,
                 "total_failures": 5,
             }
-            await valkey.set(cb_key, json.dumps(open_state), ttl=3600)
+            await valkey.set_key(cb_key, json.dumps(open_state), ttl=3600)
 
             # Attempt delivery - should be blocked immediately
             event = ModelNotificationEvent(

@@ -89,7 +89,7 @@ class ModelAgentCoordinatorResponse(BaseModel):
         ... )
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     success: bool = Field(
         ...,

@@ -111,7 +111,7 @@ class ModelAgentCoordinatorRequest(BaseModel):
         ValueError: If required fields for the action are missing.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     action: EnumAgentCoordinatorAction = Field(
         ...,

@@ -6,6 +6,17 @@ used by the subscription handler for fast topic->subscriber lookups.
 Valkey is a fork of Redis with full API compatibility. The redis-py library
 works with both Redis and Valkey seamlessly.
 
+Redis Async Type Handling
+-------------------------
+
+The redis-py library's type stubs declare many async methods as returning
+``Awaitable[T] | T`` union types. This is a known limitation where the stubs
+must cover both sync and async client behavior. In practice, the async client
+always returns awaitables, but type checkers require handling both branches.
+
+This adapter uses the ``_ensure_awaited()`` helper method to handle this
+union type cleanly. See that method's docstring for implementation details.
+
 Example::
 
     from omnimemory.handlers.adapters import (
@@ -18,7 +29,7 @@ Example::
     await adapter.initialize()
 
     # Key-value operations
-    await adapter.set("key", "value", ttl=3600)
+    await adapter.set_key("key", "value", ttl=3600)
     value = await adapter.get("key")
 
     # Set operations for topic->subscribers mapping
@@ -34,7 +45,6 @@ Example::
 from __future__ import annotations
 
 import asyncio
-import builtins
 import inspect
 import logging
 from collections.abc import AsyncGenerator, Awaitable
@@ -98,6 +108,7 @@ class AdapterValkeyConfig(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         validate_assignment=True,
     )
 
@@ -165,6 +176,7 @@ class ModelValkeyHealth(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         validate_assignment=True,
     )
 
@@ -198,7 +210,7 @@ class ValkeyPipeline:
 
         async with adapter.pipeline() as pipe:
             pipe.sadd("topic:memory.item.created", "sub_123")
-            pipe.set("subscription:sub_123", data, ttl=3600)
+            pipe.set_key("subscription:sub_123", data, ttl=3600)
             # Commands are executed atomically on context exit
 
     Note:
@@ -255,8 +267,12 @@ class ValkeyPipeline:
             self._pipe.srem(self._prefixed_key(key), *members)
         return self
 
-    def set(self, key: str, value: str, ttl: int | None = None) -> ValkeyPipeline:
+    def set_key(self, key: str, value: str, ttl: int | None = None) -> ValkeyPipeline:
         """Queue SET/SETEX command to set a key value.
+
+        Note:
+            Named ``set_key`` instead of ``set`` to avoid shadowing the
+            Python builtin ``set`` type.
 
         Args:
             key: The key to set.
@@ -373,16 +389,52 @@ class AdapterValkey:
         return f"{self._config.key_prefix}{key}"
 
     async def _ensure_awaited(self, result: _T | Awaitable[_T]) -> _T:
-        """Ensure result is awaited if it's awaitable.
+        """Ensure a Redis result is awaited if it's an awaitable.
 
-        Redis methods can return either sync or async results depending on
-        the client configuration. This helper handles both cases.
+        **Why This Helper Exists**
+
+        The redis-py library has a type annotation quirk where many async
+        methods are typed as returning ``Awaitable[T] | T`` (a union type),
+        even though in practice the async client always returns awaitables.
+        This happens because:
+
+        1. redis-py supports both sync and async clients with shared method
+           signatures in its type stubs
+        2. The type stubs use union types to cover both execution modes
+        3. Type checkers see the union and require handling both branches
+
+        Without this helper, every Redis call would need explicit type
+        narrowing or ``# type: ignore`` comments. This helper provides a
+        single, type-safe way to handle the union by checking at runtime
+        whether the result needs to be awaited.
+
+        **Example**
+
+        Instead of::
+
+            result = await client.sadd(key, *members)  # type: ignore[misc]
+
+        We use::
+
+            result = await self._ensure_awaited(client.sadd(key, *members))
+
+        **Technical Details**
+
+        - Uses ``inspect.isawaitable()`` for robust awaitable detection
+        - Handles coroutines, Tasks, and any other awaitable types
+        - Zero overhead for already-resolved values (just a type check)
+        - Maintains full type safety with ``TypeVar`` preservation
 
         Args:
-            result: The result from a Redis operation.
+            result: The result from a Redis operation, which may be either
+                an awaitable (coroutine/Task) or an already-resolved value.
 
         Returns:
-            The resolved value.
+            The resolved value of type ``T``.
+
+        See Also:
+            - https://github.com/redis/redis-py/issues/2596 (typing discussion)
+            - Module docstring for broader context on Redis async handling
         """
         if inspect.isawaitable(result):
             return await result
@@ -481,13 +533,17 @@ class AdapterValkey:
             return None
         return str(result) if not isinstance(result, str) else result
 
-    async def set(
+    async def set_key(
         self,
         key: str,
         value: str,
         ttl: int | None = None,
     ) -> None:
         """Set value for a key.
+
+        Note:
+            Named ``set_key`` instead of ``set`` to avoid shadowing the
+            Python builtin ``set`` type.
 
         Args:
             key: The key to set.
@@ -580,7 +636,7 @@ class AdapterValkey:
         )
         return int(result)
 
-    async def smembers(self, key: str) -> builtins.set[str]:
+    async def smembers(self, key: str) -> set[str]:
         """Get all members of a set.
 
         Args:
@@ -749,7 +805,7 @@ class AdapterValkey:
             async with adapter.pipeline() as pipe:
                 pipe.sadd("topic:memory.item.created", "sub_123")
                 pipe.sadd("agent:agent_456:subscriptions", "sub_123")
-                pipe.set("subscription:sub_123", data_json, ttl=3600)
+                pipe.set_key("subscription:sub_123", data_json, ttl=3600)
                 # All commands are executed atomically on context exit
 
         Yields:

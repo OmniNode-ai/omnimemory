@@ -29,7 +29,7 @@ Example::
     valkey_config = AdapterValkeyConfig(host="localhost", port=6379)
     valkey = AdapterValkey(valkey_config)
     await valkey.initialize()
-    await valkey.set("key", "value")
+    await valkey.set_key("key", "value")
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1389.

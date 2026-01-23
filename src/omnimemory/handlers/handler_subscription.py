@@ -195,6 +195,18 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
     Results are cached with LRU policy (maxsize=128) to avoid repeated string
     generation for common query sizes.
 
+    Cache Sizing Rationale:
+        The maxsize=128 is sufficient because:
+        - Typical batch queries use 1-50 placeholders (subscription IDs, etc.)
+        - Larger batches (50-100) are rare but still fit comfortably
+        - The key space is (count, start) pairs; with most start=1, the effective
+          unique keys are typically < 50 distinct counts
+        - Memory overhead per entry is minimal (~50-200 bytes for typical strings)
+        - 128 entries covers all practical query patterns with significant headroom
+
+        The cache prevents repeated string concatenation for frequently used patterns
+        like batch subscription lookups, circuit breaker queries, and bulk updates.
+
     Args:
         count: Number of placeholders to generate. If <= 0, returns empty string.
         start: Starting index (default 1 for PostgreSQL $1, $2, ...).
@@ -244,6 +256,7 @@ class ModelHandlerSubscriptionConfig(BaseModel):
     model_config = ConfigDict(
         frozen=True,
         extra="forbid",
+        strict=True,
     )
 
     db_dsn: SecretStr = Field(
@@ -356,6 +369,7 @@ class ModelSubscriptionMetrics(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         validate_assignment=True,
     )
 
@@ -406,6 +420,7 @@ class ModelSubscriptionHealth(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         validate_assignment=True,
     )
 
@@ -795,7 +810,7 @@ class HandlerSubscription:
             async with valkey.pipeline() as pipe:
                 pipe.sadd(topic_key, subscription_id)
                 pipe.sadd(agent_key, subscription_id)
-                pipe.set(
+                pipe.set_key(
                     sub_key,
                     subscription.model_dump_json(),
                     ttl=self._config.cache_ttl_seconds,
@@ -1279,7 +1294,7 @@ class HandlerSubscription:
 
                 # Cache subscription data
                 sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
-                pipe.set(
+                pipe.set_key(
                     sub_key,
                     subscription.model_dump_json(),
                     ttl=self._config.cache_ttl_seconds,
@@ -1404,7 +1419,7 @@ class HandlerSubscription:
 
                 # Update cache
                 sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
-                await valkey.set(
+                await valkey.set_key(
                     sub_key,
                     subscription.model_dump_json(),
                     ttl=self._config.cache_ttl_seconds,
@@ -1733,11 +1748,26 @@ class HandlerSubscription:
     def _endpoint_hash(self, endpoint: str) -> str:
         """Generate hash for endpoint to use as cache key.
 
+        Uses SHA256 truncated to 128 bits (32 hex chars) for cache key generation.
+        This provides strong collision resistance while keeping keys compact.
+
+        Collision Resistance:
+            With 128 bits (2^128 possible values), the birthday paradox gives us
+            approximately 2^64 operations before a 50% collision probability. For
+            practical purposes with thousands of endpoints, collision risk is
+            negligible (less than 1 in 10^30 for 10,000 endpoints).
+
+        Note:
+            This hash is used for Valkey cache keys. The database currently uses
+            truncated endpoint URLs (512 chars) as the primary key, which creates
+            a potential inconsistency. See _load_circuit_breaker_from_db() for
+            documentation on this limitation.
+
         Args:
             endpoint: The webhook URL.
 
         Returns:
-            SHA256 hash of the endpoint (first 32 chars, 128 bits).
+            SHA256 hash of the endpoint (first 32 hex chars, 128 bits).
         """
         return hashlib.sha256(endpoint.encode()).hexdigest()[:32]
 
@@ -1774,7 +1804,7 @@ class HandlerSubscription:
             state_dict = await self._load_circuit_breaker_from_db(endpoint)
             if state_dict:
                 # Repopulate Valkey cache from DB with TTL refresh
-                await valkey.set(
+                await valkey.set_key(
                     cb_key,
                     json.dumps(state_dict),
                     ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
@@ -1806,7 +1836,7 @@ class HandlerSubscription:
                         # Transition to half-open state. TTL is refreshed to prevent
                         # state loss during the half-open testing period.
                         state_dict["state"] = EnumCircuitBreakerState.HALF_OPEN.value
-                        await valkey.set(
+                        await valkey.set_key(
                             cb_key,
                             json.dumps(state_dict),
                             ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
@@ -1829,6 +1859,28 @@ class HandlerSubscription:
     ) -> dict[str, object] | None:
         """Load circuit breaker state from PostgreSQL.
 
+        Known Limitation - Cache/DB Key Inconsistency:
+            The Valkey cache uses _endpoint_hash() (32-char SHA256 hash of the FULL
+            endpoint) as the key, while the database uses the truncated endpoint URL
+            (max 512 chars) as the primary key. This creates a potential inconsistency:
+
+            - Cache key: Hash of FULL endpoint URL (collision-resistant)
+            - DB key: First 512 chars of endpoint URL (truncation-based)
+
+            If two different long URLs (>512 chars) share the same first 512 characters
+            but differ afterward, they would:
+            - Have DIFFERENT cache keys (correct behavior)
+            - Have the SAME database key (collision/overwrite)
+
+            This is unlikely in practice since most webhook URLs are well under 512
+            chars, and URLs that exceed this typically differ in the path/query
+            portion which appears early in the URL. However, the limitation exists.
+
+            TODO: Future migration should add an endpoint_hash column to the
+            circuit_breaker_states table and use it as the primary key, storing
+            the full endpoint URL in a separate TEXT column for debugging.
+            See: OMN-1393 follow-up ticket needed for this schema migration.
+
         Args:
             endpoint: The webhook endpoint URL.
 
@@ -1838,10 +1890,14 @@ class HandlerSubscription:
         _, db_handler, _ = self._ensure_initialized()
 
         # Truncate endpoint if too long (VARCHAR(512) limit in DB)
+        # WARNING: This truncation can cause key collisions for long URLs.
+        # See docstring above for full explanation of this limitation.
         endpoint_to_query = endpoint[:512]
         if len(endpoint) > 512:
             logger.warning(
-                "Endpoint URL truncated from %d to 512 chars for DB query: %s...",
+                "Endpoint URL truncated from %d to 512 chars for DB query. "
+                "COLLISION RISK: If another endpoint shares the same first 512 chars, "
+                "circuit breaker states may be incorrectly shared. Endpoint prefix: %s...",
                 len(endpoint),
                 endpoint[:50],
             )
@@ -2027,7 +2083,7 @@ class HandlerSubscription:
         # Persist to Valkey (primary cache).
         # TTL is refreshed on every update to prevent state loss for long-lived circuits.
         # This ensures that actively-used circuits never expire from cache.
-        await valkey.set(
+        await valkey.set_key(
             cb_key,
             json.dumps(state_dict),
             ttl=CIRCUIT_BREAKER_CACHE_TTL_SECONDS,
@@ -2046,6 +2102,10 @@ class HandlerSubscription:
         Uses UPSERT pattern (ON CONFLICT ... DO UPDATE) since endpoint is the
         primary key.
 
+        Known Limitation:
+            See _load_circuit_breaker_from_db() docstring for details on the
+            cache/DB key inconsistency when endpoints exceed 512 characters.
+
         Args:
             endpoint: The webhook endpoint URL (primary key, max 512 chars).
             state_dict: Circuit breaker state dictionary.
@@ -2053,10 +2113,14 @@ class HandlerSubscription:
         _, db_handler, _ = self._ensure_initialized()
 
         # Truncate endpoint if too long (VARCHAR(512) limit)
+        # WARNING: This truncation can cause key collisions for long URLs.
+        # See _load_circuit_breaker_from_db() docstring for full explanation.
         endpoint_to_store = endpoint[:512]
         if len(endpoint) > 512:
             logger.warning(
-                "Endpoint URL truncated from %d to 512 chars for DB storage: %s...",
+                "Endpoint URL truncated from %d to 512 chars for DB storage. "
+                "COLLISION RISK: If another endpoint shares the same first 512 chars, "
+                "circuit breaker states may overwrite each other. Endpoint prefix: %s...",
                 len(endpoint),
                 endpoint[:50],
             )
