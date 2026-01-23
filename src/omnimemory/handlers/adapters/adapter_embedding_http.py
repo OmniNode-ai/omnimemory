@@ -70,28 +70,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Default RPM used when only TPM is configured (i.e., rate_limit_rpm=0, rate_limit_tpm>0).
-#
-# NOTE: This constant is kept for backwards reference. The actual fallback value
-# is now configurable via ModelEmbeddingHttpClientConfig.tpm_fallback_rpm.
-#
-# The ProviderRateLimiter requires a positive RPM to function. When users want
-# token-based limiting only (TPM without RPM), we use a high RPM value as a
-# fallback to enable the limiter while making TPM the effective constraint.
-#
-# Why 10,000 (default)?
-# - At 10,000 RPM, that's ~167 requests/second - effectively unlimited for
-#   most embedding workloads where network latency is the bottleneck
-# - High enough that request-per-minute won't be the limiting factor
-# - Low enough to still provide a safety ceiling against runaway loops
-# - The TPM limit becomes the actual throttling mechanism as intended
-#
-# Example: If TPM=100,000 and average tokens/request=100, you'd hit TPM
-# after 1,000 requests. With RPM=10,000, you'd never hit the RPM limit first.
-#
-# Users can customize this value via config.tpm_fallback_rpm (range: 100-100,000).
-TPM_ONLY_DEFAULT_RPM = 10_000
-
 __all__ = [
     "EmbeddingHttpClient",
     "ModelEmbeddingHttpClientConfig",
@@ -636,3 +614,47 @@ class EmbeddingHttpClient:
             return True
         except EmbeddingClientError:
             return False
+
+
+# =============================================================================
+# Protocol Conformance Verification
+# =============================================================================
+#
+# EmbeddingHttpClient implements ProtocolEmbeddingClient.
+# Protocol defined in: omnimemory.protocols.protocol_embedding
+#
+# The protocol is @runtime_checkable, enabling isinstance() verification.
+#
+# Required interface methods (all implemented above):
+#   - async get_embedding(text, correlation_id?) -> list[float]
+#   - async get_embeddings_batch(texts, correlation_id?, max_concurrency?) -> list[list[float]]
+#   - async health_check(correlation_id?) -> bool
+#   - async initialize() -> None
+#   - async shutdown() -> None
+
+if __debug__:
+    # Import protocol for verification (development mode only, skipped with python -O)
+    from omnimemory.protocols.protocol_embedding import ProtocolEmbeddingClient
+
+    # Verify required protocol methods exist on the class at import time.
+    # This catches protocol drift during development before runtime errors occur.
+    _required_methods = (
+        "get_embedding",
+        "get_embeddings_batch",
+        "health_check",
+        "initialize",
+        "shutdown",
+    )
+    _missing = [
+        m
+        for m in _required_methods
+        if not callable(getattr(EmbeddingHttpClient, m, None))
+    ]
+    if _missing:
+        raise TypeError(
+            f"EmbeddingHttpClient does not implement ProtocolEmbeddingClient: "
+            f"missing methods {_missing}"
+        )
+
+    # Clean up verification variables to avoid polluting module namespace
+    del _required_methods, _missing, ProtocolEmbeddingClient

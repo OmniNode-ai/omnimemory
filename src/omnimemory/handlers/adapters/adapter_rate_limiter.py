@@ -298,6 +298,13 @@ class ProviderRateLimiter:
             contention due to concurrent modifications and lack of window cleanup.
             This is acceptable for monitoring, logging, and display purposes.
 
+        Concurrent Modification:
+            If concurrent modification of the internal deque is detected during
+            iteration, this method returns 0 as a conservative fallback. This
+            ensures thread-safety without blocking but may occasionally underreport
+            available capacity. This behavior is by design to prioritize safety
+            over accuracy in edge cases.
+
         Note:
             This method is intentionally non-modifying to be safe for concurrent
             reads. For accurate counts, the next ``try_acquire()`` call will
@@ -305,6 +312,7 @@ class ProviderRateLimiter:
 
         Returns:
             Approximate number of requests remaining before rate limit.
+            Returns 0 if concurrent modification is detected during iteration.
         """
         # Snapshot to avoid iteration issues during concurrent modification.
         # Intentionally skip _cleanup_window() to avoid modifying shared state

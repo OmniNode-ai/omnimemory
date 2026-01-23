@@ -29,7 +29,6 @@ from uuid import uuid4
 import pytest
 
 from omnimemory.handlers.adapters.adapter_embedding_http import (
-    TPM_ONLY_DEFAULT_RPM,
     EmbeddingClientError,
     EmbeddingConnectionError,
     EmbeddingHttpClient,
@@ -873,9 +872,10 @@ class TestEmbeddingHttpClientRateLimiting:
             # Rate limiter should be created despite RPM=0
             assert client._rate_limiter is not None
 
-            # Should use high RPM (10,000) as fallback
+            # Should use config's tpm_fallback_rpm (default: 10,000) as fallback
             assert (
-                client._rate_limiter.config.requests_per_minute == TPM_ONLY_DEFAULT_RPM
+                client._rate_limiter.config.requests_per_minute
+                == config.tpm_fallback_rpm
             )
 
             # Should use the configured TPM
@@ -1139,3 +1139,277 @@ class TestEmbeddingHttpClientHealthCheck:
                 # Health check should succeed despite strict mode + mismatch
                 is_healthy = await client.health_check()
                 assert is_healthy is True
+
+    @pytest.mark.asyncio
+    async def test_health_check_works_when_rate_limit_exhausted(
+        self,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test health_check succeeds even when rate limit is fully exhausted.
+
+        This is critical for Kubernetes liveness probes and load balancer health
+        checks that must work regardless of the application's rate limit state.
+        If health checks blocked when rate limited, infrastructure monitoring
+        would incorrectly report the service as unhealthy.
+        """
+        # Config with very restrictive rate limit (1 RPM)
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            rate_limit_rpm=1,  # Only 1 request per minute allowed
+        )
+
+        mock_handler.execute.return_value = mock_handler_result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Verify rate limiter was created
+                assert client._rate_limiter is not None
+                rate_limiter = client._rate_limiter
+
+                # Exhaust the rate limit by making one regular embedding call
+                await client.get_embedding("exhaust the rate limit")
+
+                # Verify rate limit is exhausted (0 remaining)
+                remaining = rate_limiter.get_remaining()
+                assert remaining == 0, f"Expected 0 remaining, got {remaining}"
+
+                # Now verify health_check still works immediately
+                # (if it consumed tokens, it would block waiting for rate limit reset)
+                is_healthy = await client.health_check()
+                assert is_healthy is True
+
+                # Verify rate limit is still exhausted after health check
+                # (health check didn't consume any tokens)
+                remaining_after = rate_limiter.get_remaining()
+                assert (
+                    remaining_after == 0
+                ), f"Expected 0 remaining after health check, got {remaining_after}"
+
+    @pytest.mark.asyncio
+    async def test_health_check_does_not_accumulate_in_rate_window(
+        self,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test multiple health_check calls don't accumulate in rate window.
+
+        The rate limiter's sliding window should remain unchanged after
+        multiple health checks. This ensures health monitoring doesn't
+        gradually consume rate budget over time.
+        """
+        # Config with rate limiting
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+            rate_limit_rpm=10,  # 10 RPM to make counting clear
+        )
+
+        mock_handler.execute.return_value = mock_handler_result
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                assert client._rate_limiter is not None
+                rate_limiter = client._rate_limiter
+
+                # Check initial state - should have full capacity
+                initial_remaining = rate_limiter.get_remaining()
+                assert initial_remaining == 10
+
+                # Perform multiple health checks
+                for _ in range(5):
+                    result = await client.health_check()
+                    assert result is True
+
+                # Verify rate window is still at full capacity
+                # (none of the health checks consumed tokens)
+                final_remaining = rate_limiter.get_remaining()
+                assert final_remaining == initial_remaining, (
+                    f"Rate window changed from {initial_remaining} to {final_remaining} "
+                    "after health checks - health checks should not consume tokens"
+                )
+
+                # Also verify the internal window is empty (no entries added)
+                window_length = len(rate_limiter._request_window)
+                assert (
+                    window_length == 0
+                ), f"Expected empty rate window, but found {window_length} entries"
+
+    @pytest.mark.asyncio
+    async def test_health_check_with_correlation_id_for_tracing(
+        self,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test health_check properly passes correlation_id for distributed tracing.
+
+        Infrastructure monitoring tools often need to correlate health check
+        requests with their responses across distributed systems. This test
+        verifies the correlation_id is properly propagated to the HTTP handler.
+        """
+        mock_handler.execute.return_value = mock_handler_result
+        custom_cid = uuid4()
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Call health_check with explicit correlation_id
+                result = await client.health_check(correlation_id=custom_cid)
+                assert result is True
+
+                # Verify correlation_id was passed to the HTTP handler
+                call_args = mock_handler.execute.call_args[0][0]
+                assert call_args["correlation_id"] == custom_cid
+
+    @pytest.mark.asyncio
+    async def test_health_check_generates_correlation_id_when_not_provided(
+        self,
+        mock_handler: MagicMock,
+        mock_handler_result: MagicMock,
+    ) -> None:
+        """Test health_check generates a correlation_id when none is provided.
+
+        Even when the caller doesn't provide a correlation_id, the health check
+        should generate one for internal tracing purposes.
+        """
+        from uuid import UUID
+
+        mock_handler.execute.return_value = mock_handler_result
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Call health_check without correlation_id
+                result = await client.health_check()
+                assert result is True
+
+                # Verify a correlation_id was generated and passed
+                call_args = mock_handler.execute.call_args[0][0]
+                assert "correlation_id" in call_args
+                assert isinstance(call_args["correlation_id"], UUID)
+
+    @pytest.mark.asyncio
+    async def test_health_check_returns_false_on_http_error_status(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test health_check returns False (not raises) on HTTP error status.
+
+        When the embedding server returns an error status code (e.g., 500, 503),
+        health_check should return False rather than raising an exception.
+        This allows infrastructure monitoring to handle the unhealthy state gracefully.
+        """
+        # Simulate server returning 503 Service Unavailable
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 503,
+                "body": {"error": "Service temporarily unavailable"},
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Should return False, not raise
+                is_healthy = await client.health_check()
+                assert is_healthy is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_returns_false_on_invalid_response_format(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test health_check returns False on malformed server response.
+
+        If the embedding server returns a response that cannot be parsed
+        (e.g., missing embedding field), health_check should return False
+        rather than raising an exception.
+        """
+        # Simulate server returning unexpected format
+        result = MagicMock()
+        result.result = {
+            "status": "success",
+            "payload": {
+                "status_code": 200,
+                "body": {"unexpected": "format", "no_embedding_here": True},
+            },
+        }
+        mock_handler.execute.return_value = result
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Should return False, not raise
+                is_healthy = await client.health_check()
+                assert is_healthy is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_returns_false_on_timeout(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test health_check returns False on timeout error.
+
+        When the embedding server times out, health_check should return False
+        rather than raising an exception, allowing callers to handle the
+        unhealthy state appropriately.
+        """
+        from omnibase_infra.enums import EnumInfraTransportType
+        from omnibase_infra.errors import InfraTimeoutError
+        from omnibase_infra.models.errors import ModelTimeoutErrorContext
+
+        context = ModelTimeoutErrorContext(
+            transport_type=EnumInfraTransportType.HTTP,
+            operation="http.post",
+            target_name="http://localhost:8002/embed",
+            correlation_id=uuid4(),
+            timeout_seconds=30.0,
+        )
+        mock_handler.execute.side_effect = InfraTimeoutError(
+            "Request timed out", context=context
+        )
+
+        config = ModelEmbeddingHttpClientConfig(
+            base_url="http://localhost:8002",
+        )
+
+        with patch(
+            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            return_value=mock_handler,
+        ):
+            async with EmbeddingHttpClient(config) as client:
+                # Should return False, not raise
+                is_healthy = await client.health_check()
+                assert is_healthy is False
