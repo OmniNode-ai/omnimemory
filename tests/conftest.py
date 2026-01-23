@@ -118,14 +118,19 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> MappingRes
             # contract_data contains the parsed YAML
             assert "name" in contract_data
 
+    When to Use:
+        - Parametrized tests that iterate over multiple contracts
+        - Tests that need the same contract data in multiple assertions
+        - Test classes that validate contract structure across nodes
+
+    When NOT to Use:
+        - Single-contract tests: Load YAML directly with yaml.safe_load()
+        - Non-parametrized tests: Fixture requires @pytest.mark.parametrize
+        - Tests that only need one specific contract: Direct loading is simpler
+
     Note:
         The fixture accesses node_name from request.node.callspec.params,
-        so tests must have a 'node_name' parameter defined via parametrize.
-
-    When to use:
-        Use this fixture for parametrized tests that iterate over multiple contracts.
-        For single-contract tests or non-parametrized tests, load the YAML file
-        directly with yaml.safe_load() to avoid the parametrize requirement overhead.
+        so tests MUST have a 'node_name' parameter defined via parametrize.
 
     Args:
         request: Pytest fixture request object for accessing test parameters

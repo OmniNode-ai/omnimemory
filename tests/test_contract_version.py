@@ -28,6 +28,10 @@ from tests.conftest import NODES_DIR
 if TYPE_CHECKING:
     from omnibase_core.types import MappingResultDict
 
+# Sanity check upper bound for SemVer version components (major, minor, patch).
+# Real-world SemVer versions rarely exceed 4 digits; this catches typos and corrupt data.
+MAX_REASONABLE_VERSION_COMPONENT: int = 10000
+
 # Contracts that were migrated in PR #19 (OMN-1436)
 # NOTE: This list tracks specific contracts from the migration. For comprehensive
 # contract validation, use get_all_contracts() which dynamically discovers all contracts.
@@ -101,7 +105,7 @@ def _assert_valid_contract_version(contract_version: object, node_name: str) -> 
         )
         assert value >= 0, f"contract_version.{field} must be non-negative: {node_name}"
         assert (
-            value < 10000
+            value < MAX_REASONABLE_VERSION_COMPONENT
         ), f"contract_version.{field} seems unreasonably large ({value}): {node_name}"
 
 
@@ -170,13 +174,20 @@ class TestContractVersionField:
     def test_nested_version_fields_preserved(
         self, contract_data: MappingResultDict, node_name: str
     ) -> None:
-        """Verify nested version fields (tool_specification, event_type) are preserved.
+        """Verify nested version fields are valid IF present (if-present-then-valid).
 
-        The migration only affects root-level 'version' field. Nested version
-        fields in tool_specification or event_type are intentionally kept as
-        they serve different purposes.
+        This test uses "if present, then valid" semantics intentionally:
+        - Contracts WITHOUT tool_specification.version or event_type.version PASS
+        - Contracts WITH these nested fields must have valid version structure
+        - The migration does NOT add nested version fields; it only migrates root version
 
-        Version can be either:
+        This behavior is correct because:
+        1. Not all contracts have tool_specification or event_type sections
+        2. The migration only transforms root-level 'version' to 'contract_version'
+        3. Nested version fields serve different purposes (API versioning, event schema)
+           and are preserved unchanged if they exist
+
+        When present, version can be either:
         - A string (legacy format, e.g., "1.0.0")
         - A dict with major/minor/patch structure (YAML contract format)
         """
@@ -203,6 +214,27 @@ class TestContractVersionField:
             ), f"event_type.version should be a string or dict: {node_name}"
             if isinstance(version, dict):
                 _assert_valid_contract_version(version, f"{node_name}/event_type")
+
+    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
+    def test_contract_version_values(
+        self, contract_data: MappingResultDict, node_name: str
+    ) -> None:
+        """Verify contract_version has expected initial values after migration.
+
+        This test validates the actual version values, not just the structure.
+        All contracts migrated in PR #19 (OMN-1436) should have the initial
+        version 0.1.0 (major=0, minor=1, patch=0) as their starting point.
+
+        This ensures:
+        - Migration set consistent initial versions across all contracts
+        - Future version bumps can be tracked against this baseline
+        - No accidental version drift during migration
+        """
+        expected: dict[str, int] = {"major": 0, "minor": 1, "patch": 0}
+        assert contract_data.get("contract_version") == expected, (
+            f"Expected contract_version {expected} for {node_name}, "
+            f"got {contract_data.get('contract_version')}"
+        )
 
 
 class TestAllContractsDiscovery:
