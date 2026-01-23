@@ -44,6 +44,6 @@ class ModelFileSystemAdapterConfig(BaseModel):
     )
     max_file_size: int = Field(
         default=10 * 1024 * 1024,
-        ge=1,
+        gt=0,
         description="Maximum file size in bytes (default 10MB)",
     )

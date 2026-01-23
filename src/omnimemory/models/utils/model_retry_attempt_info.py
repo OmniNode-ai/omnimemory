@@ -21,8 +21,8 @@ class ModelRetryAttemptInfo(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    attempt_number: int = Field(description="Current attempt number (1-indexed)")
-    delay_ms: int = Field(description="Delay before this attempt in milliseconds")
+    attempt_number: int = Field(ge=1, description="Current attempt number (1-indexed)")
+    delay_ms: int = Field(ge=0, description="Delay before this attempt in milliseconds")
     exception: str | None = Field(
         default=None, description="Exception that triggered the retry"
     )

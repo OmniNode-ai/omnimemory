@@ -122,8 +122,14 @@ SKIP_PATTERNS = [
 
 def is_path_allowed(filepath: Path) -> bool:
     """Check if the file path is in an allowed location for HTTP imports."""
-    filepath_str = str(filepath)
-    return any(allowed in filepath_str for allowed in ALLOWED_PATHS)
+    # Use posix path for consistent segment matching across platforms
+    filepath_posix = filepath.as_posix()
+    # Check each allowed path as a proper path segment (not substring)
+    for allowed in ALLOWED_PATHS:
+        # Ensure we match complete path segments by checking for / boundaries
+        if f"/{allowed}" in filepath_posix or filepath_posix.startswith(allowed):
+            return True
+    return False
 
 
 def validate_file(filepath: Path) -> list[Violation]:
@@ -163,9 +169,7 @@ def validate_file(filepath: Path) -> list[Violation]:
         # Exit TYPE_CHECKING block when indentation decreases
         if in_type_checking_block and stripped and not stripped.startswith("#"):
             current_indent = len(line) - len(line.lstrip())
-            if current_indent <= indent_level and not line[indent_level:].startswith(
-                " "
-            ):
+            if current_indent <= indent_level:
                 in_type_checking_block = False
 
         # Skip if in TYPE_CHECKING block

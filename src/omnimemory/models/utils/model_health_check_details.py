@@ -30,7 +30,7 @@ class ModelHealthCheckDetails(BaseModel):
         default=None, description="Last check timestamp"
     )
     latency_ms: float | None = Field(
-        default=None, description="Latency in milliseconds"
+        default=None, ge=0.0, description="Latency in milliseconds"
     )
     # Rate limiting state
     rate_limit_active: bool = Field(

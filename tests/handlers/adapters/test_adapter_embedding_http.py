@@ -562,8 +562,6 @@ class TestEmbeddingHttpClientErrors:
         mock_handler: MagicMock,
     ) -> None:
         """Test connection error is transformed."""
-        from uuid import uuid4
-
         from omnibase_infra.enums import EnumInfraTransportType
         from omnibase_infra.errors import InfraConnectionError
         from omnibase_infra.models.errors import ModelInfraErrorContext
@@ -593,8 +591,6 @@ class TestEmbeddingHttpClientErrors:
         mock_handler: MagicMock,
     ) -> None:
         """Test timeout error is transformed."""
-        from uuid import uuid4
-
         from omnibase_infra.enums import EnumInfraTransportType
         from omnibase_infra.errors import InfraTimeoutError
         from omnibase_infra.models.errors import ModelTimeoutErrorContext
@@ -855,47 +851,24 @@ class TestEmbeddingHttpClientRateLimiting:
             client = EmbeddingHttpClient(local_config, rate_limiter=custom_limiter)
             assert client._rate_limiter is custom_limiter
 
-    @pytest.mark.asyncio
-    async def test_rate_limiter_created_from_tpm_only_config(
+    def test_tpm_only_config_raises_validation_error(
         self,
-        mock_handler: MagicMock,
-        caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test rate limiter is created when only TPM is set (RPM=0).
+        """Test that TPM-only configuration (rpm=0, tpm>0) is rejected.
 
-        When only TPM is configured, the limiter should be created with a high
-        RPM value (10,000) to enable token-based limiting as the primary constraint.
+        TPM-only rate limiting is not supported because the underlying
+        ProviderRateLimiter requires a positive RPM to function correctly.
+        The config should reject this invalid combination at validation time.
         """
-        import logging
-
-        caplog.set_level(logging.INFO)
-
-        config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost",
-            rate_limit_rpm=0,  # No RPM limit
-            rate_limit_tpm=100_000,  # Only TPM limit
-        )
-
-        with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
-            return_value=mock_handler,
+        with pytest.raises(
+            ValueError,
+            match=r"TPM-only rate limiting is not supported.*rate_limit_rpm must also be > 0",
         ):
-            client = EmbeddingHttpClient(config)
-
-            # Rate limiter should be created despite RPM=0
-            assert client._rate_limiter is not None
-
-            # Should use config's tpm_fallback_rpm (default: 10,000) as fallback
-            assert (
-                client._rate_limiter.config.requests_per_minute
-                == config.tpm_fallback_rpm
+            ModelEmbeddingHttpClientConfig(
+                base_url="http://localhost",
+                rate_limit_rpm=0,  # No RPM limit
+                rate_limit_tpm=100_000,  # Only TPM limit - INVALID
             )
-
-            # Should use the configured TPM
-            assert client._rate_limiter.config.tokens_per_minute == 100_000
-
-            # Should log informational message about TPM-only config
-            assert "TPM-only rate limiting" in caplog.text
 
     @pytest.mark.asyncio
     async def test_rate_limiter_not_created_when_both_rpm_and_tpm_zero(
@@ -950,8 +923,6 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler: MagicMock,
     ) -> None:
         """Test health check returns False on error."""
-        from uuid import uuid4
-
         from omnibase_infra.enums import EnumInfraTransportType
         from omnibase_infra.errors import InfraConnectionError
         from omnibase_infra.models.errors import ModelInfraErrorContext

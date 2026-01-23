@@ -1080,7 +1080,9 @@ class TestQdrantMockConfigCrossFieldValidation:
 
     def test_config_is_frozen(self) -> None:
         """Test that config is immutable (frozen=True)."""
+        from pydantic import ValidationError
+
         config = ModelHandlerQdrantMockConfig()
 
-        with pytest.raises(Exception):  # Pydantic raises ValidationError for frozen
+        with pytest.raises(ValidationError):
             config.use_real_embeddings = True  # type: ignore[misc]

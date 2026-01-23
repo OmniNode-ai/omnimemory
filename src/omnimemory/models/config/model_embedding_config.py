@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 __all__ = [
     "EnumEmbeddingProviderType",
@@ -96,11 +96,8 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         - ``rpm=0, tpm=0``: No rate limiting applied.
         - ``rpm>0, tpm=0``: RPM-only limiting.
         - ``rpm>0, tpm>0``: Both RPM and TPM limiting.
-        - ``rpm=0, tpm>0``: TPM-only limiting. Internally, EmbeddingHttpClient
-          uses the ``tpm_fallback_rpm`` value (default: 10,000) to satisfy
-          ModelRateLimiterConfig's ``requests_per_minute >= 1`` constraint
-          while effectively disabling request-based throttling. This value
-          is configurable for users who need different fallback behavior.
+        - ``rpm=0, tpm>0``: **NOT SUPPORTED** - raises validation error.
+          You must set rate_limit_rpm > 0 when using TPM limiting.
     """
 
     model_config = ConfigDict(
@@ -145,9 +142,8 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         ge=0,
         le=10_000,
         description=(
-            "Requests per minute limit. Set to 0 to disable RPM limiting. "
-            "When rpm=0 but tpm>0, EmbeddingHttpClient uses the tpm_fallback_rpm "
-            "value to enable token-based limiting without request throttling."
+            "Requests per minute limit. Set to 0 to disable rate limiting entirely. "
+            "Must be > 0 if rate_limit_tpm is set (TPM-only not supported)."
         ),
     )
     rate_limit_tpm: int = Field(
@@ -156,17 +152,7 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         le=10_000_000,
         description=(
             "Tokens per minute limit. Set to 0 to disable TPM limiting. "
-            "Can be used alone (with rpm=0) for token-only rate limiting."
-        ),
-    )
-    tpm_fallback_rpm: int = Field(
-        default=10_000,
-        ge=100,
-        le=100_000,
-        description=(
-            "RPM fallback value used when TPM-only rate limiting is desired (rpm=0, tpm>0). "
-            "This high value ensures RPM doesn't become the bottleneck while TPM controls throttling. "
-            "Default: 10,000 RPM."
+            "Requires rate_limit_rpm > 0 (TPM-only not supported)."
         ),
     )
     auth_header: str | None = Field(
@@ -206,6 +192,27 @@ class ModelEmbeddingHttpClientConfig(BaseModel):
         if v is not None and not v.startswith("/"):
             return "/" + v
         return v
+
+    @model_validator(mode="after")
+    def validate_rate_limit_configuration(self) -> ModelEmbeddingHttpClientConfig:
+        """Validate rate limit configuration is not TPM-only.
+
+        TPM-only configurations (rate_limit_tpm > 0 with rate_limit_rpm == 0) are
+        rejected because the underlying ProviderRateLimiter requires a positive RPM
+        to function correctly. Users must explicitly set rate_limit_rpm > 0 when
+        using token-based rate limiting.
+
+        Raises:
+            ValueError: If rate_limit_tpm > 0 but rate_limit_rpm == 0.
+        """
+        if self.rate_limit_tpm > 0 and self.rate_limit_rpm == 0:
+            raise ValueError(
+                f"TPM-only rate limiting is not supported. "
+                f"When rate_limit_tpm > 0 (got {self.rate_limit_tpm}), "
+                f"rate_limit_rpm must also be > 0. "
+                f"Set rate_limit_rpm to a positive value or set rate_limit_tpm to 0."
+            )
+        return self
 
     @property
     def embed_endpoint(self) -> str:

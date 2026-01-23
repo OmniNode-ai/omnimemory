@@ -78,7 +78,6 @@ def validate_data_model_definitions() -> dict[str, Any]:
 
         # Test basic model creation (using simple types to avoid omnibase_core)
         from datetime import datetime, timezone
-        from typing import Any
         from uuid import uuid4
 
         from pydantic import BaseModel, Field

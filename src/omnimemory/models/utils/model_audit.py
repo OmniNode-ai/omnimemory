@@ -68,7 +68,7 @@ class ModelAuditEvent(BaseModel):
     # Event details
     message: str = Field(description="Human-readable event description")
     details: AuditEventDetails = Field(
-        default_factory=lambda: AuditEventDetails(),
+        default_factory=AuditEventDetails,
         description="Additional event details",
     )
 

@@ -78,9 +78,9 @@ class ModelRelatedMemory(BaseModel):
         ),
     )
     depth: int = Field(
-        default=0,
-        ge=0,
-        description="Number of hops from starting memory",
+        default=1,
+        ge=1,
+        description="Number of hops from starting memory (minimum 1, starting node excluded)",
     )
     labels: list[str] = Field(
         default_factory=list,

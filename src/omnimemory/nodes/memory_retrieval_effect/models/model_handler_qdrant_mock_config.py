@@ -42,7 +42,7 @@ class ModelHandlerQdrantMockConfig(BaseModel):
             is not provided or is not a valid HTTP(S) URL.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
     embedding_dimension: int = Field(
         default=1024,

@@ -19,15 +19,20 @@ class ModelCircuitBreakerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     failure_threshold: int = Field(
-        default=5, description="Number of failures before opening circuit"
+        default=5, ge=1, description="Number of failures before opening circuit"
     )
     recovery_timeout: int = Field(
-        default=60, description="Seconds to wait before trying half-open"
+        default=60, ge=0, description="Seconds to wait before trying half-open"
     )
     recovery_timeout_jitter: float = Field(
-        default=0.1, description="Jitter factor (0.0-1.0) to prevent thundering herd"
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Jitter factor (0.0-1.0) to prevent thundering herd",
     )
     success_threshold: int = Field(
-        default=3, description="Successful calls needed to close circuit"
+        default=3, ge=1, description="Successful calls needed to close circuit"
     )
-    timeout: float = Field(default=30.0, description="Default timeout for operations")
+    timeout: float = Field(
+        default=30.0, gt=0, description="Default timeout for operations"
+    )

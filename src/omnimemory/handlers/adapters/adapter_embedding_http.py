@@ -100,7 +100,7 @@ class EmbeddingHttpClient:
 
     Rate Limiting Modes
     -------------------
-    The client supports four rate limiting configurations via ``rate_limit_rpm``
+    The client supports three rate limiting configurations via ``rate_limit_rpm``
     and ``rate_limit_tpm`` in the config:
 
     1. **No rate limiting** (rpm=0, tpm=0):
@@ -110,28 +110,23 @@ class EmbeddingHttpClient:
        Limits requests per minute. Useful when you want to cap request
        frequency regardless of payload size.
 
-    3. **TPM only** (rpm=0, tpm>0):
-       Limits tokens per minute. Since ProviderRateLimiter requires a
-       positive RPM to function, the client uses the configurable
-       ``tpm_fallback_rpm`` (default: 10,000) as a high fallback RPM.
-       This makes TPM the effective constraint while RPM remains
-       practically unlimited.
-
-    4. **Both RPM and TPM** (rpm>0, tpm>0):
+    3. **Both RPM and TPM** (rpm>0, tpm>0):
        Both limits are enforced. Requests must satisfy BOTH constraints,
        whichever is more restrictive at any given moment.
 
+    Note:
+        TPM-only configuration (rpm=0, tpm>0) is NOT supported and will raise
+        a validation error. You must set rate_limit_rpm > 0 when using TPM limiting.
+
     Example::
 
-        # TPM-only configuration (common for OpenAI)
+        # Both RPM and TPM configuration (common for OpenAI)
         config = ModelEmbeddingHttpClientConfig(
             provider="openai",
             model="text-embedding-3-small",
-            rate_limit_rpm=0,      # No RPM limit desired
+            rate_limit_rpm=3000,   # 3K requests/minute
             rate_limit_tpm=100000, # 100K tokens/minute
-            # tpm_fallback_rpm=10000,  # Optional: customize fallback RPM
         )
-        # Internally uses tpm_fallback_rpm to enable limiter with TPM as constraint
 
     Attributes:
         config: The client configuration.
@@ -155,43 +150,21 @@ class EmbeddingHttpClient:
         self._init_lock = asyncio.Lock()
         self._rate_limiter: ProviderRateLimiter | None = None
 
-        # Rate limiter setup: supports RPM-only, TPM-only, or both.
+        # Rate limiter setup: supports RPM-only or both RPM+TPM.
         # See class docstring "Rate Limiting Modes" for detailed explanation.
+        # Note: TPM-only (rpm=0, tpm>0) is rejected at config validation time.
         if rate_limiter is not None:
             # Use externally-provided limiter (e.g., for testing or shared limiters)
             self._rate_limiter = rate_limiter
-        elif config.rate_limit_rpm > 0 or config.rate_limit_tpm > 0:
-            # At least one limit is configured - create a limiter.
-            #
-            # Handle TPM-only case (rpm=0, tpm>0):
-            # ProviderRateLimiter requires positive RPM to function, so we use
-            # config.tpm_fallback_rpm as a fallback. This high value means
-            # RPM won't be the bottleneck - TPM becomes the effective constraint.
-            rpm = (
-                config.rate_limit_rpm
-                if config.rate_limit_rpm > 0
-                else config.tpm_fallback_rpm
-            )
-
-            # Log when using TPM-only mode for transparency
-            if config.rate_limit_rpm == 0 and config.rate_limit_tpm > 0:
-                logger.info(
-                    "TPM-only rate limiting configured for %s/%s: TPM=%d. "
-                    "Using fallback RPM=%d to enable limiter with TPM as primary constraint.",
-                    config.provider.value,
-                    config.model,
-                    config.rate_limit_tpm,
-                    rpm,
-                )
-
+        elif config.rate_limit_rpm > 0:
+            # RPM is configured - create a limiter (TPM is optional)
             limiter_config = ModelRateLimiterConfig(
                 provider=config.provider.value,
                 model=config.model,
-                requests_per_minute=rpm,
+                requests_per_minute=config.rate_limit_rpm,
                 tokens_per_minute=config.rate_limit_tpm,
             )
             self._rate_limiter = ProviderRateLimiter(limiter_config)
-        # else: both rpm=0 and tpm=0 means no rate limiting - limiter stays None
 
     @property
     def config(self) -> ModelEmbeddingHttpClientConfig:
@@ -234,12 +207,14 @@ class EmbeddingHttpClient:
         """Close the HTTP handler and release resources.
 
         Safe to call multiple times - subsequent calls are no-ops.
+        Uses the same lock as initialize() to prevent race conditions.
         """
-        if self._handler is not None:
-            await self._handler.shutdown()
-            self._handler = None
-        self._initialized = False
-        logger.debug("EmbeddingHttpClient shutdown complete")
+        async with self._init_lock:
+            if self._handler is not None:
+                await self._handler.shutdown()
+                self._handler = None
+            self._initialized = False
+            logger.debug("EmbeddingHttpClient shutdown complete")
 
     async def __aenter__(self) -> EmbeddingHttpClient:
         """Enter async context manager."""

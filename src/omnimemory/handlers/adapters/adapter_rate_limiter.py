@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
 import time
 from collections import deque
@@ -97,9 +98,12 @@ class ProviderRateLimiter:
         self._lock = asyncio.Lock()
 
         # Pre-calculate limits (needed for maxlen calculation)
-        self._max_requests = int(config.requests_per_minute * config.burst_multiplier)
+        # Use math.ceil to preserve burst headroom (e.g., 1 RPM * 1.5x = 2 not 1)
+        self._max_requests = math.ceil(
+            config.requests_per_minute * config.burst_multiplier
+        )
         self._max_tokens = (
-            int(config.tokens_per_minute * config.burst_multiplier)
+            math.ceil(config.tokens_per_minute * config.burst_multiplier)
             if config.tokens_per_minute > 0
             else 0
         )
@@ -227,22 +231,28 @@ class ProviderRateLimiter:
             correlation_id: Optional correlation ID for logging.
 
         Returns:
-            True if permission was granted, False if rate limited.
+            True if permission was granted, False if rate limited or if
+            the request exceeds the maximum token limit.
 
         Raises:
-            ValueError: If tokens is negative or exceeds maximum allowed.
+            ValueError: If tokens is less than 1.
         """
         # Validate token count - zero or negative tokens are invalid
         # tokens=0 is rejected because requesting zero tokens is meaningless
         if tokens < 1:
             raise ValueError(f"tokens must be >= 1, got {tokens}")
 
-        # If token limiting is enabled and request exceeds max, it can never succeed
+        # If token limiting is enabled and request exceeds max, return False
+        # (try semantics: report failure rather than throw for "can't succeed" cases)
         if self._max_tokens > 0 and tokens > self._max_tokens:
-            raise ValueError(
-                f"tokens ({tokens}) exceeds maximum allowed ({self._max_tokens}) "
-                f"for {self._config.provider}/{self._config.model}"
+            logger.debug(
+                "Token request exceeds maximum for %s/%s: %d > %d",
+                self._config.provider,
+                self._config.model,
+                tokens,
+                self._max_tokens,
             )
+            return False
 
         async with self._lock:
             now = time.monotonic()
