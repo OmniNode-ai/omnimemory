@@ -92,8 +92,8 @@ _OMNIBASE_INFRA_AVAILABLE = False
 _OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
 
 try:
+    from omnibase_infra.event_bus.event_bus_kafka import EventBusKafka
     from omnibase_infra.handlers.handler_db import HandlerDb
-    from omnibase_infra.handlers.handler_kafka import HandlerKafka
 
     _OMNIBASE_INFRA_AVAILABLE = True
 except ImportError as e:
@@ -103,8 +103,8 @@ except ImportError as e:
     class HandlerDb:  # type: ignore[no-redef]
         """Stub for HandlerDb when omnibase_infra is not installed."""
 
-    class HandlerKafka:  # type: ignore[no-redef]
-        """Stub for HandlerKafka when omnibase_infra is not installed."""
+    class EventBusKafka:  # type: ignore[no-redef]
+        """Stub for EventBusKafka when omnibase_infra is not installed."""
 
 
 logger = logging.getLogger(__name__)
@@ -336,7 +336,7 @@ class HandlerSubscription:
 
         self._config = config
         self._db_handler: HandlerDb | None = None
-        self._kafka_handler: HandlerKafka | None = None
+        self._kafka_handler: EventBusKafka | None = None
         self._valkey: AdapterValkey | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
@@ -394,7 +394,7 @@ class HandlerSubscription:
                 logger.info("Database handler initialized")
 
                 # Initialize Kafka handler
-                self._kafka_handler = HandlerKafka()
+                self._kafka_handler = EventBusKafka()
                 await self._kafka_handler.initialize(
                     {
                         "bootstrap_servers": self._config.kafka_bootstrap_servers,
@@ -457,7 +457,7 @@ class HandlerSubscription:
             self._initialized = False
             logger.info("HandlerSubscription shutdown complete")
 
-    def _ensure_initialized(self) -> tuple[AdapterValkey, HandlerDb, HandlerKafka]:
+    def _ensure_initialized(self) -> tuple[AdapterValkey, HandlerDb, EventBusKafka]:
         """Ensure handler is initialized and return components.
 
         Returns:
