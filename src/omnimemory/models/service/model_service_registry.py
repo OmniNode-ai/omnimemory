@@ -10,6 +10,8 @@ from omnibase_core.enums import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class ModelServiceRegistry(BaseModel):
     """Service registry entry following ONEX standards."""
@@ -23,8 +25,8 @@ class ModelServiceRegistry(BaseModel):
     service_name: str = Field(
         description="Human-readable name for the service",
     )
-    service_version: str = Field(
-        description="Version of the service",
+    service_version: ModelSemVer = Field(
+        description="Semantic version of the service",
     )
 
     # Service location

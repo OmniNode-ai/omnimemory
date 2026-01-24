@@ -37,13 +37,10 @@ transaction_management:
   enabled: false
 
 # === NODE CONFIGURATION ===
+# NOTE: tool_name and main_tool_class are required per ModelContractEffect validation
 tool_specification:
-  tool_name: "node_memory_retrieval_effect"
-  version: {major: 0, minor: 1, patch: 0}
-  description: "Memory retrieval effect node for search operations"
+  tool_name: "memory_retrieval_effect"
   main_tool_class: "NodeMemoryRetrievalEffect"
-  container_injection: "ONEXContainer"
-  business_logic_pattern: "effect"
 
 # === SERVICE CONFIGURATION ===
 service_configuration:
@@ -116,6 +113,7 @@ performance:
   max_response_time_ms: 100
 
 # === EVENT TYPE CONFIGURATION ===
+# NOTE: Using version per ModelEventTypeSubcontract from omnibase_core
 event_type:
   version: {major: 1, minor: 0, patch: 0}
   primary_events: ["memory_searched", "memory_retrieved", "graph_traversed"]

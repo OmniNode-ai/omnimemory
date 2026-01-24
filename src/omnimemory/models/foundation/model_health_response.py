@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer  # noqa: TC001
+
 
 class ModelDependencyStatus(BaseModel):
     """Status of a system dependency."""
@@ -68,7 +70,7 @@ class ModelHealthResponse(BaseModel):
         default_factory=list, description="Status of system dependencies"
     )
     uptime_seconds: int = Field(ge=0, description="System uptime in seconds")
-    version: str = Field(description="System version information")
+    version: ModelSemVer = Field(description="System version information")
     environment: str = Field(description="Deployment environment")
 
 

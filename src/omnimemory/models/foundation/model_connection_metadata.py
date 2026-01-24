@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class ConnectionMetadata(BaseModel):
     """Strongly typed metadata for connection objects."""
@@ -40,8 +42,8 @@ class ConnectionMetadata(BaseModel):
 
     database_name: str | None = Field(default=None, description="Name of the database")
 
-    server_version: str | None = Field(
-        default=None, description="Server version information"
+    server_version: ModelSemVer | None = Field(
+        default=None, description="Semantic server version information"
     )
 
     is_healthy: bool = Field(

@@ -30,11 +30,6 @@ from .model_connection_metadata import (
     ConnectionPoolStats,
     SemaphoreMetrics,
 )
-from .model_contract_version import (
-    DEFAULT_CONTRACT_VERSION,
-    ContractVersionMixin,
-    ModelContractVersion,
-)
 from .model_error_details import ModelErrorDetails
 
 # New metadata models for replacing Dict[str, Any]
@@ -164,10 +159,6 @@ __all__ = [
     "SemaphoreMetrics",
     "ModelProgressPerformanceMetrics",
     "ProgressSummaryResponse",
-    # Contract versioning support
-    "ModelContractVersion",
-    "ContractVersionMixin",
-    "DEFAULT_CONTRACT_VERSION",
     # Tag normalization support
     "ModelTag",
     "ModelTagCollection",

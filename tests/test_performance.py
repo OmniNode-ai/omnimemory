@@ -69,7 +69,7 @@ class PIIMatch(BaseModel):
     value: str = Field(description="The detected PII value (may be masked)")
     start_index: int = Field(description="Start position in the content")
     end_index: int = Field(description="End position in the content")
-    confidence: float = Field(description="Confidence score (0.0-1.0)")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score (0.0-1.0)")
     masked_value: str = Field(description="Masked version of the detected value")
 
 
@@ -85,7 +85,7 @@ class PIIDetectionResult(BaseModel):
         default_factory=set, description="Types of PII found"
     )
     scan_duration_ms: float = Field(
-        description="Time taken for the scan in milliseconds"
+        ge=0, description="Time taken for the scan in milliseconds"
     )
 
 

@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class HealthCheckMetadata(BaseModel):
     """Strongly typed metadata for health check operations."""
@@ -19,8 +21,9 @@ class HealthCheckMetadata(BaseModel):
         default=None, description="Connection URL for dependency checks"
     )
 
-    database_version: str | None = Field(
-        default=None, description="Version information for database dependencies"
+    database_version: ModelSemVer | None = Field(
+        default=None,
+        description="Semantic version information for database dependencies",
     )
 
     pool_stats: dict[str, int] | None = Field(

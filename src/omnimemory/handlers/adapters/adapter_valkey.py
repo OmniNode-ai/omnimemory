@@ -90,7 +90,9 @@ __all__ = [
 ]
 
 
-class AdapterValkeyConfig(BaseModel):
+class AdapterValkeyConfig(  # omnimemory-model-exempt: adapter-specific config
+    BaseModel
+):
     """Configuration for the Valkey adapter.
 
     Attributes:
@@ -164,7 +166,7 @@ class AdapterValkeyConfig(BaseModel):
     )
 
 
-class ModelValkeyHealth(BaseModel):
+class ModelValkeyHealth(BaseModel):  # omnimemory-model-exempt: adapter-specific health
     """Health status for the Valkey adapter.
 
     Attributes:

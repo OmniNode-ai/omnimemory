@@ -8,6 +8,9 @@
     "**/tests/**"
   ],
 
+  "venvPath": ".",
+  "venv": ".venv",
+
   "typeCheckingMode": "basic",
   "pythonVersion": "3.12",
   "pythonPlatform": "Linux",

@@ -98,7 +98,6 @@ class BaseMemoryModel(BaseModel):
         arbitrary_types_allowed=False,
         # Serialization settings
         ser_json_bytes="base64",
-        ser_json_timedelta="float",
     )
 
 
@@ -659,6 +658,17 @@ class PatternAnalysisResponse(BaseMemoryResponse):
     )
     confidence_scores: list[float] = Field(description="Pattern confidence scores")
 
+    @field_validator("confidence_scores")
+    @classmethod
+    def validate_confidence_scores(cls, v: list[float]) -> list[float]:
+        """Validate all confidence scores are in [0.0, 1.0] range."""
+        for score in v:
+            if not 0.0 <= score <= 1.0:
+                raise ValueError(
+                    f"Confidence score must be between 0.0 and 1.0, got {score}"
+                )
+        return v
+
 
 class InsightExtractionRequest(BaseMemoryRequest):
     """Request for insight extraction."""
@@ -677,6 +687,17 @@ class InsightExtractionResponse(BaseMemoryResponse):
         default_factory=ModelResultCollection, description="Extracted insights"
     )
     insight_scores: list[float] = Field(description="Insight relevance scores")
+
+    @field_validator("insight_scores")
+    @classmethod
+    def validate_insight_scores(cls, v: list[float]) -> list[float]:
+        """Validate all insight scores are in [0.0, 1.0] range."""
+        for score in v:
+            if not 0.0 <= score <= 1.0:
+                raise ValueError(
+                    f"Insight score must be between 0.0 and 1.0, got {score}"
+                )
+        return v
 
 
 # Semantic Analysis Models
@@ -749,6 +770,17 @@ class PatternRecognitionResponse(BaseMemoryResponse):
         default_factory=ModelResultCollection, description="Recognized patterns"
     )
     pattern_confidence: list[float] = Field(description="Pattern confidence scores")
+
+    @field_validator("pattern_confidence")
+    @classmethod
+    def validate_pattern_confidence(cls, v: list[float]) -> list[float]:
+        """Validate all pattern confidence scores are in [0.0, 1.0] range."""
+        for score in v:
+            if not 0.0 <= score <= 1.0:
+                raise ValueError(
+                    f"Pattern confidence must be between 0.0 and 1.0, got {score}"
+                )
+        return v
 
 
 class PatternLearningRequest(BaseMemoryRequest):

@@ -162,7 +162,9 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
     return ", ".join(f"${i}" for i in range(start, start + count))
 
 
-class ModelHandlerSubscriptionConfig(BaseModel):
+class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler-specific config
+    BaseModel
+):
     """Configuration for the Subscription Handler.
 
     Attributes:
@@ -227,7 +229,9 @@ class ModelHandlerSubscriptionConfig(BaseModel):
     )
 
 
-class ModelSubscriptionMetrics(BaseModel):
+class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler-specific metrics
+    BaseModel
+):
     """Metrics for the Subscription Handler.
 
     Tracks counters for various operations to enable production monitoring
@@ -268,7 +272,9 @@ class ModelSubscriptionMetrics(BaseModel):
     )
 
 
-class ModelSubscriptionHealth(BaseModel):
+class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler-specific health
+    BaseModel
+):
     """Health status for the Subscription Handler.
 
     Attributes:
@@ -317,7 +323,9 @@ class ModelSubscriptionHealth(BaseModel):
     )
 
 
-class ModelPaginatedSubscriptions(BaseModel):
+class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler-specific response
+    BaseModel
+):
     """Paginated subscription list response.
 
     Returned by list_subscriptions() when pagination parameters are provided.

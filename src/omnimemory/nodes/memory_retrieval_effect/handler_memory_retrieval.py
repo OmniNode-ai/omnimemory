@@ -49,17 +49,17 @@ if TYPE_CHECKING:
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
 )
-from pydantic import BaseModel, ConfigDict, Field
 
 from .handlers import (
     HandlerDbMock,
     HandlerGraphMock,
     HandlerQdrantMock,
-    ModelHandlerDbMockConfig,
-    ModelHandlerGraphMockConfig,
-    ModelHandlerQdrantMockConfig,
 )
-from .models import ModelMemoryRetrievalRequest, ModelMemoryRetrievalResponse
+from .models import (
+    ModelHandlerMemoryRetrievalConfig,
+    ModelMemoryRetrievalRequest,
+    ModelMemoryRetrievalResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,37 +67,6 @@ __all__ = [
     "HandlerMemoryRetrieval",
     "ModelHandlerMemoryRetrievalConfig",
 ]
-
-
-class ModelHandlerMemoryRetrievalConfig(BaseModel):
-    """Configuration for the memory retrieval handler.
-
-    Attributes:
-        qdrant_config: Configuration for the Qdrant handler.
-        db_config: Configuration for the Database handler.
-        graph_config: Configuration for the Graph handler.
-        use_mock_handlers: Whether to use mock handlers. When False, real
-            handlers from omnibase_infra will be used (not yet implemented).
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    qdrant_config: ModelHandlerQdrantMockConfig = Field(
-        default_factory=ModelHandlerQdrantMockConfig,
-        description="Configuration for Qdrant semantic search handler",
-    )
-    db_config: ModelHandlerDbMockConfig = Field(
-        default_factory=ModelHandlerDbMockConfig,
-        description="Configuration for Database full-text search handler",
-    )
-    graph_config: ModelHandlerGraphMockConfig = Field(
-        default_factory=ModelHandlerGraphMockConfig,
-        description="Configuration for Graph traversal handler",
-    )
-    use_mock_handlers: bool = Field(
-        default=True,
-        description="Use mock handlers (True) or real handlers (False)",
-    )
 
 
 class HandlerMemoryRetrieval:

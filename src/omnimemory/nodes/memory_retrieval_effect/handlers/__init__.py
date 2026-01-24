@@ -15,13 +15,17 @@ Mock Handlers:
     Initial implementation for OMN-1387.
 """
 
-from .handler_db_mock import HandlerDbMock, ModelHandlerDbMockConfig
+from ..models import (
+    ModelHandlerDbMockConfig,
+    ModelHandlerGraphMockConfig,
+    ModelHandlerQdrantMockConfig,
+)
+from .handler_db_mock import HandlerDbMock
 from .handler_graph_mock import (
     HandlerGraphMock,
     HandlerGraphRelationship,
-    ModelHandlerGraphMockConfig,
 )
-from .handler_qdrant_mock import HandlerQdrantMock, ModelHandlerQdrantMockConfig
+from .handler_qdrant_mock import HandlerQdrantMock
 
 __all__ = [
     # Qdrant - semantic search

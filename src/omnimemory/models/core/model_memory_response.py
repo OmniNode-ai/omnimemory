@@ -10,9 +10,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_operation_status import EnumOperationStatus  # noqa: TC001
-from ..foundation.model_contract_version import DEFAULT_CONTRACT_VERSION
 from ..foundation.model_error_details import ModelErrorDetails  # noqa: TC001
 from ..foundation.model_memory_data import ModelMemoryResponseData  # noqa: TC001
+from ..foundation.model_semver import ModelSemVer
 from ..foundation.model_trust_score import ModelTrustScore  # noqa: TC001
 from .model_memory_metadata import ModelMemoryMetadata  # noqa: TC001
 from .model_operation_metadata import ModelOperationMetadata  # noqa: TC001
@@ -26,9 +26,9 @@ class ModelMemoryResponse(BaseModel):
     model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Contract version for schema tracking
-    contract_version: str = Field(
-        default=DEFAULT_CONTRACT_VERSION,
-        description="Schema version for this response contract (semver format)",
+    contract_version: ModelSemVer = Field(
+        default_factory=lambda: ModelSemVer.parse("1.0.0"),
+        description="Schema version for this response contract as ModelSemVer",
     )
 
     # Response identification

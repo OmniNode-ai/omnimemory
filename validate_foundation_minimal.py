@@ -23,7 +23,7 @@ def validate_contract_specification() -> dict[str, Any]:
         if not contract_path.exists():
             return {"success": False, "error": "contract.yaml not found"}
 
-        with open(contract_path, "r") as f:
+        with open(contract_path, encoding="utf-8") as f:
             contract = yaml.safe_load(f)
 
         # Validate contract structure
@@ -90,7 +90,7 @@ def validate_contract_specification() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Contract validation failed: {str(e)}")
+        print(f"❌ Contract validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -148,7 +148,7 @@ def validate_project_structure() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Project structure validation failed: {str(e)}")
+        print(f"❌ Project structure validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -168,7 +168,7 @@ def validate_file_syntax() -> dict[str, Any]:
             python_files.append(py_file)
 
             try:
-                with open(py_file, "r", encoding="utf-8") as f:
+                with open(py_file, encoding="utf-8") as f:
                     content = f.read()
 
                 # Try to compile the syntax (doesn't import, just checks syntax)
@@ -194,7 +194,7 @@ def validate_file_syntax() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ File syntax validation failed: {str(e)}")
+        print(f"❌ File syntax validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -255,7 +255,7 @@ def validate_pyproject_configuration() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ pyproject.toml validation failed: {str(e)}")
+        print(f"❌ pyproject.toml validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 

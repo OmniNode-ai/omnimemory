@@ -971,3 +971,118 @@ class TestPerformance:
                 UserWarning,
                 stacklevel=1,
             )
+
+
+# =============================================================================
+# Cross-Field Validation Tests (OMN-1391)
+# =============================================================================
+
+
+class TestQdrantMockConfigCrossFieldValidation:
+    """Tests for ModelHandlerQdrantMockConfig cross-field validation.
+
+    Validates that embedding_server_url is required when use_real_embeddings
+    is True, and that the URL must be a valid HTTP(S) URL.
+
+    .. versionadded:: 0.1.0
+        Added for OMN-1391 PR nitpick.
+    """
+
+    def test_valid_config_mock_mode_default(self) -> None:
+        """Test valid config with mock mode (default)."""
+        config = ModelHandlerQdrantMockConfig()
+        assert config.use_real_embeddings is False
+        assert config.embedding_server_url is None
+
+    def test_valid_config_mock_mode_explicit(self) -> None:
+        """Test valid config with explicit mock mode."""
+        config = ModelHandlerQdrantMockConfig(
+            use_real_embeddings=False,
+            embedding_server_url=None,
+        )
+        assert config.use_real_embeddings is False
+
+    def test_valid_config_real_embeddings_with_http_url(self) -> None:
+        """Test valid config with real embeddings and HTTP URL."""
+        config = ModelHandlerQdrantMockConfig(
+            use_real_embeddings=True,
+            embedding_server_url="http://localhost:8002/v1",
+        )
+        assert config.use_real_embeddings is True
+        assert config.embedding_server_url == "http://localhost:8002/v1"
+
+    def test_valid_config_real_embeddings_with_https_url(self) -> None:
+        """Test valid config with real embeddings and HTTPS URL."""
+        config = ModelHandlerQdrantMockConfig(
+            use_real_embeddings=True,
+            embedding_server_url="https://api.example.com/embeddings",
+        )
+        assert config.use_real_embeddings is True
+        assert config.embedding_server_url == "https://api.example.com/embeddings"
+
+    def test_invalid_real_embeddings_missing_url(self) -> None:
+        """Test that use_real_embeddings=True requires embedding_server_url."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            ModelHandlerQdrantMockConfig(
+                use_real_embeddings=True,
+                embedding_server_url=None,
+            )
+        error_message = str(exc_info.value)
+        assert "embedding_server_url is required" in error_message
+
+    def test_invalid_real_embeddings_empty_url(self) -> None:
+        """Test that use_real_embeddings=True rejects empty URL."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            ModelHandlerQdrantMockConfig(
+                use_real_embeddings=True,
+                embedding_server_url="",
+            )
+        error_message = str(exc_info.value)
+        assert "embedding_server_url is required" in error_message
+
+    def test_invalid_real_embeddings_non_http_url(self) -> None:
+        """Test that use_real_embeddings=True requires HTTP(S) URL."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            ModelHandlerQdrantMockConfig(
+                use_real_embeddings=True,
+                embedding_server_url="ftp://server.com/embeddings",
+            )
+        error_message = str(exc_info.value)
+        assert "must be a valid HTTP(S) URL" in error_message
+
+    def test_invalid_real_embeddings_plain_path(self) -> None:
+        """Test that use_real_embeddings=True rejects plain paths."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            ModelHandlerQdrantMockConfig(
+                use_real_embeddings=True,
+                embedding_server_url="/var/lib/embeddings",
+            )
+        error_message = str(exc_info.value)
+        assert "must be a valid HTTP(S) URL" in error_message
+
+    def test_mock_mode_accepts_any_url(self) -> None:
+        """Test that mock mode doesn't validate URL format."""
+        # When use_real_embeddings=False, any URL value is accepted
+        # (validation only triggers when use_real_embeddings=True)
+        config = ModelHandlerQdrantMockConfig(
+            use_real_embeddings=False,
+            embedding_server_url="not-a-valid-url",
+        )
+        assert config.embedding_server_url == "not-a-valid-url"
+
+    def test_config_is_frozen(self) -> None:
+        """Test that config is immutable (frozen=True)."""
+        from pydantic import ValidationError
+
+        config = ModelHandlerQdrantMockConfig()
+
+        with pytest.raises(ValidationError):
+            config.use_real_embeddings = True  # type: ignore[misc]

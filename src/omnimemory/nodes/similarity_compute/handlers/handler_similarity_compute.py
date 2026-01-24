@@ -48,37 +48,18 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from omnimemory.models.memory.model_similarity_result import ModelSimilarityResult
+from omnimemory.nodes.similarity_compute.models import (
+    ModelHandlerSimilarityComputeConfig,
+)
 
 __all__ = [
     "HandlerSimilarityCompute",
     "ModelHandlerSimilarityComputeConfig",
 ]
-
-
-class ModelHandlerSimilarityComputeConfig(BaseModel):
-    """Configuration for the similarity compute handler.
-
-    This is intentionally minimal as the handler performs pure computation
-    with no external dependencies or configurable behavior.
-
-    Attributes:
-        epsilon: Small value for floating-point comparisons to avoid
-            division by zero. Defaults to 1e-10.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    epsilon: float = Field(
-        default=1e-10,
-        gt=0,
-        description="Small value for floating-point zero comparisons",
-    )
 
 
 class HandlerSimilarityCompute:

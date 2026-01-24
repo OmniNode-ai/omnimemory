@@ -20,7 +20,7 @@ Example::
     )
     from omnimemory.handlers.adapters import (
         AdapterGraphMemory,
-        AdapterGraphMemoryConfig,
+        ModelGraphMemoryConfig,
     )
 
 .. versionadded:: 0.1.0
@@ -29,10 +29,10 @@ Example::
 
 from omnimemory.handlers.adapters import (
     AdapterGraphMemory,
-    AdapterGraphMemoryConfig,
     AdapterValkey,
     AdapterValkeyConfig,
     ModelConnectionsResult,
+    ModelGraphMemoryConfig,
     ModelGraphMemoryHealth,
     ModelMemoryConnection,
     ModelRelatedMemory,
@@ -54,8 +54,8 @@ __all__ = [
     "ModelSubscriptionMetrics",
     # Graph Memory Adapter
     "AdapterGraphMemory",
-    "AdapterGraphMemoryConfig",
     "ModelConnectionsResult",
+    "ModelGraphMemoryConfig",
     "ModelGraphMemoryHealth",
     "ModelMemoryConnection",
     "ModelRelatedMemory",

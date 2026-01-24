@@ -154,7 +154,9 @@ class ClassModelConfigCollector(ast.NodeVisitor):
         for base in bases:
             if base in self.class_bases:
                 # Base is defined in this file, trace it
-                sub_chain, is_cycle = self._trace_inheritance_chain(base, visited.copy())
+                sub_chain, is_cycle = self._trace_inheritance_chain(
+                    base, visited.copy()
+                )
                 if is_cycle:
                     return chain + sub_chain, True
             # If base not in class_bases, it's external (not traceable in this file)

@@ -35,8 +35,8 @@ pytest.importorskip(
 
 from omnimemory.handlers.adapters.adapter_graph_memory import (
     AdapterGraphMemory,
-    AdapterGraphMemoryConfig,
     CypherTemplates,
+    ModelGraphMemoryConfig,
     ModelMemoryConnection,
     ModelRelatedMemory,
     ModelRelatedMemoryResult,
@@ -48,9 +48,9 @@ from omnimemory.handlers.adapters.adapter_graph_memory import (
 
 
 @pytest.fixture
-def config() -> AdapterGraphMemoryConfig:
+def config() -> ModelGraphMemoryConfig:
     """Create a default adapter configuration."""
-    return AdapterGraphMemoryConfig(
+    return ModelGraphMemoryConfig(
         max_depth=5,
         default_depth=2,
         default_limit=100,
@@ -82,13 +82,13 @@ def mock_handler() -> MagicMock:
 
 @pytest.fixture
 def adapter_with_mock(
-    config: AdapterGraphMemoryConfig,
+    config: ModelGraphMemoryConfig,
     mock_handler: MagicMock,
 ) -> AdapterGraphMemory:
     """Create an adapter with a mock handler injected.
 
     Args:
-        config: AdapterGraphMemoryConfig fixture with test configuration.
+        config: ModelGraphMemoryConfig fixture with test configuration.
         mock_handler: MagicMock fixture configured as HandlerGraph.
 
     Returns:
@@ -106,12 +106,12 @@ def adapter_with_mock(
 # =============================================================================
 
 
-class TestAdapterGraphMemoryConfig:
-    """Tests for AdapterGraphMemoryConfig validation."""
+class TestModelGraphMemoryConfig:
+    """Tests for ModelGraphMemoryConfig validation."""
 
     def test_default_config(self) -> None:
         """Test default configuration values."""
-        config = AdapterGraphMemoryConfig()
+        config = ModelGraphMemoryConfig()
 
         assert config.max_depth == 5
         assert config.default_depth == 2
@@ -125,7 +125,7 @@ class TestAdapterGraphMemoryConfig:
 
     def test_custom_config(self) -> None:
         """Test custom configuration values."""
-        config = AdapterGraphMemoryConfig(
+        config = ModelGraphMemoryConfig(
             max_depth=3,
             default_depth=1,
             default_limit=50,
@@ -151,51 +151,51 @@ class TestAdapterGraphMemoryConfig:
 
         # Too low
         with pytest.raises(ValidationError):
-            AdapterGraphMemoryConfig(max_depth=0)
+            ModelGraphMemoryConfig(max_depth=0)
 
         # Too high
         with pytest.raises(ValidationError):
-            AdapterGraphMemoryConfig(max_depth=11)
+            ModelGraphMemoryConfig(max_depth=11)
 
     def test_timeout_must_be_positive(self) -> None:
         """Test timeout must be positive."""
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            AdapterGraphMemoryConfig(timeout_seconds=0)
+            ModelGraphMemoryConfig(timeout_seconds=0)
 
     def test_score_filter_multiplier_bounds(self) -> None:
         """Test score_filter_multiplier has valid bounds (1.0 to 10.0)."""
         from pydantic import ValidationError
 
         # Valid at bounds
-        config_min = AdapterGraphMemoryConfig(score_filter_multiplier=1.0)
+        config_min = ModelGraphMemoryConfig(score_filter_multiplier=1.0)
         assert config_min.score_filter_multiplier == 1.0
 
-        config_max = AdapterGraphMemoryConfig(score_filter_multiplier=10.0)
+        config_max = ModelGraphMemoryConfig(score_filter_multiplier=10.0)
         assert config_max.score_filter_multiplier == 10.0
 
         # Too low
         with pytest.raises(ValidationError):
-            AdapterGraphMemoryConfig(score_filter_multiplier=0.5)
+            ModelGraphMemoryConfig(score_filter_multiplier=0.5)
 
         # Too high
         with pytest.raises(ValidationError):
-            AdapterGraphMemoryConfig(score_filter_multiplier=11.0)
+            ModelGraphMemoryConfig(score_filter_multiplier=11.0)
 
     def test_default_depth_exceeds_max_depth_raises(self) -> None:
         """Test that default_depth > max_depth raises validation error."""
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError, match="default_depth"):
-            AdapterGraphMemoryConfig(max_depth=3, default_depth=5)
+            ModelGraphMemoryConfig(max_depth=3, default_depth=5)
 
     def test_default_limit_exceeds_max_limit_raises(self) -> None:
         """Test that default_limit > max_limit raises ValidationError."""
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError, match="default_limit"):
-            AdapterGraphMemoryConfig(max_limit=500, default_limit=1000)
+            ModelGraphMemoryConfig(max_limit=500, default_limit=1000)
 
 
 # =============================================================================
@@ -531,7 +531,7 @@ class TestFindRelated:
     @pytest.mark.asyncio
     async def test_find_related_respects_depth_limit(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
         mock_handler: MagicMock,
     ) -> None:
         """Test that find_related respects max_depth configuration."""
@@ -602,7 +602,7 @@ class TestFindRelated:
         2. Custom multiplier changes the query_limit accordingly
         """
         # Create config with custom multiplier
-        config = AdapterGraphMemoryConfig(
+        config = ModelGraphMemoryConfig(
             default_limit=100,
             max_limit=1000,
             score_filter_multiplier=5.0,  # Custom multiplier
@@ -634,7 +634,7 @@ class TestFindRelated:
         mock_handler: MagicMock,
     ) -> None:
         """Test that query_limit is capped by max_limit even with high multiplier."""
-        config = AdapterGraphMemoryConfig(
+        config = ModelGraphMemoryConfig(
             default_limit=100,
             max_limit=200,  # Low max_limit
             score_filter_multiplier=5.0,  # Would give 500, but capped at 200
@@ -695,7 +695,7 @@ class TestFindRelated:
     @pytest.mark.asyncio
     async def test_find_related_not_initialized(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test find_related raises error when not initialized."""
         adapter = AdapterGraphMemory(config)
@@ -935,7 +935,7 @@ class TestGetConnections:
     ) -> None:
         """Test get_connections uses config.bidirectional when param not specified."""
         # Create config with bidirectional=False
-        config = AdapterGraphMemoryConfig(
+        config = ModelGraphMemoryConfig(
             max_depth=5,
             default_depth=2,
             default_limit=100,
@@ -978,7 +978,7 @@ class TestGetConnections:
     ) -> None:
         """Test get_connections bidirectional param overrides config default."""
         # Create config with bidirectional=False
-        config = AdapterGraphMemoryConfig(
+        config = ModelGraphMemoryConfig(
             max_depth=5,
             default_depth=2,
             default_limit=100,
@@ -1070,7 +1070,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_success(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test successful initialization."""
         adapter = AdapterGraphMemory(config)
@@ -1096,7 +1096,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_idempotent(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that initialize is idempotent."""
         adapter = AdapterGraphMemory(config)
@@ -1166,7 +1166,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_health_check_not_initialized(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test health check returns unhealthy status when not initialized."""
         adapter = AdapterGraphMemory(config)
@@ -1188,7 +1188,7 @@ class TestLifecycle:
         acquisition and initialization work.
         """
         # Use a short timeout (0.5s is more reliable than 0.1s in CI)
-        config = AdapterGraphMemoryConfig(timeout_seconds=0.5)
+        config = ModelGraphMemoryConfig(timeout_seconds=0.5)
         adapter = AdapterGraphMemory(config)
 
         # Acquire the lock to simulate another initialization in progress
@@ -1207,7 +1207,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_creates_index_by_default(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that index is created during initialization by default."""
         adapter = AdapterGraphMemory(config)
@@ -1238,7 +1238,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_skips_index_when_disabled(self) -> None:
         """Test that index creation is skipped when ensure_indexes=False."""
-        config = AdapterGraphMemoryConfig(ensure_indexes=False)
+        config = ModelGraphMemoryConfig(ensure_indexes=False)
         adapter = AdapterGraphMemory(config)
 
         with patch(
@@ -1263,7 +1263,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_handles_index_already_exists(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that index creation error (e.g., already exists) doesn't fail init."""
         adapter = AdapterGraphMemory(config)
@@ -1293,7 +1293,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_uses_custom_node_label_for_index(self) -> None:
         """Test that index creation uses the configured memory_node_label."""
-        config = AdapterGraphMemoryConfig(memory_node_label="CustomMemory")
+        config = ModelGraphMemoryConfig(memory_node_label="CustomMemory")
         adapter = AdapterGraphMemory(config)
 
         with patch(
@@ -1319,7 +1319,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_validates_uri_format(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that initialize validates the connection_uri format."""
         adapter = AdapterGraphMemory(config)
@@ -1339,7 +1339,7 @@ class TestLifecycle:
     @pytest.mark.asyncio
     async def test_initialize_accepts_valid_uri_schemes(
         self,
-        config: AdapterGraphMemoryConfig,
+        config: ModelGraphMemoryConfig,
     ) -> None:
         """Test that initialize accepts all valid bolt URI schemes."""
         adapter = AdapterGraphMemory(config)

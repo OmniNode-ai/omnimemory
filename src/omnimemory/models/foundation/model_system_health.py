@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from omnibase_core.enums import EnumHealthStatus
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 
 class ModelSystemHealth(BaseModel):
     """System health information following ONEX standards."""
@@ -20,8 +22,8 @@ class ModelSystemHealth(BaseModel):
     system_name: str = Field(
         description="Human-readable name for the system",
     )
-    system_version: str = Field(
-        description="Version of the system",
+    system_version: ModelSemVer = Field(
+        description="Semantic version of the system",
     )
 
     # Overall health status

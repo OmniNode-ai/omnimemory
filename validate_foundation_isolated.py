@@ -48,7 +48,7 @@ def validate_protocol_definitions() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Protocol validation failed: {str(e)}")
+        print(f"❌ Protocol validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -78,7 +78,6 @@ def validate_data_model_definitions() -> dict[str, Any]:
 
         # Test basic model creation (using simple types to avoid omnibase_core)
         from datetime import datetime, timezone
-        from typing import Any
         from uuid import uuid4
 
         from pydantic import BaseModel, Field
@@ -108,7 +107,7 @@ def validate_data_model_definitions() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Data model validation failed: {str(e)}")
+        print(f"❌ Data model validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -144,7 +143,7 @@ def validate_error_model_definitions() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Error model validation failed: {str(e)}")
+        print(f"❌ Error model validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -158,7 +157,7 @@ def validate_contract_specification() -> dict[str, Any]:
         if not contract_path.exists():
             return {"success": False, "error": "contract.yaml not found"}
 
-        with open(contract_path, "r") as f:
+        with open(contract_path, encoding="utf-8") as f:
             contract = yaml.safe_load(f)
 
         # Validate contract structure
@@ -195,7 +194,7 @@ def validate_contract_specification() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Contract validation failed: {str(e)}")
+        print(f"❌ Contract validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
@@ -242,7 +241,7 @@ def validate_project_structure() -> dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"❌ Project structure validation failed: {str(e)}")
+        print(f"❌ Project structure validation failed: {e!s}")
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 

@@ -53,12 +53,12 @@ from typing import TYPE_CHECKING
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
 )
-from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from ..models import (
+    ModelHandlerGraphMockConfig,
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
@@ -88,35 +88,6 @@ class HandlerGraphRelationship:
     target_id: str
     relationship_type: str
     weight: float = 1.0
-
-
-class ModelHandlerGraphMockConfig(BaseModel):
-    """Configuration for the mock graph handler.
-
-    Attributes:
-        simulate_latency_ms: Simulated latency for operations in milliseconds.
-            Set to 0 for instant responses.
-        max_traversal_depth: Maximum allowed traversal depth. Defaults to 10.
-        bidirectional: Whether relationships are traversed bidirectionally.
-            Defaults to True.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    simulate_latency_ms: int = Field(
-        default=0,
-        ge=0,
-        description="Simulated latency in milliseconds",
-    )
-    max_traversal_depth: int = Field(
-        default=10,
-        ge=1,
-        description="Maximum allowed traversal depth",
-    )
-    bidirectional: bool = Field(
-        default=True,
-        description="Whether to traverse relationships bidirectionally",
-    )
 
 
 class HandlerGraphMock:

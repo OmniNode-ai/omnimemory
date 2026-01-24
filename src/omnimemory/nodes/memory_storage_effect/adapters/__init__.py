@@ -16,14 +16,14 @@ Available Handlers:
 Example::
 
     import asyncio
-    from omnimemory.nodes.memory_storage_effect.handlers import (
+    from omnimemory.nodes.memory_storage_effect.adapters import (
         HandlerFileSystemAdapter,
-        HandlerFileSystemAdapterConfig,
+        ModelFileSystemAdapterConfig,
     )
     from pathlib import Path
 
     async def example():
-        config = HandlerFileSystemAdapterConfig(base_path=Path("/data/memory"))
+        config = ModelFileSystemAdapterConfig(base_path=Path("/data/memory"))
         adapter = HandlerFileSystemAdapter(config)
         await adapter.initialize()
 
@@ -33,12 +33,13 @@ Example::
     Initial implementation for OMN-1384.
 """
 
+from omnimemory.models.adapters import ModelFileSystemAdapterConfig
+
 from .adapter_filesystem import (
     HandlerFileSystemAdapter,
-    HandlerFileSystemAdapterConfig,
 )
 
 __all__ = [
     "HandlerFileSystemAdapter",
-    "HandlerFileSystemAdapterConfig",
+    "ModelFileSystemAdapterConfig",
 ]
