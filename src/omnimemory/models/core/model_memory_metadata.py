@@ -23,7 +23,7 @@ class ModelMemoryMetadata(BaseModel):
         description="Type of memory operation being performed",
     )
     operation_version: ModelSemVer = Field(
-        default_factory=lambda: ModelSemVer.from_string("1.0.0"),
+        default_factory=lambda: ModelSemVer.parse("1.0.0"),
         description="Version of the operation schema following semantic versioning",
     )
 

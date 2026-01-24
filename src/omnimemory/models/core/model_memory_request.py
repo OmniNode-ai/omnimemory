@@ -7,7 +7,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...enums.enum_memory_operation_type import EnumMemoryOperationType
-from ..foundation.model_contract_version import DEFAULT_CONTRACT_VERSION
 from ..foundation.model_memory_data import ModelMemoryRequestData
 from ..foundation.model_semver import ModelSemVer
 from .model_memory_context import ModelMemoryContext
@@ -21,7 +20,7 @@ class ModelMemoryRequest(BaseModel):
 
     # Contract version for schema tracking
     contract_version: ModelSemVer = Field(
-        default=DEFAULT_CONTRACT_VERSION,
+        default_factory=lambda: ModelSemVer.parse("1.0.0"),
         description="Schema version for this request contract as ModelSemVer",
     )
 

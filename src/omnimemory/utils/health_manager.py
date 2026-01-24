@@ -133,7 +133,7 @@ def _get_package_version() -> ModelSemVer:
         from importlib.metadata import PackageNotFoundError, version
 
         version_str = version("omnimemory")
-        return ModelSemVer.from_string(version_str)
+        return ModelSemVer.parse(version_str)
     except PackageNotFoundError:
         return fallback_version
     except Exception:
