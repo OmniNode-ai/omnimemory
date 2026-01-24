@@ -56,7 +56,7 @@ class TestContractValidation:
         if not contract_path.exists():
             pytest.skip(f"File not yet implemented: {contract_path}")
 
-        with open(contract_path) as f:
+        with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
 
         assert isinstance(data, dict), f"Contract must be a dict: {node_name}"
@@ -72,7 +72,7 @@ class TestContractValidation:
         if not contract_path.exists():
             pytest.skip(f"File not yet implemented: {contract_path}")
 
-        with open(contract_path) as f:
+        with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
 
         # ONEX contracts must have node_type at root level (no legacy nested format)

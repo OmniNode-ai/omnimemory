@@ -5,7 +5,7 @@ Intelligence analysis model following ONEX standards.
 from datetime import datetime, timezone
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from omnimemory.models.foundation.model_semver import ModelSemVer
 
@@ -15,7 +15,7 @@ from ...enums.enum_intelligence_operation_type import EnumIntelligenceOperationT
 class ModelIntelligenceAnalysis(BaseModel):
     """Intelligence analysis result following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Analysis identification
     analysis_id: UUID = Field(
@@ -66,6 +66,7 @@ class ModelIntelligenceAnalysis(BaseModel):
 
     # Processing information
     processing_time_ms: int = Field(
+        ge=0,
         description="Time taken to perform the analysis",
     )
     model_version: ModelSemVer = Field(
@@ -102,15 +103,27 @@ class ModelIntelligenceAnalysis(BaseModel):
     )
     validation_score: float | None = Field(
         default=None,
+        ge=0.0,
+        le=1.0,
         description="Validation score if validated",
     )
 
     # Usage tracking
     access_count: int = Field(
         default=0,
+        ge=0,
         description="Number of times this analysis has been accessed",
     )
     last_accessed_at: datetime | None = Field(
         default=None,
         description="When the analysis was last accessed",
     )
+
+    @model_validator(mode="after")
+    def _validate_validation_score(self) -> "ModelIntelligenceAnalysis":
+        """Enforce consistency between validated flag and validation_score."""
+        if self.validated and self.validation_score is None:
+            raise ValueError("validation_score is required when validated is True")
+        if not self.validated and self.validation_score is not None:
+            raise ValueError("validation_score must be None when validated is False")
+        return self

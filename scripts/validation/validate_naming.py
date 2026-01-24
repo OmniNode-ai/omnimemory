@@ -193,8 +193,22 @@ def get_directory_type(filepath: Path) -> str | None:
 
     Note: We check against STRICT_NAMING_DIRECTORIES first, then FILE_PATTERNS
     to ensure we only enforce naming in directories that require it.
+
+    Special case: If the file is in models/*/adapters/, it should follow model_*.py
+    naming, not adapter_*.py naming, because models take precedence in the
+    models/ directory hierarchy.
     """
     parent = filepath.parent.name
+    path_parts = filepath.parts
+
+    # Special case: files in models/*/adapters/ should use model_*.py naming
+    # because they're model files organized by adapter domain, not adapter implementations
+    if parent == "adapters" and "models" in path_parts:
+        models_idx = path_parts.index("models")
+        parent_idx = len(path_parts) - 2  # Index of parent directory
+        # Check if "models" is an ancestor of "adapters"
+        if models_idx < parent_idx:
+            return "models"
 
     # First check if it's a strict naming directory
     if parent in STRICT_NAMING_DIRECTORIES:

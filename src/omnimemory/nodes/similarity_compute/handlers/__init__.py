@@ -28,6 +28,8 @@ Example::
 
 from omnimemory.nodes.similarity_compute.handlers.handler_similarity_compute import (
     HandlerSimilarityCompute,
+)
+from omnimemory.nodes.similarity_compute.models import (
     ModelHandlerSimilarityComputeConfig,
 )
 

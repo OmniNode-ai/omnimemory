@@ -13,7 +13,7 @@ from omnimemory.models.foundation.model_semver import ModelSemVer
 class ModelSemanticAnalysisResult(BaseModel):
     """Semantic analysis result following ONEX standards."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Result identification
     result_id: UUID = Field(
@@ -108,7 +108,8 @@ class ModelSemanticAnalysisResult(BaseModel):
         description="Semantic version of the semantic model",
     )
     processing_time_ms: int = Field(
-        description="Time taken for semantic analysis",
+        ge=0,
+        description="Time taken for semantic analysis in milliseconds",
     )
 
     # Temporal information

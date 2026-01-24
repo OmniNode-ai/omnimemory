@@ -32,7 +32,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 # Type variable for generic function return types
 F = TypeVar("F", bound=Callable[..., Any])
@@ -40,7 +40,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 from uuid import uuid4
 
 import structlog
-from pydantic import BaseModel, Field
 
 from ..models.foundation.model_connection_metadata import (
     ConnectionMetadata,
@@ -52,6 +51,9 @@ from .observability import (
     correlation_context,
     trace_operation,
 )
+
+if TYPE_CHECKING:
+    from ..models.utils.model_concurrency import ModelConnectionPoolConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -125,30 +127,6 @@ class SemaphoreStats:
     average_hold_time: float = 0.0
     max_hold_time: float = 0.0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class ConnectionPoolConfig(BaseModel):
-    """Configuration for connection pools."""
-
-    name: str = Field(description="Pool name")
-    min_connections: int = Field(default=1, ge=0, description="Minimum connections")
-    max_connections: int = Field(
-        default=50,
-        ge=1,
-        description="Maximum connections (increased for production load)",
-    )
-    connection_timeout: float = Field(
-        default=30.0, gt=0, description="Connection timeout"
-    )
-    idle_timeout: float = Field(
-        default=300.0, gt=0, description="Idle connection timeout"
-    )
-    health_check_interval: float = Field(
-        default=60.0, gt=0, description="Health check interval"
-    )
-    retry_attempts: int = Field(
-        default=3, ge=0, description="Retry attempts for failed connections"
-    )
 
 
 @dataclass
@@ -476,7 +454,7 @@ class AsyncConnectionPool:
 
     def __init__(
         self,
-        config: ConnectionPoolConfig,
+        config: ModelConnectionPoolConfig,
         create_connection: Callable[[], Any],
         validate_connection: Callable[[Any], bool] | None = None,
         close_connection: Callable[[Any], None] | None = None,
@@ -863,7 +841,7 @@ async def get_fair_semaphore(name: str, permits: int) -> FairSemaphore:
 
 async def register_connection_pool(
     name: str,
-    config: ConnectionPoolConfig,
+    config: ModelConnectionPoolConfig,
     create_connection: Callable[[], Any],
     validate_connection: Callable[[Any], bool] | None = None,
     close_connection: Callable[[Any], None] | None = None,

@@ -37,6 +37,8 @@
 # validate-no-backward-compatibility| onex-validation          | python scripts/validation/validate_no_backward_compatibility.py -d src/
 # validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
 # validate-naming-conventions       | onex-validation          | python scripts/validation/validate_naming.py src/
+# validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
+# validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
 #
 # IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
 #
@@ -230,6 +232,32 @@ repos:
       - id: validate-naming-conventions
         name: ONEX Naming Convention Validation
         entry: python scripts/validation/validate_naming.py
+        args: ['src/']
+        language: python
+        pass_filenames: false
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # HTTP Import Boundary Enforcement (OMN-1391)
+      # Ensures direct HTTP client imports (httpx, requests) are only in adapter layer
+      # This enforces the contract boundary principle for external HTTP calls
+      - id: validate-http-imports
+        name: ONEX HTTP Import Boundary Enforcement
+        entry: python scripts/validation/validate_http_imports.py
+        args: ['src/']
+        language: python
+        pass_filenames: false
+        files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # Pydantic Model Location Enforcement (ONEX compliance)
+      # Ensures Pydantic models are in approved directories (models/, nodes/*/models/, protocols/)
+      # This enforces ONEX architectural patterns for model organization
+      - id: validate-model-locations
+        name: ONEX Pydantic Model Location Enforcement
+        entry: python scripts/validation/validate_model_locations.py
         args: ['src/']
         language: python
         pass_filenames: false

@@ -12,7 +12,7 @@ import sys
 def validate_file_syntax(file_path: str) -> tuple[bool, str]:
     """Validate Python file syntax."""
     try:
-        with open(file_path, "r") as f:
+        with open(file_path, encoding="utf-8") as f:
             source = f.read()
 
         # Compile to check syntax
@@ -89,7 +89,7 @@ def check_model_completeness():
     )
 
     if os.path.exists(migration_model_path):
-        with open(migration_model_path, "r") as f:
+        with open(migration_model_path, encoding="utf-8") as f:
             content = f.read()
 
         required_classes = [
@@ -131,7 +131,7 @@ def validate_integration_patterns():
     utils_init_path = "src/omnimemory/utils/__init__.py"
 
     if os.path.exists(utils_init_path):
-        with open(utils_init_path, "r") as f:
+        with open(utils_init_path, encoding="utf-8") as f:
             content = f.read()
 
         required_imports = [

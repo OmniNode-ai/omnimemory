@@ -3,18 +3,17 @@
 # ONEX 4.0 Compliant Architecture Contract
 
 # Contract schema version - tracks the contract format itself
-# Follows semantic versioning: MAJOR.MINOR.PATCH
+# Follows semantic versioning: MAJOR.MINOR.PATCH using ModelSemVer structured format
 # - MAJOR: Breaking changes to contract schema
 # - MINOR: Backwards-compatible additions to schema
 # - PATCH: Documentation or cosmetic changes
-contract_version: "1.0.0"
+contract_version: {major: 1, minor: 0, patch: 0}
 
 contract:
   name: omnimemory
-  version: 1.0.0
   # Node version tracks the implementation version of this node
   # Follows semantic versioning independent of contract_version
-  node_version: "1.0.0"
+  node_version: {major: 1, minor: 0, patch: 0}
   description: Advanced memory management system following ONEX 4-node architecture
   architecture:
     pattern: onex_4_node

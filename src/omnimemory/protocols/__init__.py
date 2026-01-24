@@ -57,6 +57,7 @@ from .error_models import (  # Error handling; Error codes
     ProtocolSystemError,
     ProtocolValidationError,
 )
+from .protocol_embedding import ProtocolEmbeddingClient, ProtocolRateLimiter
 from .protocol_secrets_provider import ProtocolSecretsProvider
 
 __all__ = [
@@ -112,4 +113,7 @@ __all__ = [
     "EnumOmniMemoryErrorCode",
     # Secrets provider
     "ProtocolSecretsProvider",
+    # Embedding and rate limiting protocols (contract boundary)
+    "ProtocolEmbeddingClient",
+    "ProtocolRateLimiter",
 ]

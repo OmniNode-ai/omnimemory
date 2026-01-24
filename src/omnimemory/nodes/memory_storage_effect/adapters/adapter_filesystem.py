@@ -14,12 +14,12 @@ Example::
     import asyncio
     from omnimemory.nodes.memory_storage_effect.handlers import (
         HandlerFileSystemAdapter,
-        HandlerFileSystemAdapterConfig,
+        ModelFileSystemAdapterConfig,
     )
     from pathlib import Path
 
     async def example():
-        config = HandlerFileSystemAdapterConfig(base_path=Path("/data/memory"))
+        config = ModelFileSystemAdapterConfig(base_path=Path("/data/memory"))
         adapter = HandlerFileSystemAdapter(config)
         await adapter.initialize()
 
@@ -41,7 +41,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 # omnibase_infra is a dev dependency - make imports conditional
 # to allow test collection and provide clear error messages
@@ -71,13 +71,18 @@ except ImportError as e:
             )
 
 
-from ..models import ModelMemoryStorageRequest, ModelMemoryStorageResponse
+from omnimemory.models.adapters import ModelFileSystemAdapterConfig
+
+from ..models import (
+    ModelMemoryStorageRequest,
+    ModelMemoryStorageResponse,
+)
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerFileSystemAdapter",
-    "HandlerFileSystemAdapterConfig",
+    "ModelFileSystemAdapterConfig",
 ]
 
 
@@ -185,34 +190,6 @@ def _is_permission_denied_infra_error(error: InfraConnectionError) -> bool:
     return "permission denied" in message or "access denied" in message
 
 
-class HandlerFileSystemAdapterConfig(BaseModel):
-    """Configuration for FileSystem adapter.
-
-    Attributes:
-        base_path: Base path for memory storage. All snapshots will be stored
-            under this directory.
-        snapshots_dir: Subdirectory name for storing snapshot JSON files.
-            Defaults to "snapshots".
-        max_file_size: Maximum file size in bytes for read/write operations.
-            Defaults to 10MB.
-    """
-
-    model_config = ConfigDict(strict=True, arbitrary_types_allowed=True)
-
-    base_path: Path = Field(
-        ...,
-        description="Base path for memory storage",
-    )
-    snapshots_dir: str = Field(
-        default="snapshots",
-        description="Subdirectory for snapshots",
-    )
-    max_file_size: int = Field(
-        default=10 * 1024 * 1024,
-        description="Maximum file size in bytes (default 10MB)",
-    )
-
-
 class HandlerFileSystemAdapter:
     """Adapter that wraps HandlerFileSystem for memory storage operations.
 
@@ -238,7 +215,7 @@ class HandlerFileSystemAdapter:
     Example::
 
         async def example():
-            config = HandlerFileSystemAdapterConfig(base_path=Path("/data"))
+            config = ModelFileSystemAdapterConfig(base_path=Path("/data"))
             adapter = HandlerFileSystemAdapter(config)
             await adapter.initialize()
 
@@ -251,7 +228,7 @@ class HandlerFileSystemAdapter:
             assert response.status == "success"
     """
 
-    def __init__(self, config: HandlerFileSystemAdapterConfig) -> None:
+    def __init__(self, config: ModelFileSystemAdapterConfig) -> None:
         """Initialize the adapter with configuration.
 
         Args:
@@ -264,7 +241,7 @@ class HandlerFileSystemAdapter:
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> HandlerFileSystemAdapterConfig:
+    def config(self) -> ModelFileSystemAdapterConfig:
         """Get the adapter configuration."""
         return self._config
 

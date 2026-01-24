@@ -26,7 +26,9 @@ __all__ = ["ModelAdapterIntentGraphConfig"]
 _CYPHER_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-class ModelAdapterIntentGraphConfig(BaseModel):
+class ModelAdapterIntentGraphConfig(  # omnimemory-model-exempt: adapter-internal config
+    BaseModel
+):
     """Configuration for the Intent Graph adapter.
 
     Controls connection settings, graph schema configuration, and query

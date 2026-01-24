@@ -254,7 +254,7 @@ class TestFoundationArchitecture:
         if not contract_path.exists():
             pytest.skip(f"contract.yaml not found at {contract_path}")
 
-        with open(contract_path) as f:
+        with open(contract_path, encoding="utf-8") as f:
             contract_data = yaml.safe_load(f)
 
         # Verify contract structure
