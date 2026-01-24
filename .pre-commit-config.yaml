@@ -10,7 +10,7 @@
 # ====================================
 # - pyproject.toml: ruff settings [tool.ruff], mypy settings [tool.mypy]
 #   - Ruff version: 0.8.6 (synchronized with pre-commit repo)
-#   - Mypy version: 1.14.1 (synchronized with pre-commit mirror)
+#   - Mypy version: uses poetry env (local hook, matches CI exactly)
 #   - Pyright version: 1.1.391 (synchronized with pre-commit repo)
 # - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
 #
@@ -130,23 +130,19 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-  # Type checking with mypy (using official mirror for CI compatibility)
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.1
+  # Type checking with mypy (using local environment for exact CI match)
+  # NOTE: Uses language: system with poetry to ensure identical mypy config,
+  # dependencies, and type stubs as CI. The mirrors-mypy approach failed to
+  # pick up pyproject.toml overrides for redis modules.
+  - repo: local
     hooks:
       - id: mypy
         name: mypy (type checking - strict)
         # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
-        # Both pre-commit and CI use same flags for consistent output
-        args: [--show-error-codes, --no-error-summary, src/omnimemory]
+        entry: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
+        language: system
+        types: [python]
         pass_filenames: false
-        # Include pydantic, pydantic-settings for the mypy plugin,
-        # and redis, httpx for type checking (must match CI environment)
-        additional_dependencies:
-          - pydantic>=2.10.0
-          - pydantic-settings>=2.7.0
-          - redis>=6.4.0
-          - httpx>=0.28.0
         stages: [pre-push]
 
   # Type checking with pyright (using official repo for CI compatibility)
