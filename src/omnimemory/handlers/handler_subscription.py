@@ -4,7 +4,7 @@ This module provides the core subscription management functionality:
 - subscribe(): Register agent subscriptions to memory topics
 - unsubscribe(): Remove agent subscriptions
 - notify(): Publish notification events to Kafka for subscriber consumption
-- list_subscriptions(): Get all subscriptions for an agent
+- list_subscriptions(): Get subscriptions for an agent (with optional pagination)
 
 Architecture:
 - Persistence: Valkey (fast lookups) + PostgreSQL (source of truth)
@@ -749,21 +749,55 @@ class HandlerSubscription:
     async def list_subscriptions(
         self,
         agent_id: str,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[ModelSubscription]:
-        """Get all subscriptions for an agent.
+        """Get subscriptions for an agent with optional pagination.
+
+        When pagination parameters are provided (limit is not None), this method
+        queries the database directly to ensure consistent ordering. When no
+        pagination is requested, it uses the Valkey cache for performance.
 
         Args:
             agent_id: The agent's identifier.
+            limit: Maximum number of subscriptions to return. None means no limit
+                (returns all subscriptions, backward compatible default).
+            offset: Number of subscriptions to skip (default 0). Only meaningful
+                when limit is provided.
 
         Returns:
-            List of subscriptions for the agent.
+            List of subscriptions for the agent, ordered by created_at DESC.
 
         Raises:
             RuntimeError: If handler is not initialized.
+            ValueError: If offset is negative or limit is non-positive.
+
+        Example:
+            # Get all subscriptions (backward compatible)
+            all_subs = await handler.list_subscriptions("agent_123")
+
+            # Get first 10 subscriptions
+            first_page = await handler.list_subscriptions("agent_123", limit=10)
+
+            # Get next 10 subscriptions
+            second_page = await handler.list_subscriptions("agent_123", limit=10, offset=10)
         """
         valkey, _, _ = self._ensure_initialized()
 
-        # Try Valkey cache first
+        # Validate pagination parameters
+        if offset < 0:
+            raise ValueError(f"offset must be non-negative, got {offset}")
+        if limit is not None and limit <= 0:
+            raise ValueError(f"limit must be positive when provided, got {limit}")
+
+        # For paginated queries, always use database to ensure consistent ordering
+        # Cache-based retrieval doesn't guarantee order, making pagination unreliable
+        if limit is not None:
+            return await self._get_subscriptions_from_db(
+                agent_id, limit=limit, offset=offset
+            )
+
+        # Non-paginated: Try Valkey cache first for performance
         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
         subscription_ids = await valkey.smembers(agent_key)
 
@@ -904,29 +938,53 @@ class HandlerSubscription:
     async def _get_subscriptions_from_db(
         self,
         agent_id: str,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[ModelSubscription]:
-        """Get all active subscriptions for an agent from database.
+        """Get active subscriptions for an agent from database with optional pagination.
 
         Args:
             agent_id: The agent's identifier.
+            limit: Maximum number of subscriptions to return. None means no limit.
+            offset: Number of subscriptions to skip (default 0).
 
         Returns:
-            List of subscriptions.
+            List of subscriptions ordered by created_at DESC.
         """
         _, db_handler, _ = self._ensure_initialized()
 
-        sql = """
-            SELECT id, agent_id, topic, status,
-                   created_at, updated_at, metadata
-            FROM subscriptions
-            WHERE agent_id = $1 AND status = $2
-            ORDER BY created_at DESC
-        """
+        # Build SQL with optional pagination
+        # Base query always includes agent_id and status filters
+        if limit is not None:
+            sql = """
+                SELECT id, agent_id, topic, status,
+                       created_at, updated_at, metadata
+                FROM subscriptions
+                WHERE agent_id = $1 AND status = $2
+                ORDER BY created_at DESC
+                LIMIT $3 OFFSET $4
+            """
+            parameters: list[str | int] = [
+                agent_id,
+                EnumSubscriptionStatus.ACTIVE.value,
+                limit,
+                offset,
+            ]
+        else:
+            sql = """
+                SELECT id, agent_id, topic, status,
+                       created_at, updated_at, metadata
+                FROM subscriptions
+                WHERE agent_id = $1 AND status = $2
+                ORDER BY created_at DESC
+            """
+            parameters = [agent_id, EnumSubscriptionStatus.ACTIVE.value]
+
         envelope = {
             "operation": "db.query",
             "payload": {
                 "sql": sql,
-                "parameters": [agent_id, EnumSubscriptionStatus.ACTIVE.value],
+                "parameters": parameters,
             },
         }
         result = await db_handler.execute(envelope)
@@ -1186,8 +1244,17 @@ class HandlerSubscription:
     async def health_check(self) -> ModelSubscriptionHealth:
         """Check if all handler components are healthy.
 
+        Performs health checks on Valkey, database, and Kafka handlers.
+        Component health is reported as:
+        - True: Component is healthy and responding
+        - False: Component is unhealthy or failed health check
+        - None: Health status is indeterminate (e.g., handler lacks health_check method)
+
+        The overall is_healthy is conservative: only True when ALL components
+        are explicitly healthy. Indeterminate (None) states are NOT considered healthy.
+
         Returns:
-            ModelSubscriptionHealth with detailed status.
+            ModelSubscriptionHealth with detailed status for each component.
         """
         if not self._initialized:
             return ModelSubscriptionHealth(
@@ -1226,7 +1293,7 @@ class HandlerSubscription:
                 errors.append(f"Database check failed: {e}")
 
         # Check Kafka
-        kafka_healthy = False
+        kafka_healthy: bool | None = False
         if self._kafka_handler:
             try:
                 # Call health_check if available (EventBusKafka has this method)
@@ -1240,16 +1307,21 @@ class HandlerSubscription:
                             f"Kafka: unhealthy (circuit_state={circuit_state})"
                         )
                 else:
-                    # Fallback: assume healthy if handler exists and is started
+                    # Fallback: health status is indeterminate
                     logger.warning(
-                        "Kafka handler does not expose health_check() method, "
-                        "assuming healthy - this may mask connection issues"
+                        "Kafka handler does not expose health_check() method - "
+                        "connection health is indeterminate. "
+                        "Consider upgrading omnibase_infra to get proper health checks."
                     )
-                    kafka_healthy = True
+                    kafka_healthy = None  # Indeterminate, not assumed healthy
             except Exception as e:
                 errors.append(f"Kafka check failed: {e}")
 
-        is_healthy = valkey_healthy and db_healthy and kafka_healthy
+        # Only fully healthy if all components are explicitly True
+        # Conservative: unknown (None) states are NOT considered healthy
+        is_healthy = (
+            valkey_healthy is True and db_healthy is True and kafka_healthy is True
+        )
 
         return ModelSubscriptionHealth(
             is_healthy=is_healthy,
