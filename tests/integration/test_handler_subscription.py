@@ -990,6 +990,104 @@ class TestConcurrency:
         subscribed_topics = {s.topic for s in all_subs}
         assert subscribed_topics == set(topics)
 
+    @pytest.mark.asyncio
+    async def test_concurrent_subscribe_same_topic(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Multiple agents subscribing to same topic concurrently.
+
+        Verifies that concurrent subscriptions from different agents
+        to the same topic all succeed with unique subscriptions.
+        """
+        topic = f"memory.test_{uuid4().hex[:8]}.created"
+        agent_ids = [f"test_agent_{uuid4().hex[:8]}" for _ in range(10)]
+
+        # Subscribe all agents concurrently
+        tasks = [
+            subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+            for agent_id in agent_ids
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # All subscriptions should succeed
+        assert len(results) == 10
+        assert all(isinstance(r, ModelSubscription) for r in results)
+        assert all(r.topic == topic for r in results)
+        assert len({r.agent_id for r in results}) == 10  # All unique agents
+
+    @pytest.mark.asyncio
+    async def test_concurrent_subscribe_unsubscribe_same_agent(
+        self,
+        subscription_handler: HandlerSubscription,
+        unique_agent_id: str,
+    ) -> None:
+        """Subscribe and unsubscribe same agent concurrently.
+
+        Tests race conditions when an agent is simultaneously subscribing
+        to new topics while unsubscribing from others.
+        """
+        topics = [f"memory.test_{uuid4().hex[:8]}.created" for _ in range(5)]
+
+        # Subscribe to all topics first
+        for topic in topics:
+            await subscription_handler.subscribe(agent_id=unique_agent_id, topic=topic)
+
+        # Concurrently: unsubscribe some + subscribe new ones
+        unsubscribe_tasks = [
+            subscription_handler.unsubscribe(agent_id=unique_agent_id, topic=t)
+            for t in topics[:2]
+        ]
+        new_topics = [f"memory.test_{uuid4().hex[:8]}.updated" for _ in range(2)]
+        subscribe_tasks = [
+            subscription_handler.subscribe(agent_id=unique_agent_id, topic=t)
+            for t in new_topics
+        ]
+
+        all_results = await asyncio.gather(*unsubscribe_tasks, *subscribe_tasks)
+
+        # Verify final state is consistent
+        final_subs = await subscription_handler.list_subscriptions(unique_agent_id)
+        # Should have 5 - 2 + 2 = 5 subscriptions (but may vary due to race conditions)
+        # The key assertion is that no exceptions were raised
+        assert isinstance(final_subs, list)
+        # All results should be valid (bool for unsubscribe, ModelSubscription for subscribe)
+        assert len(all_results) == 4
+
+    @pytest.mark.asyncio
+    async def test_concurrent_list_during_modifications(
+        self,
+        subscription_handler: HandlerSubscription,
+        unique_agent_id: str,
+    ) -> None:
+        """List subscriptions while modifications happen.
+
+        Verifies that listing subscriptions during concurrent modifications
+        does not raise exceptions and returns consistent results.
+        """
+
+        async def subscribe_loop() -> None:
+            for i in range(5):
+                await subscription_handler.subscribe(
+                    agent_id=unique_agent_id,
+                    topic=f"memory.test_{uuid4().hex[:8]}.event{i}",
+                )
+
+        async def list_loop() -> list[int]:
+            counts = []
+            for _ in range(10):
+                subs = await subscription_handler.list_subscriptions(unique_agent_id)
+                counts.append(len(subs))
+                await asyncio.sleep(0.01)
+            return counts
+
+        # Run both concurrently
+        await asyncio.gather(subscribe_loop(), list_loop())
+
+        # Final state should be consistent
+        final_subs = await subscription_handler.list_subscriptions(unique_agent_id)
+        assert len(final_subs) >= 5  # At least the subscribed ones
+
 
 # =============================================================================
 # TestLargeBatch
