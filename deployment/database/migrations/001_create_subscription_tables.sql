@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_agent_created_desc
 -- ============================================================================
 
 -- Function to update updated_at timestamp automatically
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION omnimemory_update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -65,11 +65,11 @@ END;
 $$ language 'plpgsql';
 
 -- Trigger for subscriptions table
-DROP TRIGGER IF EXISTS trigger_subscriptions_updated_at ON subscriptions;
-CREATE TRIGGER trigger_subscriptions_updated_at
+DROP TRIGGER IF EXISTS omnimemory_trigger_subscriptions_updated_at ON subscriptions;
+CREATE TRIGGER omnimemory_trigger_subscriptions_updated_at
     BEFORE UPDATE ON subscriptions
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+    EXECUTE FUNCTION omnimemory_update_updated_at_column();
 
 -- ============================================================================
 -- Comments

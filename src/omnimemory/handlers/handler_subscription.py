@@ -86,10 +86,6 @@ from omnimemory.models.subscription import (
     ModelNotificationEvent,
     ModelSubscription,
 )
-from omnimemory.models.subscription.constants import (
-    TOPIC_PATTERN,
-    TOPIC_VALIDATION_ERROR,
-)
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -223,6 +219,12 @@ class ModelHandlerSubscriptionConfig(BaseModel):
     kafka_notification_topic: str = Field(
         default=KAFKA_TOPIC_MEMORY_NOTIFICATIONS,
         description="Kafka topic for memory notification events",
+    )
+    pagination_max_limit: int = Field(
+        default=1000,
+        ge=1,
+        le=10000,
+        description="Maximum allowed limit for pagination queries",
     )
 
 
@@ -531,9 +533,8 @@ class HandlerSubscription:
         """
         valkey, _, _ = self._ensure_initialized()
 
-        # Validate topic format
-        if not TOPIC_PATTERN.match(topic):
-            raise ValueError(TOPIC_VALIDATION_ERROR.format(topic=topic))
+        # Topic format validation happens in ModelSubscription via field_validator
+        # (memory.<entity>.<event> pattern enforced on model instantiation)
 
         # Generate subscription ID
         subscription_id = str(uuid4())
@@ -806,6 +807,10 @@ class HandlerSubscription:
             raise ValueError(f"offset must be non-negative, got {offset}")
         if limit is not None and limit <= 0:
             raise ValueError(f"limit must be positive when provided, got {limit}")
+        if limit is not None and limit > self._config.pagination_max_limit:
+            raise ValueError(
+                f"limit exceeds maximum ({self._config.pagination_max_limit}), got {limit}"
+            )
 
         # For paginated queries, always use database to ensure consistent ordering
         # Cache-based retrieval doesn't guarantee order, making pagination unreliable
@@ -1157,10 +1162,11 @@ class HandlerSubscription:
         rows = result.result.get("payload", {}).get("rows", [])
         subscription_ids = {str(row["id"]) for row in rows}
 
-        # Rebuild cache for this topic
+        # Rebuild cache for this topic (atomic pipeline to prevent TTL-less entries)
         if subscription_ids:
-            await valkey.sadd(topic_key, *subscription_ids)
-            await valkey.expire(topic_key, self._config.cache_ttl_seconds)
+            async with valkey.pipeline() as pipe:
+                pipe.sadd(topic_key, *subscription_ids)
+                pipe.expire(topic_key, self._config.cache_ttl_seconds)
 
         return subscription_ids
 
