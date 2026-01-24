@@ -884,7 +884,8 @@ class AdapterIntentGraph:
 
         Args:
             time_range_hours: Number of hours to look back from now.
-                Defaults to 24 hours.
+                Defaults to 24 hours. Values less than 1 are clamped to
+                a minimum of 1 hour.
 
         Returns:
             ModelIntentDistributionResult with distribution data or error status.
