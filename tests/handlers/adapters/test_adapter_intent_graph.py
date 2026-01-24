@@ -658,16 +658,22 @@ class TestIntentCypherTemplates:
 
     def test_create_indexes_queries_returns_list(self) -> None:
         """Test create_indexes_queries returns list of index creation queries."""
-        queries = IntentCypherTemplates.create_indexes_queries("Session", "Intent")
+        queries = IntentCypherTemplates.create_indexes_queries(
+            "Session", "Intent", "HAD_INTENT"
+        )
 
         assert isinstance(queries, list)
-        assert len(queries) == 4  # session_id, intent_id, intent_category, created_at
+        # 4 node property indexes + 1 edge property index
+        assert len(queries) == 5
 
-        # Check for expected indexes
+        # Check for expected node property indexes
         assert any("session_id" in q for q in queries)
         assert any("intent_id" in q for q in queries)
         assert any("intent_category" in q for q in queries)
         assert any("created_at_utc" in q for q in queries)
+
+        # Check for edge property index on relationship timestamp
+        assert any("timestamp_utc" in q and "EDGE INDEX" in q for q in queries)
 
         # Verify IF NOT EXISTS syntax is used for idempotent index creation
         for query in queries:
@@ -676,16 +682,20 @@ class TestIntentCypherTemplates:
     def test_create_indexes_queries_uses_configured_labels(self) -> None:
         """Test create_indexes_queries uses the configured labels."""
         queries = IntentCypherTemplates.create_indexes_queries(
-            "CustomSession", "CustomIntent"
+            "CustomSession", "CustomIntent", "CUSTOM_HAD_INTENT"
         )
 
-        # Should use custom labels
+        # Should use custom labels for node indexes
         assert any(":CustomSession" in q for q in queries)
         assert any(":CustomIntent" in q for q in queries)
+
+        # Should use custom relationship type for edge index
+        assert any(":CUSTOM_HAD_INTENT" in q for q in queries)
 
         # Should NOT use defaults
         assert not any(":Session" in q and "Custom" not in q for q in queries)
         assert not any(":Intent" in q and "Custom" not in q for q in queries)
+        assert not any(":HAD_INTENT" in q and "CUSTOM" not in q for q in queries)
 
     def test_count_sessions_query_structure(self) -> None:
         """Test count_sessions_query template structure."""
@@ -896,8 +906,8 @@ class TestLifecycle:
                 )
 
             assert adapter.is_initialized
-            # Should have 4 index creation calls
-            assert mock_instance.execute_query.call_count == 4
+            # Should have 5 index creation calls (4 node + 1 edge property index)
+            assert mock_instance.execute_query.call_count == 5
 
     @pytest.mark.asyncio
     async def test_initialize_handles_index_creation_errors(

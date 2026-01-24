@@ -160,18 +160,39 @@ class IntentCypherTemplates:
         """
 
     @staticmethod
-    def create_indexes_queries(session_label: str, intent_label: str) -> list[str]:
+    def create_indexes_queries(
+        session_label: str, intent_label: str, rel_type: str
+    ) -> list[str]:
         """Generate index creation queries for intent graph schema.
 
         Uses ``CREATE INDEX IF NOT EXISTS`` syntax (Memgraph 2.0+) to ensure
         idempotent index creation without relying on error handling for
         duplicate index detection.
+
+        Args:
+            session_label: Label for session nodes (e.g., "Session").
+            intent_label: Label for intent nodes (e.g., "Intent").
+            rel_type: Relationship type connecting sessions to intents
+                (e.g., "HAD_INTENT").
+
+        Returns:
+            List of index creation queries for both node properties and
+            relationship properties.
+
+        Note:
+            Memgraph 2.0+ supports edge property indexes via the
+            ``CREATE EDGE INDEX`` syntax. The ``timestamp_utc`` property
+            on relationships is indexed to optimize temporal queries that
+            filter or order by relationship timestamp.
         """
         return [
+            # Node property indexes
             f"CREATE INDEX IF NOT EXISTS ON :{session_label}(session_id);",
             f"CREATE INDEX IF NOT EXISTS ON :{intent_label}(intent_id);",
             f"CREATE INDEX IF NOT EXISTS ON :{intent_label}(intent_category);",
             f"CREATE INDEX IF NOT EXISTS ON :{intent_label}(created_at_utc);",
+            # Edge property index for temporal queries on relationship timestamp
+            f"CREATE EDGE INDEX IF NOT EXISTS ON :{rel_type}(timestamp_utc);",
         ]
 
     @staticmethod
@@ -436,6 +457,7 @@ class AdapterIntentGraph:
         index_queries = IntentCypherTemplates.create_indexes_queries(
             session_label=self._config.session_node_label,
             intent_label=self._config.intent_node_label,
+            rel_type=self._config.relationship_type,
         )
 
         successful = 0
@@ -582,18 +604,26 @@ class AdapterIntentGraph:
                 if result.records:
                     record = result.records[0]
                     was_created = bool(record.get("was_created", False))
-                    # Parse UUID from database string, fallback to generated UUID
+                    # Parse UUID from database string.
+                    # We generated intent_id above and passed it to the query, so the
+                    # database should return it unchanged. If it returns an invalid UUID,
+                    # that indicates a database issue (corruption, schema mismatch, etc.)
+                    # We use our generated UUID since we know it's valid.
                     db_intent_id = record.get("intent_id")
                     if isinstance(db_intent_id, str):
                         try:
                             returned_intent_id = UUID(db_intent_id)
                         except ValueError:
-                            logger.debug(
-                                "Failed to parse intent_id UUID from database: %s, "
-                                "using generated UUID",
+                            # Database returned invalid UUID - this is unexpected since we
+                            # passed a valid UUID in the query. Log as warning for
+                            # investigation but continue with our generated UUID.
+                            logger.warning(
+                                "Database returned invalid intent_id UUID: %s. "
+                                "This may indicate database corruption or schema issues. "
+                                "Using generated UUID %s instead.",
                                 db_intent_id,
+                                intent_id,
                             )
-                            returned_intent_id = intent_id
 
                 logger.info(
                     "Stored intent for session %s: category=%s, confidence=%.2f, created=%s",
@@ -732,13 +762,20 @@ class AdapterIntentGraph:
                 for record in result.records:
                     intent_id_raw = record.get("intent_id")
                     if not isinstance(intent_id_raw, str):
+                        logger.warning(
+                            "Skipping intent record with missing or non-string intent_id: %s",
+                            intent_id_raw,
+                        )
                         continue
 
                     # Parse UUID from database string
                     try:
                         intent_id = UUID(intent_id_raw)
                     except ValueError:
-                        logger.warning("Invalid intent_id UUID: %s", intent_id_raw)
+                        logger.warning(
+                            "Skipping intent record with invalid intent_id UUID: %s",
+                            intent_id_raw,
+                        )
                         continue
 
                     keywords_raw = record.get("keywords", [])
@@ -772,8 +809,11 @@ class AdapterIntentGraph:
                     try:
                         created_at_utc = datetime.fromisoformat(str(created_at_raw))
                     except ValueError:
-                        logger.warning("Invalid created_at_utc: %s", created_at_raw)
-                        created_at_utc = datetime.now(UTC)
+                        logger.warning(
+                            "Skipping intent record with invalid created_at_utc: %s",
+                            created_at_raw,
+                        )
+                        continue
 
                     intents.append(
                         ModelIntentRecord(
