@@ -279,7 +279,9 @@ class TestSubscribe:
         unique_agent_id: str,
     ) -> None:
         """Subscribe with invalid topic format raises ValueError."""
-        with pytest.raises(ValueError, match="Topic must match pattern"):
+        with pytest.raises(
+            ValueError, match="subscribe\\(\\) received invalid topic format"
+        ):
             await subscription_handler.subscribe(
                 agent_id=unique_agent_id,
                 topic="invalid-topic-format",

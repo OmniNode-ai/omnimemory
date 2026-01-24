@@ -86,6 +86,7 @@ from omnimemory.models.subscription import (
     ModelNotificationEvent,
     ModelSubscription,
 )
+from omnimemory.models.subscription.constants import TOPIC_PATTERN
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -112,6 +113,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "HandlerSubscription",
     "ModelHandlerSubscriptionConfig",
+    "ModelPaginatedSubscriptions",
     "ModelSubscriptionHealth",
     "ModelSubscriptionMetrics",
 ]
@@ -120,9 +122,6 @@ __all__ = [
 CACHE_KEY_TOPIC_SUBSCRIBERS = "topic:{topic}:subscribers"
 CACHE_KEY_AGENT_SUBSCRIPTIONS = "agent:{agent_id}:subscriptions"
 CACHE_KEY_SUBSCRIPTION = "subscription:{subscription_id}"
-
-# Kafka topic for memory notifications
-KAFKA_TOPIC_MEMORY_NOTIFICATIONS = "omnimemory.memory.notification.v1"
 
 
 @lru_cache(maxsize=128)
@@ -217,7 +216,7 @@ class ModelHandlerSubscriptionConfig(BaseModel):
         description="TTL for cached subscription data",
     )
     kafka_notification_topic: str = Field(
-        default=KAFKA_TOPIC_MEMORY_NOTIFICATIONS,
+        default="omnimemory.memory.notification.v1",
         description="Kafka topic for memory notification events",
     )
     pagination_max_limit: int = Field(
@@ -315,6 +314,42 @@ class ModelSubscriptionHealth(BaseModel):
     metrics: ModelSubscriptionMetrics | None = Field(
         default=None,
         description="Handler metrics for observability",
+    )
+
+
+class ModelPaginatedSubscriptions(BaseModel):
+    """Paginated subscription list response.
+
+    Returned by list_subscriptions() when pagination parameters are provided.
+    Contains the subscription list along with pagination metadata for UI support.
+
+    Attributes:
+        subscriptions: List of subscriptions for the current page.
+        total_count: Total number of subscriptions matching the query.
+        limit: Requested limit (None if no pagination).
+        offset: Requested offset.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    subscriptions: list[ModelSubscription] = Field(
+        description="List of subscriptions for the current page",
+    )
+    total_count: int = Field(
+        ge=0,
+        description="Total number of subscriptions matching the query",
+    )
+    limit: int | None = Field(
+        default=None,
+        description="Requested limit (None if no pagination)",
+    )
+    offset: int = Field(
+        default=0,
+        ge=0,
+        description="Requested offset",
     )
 
 
@@ -533,8 +568,13 @@ class HandlerSubscription:
         """
         valkey, _, _ = self._ensure_initialized()
 
-        # Topic format validation happens in ModelSubscription via field_validator
-        # (memory.<entity>.<event> pattern enforced on model instantiation)
+        # Early topic validation with clear error message for better debugging
+        # (ModelSubscription also validates, but this provides subscribe()-specific context)
+        if not TOPIC_PATTERN.match(topic):
+            raise ValueError(
+                f"subscribe() received invalid topic format: '{topic}'. "
+                f"Expected pattern: memory.<entity>.<event> (e.g., memory.item.created)"
+            )
 
         # Generate subscription ID
         subscription_id = str(uuid4())
@@ -754,12 +794,14 @@ class HandlerSubscription:
         agent_id: str,
         limit: int | None = None,
         offset: int = 0,
-    ) -> list[ModelSubscription]:
+    ) -> list[ModelSubscription] | ModelPaginatedSubscriptions:
         """Get subscriptions for an agent with optional pagination.
 
         When pagination parameters are provided (limit is not None), this method
-        queries the database directly to ensure consistent ordering. When no
-        pagination is requested, it uses the Valkey cache for performance.
+        queries the database directly to ensure consistent ordering and returns
+        a ModelPaginatedSubscriptions response with total_count for UI pagination.
+        When no pagination is requested, it uses the Valkey cache for performance
+        and returns a plain list for backward compatibility.
 
         Args:
             agent_id: The agent's identifier.
@@ -769,18 +811,23 @@ class HandlerSubscription:
                 when limit is provided.
 
         Returns:
-            List of subscriptions for the agent, ordered by created_at DESC.
+            - When limit is None: list[ModelSubscription] (backward compatible)
+            - When limit is provided: ModelPaginatedSubscriptions with total_count
 
         Raises:
             RuntimeError: If handler is not initialized.
             ValueError: If offset is negative or limit is non-positive.
 
         Example:
-            # Get all subscriptions (backward compatible)
+            # Get all subscriptions (backward compatible, returns list)
             all_subs = await handler.list_subscriptions("agent_123")
 
-            # Get first 10 subscriptions
+            # Get first 10 subscriptions with pagination info
             first_page = await handler.list_subscriptions("agent_123", limit=10)
+            # first_page.subscriptions = [...]
+            # first_page.total_count = 25
+            # first_page.limit = 10
+            # first_page.offset = 0
 
             # Get next 10 subscriptions
             second_page = await handler.list_subscriptions("agent_123", limit=10, offset=10)
@@ -815,8 +862,15 @@ class HandlerSubscription:
         # For paginated queries, always use database to ensure consistent ordering
         # Cache-based retrieval doesn't guarantee order, making pagination unreliable
         if limit is not None:
-            return await self._get_subscriptions_from_db(
+            subscriptions = await self._get_subscriptions_from_db(
                 agent_id, limit=limit, offset=offset
+            )
+            total_count = await self._get_subscription_count(agent_id)
+            return ModelPaginatedSubscriptions(
+                subscriptions=subscriptions,
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
             )
 
         # Non-paginated: Try Valkey cache first for performance
@@ -1014,6 +1068,35 @@ class HandlerSubscription:
         rows = result.result.get("payload", {}).get("rows", [])
         return [self._row_to_subscription(row) for row in rows]
 
+    async def _get_subscription_count(self, agent_id: str) -> int:
+        """Get total count of active subscriptions for an agent.
+
+        Used by list_subscriptions() to provide total_count for pagination.
+
+        Args:
+            agent_id: The agent's identifier.
+
+        Returns:
+            Total count of active subscriptions.
+        """
+        _, db_handler, _ = self._ensure_initialized()
+
+        sql = """
+            SELECT COUNT(*) as count FROM subscriptions
+            WHERE agent_id = $1 AND status = $2
+        """
+        envelope = {
+            "operation": "db.query",
+            "payload": {
+                "sql": sql,
+                "parameters": [agent_id, EnumSubscriptionStatus.ACTIVE.value],
+            },
+        }
+        result = await db_handler.execute(envelope)
+
+        rows = result.result.get("payload", {}).get("rows", [])
+        return int(rows[0]["count"]) if rows else 0
+
     def _row_to_subscription(self, row: dict[str, object]) -> ModelSubscription:
         """Convert database row to ModelSubscription.
 
@@ -1208,6 +1291,19 @@ class HandlerSubscription:
                         missing_ids.append(sub_id)
                 else:
                     missing_ids.append(sub_id)
+
+            # Refresh TTL on successfully loaded cache entries to prevent
+            # expiry during active usage (consistent with _get_subscribers_for_topic)
+            if subscriptions:
+                try:
+                    async with valkey.pipeline() as pipe:
+                        for sub in subscriptions:
+                            sub_key = CACHE_KEY_SUBSCRIPTION.format(
+                                subscription_id=sub.id
+                            )
+                            pipe.expire(sub_key, self._config.cache_ttl_seconds)
+                except Exception as e:
+                    logger.debug("Failed to refresh cache TTL: %s", e)
 
         # Load missing from database
         if missing_ids:

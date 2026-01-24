@@ -396,7 +396,7 @@ class TestOrchestratorSubscribe:
 
         assert response.success is False
         assert response.error_message is not None
-        assert "Topic must match pattern" in response.error_message
+        assert "subscribe() received invalid topic format" in response.error_message
 
 
 # =============================================================================

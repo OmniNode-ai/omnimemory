@@ -41,6 +41,12 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_active_topic
     ON subscriptions(topic)
     WHERE status = 'active';
 
+-- Optimizes: SELECT id FROM subscriptions WHERE topic = $1 AND status = 'active'
+-- Composite index for topic-based subscriber lookups (hot path in notify())
+CREATE INDEX IF NOT EXISTS idx_subscriptions_topic_id_active
+    ON subscriptions(topic, id)
+    WHERE status = 'active';
+
 CREATE INDEX IF NOT EXISTS idx_subscriptions_active_agent
     ON subscriptions(agent_id)
     WHERE status = 'active';
