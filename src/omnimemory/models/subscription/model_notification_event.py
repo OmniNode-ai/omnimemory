@@ -9,7 +9,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .constants import TOPIC_PATTERN
+from .constants import TOPIC_PATTERN, TOPIC_VALIDATION_ERROR
 from .model_notification_event_payload import (
     ModelNotificationEventPayload,  # noqa: TC001 - runtime import for Pydantic field type
 )
@@ -51,9 +51,7 @@ class ModelNotificationEvent(BaseModel):
     def validate_topic_format(cls, v: str) -> str:
         """Validate topic follows memory.<entity>.<event> convention."""
         if not TOPIC_PATTERN.match(v):
-            raise ValueError(
-                f"Topic must match pattern 'memory.<entity>.<event>', got: {v}"
-            )
+            raise ValueError(TOPIC_VALIDATION_ERROR.format(topic=v))
         return v
 
     @field_validator("event_id")

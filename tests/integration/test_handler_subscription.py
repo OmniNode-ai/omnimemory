@@ -708,7 +708,7 @@ class TestMetrics:
         subscription_handler: HandlerSubscription,
     ) -> None:
         """Get metrics returns counter values."""
-        metrics = subscription_handler.get_metrics()
+        metrics = await subscription_handler.get_metrics()
 
         assert isinstance(metrics, ModelSubscriptionMetrics)
         assert metrics.subscriptions_created >= 0
@@ -723,14 +723,14 @@ class TestMetrics:
         unique_topic: str,
     ) -> None:
         """Subscribe increments subscriptions_created counter."""
-        initial_metrics = subscription_handler.get_metrics()
+        initial_metrics = await subscription_handler.get_metrics()
 
         await subscription_handler.subscribe(
             agent_id=unique_agent_id,
             topic=unique_topic,
         )
 
-        final_metrics = subscription_handler.get_metrics()
+        final_metrics = await subscription_handler.get_metrics()
 
         assert (
             final_metrics.subscriptions_created
@@ -749,14 +749,14 @@ class TestMetrics:
             agent_id=unique_agent_id,
             topic=unique_topic,
         )
-        initial_metrics = subscription_handler.get_metrics()
+        initial_metrics = await subscription_handler.get_metrics()
 
         await subscription_handler.unsubscribe(
             agent_id=unique_agent_id,
             topic=unique_topic,
         )
 
-        final_metrics = subscription_handler.get_metrics()
+        final_metrics = await subscription_handler.get_metrics()
 
         assert (
             final_metrics.subscriptions_deleted
@@ -776,7 +776,7 @@ class TestMetrics:
             agent_id=unique_agent_id,
             topic=unique_topic,
         )
-        initial_metrics = subscription_handler.get_metrics()
+        initial_metrics = await subscription_handler.get_metrics()
 
         try:
             await subscription_handler.notify(
@@ -788,7 +788,7 @@ class TestMetrics:
                 pytest.skip(f"Kafka not available: {e}")
             raise
 
-        final_metrics = subscription_handler.get_metrics()
+        final_metrics = await subscription_handler.get_metrics()
 
         assert (
             final_metrics.notifications_published

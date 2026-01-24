@@ -33,7 +33,13 @@ TOPIC_PATTERN_REGEX = r"^memory\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$"
 # Compiled topic pattern for validation
 TOPIC_PATTERN = re.compile(TOPIC_PATTERN_REGEX)
 
+# Error message for invalid topic format
+TOPIC_VALIDATION_ERROR = (
+    "Topic must match pattern 'memory.<entity>.<event>', got: {topic}"
+)
+
 __all__ = [
     "TOPIC_PATTERN",
     "TOPIC_PATTERN_REGEX",
+    "TOPIC_VALIDATION_ERROR",
 ]

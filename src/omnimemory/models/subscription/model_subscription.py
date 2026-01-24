@@ -14,7 +14,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...enums.enum_subscription_status import EnumSubscriptionStatus
-from .constants import TOPIC_PATTERN
+from .constants import TOPIC_PATTERN, TOPIC_VALIDATION_ERROR
 
 
 class ModelSubscription(BaseModel):
@@ -72,9 +72,7 @@ class ModelSubscription(BaseModel):
     def validate_topic_format(cls, v: str) -> str:
         """Validate topic follows memory.<entity>.<event> convention."""
         if not TOPIC_PATTERN.match(v):
-            raise ValueError(
-                f"Topic must match pattern 'memory.<entity>.<event>', got: {v}"
-            )
+            raise ValueError(TOPIC_VALIDATION_ERROR.format(topic=v))
         return v
 
     @field_validator("id", "agent_id")

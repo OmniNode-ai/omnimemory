@@ -45,6 +45,12 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_active_agent
     ON subscriptions(agent_id)
     WHERE status = 'active';
 
+-- Optimizes: SELECT ... WHERE agent_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT N
+-- Composite index for paginated queries (ORDER BY created_at DESC)
+CREATE INDEX IF NOT EXISTS idx_subscriptions_agent_created_desc
+    ON subscriptions(agent_id, created_at DESC)
+    WHERE status = 'active';
+
 -- ============================================================================
 -- Helper Functions
 -- ============================================================================

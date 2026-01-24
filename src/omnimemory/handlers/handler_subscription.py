@@ -86,7 +86,10 @@ from omnimemory.models.subscription import (
     ModelNotificationEvent,
     ModelSubscription,
 )
-from omnimemory.models.subscription.constants import TOPIC_PATTERN
+from omnimemory.models.subscription.constants import (
+    TOPIC_PATTERN,
+    TOPIC_VALIDATION_ERROR,
+)
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
@@ -275,6 +278,7 @@ class ModelSubscriptionHealth(BaseModel):
         kafka_healthy: Kafka connection health.
         error_message: Error details if unhealthy.
         metrics: Optional metrics for observability.
+        has_indeterminate_components: True if any component health is indeterminate.
     """
 
     model_config = ConfigDict(
@@ -310,6 +314,10 @@ class ModelSubscriptionHealth(BaseModel):
     metrics: ModelSubscriptionMetrics | None = Field(
         default=None,
         description="Handler metrics for observability",
+    )
+    has_indeterminate_components: bool | None = Field(
+        default=None,
+        description="True if any component health is indeterminate (not False, but unknown)",
     )
 
 
@@ -356,6 +364,7 @@ class HandlerSubscription:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._cache_rebuild_lock = asyncio.Lock()
+        self._metrics_lock = asyncio.Lock()
 
         # Metrics for observability
         self._metrics: dict[str, int] = {
@@ -529,9 +538,7 @@ class HandlerSubscription:
 
         # Validate topic format
         if not TOPIC_PATTERN.match(topic):
-            raise ValueError(
-                f"Topic must match pattern 'memory.<entity>.<event>', got: {topic}"
-            )
+            raise ValueError(TOPIC_VALIDATION_ERROR.format(topic=topic))
 
         # Generate subscription ID
         subscription_id = str(uuid4())
@@ -563,9 +570,9 @@ class HandlerSubscription:
         # Persist to PostgreSQL (source of truth)
         await self._persist_subscription(subscription, is_update=existing is not None)
         if existing is not None:
-            self._metrics["subscriptions_updated"] += 1
+            await self._increment_metric("subscriptions_updated")
         else:
-            self._metrics["subscriptions_created"] += 1
+            await self._increment_metric("subscriptions_created")
 
         # Update Valkey caches (best effort - DB is source of truth)
         try:
@@ -635,7 +642,7 @@ class HandlerSubscription:
 
         # Soft delete in PostgreSQL
         await self._soft_delete_subscription(subscription.id)
-        self._metrics["subscriptions_deleted"] += 1
+        await self._increment_metric("subscriptions_deleted")
 
         # Remove from Valkey caches (best effort - DB is source of truth)
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
@@ -735,7 +742,7 @@ class HandlerSubscription:
                 result.result.get("error", "unknown error"),
             )
 
-        self._metrics["notifications_published"] += 1
+        await self._increment_metric("notifications_published")
 
         logger.info(
             "Published notification for topic %s, event %s, %d subscribers",
@@ -781,6 +788,21 @@ class HandlerSubscription:
 
             # Get next 10 subscriptions
             second_page = await handler.list_subscriptions("agent_123", limit=10, offset=10)
+
+        Note:
+            **Ordering Behavior Difference**:
+
+            - **Without pagination** (``limit=None``, the default): Results are retrieved
+              from the Valkey cache for performance. The order of returned subscriptions
+              is **NOT guaranteed** since Redis/Valkey sets are unordered collections.
+
+            - **With pagination** (``limit`` provided): Results are retrieved directly
+              from the database with ``ORDER BY created_at DESC``, ensuring consistent
+              and deterministic ordering across calls.
+
+            **Recommendation**: For consistent ordering across multiple calls or when
+            implementing UI pagination, always provide a ``limit`` parameter even if
+            you want all results (e.g., ``limit=1000``).
         """
         valkey, _, _ = self._ensure_initialized()
 
@@ -1226,16 +1248,27 @@ class HandlerSubscription:
     # Metrics
     # =========================================================================
 
-    def get_metrics(self) -> ModelSubscriptionMetrics:
+    async def _increment_metric(self, key: str, amount: int = 1) -> None:
+        """Thread-safe metric increment.
+
+        Args:
+            key: The metric key to increment.
+            amount: The amount to increment by (default 1).
+        """
+        async with self._metrics_lock:
+            self._metrics[key] += amount
+
+    async def get_metrics(self) -> ModelSubscriptionMetrics:
         """Get handler metrics for observability.
 
         Returns a copy of current metrics as a Pydantic model for production
-        monitoring and alerting.
+        monitoring and alerting. Uses async lock for thread-safe access.
 
         Returns:
             ModelSubscriptionMetrics with current counter values.
         """
-        return ModelSubscriptionMetrics(**self._metrics)
+        async with self._metrics_lock:
+            return ModelSubscriptionMetrics(**self._metrics)
 
     # =========================================================================
     # Health Check
@@ -1314,6 +1347,10 @@ class HandlerSubscription:
                         "Consider upgrading omnibase_infra to get proper health checks."
                     )
                     kafka_healthy = None  # Indeterminate, not assumed healthy
+                    errors.append(
+                        "Kafka: health status indeterminate "
+                        "(handler lacks health_check method)"
+                    )
             except Exception as e:
                 errors.append(f"Kafka check failed: {e}")
 
@@ -1323,6 +1360,11 @@ class HandlerSubscription:
             valkey_healthy is True and db_healthy is True and kafka_healthy is True
         )
 
+        # Check if any component has indeterminate health status
+        has_indeterminate = any(
+            health is None for health in [db_healthy, valkey_healthy, kafka_healthy]
+        )
+
         return ModelSubscriptionHealth(
             is_healthy=is_healthy,
             initialized=True,
@@ -1330,5 +1372,8 @@ class HandlerSubscription:
             valkey_healthy=valkey_healthy,
             kafka_healthy=kafka_healthy,
             error_message="; ".join(errors) if errors else None,
-            metrics=self.get_metrics(),
+            metrics=await self.get_metrics(),
+            has_indeterminate_components=has_indeterminate
+            if has_indeterminate
+            else None,
         )
