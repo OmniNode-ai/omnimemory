@@ -305,16 +305,15 @@ def is_port_available(host: str, port: int, timeout: float = 1.0) -> bool:
         True if port is open and responding, False otherwise.
     """
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            result = sock.connect_ex((host, port))
+            return result == 0
     except OSError:
         return False
 
 
-async def check_services_available() -> bool:
+def check_services_available() -> bool:
     """Check if PostgreSQL and Valkey are available.
 
     Returns:
@@ -375,10 +374,10 @@ def test_valkey_port() -> int:
 
 
 @pytest.fixture
-async def services_available() -> bool:
+def services_available() -> bool:
     """Check if required services are available.
 
     Returns:
         True if PostgreSQL and Valkey are available.
     """
-    return await check_services_available()
+    return check_services_available()

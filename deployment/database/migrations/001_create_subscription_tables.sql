@@ -2,7 +2,7 @@
 -- Description: Create tables for agent subscriptions
 -- Created: 2026-01-22
 -- Ticket: OMN-1393
--- Updated: 2026-01-23 - Removed webhook delivery columns (v0.2.0)
+-- Updated: 2026-01-24 - Address PR #22 review: NOT NULL constraints, column alignment (v0.2.1)
 --   Notifications now use Kafka event bus, not webhooks.
 --   If WebhookEmitterEffect is needed later, add webhook columns to that node.
 
@@ -16,8 +16,8 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY,
     agent_id VARCHAR(255) NOT NULL,
-    topic VARCHAR(255) NOT NULL,
-    status VARCHAR(50) DEFAULT 'active',
+    topic VARCHAR(256) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     suspended_reason TEXT,

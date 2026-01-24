@@ -193,4 +193,12 @@ class ModelAgentCoordinatorRequest(BaseModel):
                     f"'notify' action requires fields: {', '.join(missing)}"
                 )
 
+            # Topic consistency check: event.topic must match request topic
+            if self.event is not None and self.topic is not None:
+                if self.event.topic != self.topic:
+                    raise ValueError(
+                        f"Event topic mismatch: event.topic='{self.event.topic}' "
+                        f"does not match topic='{self.topic}'"
+                    )
+
         return self

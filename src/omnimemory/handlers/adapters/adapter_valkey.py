@@ -47,11 +47,12 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import warnings
 from collections.abc import AsyncGenerator, Awaitable
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 _T = TypeVar("_T")
 
@@ -165,6 +166,34 @@ class AdapterValkeyConfig(  # omnimemory-model-exempt: adapter-specific config
         description="Prefix for all keys (namespacing)",
     )
 
+    @field_validator("decode_responses")
+    @classmethod
+    def validate_decode_responses(cls, v: bool) -> bool:
+        """Warn if decode_responses is False since adapter assumes string responses.
+
+        The AdapterValkey implementation assumes all responses are decoded to
+        strings. Setting decode_responses=False will cause bytes to be returned,
+        which may lead to type errors in methods like get(), smembers(), etc.
+
+        Args:
+            v: The decode_responses value.
+
+        Returns:
+            The validated value (unchanged).
+
+        Warns:
+            UserWarning: If decode_responses is False.
+        """
+        if not v:
+            warnings.warn(
+                "AdapterValkey assumes decode_responses=True for string handling. "
+                "Setting to False may cause type errors in methods that expect "
+                "string responses (get, smembers, hgetall, etc.).",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v
+
 
 class ModelValkeyHealth(BaseModel):  # omnimemory-model-exempt: adapter-specific health
     """Health status for the Valkey adapter.
@@ -218,6 +247,8 @@ class ValkeyPipeline:
     Note:
         Pipeline methods are synchronous (they queue commands). The actual
         execution happens asynchronously when the context manager exits.
+        Calling execute() manually is supported but the context manager will
+        skip re-execution if already executed.
     """
 
     def __init__(self, pipe: PipelineType, key_prefix: str) -> None:
@@ -229,6 +260,8 @@ class ValkeyPipeline:
         """
         self._pipe = pipe
         self._key_prefix = key_prefix
+        self._executed = False
+        self._results: list[object] = []
 
     def _prefixed_key(self, key: str) -> str:
         """Add namespace prefix to key.
@@ -318,10 +351,33 @@ class ValkeyPipeline:
     async def execute(self) -> list[object]:
         """Execute all queued commands atomically.
 
+        This method is safe to call multiple times - subsequent calls return
+        the cached results from the first execution. The context manager will
+        also skip re-execution if this method was called manually.
+
         Returns:
             List of results from each command.
+
+        Note:
+            When using the pipeline as a context manager, execution happens
+            automatically on context exit. Calling this method manually is
+            optional and only needed if you want access to the results before
+            the context exits.
         """
-        return await self._pipe.execute()
+        if self._executed:
+            return self._results
+        self._results = await self._pipe.execute()
+        self._executed = True
+        return self._results
+
+    @property
+    def executed(self) -> bool:
+        """Check if the pipeline has been executed.
+
+        Returns:
+            True if execute() has been called, False otherwise.
+        """
+        return self._executed
 
 
 class AdapterValkey:
@@ -847,7 +903,10 @@ class AdapterValkey:
         wrapper = ValkeyPipeline(pipe, self._config.key_prefix)
         try:
             yield wrapper
-            await pipe.execute()
+            # Only execute if not already executed (prevents double-execution
+            # if user called execute() manually inside the context)
+            if not wrapper.executed:
+                await wrapper.execute()
         finally:
             # Reset releases pipeline resources
             # Note: reset() is untyped in redis-py stubs

@@ -147,15 +147,18 @@ class NodeAgentCoordinatorOrchestrator:
             request: The coordinator request.
 
         Returns:
-            The coordinator response.
-
-        Raises:
-            RuntimeError: If orchestrator is not initialized.
+            The coordinator response. Returns error response if not initialized.
         """
         if not self._initialized or self._handler is None:
-            raise RuntimeError(
-                "NodeAgentCoordinatorOrchestrator not initialized. "
-                "Call initialize() first."
+            return ModelAgentCoordinatorResponse(
+                success=False,
+                action=request.action,
+                correlation_id=request.correlation_id,
+                error_message=(
+                    "NodeAgentCoordinatorOrchestrator not initialized. "
+                    "Call initialize() first."
+                ),
+                error_code="NOT_INITIALIZED",
             )
 
         try:
@@ -681,6 +684,41 @@ class TestRequestValidation:
                 topic="memory.item.created",
             )
 
+    def test_notify_topic_consistency_validation(self) -> None:
+        """Notify action validates that event.topic matches request topic."""
+        with pytest.raises(ValueError, match="Event topic mismatch"):
+            ModelAgentCoordinatorRequest(
+                action=EnumAgentCoordinatorAction.NOTIFY,
+                topic="memory.item.created",
+                event=ModelNotificationEvent(
+                    event_id=str(uuid4()),
+                    topic="memory.item.updated",  # Mismatch with request topic
+                    payload=ModelNotificationEventPayload(
+                        entity_type="item",
+                        entity_id="item_123",
+                        action="updated",
+                    ),
+                ),
+            )
+
+    def test_notify_topic_consistency_valid(self) -> None:
+        """Notify action accepts matching topic in event and request."""
+        # Should not raise - topics match
+        request = ModelAgentCoordinatorRequest(
+            action=EnumAgentCoordinatorAction.NOTIFY,
+            topic="memory.item.created",
+            event=ModelNotificationEvent(
+                event_id=str(uuid4()),
+                topic="memory.item.created",  # Matches request topic
+                payload=ModelNotificationEventPayload(
+                    entity_type="item",
+                    entity_id="item_123",
+                    action="created",
+                ),
+            ),
+        )
+        assert request.topic == request.event.topic
+
     def test_list_subscriptions_requires_agent_id(self) -> None:
         """List subscriptions action requires agent_id."""
         with pytest.raises(ValueError, match="agent_id"):
@@ -698,7 +736,7 @@ class TestOrchestratorErrorHandling:
     """Tests for orchestrator error handling."""
 
     @pytest.mark.asyncio
-    async def test_execute_before_initialize_raises(
+    async def test_execute_before_initialize_returns_error(
         self,
         test_db_dsn: str,
         test_valkey_host: str,
@@ -706,7 +744,7 @@ class TestOrchestratorErrorHandling:
         unique_agent_id: str,
         unique_topic: str,
     ) -> None:
-        """Execute before initialize raises RuntimeError."""
+        """Execute before initialize returns error response."""
         config = ModelHandlerSubscriptionConfig(
             db_dsn=test_db_dsn,
             valkey_host=test_valkey_host,
@@ -720,8 +758,12 @@ class TestOrchestratorErrorHandling:
             topic=unique_topic,
         )
 
-        with pytest.raises(RuntimeError, match="not initialized"):
-            await node.execute(request)
+        response = await node.execute(request)
+
+        assert response.success is False
+        assert response.error_code == "NOT_INITIALIZED"
+        assert response.error_message is not None
+        assert "not initialized" in response.error_message
 
     @pytest.mark.asyncio
     async def test_correlation_id_preserved_in_response(

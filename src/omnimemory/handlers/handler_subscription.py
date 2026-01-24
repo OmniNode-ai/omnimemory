@@ -888,14 +888,23 @@ class HandlerSubscription:
 
         # Non-paginated: Try Valkey cache first for performance
         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
-        subscription_ids = await valkey.smembers(agent_key)
+        try:
+            subscription_ids = await valkey.smembers(agent_key)
 
-        if subscription_ids:
-            subscriptions = await self._load_subscriptions(subscription_ids)
-            # Filter to only active subscriptions
-            return [
-                s for s in subscriptions if s.status == EnumSubscriptionStatus.ACTIVE
-            ]
+            if subscription_ids:
+                subscriptions = await self._load_subscriptions(subscription_ids)
+                # Filter to only active subscriptions
+                return [
+                    s
+                    for s in subscriptions
+                    if s.status == EnumSubscriptionStatus.ACTIVE
+                ]
+        except Exception as e:
+            logger.warning(
+                "Valkey smembers failed for agent %s, falling back to database: %s",
+                agent_id,
+                e,
+            )
 
         # Fallback to database
         return await self._get_subscriptions_from_db(agent_id)
@@ -1113,17 +1122,34 @@ class HandlerSubscription:
     def _row_to_subscription(self, row: dict[str, object]) -> ModelSubscription:
         """Convert database row to ModelSubscription.
 
+        Handles various return types from different DB drivers:
+        - JSONB fields may return dict (asyncpg) or str (other drivers)
+        - Datetime fields may return datetime objects or ISO strings
+
         Args:
             row: Database row dict.
 
         Returns:
             ModelSubscription instance.
         """
-        # Parse JSON fields
-        metadata = None
+        # Parse JSON/JSONB fields with explicit type handling
+        # Some DB drivers (asyncpg) return JSONB as dict, others return str
+        metadata: dict[str, str] | None = None
         metadata_raw = row.get("metadata")
-        if metadata_raw:
-            metadata = json.loads(str(metadata_raw))
+        if metadata_raw is not None:
+            if isinstance(metadata_raw, dict):
+                # JSONB already parsed by driver (e.g., asyncpg)
+                metadata = cast(dict[str, str], metadata_raw)
+            elif isinstance(metadata_raw, str):
+                # JSON string needs parsing
+                metadata = json.loads(metadata_raw)
+            else:
+                # Fallback: convert to string and parse
+                logger.warning(
+                    "Unexpected metadata type %s, attempting string conversion",
+                    type(metadata_raw).__name__,
+                )
+                metadata = json.loads(str(metadata_raw))
 
         # Parse datetime fields with proper type handling
         created_at_raw = row["created_at"]
@@ -1157,9 +1183,26 @@ class HandlerSubscription:
     # =========================================================================
 
     async def _rebuild_cache_from_db(self) -> None:
-        """Cold start recovery: rebuild Valkey from Postgres."""
+        """Cold start recovery: rebuild Valkey from Postgres.
+
+        Note:
+            This method accesses components directly rather than using
+            _ensure_initialized() because it is called during initialize()
+            before _initialized is set to True. The components are already
+            initialized by the time this method is called.
+
+        Raises:
+            RuntimeError: If required components are not available.
+        """
         async with self._cache_rebuild_lock:
-            valkey, db_handler, _ = self._ensure_initialized()
+            # Access components directly - this is called during initialize()
+            # before _initialized is set, so we can't use _ensure_initialized()
+            if self._valkey is None or self._db_handler is None:
+                raise RuntimeError(
+                    "_rebuild_cache_from_db called before components initialized"
+                )
+            valkey = self._valkey
+            db_handler = self._db_handler
 
             logger.info("Rebuilding Valkey cache from PostgreSQL...")
 
@@ -1222,7 +1265,8 @@ class HandlerSubscription:
     async def _get_subscribers_for_topic(self, topic: str) -> set[str]:
         """Get subscriber IDs for a topic.
 
-        Tries Valkey first, falls back to Postgres.
+        Tries Valkey first, falls back to Postgres. Valkey failures are
+        handled gracefully with automatic DB fallback.
 
         Args:
             topic: The topic.
@@ -1232,22 +1276,34 @@ class HandlerSubscription:
         """
         valkey, db_handler, _ = self._ensure_initialized()
 
-        # Try cache first
+        # Try cache first (best-effort - DB is authoritative)
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
-        subscriber_ids = await valkey.smembers(topic_key)
+        try:
+            subscriber_ids = await valkey.smembers(topic_key)
 
-        if subscriber_ids:
-            # Refresh TTL on cache hit to prevent expiry during active usage
-            await valkey.expire(topic_key, self._config.cache_ttl_seconds)
-            return subscriber_ids
+            if subscriber_ids:
+                # Refresh TTL on cache hit to prevent expiry during active usage
+                try:
+                    await valkey.expire(topic_key, self._config.cache_ttl_seconds)
+                except Exception as e:
+                    logger.debug(
+                        "Failed to refresh cache TTL for topic %s: %s", topic, e
+                    )
+                return subscriber_ids
+        except Exception as e:
+            logger.warning(
+                "Valkey smembers failed for topic %s, falling back to database: %s",
+                topic,
+                e,
+            )
 
-        # Cache miss - log for monitoring cache effectiveness
+        # Cache miss or failure - log for monitoring cache effectiveness
         logger.info(
             "Cache miss for topic subscribers: %s, falling back to database",
             topic,
         )
 
-        # Fallback to database
+        # Fallback to database (authoritative source)
         sql = """
             SELECT id FROM subscriptions
             WHERE topic = $1 AND status = $2
@@ -1264,11 +1320,18 @@ class HandlerSubscription:
         rows = result.result.get("payload", {}).get("rows", [])
         subscription_ids = {str(row["id"]) for row in rows}
 
-        # Rebuild cache for this topic (atomic pipeline to prevent TTL-less entries)
+        # Rebuild cache for this topic (best-effort - don't fail if cache write fails)
         if subscription_ids:
-            async with valkey.pipeline() as pipe:
-                pipe.sadd(topic_key, *subscription_ids)
-                pipe.expire(topic_key, self._config.cache_ttl_seconds)
+            try:
+                async with valkey.pipeline() as pipe:
+                    pipe.sadd(topic_key, *subscription_ids)
+                    pipe.expire(topic_key, self._config.cache_ttl_seconds)
+            except Exception as e:
+                logger.warning(
+                    "Failed to rebuild cache for topic %s (DB query succeeded): %s",
+                    topic,
+                    e,
+                )
 
         return subscription_ids
 
@@ -1277,6 +1340,9 @@ class HandlerSubscription:
         subscription_ids: set[str],
     ) -> list[ModelSubscription]:
         """Load subscription details from cache or database.
+
+        Tries Valkey cache first for performance, falls back to database
+        if cache fails. Cache writes after DB fallback are best-effort.
 
         Args:
             subscription_ids: Set of subscription IDs to load.
@@ -1287,42 +1353,54 @@ class HandlerSubscription:
         valkey, db_handler, _ = self._ensure_initialized()
 
         subscriptions: list[ModelSubscription] = []
-        missing_ids: list[str] = []
+        missing_ids: list[str] = list(subscription_ids)
 
-        # Try cache first using batch retrieval
+        # Try cache first using batch retrieval (best-effort - DB is authoritative)
         sub_id_list = list(subscription_ids)
         if sub_id_list:
-            cache_keys = [
-                CACHE_KEY_SUBSCRIPTION.format(subscription_id=sub_id)
-                for sub_id in sub_id_list
-            ]
-            cached_values = await valkey.mget(*cache_keys)
+            try:
+                cache_keys = [
+                    CACHE_KEY_SUBSCRIPTION.format(subscription_id=sub_id)
+                    for sub_id in sub_id_list
+                ]
+                cached_values = await valkey.mget(*cache_keys)
 
-            for sub_id, cached in zip(sub_id_list, cached_values, strict=True):
-                if cached:
-                    try:
-                        subscription = ModelSubscription.model_validate_json(cached)
-                        subscriptions.append(subscription)
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to parse cached subscription %s: %s", sub_id, e
-                        )
-                        missing_ids.append(sub_id)
-                else:
-                    missing_ids.append(sub_id)
+                # Reset missing_ids since we successfully read from cache
+                missing_ids = []
 
-            # Refresh TTL on successfully loaded cache entries to prevent
-            # expiry during active usage (consistent with _get_subscribers_for_topic)
-            if subscriptions:
-                try:
-                    async with valkey.pipeline() as pipe:
-                        for sub in subscriptions:
-                            sub_key = CACHE_KEY_SUBSCRIPTION.format(
-                                subscription_id=sub.id
+                for sub_id, cached in zip(sub_id_list, cached_values, strict=True):
+                    if cached:
+                        try:
+                            subscription = ModelSubscription.model_validate_json(cached)
+                            subscriptions.append(subscription)
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to parse cached subscription %s: %s", sub_id, e
                             )
-                            pipe.expire(sub_key, self._config.cache_ttl_seconds)
-                except Exception as e:
-                    logger.debug("Failed to refresh cache TTL: %s", e)
+                            missing_ids.append(sub_id)
+                    else:
+                        missing_ids.append(sub_id)
+
+                # Refresh TTL on successfully loaded cache entries to prevent
+                # expiry during active usage (consistent with _get_subscribers_for_topic)
+                if subscriptions:
+                    try:
+                        async with valkey.pipeline() as pipe:
+                            for sub in subscriptions:
+                                sub_key = CACHE_KEY_SUBSCRIPTION.format(
+                                    subscription_id=sub.id
+                                )
+                                pipe.expire(sub_key, self._config.cache_ttl_seconds)
+                    except Exception as e:
+                        logger.debug("Failed to refresh cache TTL: %s", e)
+
+            except Exception as e:
+                logger.warning(
+                    "Valkey mget failed for subscriptions, falling back to database: %s",
+                    e,
+                )
+                # All IDs need to be loaded from DB
+                missing_ids = sub_id_list
 
         # Load missing from database
         if missing_ids:
@@ -1350,13 +1428,22 @@ class HandlerSubscription:
                 subscription = self._row_to_subscription(row)
                 subscriptions.append(subscription)
 
-                # Update cache
-                sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
-                await valkey.set_key(
-                    sub_key,
-                    subscription.model_dump_json(),
-                    ttl=self._config.cache_ttl_seconds,
-                )
+                # Update cache (best-effort - don't fail if cache write fails)
+                try:
+                    sub_key = CACHE_KEY_SUBSCRIPTION.format(
+                        subscription_id=subscription.id
+                    )
+                    await valkey.set_key(
+                        sub_key,
+                        subscription.model_dump_json(),
+                        ttl=self._config.cache_ttl_seconds,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to cache subscription %s (DB query succeeded): %s",
+                        subscription.id,
+                        e,
+                    )
 
         return subscriptions
 
