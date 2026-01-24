@@ -116,10 +116,21 @@ class IntentCypherTemplates:
         - Relationship properties track when each intent was detected
 
     Security:
-        All queries use parameters ($param) instead of string interpolation.
-        The label/type parameters are safe from injection as they come from
-        config validation (string type with pydantic validation).
-        NEVER construct queries by concatenating user input.
+        All dynamic data values use Cypher parameters ($param syntax) to prevent
+        injection attacks - these are handled safely by the database driver.
+
+        Label/type parameters (session_label, intent_label, rel_type) use f-string
+        interpolation, which is SAFE because of the validation chain:
+
+        1. Labels/types originate from ModelAdapterIntentGraphConfig fields
+        2. Config validates via _CYPHER_IDENTIFIER_PATTERN regex: ^[A-Za-z_][A-Za-z0-9_]*$
+        3. This pattern ONLY allows: letters, numbers, underscores (starting with letter/_)
+        4. Injection payloads require special chars (quotes, braces, semicolons, etc.)
+        5. Since those chars are rejected by validation, injection is impossible
+
+        Example: "Session" passes validation, "Session'; DROP" fails validation.
+
+        NEVER bypass config validation or accept unvalidated strings for labels.
     """
 
     @staticmethod
@@ -196,17 +207,13 @@ class IntentCypherTemplates:
         ]
 
     @staticmethod
-    def count_sessions_query(session_label: str) -> str:
-        """Generate query to count session nodes."""
+    def count_all_query(session_label: str, intent_label: str) -> str:
+        """Generate query to count both session and intent nodes in one call."""
         return f"""
-        MATCH (s:{session_label}) RETURN count(s) AS count
-        """
-
-    @staticmethod
-    def count_intents_query(intent_label: str) -> str:
-        """Generate query to count intent nodes."""
-        return f"""
-        MATCH (i:{intent_label}) RETURN count(i) AS count
+        OPTIONAL MATCH (s:{session_label})
+        WITH count(s) AS session_count
+        OPTIONAL MATCH (i:{intent_label})
+        RETURN session_count, count(i) AS intent_count
         """
 
 
@@ -326,6 +333,10 @@ class AdapterIntentGraph:
     def is_initialized(self) -> bool:
         """Check if the adapter has been initialized."""
         return self._initialized
+
+    def __repr__(self) -> str:
+        """Return string representation for debugging."""
+        return f"AdapterIntentGraph(initialized={self._initialized})"
 
     async def initialize(
         self,
@@ -904,6 +915,9 @@ class AdapterIntentGraph:
                 error_message=str(e),
             )
 
+        # Clamp time_range_hours to valid range (minimum 1 hour)
+        time_range_hours = max(1, time_range_hours)
+
         # Calculate time boundary
         since_utc = (datetime.now(UTC) - timedelta(hours=time_range_hours)).isoformat()
 
@@ -1010,36 +1024,27 @@ class AdapterIntentGraph:
                         last_check_timestamp=timestamp,
                     )
 
-                # Get counts for detailed health info
+                # Get counts for detailed health info using single combined query
                 session_count: int | None = None
                 intent_count: int | None = None
 
                 try:
-                    # Count sessions
-                    session_query = IntentCypherTemplates.count_sessions_query(
+                    count_query = IntentCypherTemplates.count_all_query(
                         session_label=self._config.session_node_label,
-                    )
-                    session_result = await self._handler.execute_query(
-                        query=session_query,
-                        parameters={},
-                    )
-                    if session_result.records:
-                        count_val = session_result.records[0].get("count")
-                        if isinstance(count_val, int):
-                            session_count = count_val
-
-                    # Count intents
-                    intent_query = IntentCypherTemplates.count_intents_query(
                         intent_label=self._config.intent_node_label,
                     )
-                    intent_result = await self._handler.execute_query(
-                        query=intent_query,
+                    count_result = await self._handler.execute_query(
+                        query=count_query,
                         parameters={},
                     )
-                    if intent_result.records:
-                        count_val = intent_result.records[0].get("count")
-                        if isinstance(count_val, int):
-                            intent_count = count_val
+                    if count_result.records:
+                        record = count_result.records[0]
+                        session_val = record.get("session_count")
+                        intent_val = record.get("intent_count")
+                        if isinstance(session_val, int):
+                            session_count = session_val
+                        if isinstance(intent_val, int):
+                            intent_count = intent_val
 
                 except Exception as e:
                     # Log but don't fail health check for count errors

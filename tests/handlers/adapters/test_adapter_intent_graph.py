@@ -567,8 +567,7 @@ class TestIntentCypherTemplates:
                 session_label, intent_label, rel_type
             ),
             IntentCypherTemplates.get_intent_distribution_query(intent_label),
-            IntentCypherTemplates.count_sessions_query(session_label),
-            IntentCypherTemplates.count_intents_query(intent_label),
+            IntentCypherTemplates.count_all_query(session_label, intent_label),
         ]
 
         for template in templates:
@@ -697,23 +696,17 @@ class TestIntentCypherTemplates:
         assert not any(":Intent" in q and "Custom" not in q for q in queries)
         assert not any(":HAD_INTENT" in q and "CUSTOM" not in q for q in queries)
 
-    def test_count_sessions_query_structure(self) -> None:
-        """Test count_sessions_query template structure."""
-        template = IntentCypherTemplates.count_sessions_query("Session")
+    def test_count_all_query_structure(self) -> None:
+        """Test count_all_query generates valid Cypher."""
+        template = IntentCypherTemplates.count_all_query("Session", "Intent")
 
-        assert "MATCH" in template
+        # Should use OPTIONAL MATCH for both node types
+        assert "OPTIONAL MATCH" in template
         assert ":Session" in template
-        assert "count" in template.lower()
-        assert "AS count" in template
-
-    def test_count_intents_query_structure(self) -> None:
-        """Test count_intents_query template structure."""
-        template = IntentCypherTemplates.count_intents_query("Intent")
-
-        assert "MATCH" in template
         assert ":Intent" in template
-        assert "count" in template.lower()
-        assert "AS count" in template
+        # Should return both counts
+        assert "session_count" in template
+        assert "intent_count" in template
 
 
 # =============================================================================
@@ -1555,6 +1548,23 @@ class TestGetIntentDistribution:
         }
         assert result.total_intents == 160
 
+    @pytest.mark.asyncio
+    async def test_get_intent_distribution_zero_time_range(
+        self,
+        adapter_with_mock: AdapterIntentGraph,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_intent_distribution handles zero time_range_hours gracefully."""
+        mock_handler.execute_query.return_value = MagicMock(records=[])
+
+        # Call with zero time range - should be handled gracefully
+        result = await adapter_with_mock.get_intent_distribution(time_range_hours=0)
+
+        # Should succeed, not error
+        assert result.status == "success"
+        # Time range should be clamped to at least 1
+        assert result.time_range_hours >= 1
+
 
 # =============================================================================
 # health_check Tests
@@ -1572,10 +1582,10 @@ class TestHealthCheck:
     ) -> None:
         """Test health check returns healthy status when handler is healthy."""
         mock_handler.health_check.return_value = MagicMock(healthy=True)
-        mock_handler.execute_query.side_effect = [
-            MagicMock(records=[{"count": 100}]),  # session count
-            MagicMock(records=[{"count": 500}]),  # intent count
-        ]
+        # Mock returns combined count result from count_all_query
+        mock_handler.execute_query.return_value = MagicMock(
+            records=[{"session_count": 100, "intent_count": 500}]
+        )
 
         result = await adapter_with_mock.health_check()
 
