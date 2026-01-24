@@ -278,7 +278,6 @@ class ModelSubscriptionHealth(BaseModel):
         kafka_healthy: Kafka connection health.
         error_message: Error details if unhealthy.
         metrics: Optional metrics for observability.
-        has_indeterminate_components: True if any component health is indeterminate.
     """
 
     model_config = ConfigDict(
@@ -314,10 +313,6 @@ class ModelSubscriptionHealth(BaseModel):
     metrics: ModelSubscriptionMetrics | None = Field(
         default=None,
         description="Handler metrics for observability",
-    )
-    has_indeterminate_components: bool | None = Field(
-        default=None,
-        description="True if any component health is indeterminate (not False, but unknown)",
     )
 
 
@@ -1281,10 +1276,8 @@ class HandlerSubscription:
         Component health is reported as:
         - True: Component is healthy and responding
         - False: Component is unhealthy or failed health check
-        - None: Health status is indeterminate (e.g., handler lacks health_check method)
 
-        The overall is_healthy is conservative: only True when ALL components
-        are explicitly healthy. Indeterminate (None) states are NOT considered healthy.
+        The overall is_healthy is True when ALL components are healthy.
 
         Returns:
             ModelSubscriptionHealth with detailed status for each component.
@@ -1326,43 +1319,20 @@ class HandlerSubscription:
                 errors.append(f"Database check failed: {e}")
 
         # Check Kafka
-        kafka_healthy: bool | None = False
+        kafka_healthy = False
         if self._kafka_handler:
             try:
-                # Call health_check if available (EventBusKafka has this method)
-                if hasattr(self._kafka_handler, "health_check"):
-                    health_result = await self._kafka_handler.health_check()
-                    # EventBusKafka.health_check returns dict with 'healthy' key
-                    kafka_healthy = bool(health_result.get("healthy", False))
-                    if not kafka_healthy:
-                        circuit_state = health_result.get("circuit_state", "unknown")
-                        errors.append(
-                            f"Kafka: unhealthy (circuit_state={circuit_state})"
-                        )
-                else:
-                    # Fallback: health status is indeterminate
-                    logger.warning(
-                        "Kafka handler does not expose health_check() method - "
-                        "connection health is indeterminate. "
-                        "Consider upgrading omnibase_infra to get proper health checks."
-                    )
-                    kafka_healthy = None  # Indeterminate, not assumed healthy
-                    errors.append(
-                        "Kafka: health status indeterminate "
-                        "(handler lacks health_check method)"
-                    )
+                health_result = await self._kafka_handler.health_check()
+                kafka_healthy = bool(health_result.get("healthy", False))
+                if not kafka_healthy:
+                    circuit_state = health_result.get("circuit_state", "unknown")
+                    errors.append(f"Kafka: unhealthy (circuit_state={circuit_state})")
             except Exception as e:
                 errors.append(f"Kafka check failed: {e}")
 
         # Only fully healthy if all components are explicitly True
-        # Conservative: unknown (None) states are NOT considered healthy
         is_healthy = (
             valkey_healthy is True and db_healthy is True and kafka_healthy is True
-        )
-
-        # Check if any component has indeterminate health status
-        has_indeterminate = any(
-            health is None for health in [db_healthy, valkey_healthy, kafka_healthy]
         )
 
         return ModelSubscriptionHealth(
@@ -1373,7 +1343,4 @@ class HandlerSubscription:
             kafka_healthy=kafka_healthy,
             error_message="; ".join(errors) if errors else None,
             metrics=await self.get_metrics(),
-            has_indeterminate_components=has_indeterminate
-            if has_indeterminate
-            else None,
         )
