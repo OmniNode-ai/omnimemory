@@ -533,6 +533,25 @@ class AdapterValkey:
             return None
         return str(result) if not isinstance(result, str) else result
 
+    async def mget(self, *keys: str) -> list[str | None]:
+        """Get values for multiple keys in a single round-trip.
+
+        This is more efficient than calling get() in a loop when retrieving
+        multiple keys, as it reduces network round-trips.
+
+        Args:
+            *keys: The keys to retrieve.
+
+        Returns:
+            List of values in the same order as keys (None for missing keys).
+        """
+        if not keys:
+            return []
+        client = self._ensure_initialized()
+        prefixed_keys = [self._prefixed_key(k) for k in keys]
+        results = await client.mget(prefixed_keys)
+        return [str(v) if v is not None else None for v in results]
+
     async def set_key(
         self,
         key: str,

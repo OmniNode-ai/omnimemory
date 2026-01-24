@@ -135,6 +135,7 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
 
     Args:
         count: Number of placeholders to generate. If <= 0, returns empty string.
+               Must not exceed 10000 for safety.
         start: Starting index (default 1 for PostgreSQL $1, $2, ...).
                Must be >= 1.
 
@@ -144,6 +145,7 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
 
     Raises:
         ValueError: If start < 1 (PostgreSQL placeholders start at $1).
+        ValueError: If count > 10000 (safety limit for batch operations).
 
     Example:
         >>> _sql_placeholders(3)
@@ -155,6 +157,8 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
     """
     if start < 1:
         raise ValueError(f"start must be >= 1 for PostgreSQL placeholders, got {start}")
+    if count > 10000:
+        raise ValueError(f"count exceeds maximum (10000) for safety, got {count}")
     if count <= 0:
         return ""
     return ", ".join(f"${i}" for i in range(start, start + count))
@@ -1081,6 +1085,7 @@ class HandlerSubscription:
         # Rebuild cache for this topic
         if subscription_ids:
             await valkey.sadd(topic_key, *subscription_ids)
+            await valkey.expire(topic_key, self._config.cache_ttl_seconds)
 
         return subscription_ids
 
@@ -1101,21 +1106,27 @@ class HandlerSubscription:
         subscriptions: list[ModelSubscription] = []
         missing_ids: list[str] = []
 
-        # Try cache first
-        for sub_id in subscription_ids:
-            sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=sub_id)
-            cached = await valkey.get(sub_key)
-            if cached:
-                try:
-                    subscription = ModelSubscription.model_validate_json(cached)
-                    subscriptions.append(subscription)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to parse cached subscription %s: %s", sub_id, e
-                    )
+        # Try cache first using batch retrieval
+        sub_id_list = list(subscription_ids)
+        if sub_id_list:
+            cache_keys = [
+                CACHE_KEY_SUBSCRIPTION.format(subscription_id=sub_id)
+                for sub_id in sub_id_list
+            ]
+            cached_values = await valkey.mget(*cache_keys)
+
+            for sub_id, cached in zip(sub_id_list, cached_values, strict=True):
+                if cached:
+                    try:
+                        subscription = ModelSubscription.model_validate_json(cached)
+                        subscriptions.append(subscription)
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to parse cached subscription %s: %s", sub_id, e
+                        )
+                        missing_ids.append(sub_id)
+                else:
                     missing_ids.append(sub_id)
-            else:
-                missing_ids.append(sub_id)
 
         # Load missing from database
         if missing_ids:
@@ -1230,6 +1241,10 @@ class HandlerSubscription:
                         )
                 else:
                     # Fallback: assume healthy if handler exists and is started
+                    logger.warning(
+                        "Kafka handler does not expose health_check() method, "
+                        "assuming healthy - this may mask connection issues"
+                    )
                     kafka_healthy = True
             except Exception as e:
                 errors.append(f"Kafka check failed: {e}")
