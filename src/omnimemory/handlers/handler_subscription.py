@@ -123,13 +123,18 @@ CACHE_KEY_TOPIC_SUBSCRIBERS = "topic:{topic}:subscribers"
 CACHE_KEY_AGENT_SUBSCRIPTIONS = "agent:{agent_id}:subscriptions"
 CACHE_KEY_SUBSCRIPTION = "subscription:{subscription_id}"
 
+# Maximum cached entries for SQL placeholder generation.
+# 128 entries covers common batch sizes (1-100 items) with room for
+# various start offsets. Larger batches are rare and regeneration is cheap.
+_SQL_PLACEHOLDERS_CACHE_SIZE = 128
 
-@lru_cache(maxsize=128)
+
+@lru_cache(maxsize=_SQL_PLACEHOLDERS_CACHE_SIZE)
 def _sql_placeholders(count: int, start: int = 1) -> str:
     """Generate SQL parameter placeholders for parameterized queries.
 
-    Results are cached with LRU policy (maxsize=128) to avoid repeated string
-    generation for common query sizes.
+    Results are cached with LRU policy to avoid repeated string generation
+    for common query sizes. See _SQL_PLACEHOLDERS_CACHE_SIZE for capacity.
 
     Args:
         count: Number of placeholders to generate. If <= 0, returns empty string.
@@ -1235,6 +1240,12 @@ class HandlerSubscription:
             # Refresh TTL on cache hit to prevent expiry during active usage
             await valkey.expire(topic_key, self._config.cache_ttl_seconds)
             return subscriber_ids
+
+        # Cache miss - log for monitoring cache effectiveness
+        logger.info(
+            "Cache miss for topic subscribers: %s, falling back to database",
+            topic,
+        )
 
         # Fallback to database
         sql = """

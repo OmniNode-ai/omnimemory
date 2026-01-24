@@ -47,6 +47,8 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_topic_id_active
     ON subscriptions(topic, id)
     WHERE status = 'active';
 
+-- Optimizes: SELECT ... WHERE agent_id = $1 AND status = 'active' (no ORDER BY)
+-- Covering index for non-paginated list_subscriptions() queries
 CREATE INDEX IF NOT EXISTS idx_subscriptions_active_agent
     ON subscriptions(agent_id)
     WHERE status = 'active';
