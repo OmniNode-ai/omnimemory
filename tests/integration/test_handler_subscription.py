@@ -39,6 +39,7 @@ Environment Variables:
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncGenerator
 from uuid import uuid4
@@ -859,3 +860,404 @@ class TestInitialization:
         await handler.shutdown()
         await handler.shutdown()  # Should not raise
         assert handler.is_initialized is False
+
+
+# =============================================================================
+# TestConcurrency
+# =============================================================================
+
+
+class TestConcurrency:
+    """Tests for concurrent subscription operations.
+
+    These tests verify that the subscription handler correctly handles
+    race conditions and concurrent access patterns that occur in production
+    when multiple agents interact with the subscription system simultaneously.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_subscribes_same_topic(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Multiple agents can subscribe to the same topic concurrently.
+
+        This test verifies that when multiple agents attempt to subscribe
+        to the same topic at the same time, all subscriptions succeed
+        without race conditions or data corruption.
+        """
+        topic = f"memory.concurrent_{uuid4().hex[:8]}.created"
+        agent_ids = [f"concurrent_agent_{i}_{uuid4().hex[:4]}" for i in range(10)]
+
+        # Subscribe all agents concurrently
+        tasks = [
+            subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+            for agent_id in agent_ids
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # All subscriptions should succeed
+        assert len(results) == 10
+        assert all(r.status == EnumSubscriptionStatus.ACTIVE for r in results)
+        assert all(r.topic == topic for r in results)
+
+        # Verify all agents are subscribed with unique subscription IDs
+        subscription_ids = {r.id for r in results}
+        assert len(subscription_ids) == 10  # All unique IDs
+
+        # Verify each agent has their subscription
+        for agent_id in agent_ids:
+            subs = await subscription_handler.list_subscriptions(agent_id)
+            assert len(subs) == 1
+            assert subs[0].topic == topic
+
+    @pytest.mark.asyncio
+    async def test_concurrent_subscribe_unsubscribe(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Subscribe and unsubscribe operations handle concurrent access correctly.
+
+        This test simulates a race condition where one operation tries to
+        subscribe while another tries to unsubscribe, verifying the system
+        reaches a consistent final state.
+        """
+        agent_id = f"race_agent_{uuid4().hex[:8]}"
+        topic = f"memory.race_{uuid4().hex[:8]}.created"
+
+        # First, establish a subscription
+        await subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+
+        # Define operations that will run concurrently
+        async def subscribe_op() -> ModelSubscription:
+            return await subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+
+        async def unsubscribe_op() -> bool:
+            return await subscription_handler.unsubscribe(
+                agent_id=agent_id, topic=topic
+            )
+
+        # Run subscribe and unsubscribe concurrently multiple times
+        for _ in range(5):
+            # Create initial subscription if not exists
+            await subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+
+            # Run concurrent operations
+            results = await asyncio.gather(
+                subscribe_op(),
+                unsubscribe_op(),
+                return_exceptions=True,
+            )
+
+            # Neither should raise an exception
+            for result in results:
+                assert not isinstance(
+                    result, Exception
+                ), f"Unexpected exception: {result}"
+
+        # Final state should be consistent (either subscribed or not)
+        final_subs = await subscription_handler.list_subscriptions(agent_id)
+        # The list should have 0 or 1 subscriptions for this topic
+        topic_subs = [s for s in final_subs if s.topic == topic]
+        assert len(topic_subs) <= 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_subscribes_multiple_topics(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Single agent can subscribe to multiple topics concurrently.
+
+        Verifies that concurrent subscription to different topics
+        by the same agent works correctly without conflicts.
+        """
+        agent_id = f"multi_topic_agent_{uuid4().hex[:8]}"
+        topics = [f"memory.concurrent_{uuid4().hex[:8]}.created" for _ in range(10)]
+
+        # Subscribe to all topics concurrently
+        tasks = [
+            subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+            for topic in topics
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # All subscriptions should succeed
+        assert len(results) == 10
+        assert all(r.status == EnumSubscriptionStatus.ACTIVE for r in results)
+
+        # Verify all subscriptions exist
+        all_subs = await subscription_handler.list_subscriptions(agent_id)
+        subscribed_topics = {s.topic for s in all_subs}
+        assert subscribed_topics == set(topics)
+
+
+# =============================================================================
+# TestLargeBatch
+# =============================================================================
+
+
+class TestLargeBatch:
+    """Tests for large-scale subscription operations.
+
+    These tests verify that the subscription system handles large numbers
+    of subscriptions efficiently and correctly, which is important for
+    production scenarios with many agents.
+    """
+
+    @pytest.mark.asyncio
+    async def test_notify_large_subscriber_count(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Notify works correctly with many subscribers.
+
+        Creates 100 subscriptions to a single topic and verifies that
+        the notify operation correctly reports the subscriber count.
+        """
+        topic = f"memory.large_batch_{uuid4().hex[:8]}.created"
+
+        # Create 100 subscriptions
+        for i in range(100):
+            await subscription_handler.subscribe(
+                agent_id=f"batch_agent_{i}_{uuid4().hex[:4]}",
+                topic=topic,
+            )
+
+        # Create notification event
+        event = ModelNotificationEvent(
+            event_id=str(uuid4()),
+            topic=topic,
+            payload=ModelNotificationEventPayload(
+                entity_type="batch_item",
+                entity_id=f"item_{uuid4().hex[:8]}",
+                action="created",
+            ),
+        )
+
+        try:
+            subscriber_count = await subscription_handler.notify(topic, event)
+            assert subscriber_count == 100
+        except RuntimeError as e:
+            # Kafka may not be available - skip gracefully
+            if "Kafka" in str(e) or "kafka" in str(e).lower():
+                pytest.skip(f"Kafka not available: {e}")
+            raise
+
+    @pytest.mark.asyncio
+    async def test_list_subscriptions_large_result(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """List subscriptions handles large result sets correctly.
+
+        Creates many subscriptions for a single agent and verifies
+        that list_subscriptions returns all of them.
+        """
+        agent_id = f"large_list_agent_{uuid4().hex[:8]}"
+        num_subscriptions = 50
+
+        # Create many subscriptions for the same agent
+        topics = [
+            f"memory.list_test_{i}_{uuid4().hex[:6]}.created"
+            for i in range(num_subscriptions)
+        ]
+        for topic in topics:
+            await subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+
+        # List all subscriptions (non-paginated)
+        all_subs = await subscription_handler.list_subscriptions(agent_id)
+        assert len(all_subs) == num_subscriptions
+
+        # Verify all topics are present
+        returned_topics = {s.topic for s in all_subs}
+        assert returned_topics == set(topics)
+
+    @pytest.mark.asyncio
+    async def test_list_subscriptions_pagination_large_result(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Paginated list_subscriptions works with large result sets.
+
+        Creates many subscriptions and verifies that pagination
+        correctly returns subsets and total counts.
+        """
+        from omnimemory.handlers import ModelPaginatedSubscriptions
+
+        agent_id = f"paginated_agent_{uuid4().hex[:8]}"
+        num_subscriptions = 50
+
+        # Create subscriptions
+        for i in range(num_subscriptions):
+            await subscription_handler.subscribe(
+                agent_id=agent_id,
+                topic=f"memory.paginate_{i}_{uuid4().hex[:6]}.created",
+            )
+
+        # Test first page
+        first_page = await subscription_handler.list_subscriptions(
+            agent_id, limit=10, offset=0
+        )
+        assert isinstance(first_page, ModelPaginatedSubscriptions)
+        assert len(first_page.subscriptions) == 10
+        assert first_page.total_count == num_subscriptions
+        assert first_page.limit == 10
+        assert first_page.offset == 0
+
+        # Test middle page
+        middle_page = await subscription_handler.list_subscriptions(
+            agent_id, limit=10, offset=20
+        )
+        assert isinstance(middle_page, ModelPaginatedSubscriptions)
+        assert len(middle_page.subscriptions) == 10
+        assert middle_page.total_count == num_subscriptions
+        assert middle_page.offset == 20
+
+        # Test last page (may have fewer items)
+        last_page = await subscription_handler.list_subscriptions(
+            agent_id, limit=10, offset=45
+        )
+        assert isinstance(last_page, ModelPaginatedSubscriptions)
+        assert len(last_page.subscriptions) == 5  # Only 5 remaining
+        assert last_page.total_count == num_subscriptions
+
+        # Verify no overlap between pages
+        first_ids = {s.id for s in first_page.subscriptions}
+        middle_ids = {s.id for s in middle_page.subscriptions}
+        last_ids = {s.id for s in last_page.subscriptions}
+        assert first_ids.isdisjoint(middle_ids)
+        assert middle_ids.isdisjoint(last_ids)
+        assert first_ids.isdisjoint(last_ids)
+
+
+# =============================================================================
+# TestKafkaFailureHandling
+# =============================================================================
+
+
+class TestKafkaFailureHandling:
+    """Tests for Kafka failure scenarios.
+
+    These tests verify that the subscription handler behaves correctly
+    when Kafka operations fail, including proper error propagation
+    and graceful degradation.
+    """
+
+    @pytest.mark.asyncio
+    async def test_notify_returns_subscriber_count_even_with_kafka_issues(
+        self,
+        subscription_handler: HandlerSubscription,
+        unique_agent_id: str,
+        unique_topic: str,
+    ) -> None:
+        """Notify correctly counts subscribers regardless of Kafka status.
+
+        The subscriber count is determined from the database/cache before
+        Kafka publish, so it should be accurate even if Kafka has issues.
+        """
+        # Subscribe an agent
+        await subscription_handler.subscribe(
+            agent_id=unique_agent_id,
+            topic=unique_topic,
+        )
+
+        event = ModelNotificationEvent(
+            event_id=str(uuid4()),
+            topic=unique_topic,
+            payload=ModelNotificationEventPayload(
+                entity_type="test",
+                entity_id="test_123",
+                action="created",
+            ),
+        )
+
+        try:
+            count = await subscription_handler.notify(
+                topic=unique_topic,
+                event=event,
+            )
+            # Count should reflect actual subscribers
+            assert count == 1
+        except RuntimeError as e:
+            # If Kafka is unavailable, the test demonstrates the handler's
+            # behavior - it requires Kafka for notify operations
+            if "Kafka" in str(e) or "kafka" in str(e).lower():
+                pytest.skip(f"Kafka not available: {e}")
+            raise
+
+    @pytest.mark.asyncio
+    async def test_notify_handles_kafka_timeout_gracefully(
+        self,
+        subscription_handler: HandlerSubscription,
+    ) -> None:
+        """Notify operation handles potential Kafka timeouts.
+
+        Verifies that the system properly handles slow Kafka responses
+        without hanging indefinitely or corrupting state.
+        """
+        topic = f"memory.timeout_test_{uuid4().hex[:8]}.created"
+        agent_id = f"timeout_agent_{uuid4().hex[:8]}"
+
+        # Subscribe first
+        await subscription_handler.subscribe(agent_id=agent_id, topic=topic)
+
+        event = ModelNotificationEvent(
+            event_id=str(uuid4()),
+            topic=topic,
+            payload=ModelNotificationEventPayload(
+                entity_type="timeout_test",
+                entity_id="item_123",
+                action="created",
+            ),
+        )
+
+        try:
+            # Use asyncio.wait_for to enforce our own timeout
+            result = await asyncio.wait_for(
+                subscription_handler.notify(topic, event),
+                timeout=30.0,  # 30 second timeout
+            )
+            assert result >= 0  # Should return valid count
+        except TimeoutError:
+            pytest.fail("Notify operation timed out after 30 seconds")
+        except RuntimeError as e:
+            if "Kafka" in str(e) or "kafka" in str(e).lower():
+                pytest.skip(f"Kafka not available: {e}")
+            raise
+
+    @pytest.mark.asyncio
+    async def test_metrics_track_notification_attempts(
+        self,
+        subscription_handler: HandlerSubscription,
+        unique_agent_id: str,
+        unique_topic: str,
+        sample_event: ModelNotificationEvent,
+    ) -> None:
+        """Metrics correctly track notification publish attempts.
+
+        Verifies that the notifications_published metric is incremented
+        when a notify operation is attempted.
+        """
+        # Subscribe first
+        await subscription_handler.subscribe(
+            agent_id=unique_agent_id,
+            topic=unique_topic,
+        )
+
+        initial_metrics = await subscription_handler.get_metrics()
+        initial_published = initial_metrics.notifications_published
+
+        try:
+            await subscription_handler.notify(
+                topic=unique_topic,
+                event=sample_event,
+            )
+        except RuntimeError as e:
+            if "Kafka" in str(e) or "kafka" in str(e).lower():
+                pytest.skip(f"Kafka not available: {e}")
+            raise
+
+        final_metrics = await subscription_handler.get_metrics()
+
+        # Verify metric was incremented
+        assert final_metrics.notifications_published == initial_published + 1

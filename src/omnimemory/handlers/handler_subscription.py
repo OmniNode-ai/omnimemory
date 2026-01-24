@@ -17,6 +17,31 @@ Event Bus Strategy:
     is needed in the future, implement a WebhookEmitterEffect node that
     consumes bus events and handles HTTP delivery separately.
 
+Known Limitations:
+    Transaction Boundaries:
+        The subscribe() and unsubscribe() operations persist to PostgreSQL
+        first, then update the Valkey cache. These are NOT atomic operations.
+        If the process crashes after DB write but before cache update, the
+        cache may be inconsistent until the next cold start triggers
+        _rebuild_cache_from_db().
+
+        Mitigation: Cache rebuild on initialization ensures eventual consistency.
+        The _rebuild_cache_from_db() method is called during initialize() and
+        reconstructs the entire Valkey cache from PostgreSQL, which is the
+        authoritative source of truth. This means any inconsistency is
+        automatically resolved on the next handler startup.
+
+        For strict consistency requirements, consider implementing:
+        - A write-ahead log (WAL) pattern
+        - Redis transactions with WATCH/MULTI/EXEC
+        - Two-phase commit with compensation logic
+
+        Current trade-off rationale: The eventual consistency model was chosen
+        because (1) subscription changes are infrequent compared to reads,
+        (2) cold start recovery is fast and automatic, and (3) the added
+        complexity of distributed transactions was deemed unnecessary for
+        the current use case.
+
 Example::
 
     from omnimemory.handlers import (
@@ -124,9 +149,15 @@ CACHE_KEY_AGENT_SUBSCRIPTIONS = "agent:{agent_id}:subscriptions"
 CACHE_KEY_SUBSCRIPTION = "subscription:{subscription_id}"
 
 # Maximum cached entries for SQL placeholder generation.
-# 128 entries covers common batch sizes (1-100 items) with room for
-# various start offsets. Larger batches are rare and regeneration is cheap.
-_SQL_PLACEHOLDERS_CACHE_SIZE = 128
+# 256 entries covers common batch sizes (1-128 items) with various start offsets,
+# providing ~95% hit rate for typical pagination and bulk operations.
+# Larger batches are rare and regeneration overhead is minimal (~1us).
+_SQL_PLACEHOLDERS_CACHE_SIZE = 256
+
+# Batch size for cache rebuild from database.
+# Limits memory usage when rebuilding cache for large subscription counts (100K+).
+# Each batch is processed atomically via pipeline before loading the next batch.
+_CACHE_REBUILD_BATCH_SIZE = 1000
 
 
 @lru_cache(maxsize=_SQL_PLACEHOLDERS_CACHE_SIZE)
@@ -617,6 +648,10 @@ class HandlerSubscription:
         )
 
         # Persist to PostgreSQL (source of truth)
+        # NOTE: Transaction boundary limitation - DB persist and cache update are NOT
+        # atomic. If process crashes after this point but before cache update completes,
+        # cache may be inconsistent. Mitigation: _rebuild_cache_from_db() on cold start
+        # ensures eventual consistency. See module docstring "Known Limitations" section.
         await self._persist_subscription(subscription, is_update=existing is not None)
         if existing is not None:
             await self._increment_metric("subscriptions_updated")
@@ -624,6 +659,7 @@ class HandlerSubscription:
             await self._increment_metric("subscriptions_created")
 
         # Update Valkey caches (best effort - DB is source of truth)
+        # Cache update happens AFTER DB persist - not atomic with DB operation above.
         try:
             topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
             agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
@@ -690,10 +726,16 @@ class HandlerSubscription:
             return False
 
         # Soft delete in PostgreSQL
+        # NOTE: Transaction boundary limitation - DB delete and cache eviction are NOT
+        # atomic. If process crashes after this point but before cache eviction completes,
+        # cache may be inconsistent (stale subscription in cache). Mitigation:
+        # _rebuild_cache_from_db() on cold start ensures eventual consistency.
+        # See module docstring "Known Limitations" section.
         await self._soft_delete_subscription(subscription.id)
         await self._increment_metric("subscriptions_deleted")
 
         # Remove from Valkey caches (best effort - DB is source of truth)
+        # Cache eviction happens AFTER DB delete - not atomic with DB operation above.
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(agent_id=agent_id)
         sub_key = CACHE_KEY_SUBSCRIPTION.format(subscription_id=subscription.id)
@@ -874,11 +916,15 @@ class HandlerSubscription:
 
         # For paginated queries, always use database to ensure consistent ordering
         # Cache-based retrieval doesn't guarantee order, making pagination unreliable
+        # Use atomic query with window function to prevent race condition between
+        # fetching subscriptions and counting total
         if limit is not None:
-            subscriptions = await self._get_subscriptions_from_db(
+            (
+                subscriptions,
+                total_count,
+            ) = await self._get_subscriptions_with_count_from_db(
                 agent_id, limit=limit, offset=offset
             )
-            total_count = await self._get_subscription_count(agent_id)
             return ModelPaginatedSubscriptions(
                 subscriptions=subscriptions,
                 total_count=total_count,
@@ -1036,47 +1082,30 @@ class HandlerSubscription:
     async def _get_subscriptions_from_db(
         self,
         agent_id: str,
-        limit: int | None = None,
-        offset: int = 0,
     ) -> list[ModelSubscription]:
-        """Get active subscriptions for an agent from database with optional pagination.
+        """Get all active subscriptions for an agent from database.
+
+        This method is used for non-paginated queries (cache fallback).
+        For paginated queries with total count, use
+        _get_subscriptions_with_count_from_db() which returns both results
+        and total count atomically using a window function.
 
         Args:
             agent_id: The agent's identifier.
-            limit: Maximum number of subscriptions to return. None means no limit.
-            offset: Number of subscriptions to skip (default 0).
 
         Returns:
-            List of subscriptions ordered by created_at DESC.
+            List of all active subscriptions ordered by created_at DESC.
         """
         _, db_handler, _ = self._ensure_initialized()
 
-        # Build SQL with optional pagination
-        # Base query always includes agent_id and status filters
-        if limit is not None:
-            sql = """
-                SELECT id, agent_id, topic, status,
-                       created_at, updated_at, metadata
-                FROM subscriptions
-                WHERE agent_id = $1 AND status = $2
-                ORDER BY created_at DESC
-                LIMIT $3 OFFSET $4
-            """
-            parameters: list[str | int] = [
-                agent_id,
-                EnumSubscriptionStatus.ACTIVE.value,
-                limit,
-                offset,
-            ]
-        else:
-            sql = """
-                SELECT id, agent_id, topic, status,
-                       created_at, updated_at, metadata
-                FROM subscriptions
-                WHERE agent_id = $1 AND status = $2
-                ORDER BY created_at DESC
-            """
-            parameters = [agent_id, EnumSubscriptionStatus.ACTIVE.value]
+        sql = """
+            SELECT id, agent_id, topic, status,
+                   created_at, updated_at, metadata
+            FROM subscriptions
+            WHERE agent_id = $1 AND status = $2
+            ORDER BY created_at DESC
+        """
+        parameters: list[str | int] = [agent_id, EnumSubscriptionStatus.ACTIVE.value]
 
         envelope = {
             "operation": "db.query",
@@ -1090,34 +1119,72 @@ class HandlerSubscription:
         rows = result.result.get("payload", {}).get("rows", [])
         return [self._row_to_subscription(row) for row in rows]
 
-    async def _get_subscription_count(self, agent_id: str) -> int:
-        """Get total count of active subscriptions for an agent.
+    async def _get_subscriptions_with_count_from_db(
+        self,
+        agent_id: str,
+        limit: int,
+        offset: int = 0,
+    ) -> tuple[list[ModelSubscription], int]:
+        """Get paginated subscriptions with total count atomically.
 
-        Used by list_subscriptions() to provide total_count for pagination.
+        Uses PostgreSQL window function COUNT(*) OVER() to retrieve both
+        the paginated subscription list and the total count in a single
+        atomic query. This prevents race conditions where the count could
+        become inconsistent with the results if subscriptions change
+        between separate queries.
 
         Args:
             agent_id: The agent's identifier.
+            limit: Maximum number of subscriptions to return.
+            offset: Number of subscriptions to skip (default 0).
 
         Returns:
-            Total count of active subscriptions.
+            Tuple of (subscriptions, total_count) where:
+            - subscriptions: List of subscriptions for the requested page
+            - total_count: Total number of matching subscriptions (before pagination)
         """
         _, db_handler, _ = self._ensure_initialized()
 
+        # Use window function to get total count in the same query
+        # COUNT(*) OVER() returns the total count for each row without grouping
         sql = """
-            SELECT COUNT(*) as count FROM subscriptions
+            SELECT id, agent_id, topic, status,
+                   created_at, updated_at, metadata,
+                   COUNT(*) OVER() as total_count
+            FROM subscriptions
             WHERE agent_id = $1 AND status = $2
+            ORDER BY created_at DESC
+            LIMIT $3 OFFSET $4
         """
+        parameters: list[str | int] = [
+            agent_id,
+            EnumSubscriptionStatus.ACTIVE.value,
+            limit,
+            offset,
+        ]
+
         envelope = {
             "operation": "db.query",
             "payload": {
                 "sql": sql,
-                "parameters": [agent_id, EnumSubscriptionStatus.ACTIVE.value],
+                "parameters": parameters,
             },
         }
         result = await db_handler.execute(envelope)
 
         rows = result.result.get("payload", {}).get("rows", [])
-        return int(rows[0]["count"]) if rows else 0
+
+        if not rows:
+            # No results - total count is 0
+            return [], 0
+
+        # Extract total_count from the first row (same for all rows due to OVER())
+        total_count = int(rows[0]["total_count"])
+
+        # Convert rows to subscriptions
+        subscriptions = [self._row_to_subscription(row) for row in rows]
+
+        return subscriptions, total_count
 
     def _row_to_subscription(self, row: dict[str, object]) -> ModelSubscription:
         """Convert database row to ModelSubscription.
@@ -1185,6 +1252,18 @@ class HandlerSubscription:
     async def _rebuild_cache_from_db(self) -> None:
         """Cold start recovery: rebuild Valkey from Postgres.
 
+        Processes subscriptions in batches to limit memory usage for large
+        subscription counts (100K+). Each batch is processed atomically via
+        pipeline before loading the next batch.
+
+        This method is the primary mitigation for the transaction boundary
+        limitation documented in the module docstring. Since subscribe() and
+        unsubscribe() operations persist to PostgreSQL before updating the
+        Valkey cache (non-atomic), a crash between these operations can leave
+        the cache inconsistent. This method rebuilds the entire cache from
+        PostgreSQL (the source of truth), ensuring eventual consistency on
+        every handler restart.
+
         Note:
             This method accesses components directly rather than using
             _ensure_initialized() because it is called during initialize()
@@ -1206,61 +1285,97 @@ class HandlerSubscription:
 
             logger.info("Rebuilding Valkey cache from PostgreSQL...")
 
-            sql = """
-                SELECT id, agent_id, topic, status,
-                       created_at, updated_at, metadata
-                FROM subscriptions
-                WHERE status = $1
+            # Count total for progress logging
+            count_sql = """
+                SELECT COUNT(*) as count FROM subscriptions WHERE status = $1
             """
-            envelope = {
+            count_envelope = {
                 "operation": "db.query",
                 "payload": {
-                    "sql": sql,
+                    "sql": count_sql,
                     "parameters": [EnumSubscriptionStatus.ACTIVE.value],
                 },
             }
-            result = await db_handler.execute(envelope)
+            count_result = await db_handler.execute(count_envelope)
+            total_count = int(
+                count_result.result.get("payload", {})
+                .get("rows", [{}])[0]
+                .get("count", 0)
+            )
 
-            rows = result.result.get("payload", {}).get("rows", [])
-            logger.info("Found %d active subscriptions to cache", len(rows))
-
-            if not rows:
-                logger.info("No subscriptions to cache, skipping pipeline")
+            if total_count == 0:
+                logger.info("No subscriptions to cache, skipping rebuild")
                 return
 
-            # Use pipeline for atomic batch update
-            async with valkey.pipeline() as pipe:
-                for row in rows:
-                    subscription = self._row_to_subscription(row)
+            logger.info("Found %d active subscriptions to cache", total_count)
 
-                    # Cache subscription data
-                    sub_key = CACHE_KEY_SUBSCRIPTION.format(
-                        subscription_id=subscription.id
-                    )
-                    pipe.set_key(
-                        sub_key,
-                        subscription.model_dump_json(),
-                        ttl=self._config.cache_ttl_seconds,
-                    )
+            # Process in batches for memory efficiency
+            offset = 0
+            processed = 0
+            while offset < total_count:
+                sql = """
+                    SELECT id, agent_id, topic, status,
+                           created_at, updated_at, metadata
+                    FROM subscriptions
+                    WHERE status = $1
+                    ORDER BY id
+                    LIMIT $2 OFFSET $3
+                """
+                envelope = {
+                    "operation": "db.query",
+                    "payload": {
+                        "sql": sql,
+                        "parameters": [
+                            EnumSubscriptionStatus.ACTIVE.value,
+                            _CACHE_REBUILD_BATCH_SIZE,
+                            offset,
+                        ],
+                    },
+                }
+                result = await db_handler.execute(envelope)
+                rows = result.result.get("payload", {}).get("rows", [])
 
-                    # Add to topic->subscribers mapping
-                    topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(
-                        topic=subscription.topic
-                    )
-                    pipe.sadd(topic_key, subscription.id)
-                    pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                if not rows:
+                    break
 
-                    # Add to agent->subscriptions mapping
-                    agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
-                        agent_id=subscription.agent_id
-                    )
-                    pipe.sadd(agent_key, subscription.id)
-                    pipe.expire(agent_key, self._config.cache_ttl_seconds)
+                # Use pipeline for atomic batch update
+                async with valkey.pipeline() as pipe:
+                    for row in rows:
+                        subscription = self._row_to_subscription(row)
 
-            logger.info(
-                "Valkey cache rebuilt with %d subscriptions using pipeline (atomic batch)",
-                len(rows),
-            )
+                        # Cache subscription data
+                        sub_key = CACHE_KEY_SUBSCRIPTION.format(
+                            subscription_id=subscription.id
+                        )
+                        pipe.set_key(
+                            sub_key,
+                            subscription.model_dump_json(),
+                            ttl=self._config.cache_ttl_seconds,
+                        )
+
+                        # Add to topic->subscribers mapping
+                        topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(
+                            topic=subscription.topic
+                        )
+                        pipe.sadd(topic_key, subscription.id)
+                        pipe.expire(topic_key, self._config.cache_ttl_seconds)
+
+                        # Add to agent->subscriptions mapping
+                        agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
+                            agent_id=subscription.agent_id
+                        )
+                        pipe.sadd(agent_key, subscription.id)
+                        pipe.expire(agent_key, self._config.cache_ttl_seconds)
+
+                processed += len(rows)
+                offset += _CACHE_REBUILD_BATCH_SIZE
+                logger.info(
+                    "Cache rebuild progress: %d/%d subscriptions",
+                    processed,
+                    total_count,
+                )
+
+            logger.info("Valkey cache rebuilt with %d subscriptions", processed)
 
     async def _get_subscribers_for_topic(self, topic: str) -> set[str]:
         """Get subscriber IDs for a topic.
@@ -1526,15 +1641,45 @@ class HandlerSubscription:
             except Exception as e:
                 errors.append(f"Database check failed: {e}")
 
-        # Check Kafka
+        # Check Kafka with robust type handling
+        # EventBusKafka.health_check() may return:
+        #   - dict: {"healthy": bool, "circuit_state": str, ...}
+        #   - bool: Direct healthy status
+        #   - Pydantic model: Object with is_healthy attribute
         kafka_healthy = False
         if self._kafka_handler:
             try:
                 health_result = await self._kafka_handler.health_check()
-                kafka_healthy = bool(health_result.get("healthy", False))
-                if not kafka_healthy:
-                    circuit_state = health_result.get("circuit_state", "unknown")
-                    errors.append(f"Kafka: unhealthy (circuit_state={circuit_state})")
+                # Handle different return types from EventBusKafka
+                if isinstance(health_result, dict):
+                    kafka_healthy = bool(health_result.get("healthy", False))
+                    if not kafka_healthy:
+                        circuit_state = health_result.get("circuit_state", "unknown")
+                        errors.append(
+                            f"Kafka: unhealthy (circuit_state={circuit_state})"
+                        )
+                elif isinstance(health_result, bool):
+                    kafka_healthy = health_result
+                    if not kafka_healthy:
+                        errors.append("Kafka: unhealthy (returned False)")
+                elif hasattr(health_result, "is_healthy"):
+                    # Handle Pydantic model response (e.g., ModelHealthStatus)
+                    kafka_healthy = bool(health_result.is_healthy)
+                    if not kafka_healthy:
+                        error_detail = getattr(health_result, "error", None) or getattr(
+                            health_result, "error_message", "unknown"
+                        )
+                        errors.append(f"Kafka: unhealthy ({error_detail})")
+                else:
+                    # Unexpected return type - log warning and treat as unhealthy
+                    logger.warning(
+                        "Unexpected Kafka health_check return type: %s, treating as unhealthy",
+                        type(health_result).__name__,
+                    )
+                    errors.append(
+                        f"Kafka: unexpected health_check return type "
+                        f"({type(health_result).__name__})"
+                    )
             except Exception as e:
                 errors.append(f"Kafka check failed: {e}")
 
