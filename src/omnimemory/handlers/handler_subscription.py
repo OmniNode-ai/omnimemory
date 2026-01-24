@@ -1057,6 +1057,8 @@ class HandlerSubscription:
         subscriber_ids = await valkey.smembers(topic_key)
 
         if subscriber_ids:
+            # Refresh TTL on cache hit to prevent expiry during active usage
+            await valkey.expire(topic_key, self._config.cache_ttl_seconds)
             return subscriber_ids
 
         # Fallback to database
@@ -1118,6 +1120,9 @@ class HandlerSubscription:
         # Load missing from database
         if missing_ids:
             placeholders = _sql_placeholders(len(missing_ids))
+            # Security: Safe f-string usage - _sql_placeholders() only generates
+            # parameterized placeholders ($1, $2, ...), not user data. Actual values
+            # are passed via the parameters list below (parameterized query).  # nosec B608
             sql = f"""
                 SELECT id, agent_id, topic, status,
                        created_at, updated_at, metadata
