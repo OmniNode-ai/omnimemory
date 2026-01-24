@@ -298,8 +298,6 @@ async def orchestrator_node(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
-        max_retry_attempts=3,
-        retry_base_delay_ms=100,
     )
     node = NodeAgentCoordinatorOrchestrator(config)
     await node.initialize()
