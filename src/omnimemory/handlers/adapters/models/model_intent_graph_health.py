@@ -4,6 +4,8 @@ This module provides the Pydantic model for representing health check results
 from the AdapterIntentGraph, which stores intent classification results in Memgraph.
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = ["ModelIntentGraphHealth"]
@@ -23,7 +25,7 @@ class ModelIntentGraphHealth(BaseModel):
         error_message: Error details if unhealthy.
         session_count: Number of sessions stored in the intent graph.
         intent_count: Number of intents stored in the intent graph.
-        last_check_timestamp: ISO-8601 timestamp of the last health check.
+        last_check_timestamp: Timestamp of the last health check.
     """
 
     model_config = ConfigDict(
@@ -57,7 +59,7 @@ class ModelIntentGraphHealth(BaseModel):
         ge=0,
         description="Number of intents stored in the intent graph (None if not queried)",
     )
-    last_check_timestamp: str | None = Field(
+    last_check_timestamp: datetime | None = Field(
         default=None,
-        description="ISO-8601 timestamp of the last health check (None if not recorded)",
+        description="Timestamp of the last health check (None if not recorded)",
     )

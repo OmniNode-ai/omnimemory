@@ -588,6 +588,11 @@ class AdapterIntentGraph:
                         try:
                             returned_intent_id = UUID(db_intent_id)
                         except ValueError:
+                            logger.debug(
+                                "Failed to parse intent_id UUID from database: %s, "
+                                "using generated UUID",
+                                db_intent_id,
+                            )
                             returned_intent_id = intent_id
 
                 logger.info(
@@ -939,7 +944,7 @@ class AdapterIntentGraph:
             This method never raises - errors are captured in the
             result model.
         """
-        timestamp = datetime.now(UTC).isoformat()
+        timestamp = datetime.now(UTC)
 
         if not self._initialized or self._handler is None:
             return ModelIntentGraphHealth(

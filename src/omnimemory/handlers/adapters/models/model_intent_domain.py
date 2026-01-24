@@ -47,6 +47,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from omnibase_core.types.type_json import JsonType  # noqa: TC002
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
@@ -113,7 +114,7 @@ class ModelIntentClassificationOutput(BaseModel):
             "use only; not stored in the graph database."
         ),
     )
-    metadata: dict[str, str | int | float | bool | None] = Field(
+    metadata: dict[str, JsonType] = Field(
         default_factory=dict,
         description=(
             "Additional key-value metadata (e.g., model version, timestamp). "
