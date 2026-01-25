@@ -66,8 +66,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from asyncpg import Pool
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -276,7 +279,7 @@ class HandlerMemoryExpire:
 
     def __init__(
         self,
-        db_pool: Any | None = None,
+        db_pool: Pool | None = None,
         max_retries: int = 3,
     ) -> None:
         """Initialize the expiration handler.
@@ -337,19 +340,11 @@ class HandlerMemoryExpire:
             command.reason,
         )
 
-        # Database operation placeholder - see OMN-1524 for implementation
-
-        # Stub implementation for interface testing
+        # Require database pool for all operations
         if self._db_pool is None:
-            logger.warning(
-                "HandlerMemoryExpire operating in stub mode (no db_pool). "
-                "Returning success for interface testing."
-            )
-            return ModelMemoryExpireResult(
-                memory_id=command.memory_id,
-                success=True,
-                new_revision=command.expected_revision + 1,
-                previous_state=EnumLifecycleState.ACTIVE,
+            raise RuntimeError(
+                "Database pool not configured. "
+                "Initialize handler with db_pool parameter."
             )
 
         # Actual implementation will be added with OMN-1524
@@ -493,13 +488,12 @@ class HandlerMemoryExpire:
                     updated_at=row["updated_at"],
                 )
         """
-        # Placeholder for actual implementation
+        # Require database pool for all operations
         if self._db_pool is None:
-            logger.debug(
-                "Stub mode: _read_current_state returning None for memory %s",
-                memory_id,
+            raise RuntimeError(
+                "Database pool not configured. "
+                "Initialize handler with db_pool parameter."
             )
-            return None
 
         # Actual implementation will be added with OMN-1524
         return None

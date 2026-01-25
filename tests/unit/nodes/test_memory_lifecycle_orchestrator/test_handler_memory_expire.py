@@ -3,16 +3,18 @@
 """Unit tests for HandlerMemoryExpire.
 
 Tests the memory expiration handler that performs ACTIVE -> EXPIRED state
-transitions using optimistic locking. Tests cover stub mode behavior,
-conflict detection, retry logic, and state validation.
+transitions using optimistic locking. Tests cover error handling when db_pool
+is not configured, model validation, and SQL pattern documentation.
 
 Test Categories:
     - Initialization: Handler setup with max_retries validation
-    - Stub Mode: Success behavior when no database pool configured
-    - Conflict Detection: Revision mismatch handling
-    - Retry Logic: handle_with_retry() behavior
-    - State Validation: Only ACTIVE memories can be expired
-    - Revision Increment: New revision on success
+    - No Database Pool: RuntimeError behavior when db_pool not configured
+    - Command Validation: ModelExpireMemoryCommand field validation
+    - Result Model: ModelMemoryExpireResult representation
+    - Current State Model: ModelMemoryCurrentState validation
+    - Retry Logic: handle_with_retry() error behavior without db_pool
+    - Edge Cases: Command boundary condition validation
+    - SQL Pattern Documentation: SQL constant verification
 
 Related Tickets:
     - OMN-1453: OmniMemory P4b - Lifecycle Orchestrator Database Integration
@@ -60,16 +62,6 @@ def memory_id() -> UUID:
         A deterministic UUID for the memory.
     """
     return UUID("12345678-abcd-1234-abcd-567812345678")
-
-
-@pytest.fixture
-def handler_stub() -> HandlerMemoryExpire:
-    """Create handler in stub mode (no db_pool).
-
-    Returns:
-        HandlerMemoryExpire instance without database connection.
-    """
-    return HandlerMemoryExpire(db_pool=None)
 
 
 @pytest.fixture
@@ -152,69 +144,67 @@ class TestHandlerMemoryExpireInitialization:
 
 
 # =============================================================================
-# Stub Mode Tests
+# No Database Pool Tests
 # =============================================================================
 
 
-class TestStubMode:
-    """Tests for handler behavior in stub mode (no database)."""
+class TestNoDatabasePool:
+    """Tests for handler behavior when db_pool is not configured."""
 
     @pytest.mark.asyncio
-    async def test_expire_success_in_stub_mode(
+    async def test_handle_without_db_pool_raises_error(
         self,
-        handler_stub: HandlerMemoryExpire,
-        expire_command: ModelExpireMemoryCommand,
+        memory_id: UUID,
     ) -> None:
-        """Test handler returns success in stub mode.
+        """Test that handle() raises RuntimeError when db_pool is not configured.
 
-        Given: Handler without db_pool (stub mode)
-        When: Handling an expire command
-        Then: Returns success with incremented revision
+        Given: Handler without db_pool
+        When: Calling handle()
+        Then: RuntimeError is raised with appropriate message
         """
-        result = await handler_stub.handle(expire_command)
+        handler = HandlerMemoryExpire()
+        command = ModelExpireMemoryCommand(
+            memory_id=memory_id,
+            expected_revision=1,
+        )
 
-        assert result.success is True
-        assert result.new_revision == expire_command.expected_revision + 1
-        assert result.conflict is False
-        assert result.error_message is None
-        assert result.previous_state == EnumLifecycleState.ACTIVE
+        with pytest.raises(RuntimeError, match="Database pool not configured"):
+            await handler.handle(command)
 
     @pytest.mark.asyncio
-    async def test_stub_mode_returns_correct_memory_id(
+    async def test_handle_without_db_pool_raises_error_with_custom_params(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
         fixed_now: datetime,
     ) -> None:
-        """Test stub mode returns correct memory_id in result.
+        """Test that handle() raises RuntimeError regardless of command parameters.
 
-        Given: Handler in stub mode
-        When: Handling an expire command
-        Then: Result contains correct memory_id
+        Given: Handler without db_pool and command with custom parameters
+        When: Calling handle()
+        Then: RuntimeError is raised
         """
+        handler = HandlerMemoryExpire()
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
             expected_revision=5,
             expired_at=fixed_now,
         )
 
-        result = await handler_stub.handle(command)
-
-        assert result.memory_id == memory_id
-        assert result.new_revision == 6
+        with pytest.raises(RuntimeError, match="Database pool not configured"):
+            await handler.handle(command)
 
     @pytest.mark.asyncio
-    async def test_stub_mode_increments_revision_correctly(
+    async def test_handle_without_db_pool_raises_error_for_various_revisions(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
     ) -> None:
-        """Test stub mode increments revision by 1.
+        """Test that handle() raises RuntimeError for any expected_revision.
 
-        Given: Various expected_revision values
-        When: Handling expire commands
-        Then: new_revision = expected_revision + 1
+        Given: Handler without db_pool and various revision values
+        When: Calling handle()
+        Then: RuntimeError is raised for all cases
         """
+        handler = HandlerMemoryExpire()
         test_cases = [0, 1, 5, 100, 999]
 
         for expected_revision in test_cases:
@@ -222,9 +212,9 @@ class TestStubMode:
                 memory_id=memory_id,
                 expected_revision=expected_revision,
             )
-            result = await handler_stub.handle(command)
 
-            assert result.new_revision == expected_revision + 1
+            with pytest.raises(RuntimeError, match="Database pool not configured"):
+                await handler.handle(command)
 
 
 # =============================================================================
@@ -498,122 +488,107 @@ class TestCurrentStateModel:
 
 
 # =============================================================================
-# Retry Logic Tests (Stub Mode)
+# Retry Logic Tests (No Database Pool)
 # =============================================================================
 
 
 class TestRetryLogic:
-    """Tests for handle_with_retry() behavior in stub mode."""
+    """Tests for handle_with_retry() behavior when db_pool is not configured."""
 
     @pytest.mark.asyncio
-    async def test_retry_succeeds_first_attempt_in_stub_mode(
+    async def test_handle_with_retry_without_db_pool_raises_error(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
         fixed_now: datetime,
     ) -> None:
-        """Test handle_with_retry succeeds on first attempt in stub mode.
+        """Test handle_with_retry raises RuntimeError when db_pool is not configured.
 
-        Given: Handler in stub mode
+        Given: Handler without db_pool
         When: Calling handle_with_retry
-        Then: Returns success on first attempt
+        Then: RuntimeError is raised
         """
-        result = await handler_stub.handle_with_retry(
-            memory_id=memory_id,
-            initial_revision=1,
-            reason="test_retry",
-            expired_at=fixed_now,
-        )
+        handler = HandlerMemoryExpire()
 
-        assert result.success is True
-        assert result.new_revision == 2
-        assert result.conflict is False
+        with pytest.raises(RuntimeError, match="Database pool not configured"):
+            await handler.handle_with_retry(
+                memory_id=memory_id,
+                initial_revision=1,
+                reason="test_retry",
+                expired_at=fixed_now,
+            )
 
     @pytest.mark.asyncio
-    async def test_retry_uses_correct_parameters(
+    async def test_handle_with_retry_without_db_pool_raises_error_with_params(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
     ) -> None:
-        """Test handle_with_retry passes correct parameters to handle().
+        """Test handle_with_retry raises RuntimeError regardless of parameters.
 
-        Given: Specific parameters for retry
+        Given: Handler without db_pool and specific parameters
         When: Calling handle_with_retry
-        Then: Parameters are correctly used
+        Then: RuntimeError is raised
         """
-        result = await handler_stub.handle_with_retry(
-            memory_id=memory_id,
-            initial_revision=10,
-            reason="custom_reason",
-        )
+        handler = HandlerMemoryExpire()
 
-        assert result.memory_id == memory_id
-        assert result.new_revision == 11
+        with pytest.raises(RuntimeError, match="Database pool not configured"):
+            await handler.handle_with_retry(
+                memory_id=memory_id,
+                initial_revision=10,
+                reason="custom_reason",
+            )
 
 
 # =============================================================================
-# Edge Cases
+# Edge Cases - Command Validation
 # =============================================================================
 
 
 class TestEdgeCases:
-    """Tests for edge cases and boundary conditions."""
+    """Tests for edge cases and boundary conditions in command creation."""
 
-    @pytest.mark.asyncio
-    async def test_large_revision_number(
+    def test_large_revision_number_accepted(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
     ) -> None:
-        """Test handler handles large revision numbers correctly.
+        """Test command accepts large revision numbers.
 
         Given: Very large expected_revision
-        When: Handling expire command
-        Then: Returns success with incremented revision
+        When: Creating expire command
+        Then: Command is created successfully
         """
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
             expected_revision=999999999,
         )
 
-        result = await handler_stub.handle(command)
+        assert command.expected_revision == 999999999
 
-        assert result.success is True
-        assert result.new_revision == 1000000000
-
-    @pytest.mark.asyncio
-    async def test_zero_revision(
+    def test_zero_revision_accepted(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
     ) -> None:
-        """Test handler handles revision 0 correctly.
+        """Test command accepts revision 0.
 
         Given: expected_revision = 0 (first revision)
-        When: Handling expire command
-        Then: Returns success with new_revision = 1
+        When: Creating expire command
+        Then: Command is created successfully
         """
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
             expected_revision=0,
         )
 
-        result = await handler_stub.handle(command)
+        assert command.expected_revision == 0
 
-        assert result.success is True
-        assert result.new_revision == 1
-
-    @pytest.mark.asyncio
-    async def test_custom_expired_at_timestamp(
+    def test_custom_expired_at_timestamp_accepted(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
     ) -> None:
-        """Test handler accepts custom expired_at timestamp.
+        """Test command accepts custom expired_at timestamp.
 
         Given: Custom expired_at timestamp
-        When: Handling expire command
-        Then: Command is processed successfully
+        When: Creating expire command
+        Then: Command is created with the custom timestamp
         """
         custom_time = datetime(2020, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
         command = ModelExpireMemoryCommand(
@@ -622,21 +597,17 @@ class TestEdgeCases:
             expired_at=custom_time,
         )
 
-        result = await handler_stub.handle(command)
+        assert command.expired_at == custom_time
 
-        assert result.success is True
-
-    @pytest.mark.asyncio
-    async def test_none_expired_at_uses_current_time(
+    def test_none_expired_at_accepted(
         self,
-        handler_stub: HandlerMemoryExpire,
         memory_id: UUID,
     ) -> None:
-        """Test handler uses current time when expired_at is None.
+        """Test command accepts None for expired_at.
 
         Given: No expired_at provided
-        When: Handling expire command
-        Then: Command is processed using current time
+        When: Creating expire command
+        Then: Command is created with expired_at=None
         """
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
@@ -644,9 +615,7 @@ class TestEdgeCases:
             expired_at=None,
         )
 
-        result = await handler_stub.handle(command)
-
-        assert result.success is True
+        assert command.expired_at is None
 
 
 # =============================================================================
