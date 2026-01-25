@@ -71,6 +71,14 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from asyncpg import Pool
+    from asyncpg.exceptions import PostgresError
+else:
+    try:
+        from asyncpg.exceptions import PostgresError
+    except ImportError:
+        # Fallback if asyncpg not installed - use base Exception
+        # This allows the module to be imported even without asyncpg
+        PostgresError = Exception  # type: ignore[misc,assignment]
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -267,10 +275,11 @@ class HandlerMemoryExpire:
         WHERE id = $1
     """
 
-    # Valid source states for expiration transition
-    _VALID_FROM_STATES = frozenset(
-        {EnumLifecycleState.ACTIVE, EnumLifecycleState.EXPIRED}
-    )
+    # Valid source states for expiration transition.
+    # Only ACTIVE memories can be expired - the SQL WHERE clause requires
+    # lifecycle_state = 'active'. Including EXPIRED here would cause
+    # handle_with_retry() to keep retrying on already-expired memories.
+    _VALID_FROM_STATES = frozenset({EnumLifecycleState.ACTIVE})
 
     def __init__(
         self,
@@ -397,7 +406,7 @@ class HandlerMemoryExpire:
                     previous_state=EnumLifecycleState.ACTIVE,
                 )
 
-        except Exception as e:
+        except PostgresError as e:
             logger.error(
                 "Database error during expiration of memory %s: %s",
                 command.memory_id,
