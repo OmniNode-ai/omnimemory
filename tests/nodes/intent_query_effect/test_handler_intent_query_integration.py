@@ -9,6 +9,8 @@ Test Categories:
     - Distribution: Query intent distribution by category
     - Session: Query intents for a specific session
     - Recent: Query recent intents across all sessions
+    - Data round-trip: Create, query, and verify intent data
+    - Filtering: Test confidence and other filter criteria
     - Error handling: Test error conditions and edge cases
 
 Prerequisites:
@@ -38,7 +40,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -198,6 +200,70 @@ async def initialized_handler(
     await handler.shutdown()
 
 
+@pytest.fixture
+async def test_intents_in_db(
+    initialized_adapter: AdapterIntentGraph,
+    test_session_id: str,
+) -> list[dict[str, Any]]:
+    """Create test intents in database for query testing.
+
+    This fixture stores test intents with varying categories and confidence
+    levels to enable comprehensive query testing. The intents are linked to
+    the unique test_session_id to ensure test isolation.
+
+    Returns:
+        List of dictionaries containing stored intent metadata:
+        - intent_id: UUID of the stored intent
+        - session_id: Session the intent belongs to
+        - category: Intent category string
+        - confidence: Confidence score (0.0-1.0)
+        - keywords: List of keywords for this intent
+
+    Note:
+        No cleanup is needed since each test run uses a unique session_id,
+        providing natural test isolation without explicit deletion.
+    """
+    from uuid import uuid4
+
+    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
+
+    # Create test intents with varying categories and confidence levels
+    test_intents: list[dict[str, Any]] = []
+    test_data = [
+        ("debugging", 0.80, ["error", "traceback"]),
+        ("feature_request", 0.85, ["add", "implement"]),
+        ("documentation", 0.90, ["docs", "explain"]),
+    ]
+
+    for category, confidence, keywords in test_data:
+        intent_data = ModelIntentClassificationOutput(
+            intent_category=category,
+            confidence=confidence,
+            keywords=keywords,
+        )
+        correlation_id = uuid4()
+
+        result = await initialized_adapter.store_intent(
+            session_id=test_session_id,
+            intent_data=intent_data,
+            correlation_id=correlation_id,
+        )
+
+        if result.status == "success" and result.intent_id is not None:
+            test_intents.append(
+                {
+                    "intent_id": result.intent_id,
+                    "session_id": test_session_id,
+                    "category": category,
+                    "confidence": confidence,
+                    "keywords": keywords,
+                    "correlation_id": correlation_id,
+                }
+            )
+
+    return test_intents
+
+
 # =============================================================================
 # Integration Tests
 # =============================================================================
@@ -324,6 +390,274 @@ class TestHandlerIntentQueryIntegration:
 
         assert response.execution_time_ms is not None
         assert response.execution_time_ms > 0
+
+    # =========================================================================
+    # Data Round-Trip Tests (Create -> Query -> Verify)
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_session_query_returns_stored_intents(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+        test_session_id: str,
+    ) -> None:
+        """Test session query returns intents that were stored.
+
+        This test validates the full round-trip: intents are stored via the
+        adapter, then queried via the handler, and results are verified to
+        match the stored data.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        # Skip if no intents were stored (indicates storage failure)
+        if not test_intents_in_db:
+            pytest.skip("No test intents were stored - storage may have failed")
+
+        request = ModelIntentQueryRequestedEvent.create_session_query(
+            session_ref=test_session_id,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        assert response.status == "success", f"Query failed: {response.error_message}"
+        assert len(response.intents) == len(test_intents_in_db)
+
+        # Verify all expected categories are present
+        response_categories = {i.intent_category for i in response.intents}
+        expected_categories = {i["category"] for i in test_intents_in_db}
+        assert response_categories == expected_categories
+
+        # Verify confidence values match
+        response_confidences = {
+            i.intent_category: i.confidence for i in response.intents
+        }
+        for stored_intent in test_intents_in_db:
+            category = stored_intent["category"]
+            expected_confidence = stored_intent["confidence"]
+            assert category in response_confidences
+            assert abs(response_confidences[category] - expected_confidence) < 0.001
+
+    @pytest.mark.asyncio
+    async def test_recent_query_returns_stored_intents(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+    ) -> None:
+        """Test recent query returns recently stored intents.
+
+        Since test intents are created just before this test runs, they
+        should appear in a recent query with a short time range.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        if not test_intents_in_db:
+            pytest.skip("No test intents were stored - storage may have failed")
+
+        request = ModelIntentQueryRequestedEvent.create_recent_query(
+            time_range_hours=1,  # Just created, should be within 1 hour
+            limit=100,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        assert response.status == "success", f"Query failed: {response.error_message}"
+        # Should have at least our test intents (might have more from other tests)
+        assert len(response.intents) >= len(test_intents_in_db)
+
+        # Verify our test categories appear in the results
+        response_categories = {i.intent_category for i in response.intents}
+        expected_categories = {i["category"] for i in test_intents_in_db}
+        assert expected_categories.issubset(response_categories)
+
+    @pytest.mark.asyncio
+    async def test_distribution_query_includes_stored_categories(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+    ) -> None:
+        """Test distribution query includes stored intent categories.
+
+        The distribution query aggregates intent counts by category. Our
+        test intents should appear in the distribution with correct counts.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        if not test_intents_in_db:
+            pytest.skip("No test intents were stored - storage may have failed")
+
+        request = ModelIntentQueryRequestedEvent.create_distribution_query(
+            time_range_hours=1,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        assert response.status == "success", f"Query failed: {response.error_message}"
+        assert response.distribution is not None
+
+        # Our test categories should appear in distribution
+        for test_intent in test_intents_in_db:
+            category = test_intent["category"]
+            assert category in response.distribution, (
+                f"Expected category '{category}' not found in distribution. "
+                f"Available categories: {list(response.distribution.keys())}"
+            )
+            # Each category should have at least 1 intent
+            assert response.distribution[category] >= 1
+
+    @pytest.mark.asyncio
+    async def test_session_query_with_confidence_filter(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+        test_session_id: str,
+    ) -> None:
+        """Test session query filters by min_confidence.
+
+        Test data has confidence values: 0.80, 0.85, 0.90
+        Filtering with min_confidence=0.84 should exclude the first intent.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        if not test_intents_in_db:
+            pytest.skip("No test intents were stored - storage may have failed")
+
+        # Filter for confidence > 0.84, should exclude 0.80
+        min_confidence = 0.84
+        request = ModelIntentQueryRequestedEvent.create_session_query(
+            session_ref=test_session_id,
+            min_confidence=min_confidence,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        # Should have filtered out the low-confidence intent
+        assert response.status in ("success", "no_results")
+
+        if response.status == "success":
+            # All returned intents should have confidence >= min_confidence
+            for intent in response.intents:
+                assert intent.confidence >= min_confidence, (
+                    f"Intent with confidence {intent.confidence} should have "
+                    f"been filtered out (min_confidence={min_confidence})"
+                )
+
+            # Count how many test intents should pass the filter
+            expected_count = sum(
+                1 for i in test_intents_in_db if i["confidence"] >= min_confidence
+            )
+            assert len(response.intents) == expected_count
+
+    @pytest.mark.asyncio
+    async def test_session_query_returns_intent_ids(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+        test_session_id: str,
+    ) -> None:
+        """Test session query returns valid intent IDs.
+
+        Verify that the returned intent records have valid UUIDs that match
+        the IDs returned during storage.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        if not test_intents_in_db:
+            pytest.skip("No test intents were stored - storage may have failed")
+
+        request = ModelIntentQueryRequestedEvent.create_session_query(
+            session_ref=test_session_id,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        assert response.status == "success"
+
+        # All returned intents should have valid UUIDs
+        for intent in response.intents:
+            assert intent.intent_id is not None
+            # UUID should be valid (not raise on str conversion)
+            assert str(intent.intent_id)
+
+        # The returned intent_ids should match what was stored
+        response_ids = {intent.intent_id for intent in response.intents}
+        stored_ids = {i["intent_id"] for i in test_intents_in_db}
+        assert response_ids == stored_ids
+
+    @pytest.mark.asyncio
+    async def test_recent_query_with_limit(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+    ) -> None:
+        """Test recent query respects limit parameter.
+
+        When limit is less than the number of stored intents, only
+        that many should be returned.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        if len(test_intents_in_db) < 2:
+            pytest.skip("Need at least 2 intents for limit test")
+
+        # Request fewer intents than we stored
+        limit = 2
+        request = ModelIntentQueryRequestedEvent.create_recent_query(
+            time_range_hours=1,
+            limit=limit,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        assert response.status == "success"
+        # Should not exceed the requested limit
+        assert len(response.intents) <= limit
+
+    @pytest.mark.asyncio
+    async def test_intent_keywords_preserved(
+        self,
+        initialized_handler: HandlerIntentQuery,
+        test_intents_in_db: list[dict[str, Any]],
+        test_session_id: str,
+    ) -> None:
+        """Test that intent keywords are preserved through storage and retrieval.
+
+        Keywords are an important part of intent classification and should
+        be accurately stored and returned.
+        """
+        from omnibase_core.models.events import ModelIntentQueryRequestedEvent
+
+        if not test_intents_in_db:
+            pytest.skip("No test intents were stored - storage may have failed")
+
+        request = ModelIntentQueryRequestedEvent.create_session_query(
+            session_ref=test_session_id,
+            requester_name="test",
+        )
+
+        response = await initialized_handler.execute(request)
+
+        assert response.status == "success"
+
+        # Build a map of category -> keywords from stored data
+        stored_keywords: dict[str, list[str]] = {
+            i["category"]: i["keywords"] for i in test_intents_in_db
+        }
+
+        # Verify keywords match for each returned intent
+        for intent in response.intents:
+            expected_keywords = stored_keywords.get(intent.intent_category)
+            assert expected_keywords is not None
+            assert set(intent.keywords) == set(expected_keywords), (
+                f"Keywords mismatch for category '{intent.intent_category}': "
+                f"expected {expected_keywords}, got {intent.keywords}"
+            )
 
 
 # =============================================================================

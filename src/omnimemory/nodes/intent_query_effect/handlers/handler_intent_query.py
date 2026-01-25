@@ -39,6 +39,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Contract SLA: max response time in milliseconds
+_CONTRACT_MAX_RESPONSE_TIME_MS = 100.0
+
 __all__ = ["HandlerIntentQuery"]
 
 
@@ -156,20 +159,28 @@ class HandlerIntentQuery:
         start = time.monotonic()
 
         try:
-            match request.query_type:
-                case "distribution":
-                    return await self._handle_distribution(request, start)
-                case "session":
-                    return await self._handle_session(request, start)
-                case "recent":
-                    return await self._handle_recent(request, start)
-                case _:
-                    return ModelIntentQueryResponseEvent.from_error(
-                        query_id=request.query_id,
-                        query_type=request.query_type,
-                        error_message=f"Unknown query_type: {request.query_type}",
-                        correlation_id=request.correlation_id,
-                    )
+            async with asyncio.timeout(self._config.timeout_seconds):
+                match request.query_type:
+                    case "distribution":
+                        return await self._handle_distribution(request, start)
+                    case "session":
+                        return await self._handle_session(request, start)
+                    case "recent":
+                        return await self._handle_recent(request, start)
+                    case _:
+                        return ModelIntentQueryResponseEvent.from_error(
+                            query_id=request.query_id,
+                            query_type=request.query_type,
+                            error_message=f"Unknown query_type: {request.query_type}",
+                            correlation_id=request.correlation_id,
+                        )
+        except TimeoutError:
+            return ModelIntentQueryResponseEvent.from_error(
+                query_id=request.query_id,
+                query_type=request.query_type,
+                error_message=f"Handler timeout after {self._config.timeout_seconds}s",
+                correlation_id=request.correlation_id,
+            )
         except Exception as e:
             logger.exception("Error executing intent query: %s", request.query_type)
             return ModelIntentQueryResponseEvent.from_error(
@@ -200,6 +211,14 @@ class HandlerIntentQuery:
         )
 
         execution_time_ms = (time.monotonic() - start) * 1000
+
+        if execution_time_ms > _CONTRACT_MAX_RESPONSE_TIME_MS:
+            logger.warning(
+                "Query %s exceeded SLA: %.2fms (max: %.2fms)",
+                request.query_type,
+                execution_time_ms,
+                _CONTRACT_MAX_RESPONSE_TIME_MS,
+            )
 
         if result.status == "error":
             return ModelIntentQueryResponseEvent.from_error(
@@ -244,12 +263,20 @@ class HandlerIntentQuery:
         result = await self._adapter.get_session_intents(
             session_id=request.session_ref,
             min_confidence=request.min_confidence
-            if request.min_confidence > 0
+            if request.min_confidence is not None and request.min_confidence > 0
             else None,
             limit=request.limit,
         )
 
         execution_time_ms = (time.monotonic() - start) * 1000
+
+        if execution_time_ms > _CONTRACT_MAX_RESPONSE_TIME_MS:
+            logger.warning(
+                "Query %s exceeded SLA: %.2fms (max: %.2fms)",
+                request.query_type,
+                execution_time_ms,
+                _CONTRACT_MAX_RESPONSE_TIME_MS,
+            )
 
         if result.status == "error":
             return ModelIntentQueryResponseEvent.from_error(
@@ -260,11 +287,26 @@ class HandlerIntentQuery:
             )
 
         # Session queries need session_ref populated in records for mapping
+        # Create new instances instead of mutating adapter results
+        intents_with_ref = []
         for intent in result.intents:
             if intent.session_ref is None:
-                intent.session_ref = request.session_ref
+                intents_with_ref.append(
+                    intent.model_copy(update={"session_ref": request.session_ref})
+                )
+            else:
+                intents_with_ref.append(intent)
 
-        payloads = map_intent_records(result.intents)
+        try:
+            payloads = map_intent_records(intents_with_ref)
+        except ValueError as e:
+            logger.warning("Failed to map intent records: %s", e)
+            return ModelIntentQueryResponseEvent.from_error(
+                query_id=request.query_id,
+                query_type="session",
+                error_message=f"Failed to map intent records: {e}",
+                correlation_id=request.correlation_id,
+            )
 
         return ModelIntentQueryResponseEvent.create_session_response(
             query_id=request.query_id,
@@ -292,12 +334,20 @@ class HandlerIntentQuery:
         result = await self._adapter.get_recent_intents(
             time_range_hours=request.time_range_hours,
             min_confidence=request.min_confidence
-            if request.min_confidence > 0
+            if request.min_confidence is not None and request.min_confidence > 0
             else None,
             limit=request.limit,
         )
 
         execution_time_ms = (time.monotonic() - start) * 1000
+
+        if execution_time_ms > _CONTRACT_MAX_RESPONSE_TIME_MS:
+            logger.warning(
+                "Query %s exceeded SLA: %.2fms (max: %.2fms)",
+                request.query_type,
+                execution_time_ms,
+                _CONTRACT_MAX_RESPONSE_TIME_MS,
+            )
 
         if result.status == "error":
             return ModelIntentQueryResponseEvent.from_error(
@@ -307,7 +357,16 @@ class HandlerIntentQuery:
                 correlation_id=request.correlation_id,
             )
 
-        payloads = map_intent_records(result.intents)
+        try:
+            payloads = map_intent_records(result.intents)
+        except ValueError as e:
+            logger.warning("Failed to map intent records: %s", e)
+            return ModelIntentQueryResponseEvent.from_error(
+                query_id=request.query_id,
+                query_type="recent",
+                error_message=f"Failed to map intent records: {e}",
+                correlation_id=request.correlation_id,
+            )
 
         return ModelIntentQueryResponseEvent.create_recent_response(
             query_id=request.query_id,
