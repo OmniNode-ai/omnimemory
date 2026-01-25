@@ -207,21 +207,38 @@ class RegistryIntentQueryEffect:
         return ["distribution", "session", "recent"]
 
     @staticmethod
-    def get_kafka_topics() -> dict[str, str]:
-        """Get Kafka topic configuration.
+    def get_topic_suffixes() -> dict[str, str]:
+        """Get Kafka topic suffixes for this node.
 
-        Returns the topic names used by this node for event
-        consumption and production.
+        Returns topic SUFFIXES (not full topics). Runtime composes
+        full topics by adding env prefix:
+            full_topic = f"{topic_env_prefix}.{suffix}"
+
+        Example full topics (with "dev" env prefix):
+            - dev.onex.cmd.omnimemory.intent-query-requested.v1
+            - dev.onex.evt.omnimemory.intent-query-response.v1
 
         Returns:
-            Dictionary with 'input' and 'output' topic names.
+            Dictionary with 'subscribe' and 'publish' topic suffixes.
 
         .. versionadded:: 0.1.0
         """
         return {
-            "input": "onex.cmd.omnimemory.intent-query-requested.v1",
-            "output": "onex.evt.omnimemory.intent-query-response.v1",
+            "subscribe": "onex.cmd.omnimemory.intent-query-requested.v1",
+            "publish": "onex.evt.omnimemory.intent-query-response.v1",
         }
+
+    @staticmethod
+    def get_invocation_mode() -> str:
+        """Get the invocation mode for this node.
+
+        Returns:
+            "subscription" - node subscribes to topic, runtime dispatches
+            "orchestrator" - node is invoked by orchestrator, no subscription
+
+        .. versionadded:: 0.1.0
+        """
+        return "subscription"
 
     @staticmethod
     def get_supported_operations() -> list[str]:
