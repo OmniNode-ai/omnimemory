@@ -27,6 +27,7 @@ from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_arch
     ModelArchiveMemoryCommand,
     ModelArchiveRecord,
     ModelMemoryArchiveResult,
+    ProtocolOrphanedArchiveTracker,
 )
 from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
     HandlerMemoryExpire,
@@ -53,4 +54,5 @@ __all__ = [
     "ModelArchiveMemoryCommand",
     "ModelArchiveRecord",
     "ModelMemoryArchiveResult",
+    "ProtocolOrphanedArchiveTracker",
 ]

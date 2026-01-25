@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -165,15 +166,52 @@ class TestHandlerMemoryArchiveInitialization:
         assert handler is not None
         assert handler._db_pool is None
 
-    def test_handler_default_archive_path(self) -> None:
-        """Test handler uses default archive path.
+    def test_handler_default_archive_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test handler uses temp directory-based default path.
 
-        Given: No archive_base_path provided
+        Given: No archive_base_path provided and no env var set
         When: Creating HandlerMemoryArchive
-        Then: Handler uses default path /var/omnimemory/archives
+        Then: Handler uses temp directory-based path
         """
+        # Ensure env var is not set
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_PATH", raising=False)
+
         handler = HandlerMemoryArchive()
-        assert handler.archive_base_path == Path("/var/omnimemory/archives")
+        expected_path = Path(tempfile.gettempdir()) / "omnimemory" / "archives"
+        assert handler.archive_base_path == expected_path
+
+    def test_handler_archive_path_from_env_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test handler reads archive path from environment variable.
+
+        Given: OMNIMEMORY_ARCHIVE_PATH environment variable is set
+        When: Creating HandlerMemoryArchive without explicit path
+        Then: Handler uses path from environment variable
+        """
+        env_path = "/custom/env/archive/path"
+        monkeypatch.setenv("OMNIMEMORY_ARCHIVE_PATH", env_path)
+
+        handler = HandlerMemoryArchive()
+        assert handler.archive_base_path == Path(env_path)
+
+    def test_handler_explicit_path_overrides_env_var(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        archive_base_path: Path,
+    ) -> None:
+        """Test explicit path parameter overrides environment variable.
+
+        Given: Both env var and explicit path provided
+        When: Creating HandlerMemoryArchive
+        Then: Explicit path takes precedence over env var
+        """
+        monkeypatch.setenv("OMNIMEMORY_ARCHIVE_PATH", "/ignored/env/path")
+
+        handler = HandlerMemoryArchive(archive_base_path=archive_base_path)
+        assert handler.archive_base_path == archive_base_path
 
     def test_handler_custom_archive_path(
         self,

@@ -39,9 +39,14 @@ Example::
     from pathlib import Path
     from uuid import UUID
 
+    # Option 1: Use OMNIMEMORY_ARCHIVE_PATH environment variable (recommended)
+    # export OMNIMEMORY_ARCHIVE_PATH=/var/omnimemory/archives
+    handler = HandlerMemoryArchive(db_pool=pool)
+
+    # Option 2: Explicit path (useful for testing)
     handler = HandlerMemoryArchive(
         db_pool=pool,
-        archive_base_path=Path("/var/omnimemory/archives"),
+        archive_base_path=Path("/custom/archive/path"),
     )
 
     command = ModelArchiveMemoryCommand(
@@ -70,7 +75,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -90,7 +95,65 @@ __all__ = [
     "ModelArchiveMemoryCommand",
     "ModelArchiveRecord",
     "ModelMemoryArchiveResult",
+    "ProtocolOrphanedArchiveTracker",
 ]
+
+
+@runtime_checkable
+class ProtocolOrphanedArchiveTracker(Protocol):
+    """Protocol for tracking orphaned archive files.
+
+    An orphaned archive file occurs when the archive is successfully written
+    to disk but the database state update fails (e.g., due to revision conflict
+    or database error). These files exist on disk but are not tracked in the
+    database, requiring periodic cleanup.
+
+    Implementations of this protocol can:
+    - Log orphaned files for later cleanup
+    - Store in a dedicated cleanup queue
+    - Send alerts for immediate investigation
+    - Track metrics on orphan frequency
+
+    Example::
+
+        class FileOrphanTracker:
+            async def track_orphan(
+                self,
+                memory_id: UUID,
+                archive_path: Path,
+                reason: str,
+            ) -> None:
+                with open("/var/log/orphans.jsonl", "a") as f:
+                    f.write(json.dumps({
+                        "memory_id": str(memory_id),
+                        "archive_path": str(archive_path),
+                        "reason": reason,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }) + "\\n")
+
+    .. versionadded:: 0.1.0
+        Added for orphan tracking in OMN-1453.
+    """
+
+    async def track_orphan(
+        self,
+        memory_id: UUID,
+        archive_path: Path,
+        reason: str,
+    ) -> None:
+        """Track an orphaned archive file for later cleanup.
+
+        Called when an archive file is written but the database state
+        cannot be updated, leaving the file orphaned.
+
+        Args:
+            memory_id: UUID of the memory that was archived.
+            archive_path: Filesystem path where the orphaned archive exists.
+            reason: Description of why the file was orphaned (e.g.,
+                "revision_conflict_during_state_update" or
+                "database_error_during_state_update").
+        """
+        ...
 
 
 class ModelArchiveMemoryCommand(BaseModel):  # omnimemory-model-exempt: handler command
@@ -144,6 +207,8 @@ class ModelMemoryArchiveResult(BaseModel):  # omnimemory-model-exempt: handler r
         archive_path: Filesystem path where the archive was written.
         bytes_written: Number of compressed bytes written to the archive.
         conflict: True if a revision conflict prevented archival.
+        orphaned: True if an archive file was written but database state
+            update failed, leaving an orphaned file on disk.
         error_message: Human-readable error description if failed.
     """
 
@@ -176,6 +241,10 @@ class ModelMemoryArchiveResult(BaseModel):  # omnimemory-model-exempt: handler r
     conflict: bool = Field(
         default=False,
         description="True if revision conflict prevented archival",
+    )
+    orphaned: bool = Field(
+        default=False,
+        description="True if archive file was written but DB state update failed",
     )
     error_message: str | None = Field(
         default=None,
@@ -310,7 +379,8 @@ class HandlerMemoryArchive:
     def __init__(
         self,
         db_pool: Pool | None = None,
-        archive_base_path: Path = Path("/var/omnimemory/archives"),
+        archive_base_path: Path | None = None,
+        orphan_tracker: ProtocolOrphanedArchiveTracker | None = None,
     ) -> None:
         """Initialize the archive handler.
 
@@ -318,10 +388,35 @@ class HandlerMemoryArchive:
             db_pool: PostgreSQL connection pool for database operations.
                 If None, database operations will raise RuntimeError.
             archive_base_path: Base directory for archive storage.
+                If None, reads from OMNIMEMORY_ARCHIVE_PATH environment variable.
+                If env var not set, falls back to {tempdir}/omnimemory/archives.
                 Directories are created on-demand during archive operations.
+            orphan_tracker: Optional tracker for orphaned archive files.
+                If provided, will be called when an archive file is written
+                but the database state update fails. This enables monitoring
+                and cleanup of orphaned files.
         """
         self._db_pool = db_pool
-        self._archive_base_path = archive_base_path
+        self._orphan_tracker = orphan_tracker
+
+        if archive_base_path is not None:
+            self._archive_base_path = archive_base_path
+        else:
+            env_path = os.environ.get("OMNIMEMORY_ARCHIVE_PATH")
+            if env_path:
+                self._archive_base_path = Path(env_path)
+                logger.debug(
+                    "Using archive path from OMNIMEMORY_ARCHIVE_PATH: %s",
+                    self._archive_base_path,
+                )
+            else:
+                self._archive_base_path = (
+                    Path(tempfile.gettempdir()) / "omnimemory" / "archives"
+                )
+                logger.info(
+                    "OMNIMEMORY_ARCHIVE_PATH not set, using default archive path: %s",
+                    self._archive_base_path,
+                )
 
     @property
     def archive_base_path(self) -> Path:
@@ -441,10 +536,20 @@ class HandlerMemoryArchive:
                     command.memory_id,
                     archive_path,
                 )
+
+                # Track orphaned file if tracker configured
+                if self._orphan_tracker is not None:
+                    await self._orphan_tracker.track_orphan(
+                        memory_id=command.memory_id,
+                        archive_path=archive_path,
+                        reason="revision_conflict_during_state_update",
+                    )
+
                 return ModelMemoryArchiveResult(
                     memory_id=command.memory_id,
                     success=False,
                     conflict=True,
+                    orphaned=True,
                     archive_path=archive_path,
                     bytes_written=bytes_written,
                     error_message=(
@@ -458,9 +563,19 @@ class HandlerMemoryArchive:
                 command.memory_id,
                 e,
             )
+
+            # Track orphaned file if tracker configured
+            if self._orphan_tracker is not None:
+                await self._orphan_tracker.track_orphan(
+                    memory_id=command.memory_id,
+                    archive_path=archive_path,
+                    reason="database_error_during_state_update",
+                )
+
             return ModelMemoryArchiveResult(
                 memory_id=command.memory_id,
                 success=False,
+                orphaned=True,
                 archive_path=archive_path,
                 bytes_written=bytes_written,
                 error_message=f"State update failed: {e}",
