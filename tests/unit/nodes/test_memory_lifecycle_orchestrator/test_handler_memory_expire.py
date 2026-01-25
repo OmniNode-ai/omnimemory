@@ -669,13 +669,17 @@ class TestSQLPatternDocumentation:
 
         Given: HandlerMemoryExpire class
         When: Checking for _VALID_FROM_STATES attribute
-        Then: Attribute exists and contains expected states
+        Then: Attribute exists and contains only ACTIVE state
+
+        Note: Only ACTIVE memories can be expired. You cannot expire an
+        already EXPIRED memory - that would be a no-op or error condition.
         """
         assert hasattr(HandlerMemoryExpire, "_VALID_FROM_STATES")
         valid_states = HandlerMemoryExpire._VALID_FROM_STATES
 
-        # Verify contains expected states
+        # Only ACTIVE memories can be expired
         assert EnumLifecycleState.ACTIVE in valid_states
-        assert EnumLifecycleState.EXPIRED in valid_states
+        # EXPIRED is NOT a valid source state - can't expire already expired
+        assert EnumLifecycleState.EXPIRED not in valid_states
         assert EnumLifecycleState.ARCHIVED not in valid_states
         assert EnumLifecycleState.DELETED not in valid_states
