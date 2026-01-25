@@ -49,7 +49,7 @@ class ModelIntentStorageRequest(BaseModel):
         min_length=1,
         description="Session identifier (required for store and get_session)",
     )
-    intent_data: dict | None = Field(
+    intent_data: dict[str, object] | None = Field(
         default=None,
         description="Intent classification data as dict (required for store)",
     )

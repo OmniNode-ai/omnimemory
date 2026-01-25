@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -49,7 +50,7 @@ from omnimemory.handlers.adapters.models import (
     ModelIntentClassificationOutput,
 )
 from omnimemory.nodes.intent_storage_effect.models import (
-    IntentRecordResponse,
+    ModelIntentRecordResponse,
     ModelIntentStorageRequest,
     ModelIntentStorageResponse,
 )
@@ -113,13 +114,16 @@ class HandlerIntentStorageAdapter:
     async def initialize(
         self,
         connection_uri: str = "bolt://localhost:7687",
-        **kwargs: object,
+        auth: tuple[str, str] | None = None,
+        *,
+        options: Mapping[str, object] | None = None,
     ) -> None:
         """Initialize the underlying adapter.
 
         Args:
             connection_uri: Memgraph connection URI.
-            **kwargs: Additional configuration passed to adapter.
+            auth: Optional (username, password) tuple for authentication.
+            options: Additional options passed to the graph handler.
         """
         if self._initialized:
             return
@@ -130,7 +134,11 @@ class HandlerIntentStorageAdapter:
             )
 
         self._adapter = AdapterIntentGraph(self._config)
-        await self._adapter.initialize(connection_uri=connection_uri, **kwargs)
+        await self._adapter.initialize(
+            connection_uri=connection_uri,
+            auth=auth,
+            options=options,
+        )
         self._initialized = True
         logger.info("HandlerIntentStorageAdapter initialized")
 
@@ -249,7 +257,7 @@ class HandlerIntentStorageAdapter:
         if result.status == "success":
             # Convert to response model format
             intents = [
-                IntentRecordResponse(
+                ModelIntentRecordResponse(
                     intent_id=intent.intent_id,
                     intent_category=intent.intent_category,
                     confidence=intent.confidence,
