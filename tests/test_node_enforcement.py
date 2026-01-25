@@ -10,6 +10,18 @@ Ensures all ONEX nodes follow the FULLY DECLARATIVE pattern:
 This module validates that node directories contain proper contracts
 and handler registrations, catching violations at test time.
 
+Valid Node Types:
+    The following node_type values are accepted in contract.yaml files:
+    - effect: External I/O operations (APIs, DB, files)
+    - compute: Pure transforms and algorithms
+    - reducer: Aggregation and persistence operations
+    - orchestrator: Workflow coordination
+    - effect_generic: Generic effect node (EnumNodeType suffix variant)
+    - compute_generic: Generic compute node (EnumNodeType suffix variant)
+    - reducer_generic: Generic reducer node (EnumNodeType suffix variant)
+    - orchestrator_generic: Generic orchestrator node (EnumNodeType suffix variant)
+    - runtime_host_generic: Runtime host infrastructure node
+
 AST Enforcement:
     If node.py files exist (legacy pattern), validates they properly
     call super().__init__(container) to ensure proper initialization.
@@ -331,12 +343,32 @@ onex:
         assert result.valid, f"Should be valid: {result.error}"
 
     @pytest.mark.parametrize(
-        "node_type", ["effect", "compute", "reducer", "orchestrator"]
+        "node_type",
+        [
+            # Core 4-node architecture types
+            "effect",
+            "compute",
+            "reducer",
+            "orchestrator",
+            # _GENERIC suffix variants (from EnumNodeType)
+            "effect_generic",
+            "compute_generic",
+            "reducer_generic",
+            "orchestrator_generic",
+            # Runtime host type
+            "runtime_host_generic",
+        ],
     )
     def test_validate_contract_accepts_all_node_types(
         self, tmp_path: Path, node_type: str
     ) -> None:
-        """Test that validator accepts all valid node types."""
+        """Test that validator accepts all valid node types.
+
+        Validates all 9 valid node types defined in VALID_NODE_TYPES:
+        - Core types: effect, compute, reducer, orchestrator
+        - Generic variants: effect_generic, compute_generic, reducer_generic, orchestrator_generic
+        - Runtime host: runtime_host_generic
+        """
         contract: Path = tmp_path / f"{node_type}_contract.yaml"
         contract.write_text(
             f"""
@@ -347,6 +379,53 @@ onex:
         )
         result: ContractValidationResult = validate_contract(contract)
         assert result.valid, f"node_type '{node_type}' should be valid: {result.error}"
+
+    def test_runtime_host_generic_is_valid_node_type(self, tmp_path: Path) -> None:
+        """Explicitly verify runtime_host_generic is accepted as valid node type.
+
+        This test ensures the runtime_host_generic type (used for runtime host
+        infrastructure nodes) is properly included in VALID_NODE_TYPES and
+        passes contract validation.
+        """
+        contract: Path = tmp_path / "runtime_host_contract.yaml"
+        contract.write_text(
+            """
+onex:
+  name: runtime_host_node
+  node_type: runtime_host_generic
+  description: Runtime host infrastructure node for ONEX
+"""
+        )
+        result: ContractValidationResult = validate_contract(contract)
+        assert result.valid, f"runtime_host_generic should be valid: {result.error}"
+
+    def test_valid_node_types_frozenset_completeness(self) -> None:
+        """Verify VALID_NODE_TYPES contains all expected node types.
+
+        This test documents and enforces the complete set of valid node types
+        that should be accepted by the contract validator.
+        """
+        expected_types = {
+            # Core 4-node architecture
+            "effect",
+            "compute",
+            "reducer",
+            "orchestrator",
+            # Generic variants
+            "effect_generic",
+            "compute_generic",
+            "reducer_generic",
+            "orchestrator_generic",
+            # Runtime host
+            "runtime_host_generic",
+        }
+        assert expected_types == VALID_NODE_TYPES, (
+            f"VALID_NODE_TYPES mismatch.\n"
+            f"Expected: {sorted(expected_types)}\n"
+            f"Actual: {sorted(VALID_NODE_TYPES)}\n"
+            f"Missing: {sorted(expected_types - VALID_NODE_TYPES)}\n"
+            f"Extra: {sorted(VALID_NODE_TYPES - expected_types)}"
+        )
 
     def test_validate_contract_rejects_invalid_yaml(self, tmp_path: Path) -> None:
         """Test that validator rejects malformed YAML."""

@@ -47,12 +47,19 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import structlog
+
 from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
+from omnimemory.models.utils.model_circuit_breaker_config import (
+    ModelCircuitBreakerConfig,
+)
 from omnimemory.nodes.intent_storage_effect.models import (
     ModelIntentRecordResponse,
     ModelIntentStorageRequest,
     ModelIntentStorageResponse,
 )
+from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerOpenError
+from omnimemory.utils.pii_detector import PIIDetector
 
 if TYPE_CHECKING:
     from omnimemory.handlers.adapters import AdapterIntentGraph
@@ -80,35 +87,62 @@ except ImportError as e:
 
 
 logger = logging.getLogger(__name__)
+structured_logger = structlog.get_logger(__name__)
 
 __all__ = ["HandlerIntentStorageAdapter"]
+
+# Default circuit breaker configuration for external adapter calls
+_DEFAULT_CIRCUIT_BREAKER_CONFIG = ModelCircuitBreakerConfig(
+    failure_threshold=5,
+    recovery_timeout=60,
+    success_threshold=3,
+    timeout=30.0,
+)
 
 
 class HandlerIntentStorageAdapter:
     """Handler adapter for intent storage operations.
 
     Wraps AdapterIntentGraph to provide the execute() interface expected
-    by the ONEX node framework.
+    by the ONEX node framework. Includes circuit breaker protection to
+    prevent cascading failures when the underlying adapter is unavailable.
 
     Attributes:
         _adapter: The underlying AdapterIntentGraph instance.
         _initialized: Whether the adapter has been initialized.
         _config: Configuration for the intent graph adapter.
+        _circuit_breaker: Circuit breaker for external adapter calls.
+        _pii_detector: PII detector for user input sanitization.
     """
 
     def __init__(
         self,
         config: ModelAdapterIntentGraphConfig | None = None,
+        circuit_breaker_config: ModelCircuitBreakerConfig | None = None,
     ) -> None:
         """Initialize the handler adapter.
 
         Args:
             config: Optional configuration for the intent graph adapter.
                 If not provided, uses default configuration.
+            circuit_breaker_config: Optional circuit breaker configuration.
+                If not provided, uses default configuration with 5 failure
+                threshold, 60s recovery timeout, and 3 success threshold.
         """
         self._config = config or ModelAdapterIntentGraphConfig()
         self._adapter: AdapterIntentGraph | None = None
         self._initialized = False
+
+        # Initialize circuit breaker for external adapter calls
+        cb_config = circuit_breaker_config or _DEFAULT_CIRCUIT_BREAKER_CONFIG
+        self._circuit_breaker = CircuitBreaker(
+            failure_threshold=cb_config.failure_threshold,
+            recovery_timeout=float(cb_config.recovery_timeout),
+            success_threshold=cb_config.success_threshold,
+        )
+
+        # Initialize PII detector for user input sanitization
+        self._pii_detector = PIIDetector()
 
     async def initialize(
         self,
@@ -160,6 +194,9 @@ class HandlerIntentStorageAdapter:
         - get_session: Get intents for a session
         - get_distribution: Get intent category distribution
 
+        Uses circuit breaker protection to prevent cascading failures when
+        the underlying adapter is unavailable.
+
         Args:
             request: The storage request.
 
@@ -167,6 +204,12 @@ class HandlerIntentStorageAdapter:
             Response with operation results. If adapter is not initialized,
             returns a response with status="error" and error_message
             instructing to call initialize() first.
+
+        Note:
+            This method catches and handles the following exceptions:
+            - CircuitBreakerOpenError: When circuit breaker is open
+            - ValueError: Invalid input data or configuration
+            - Exception: Any other unexpected errors
         """
         if not self._initialized or self._adapter is None:
             return ModelIntentStorageResponse(
@@ -175,49 +218,43 @@ class HandlerIntentStorageAdapter:
             )
 
         start_time = time.perf_counter()
+        response: ModelIntentStorageResponse
 
         try:
+            # Route to appropriate handler with circuit breaker protection
             if request.operation == "store":
-                response = await self._store_intent(request)
+                response = await self._circuit_breaker.call(self._store_intent, request)
             elif request.operation == "get_session":
-                response = await self._get_session_intents(request)
+                response = await self._circuit_breaker.call(
+                    self._get_session_intents, request
+                )
             elif request.operation == "get_distribution":
-                response = await self._get_distribution(request)
+                response = await self._circuit_breaker.call(
+                    self._get_distribution, request
+                )
             else:
                 response = ModelIntentStorageResponse(
                     status="error",
                     error_message=f"Unknown operation: {request.operation}",
                 )
-        except AssertionError as e:
-            # AssertionError indicates a programming bug - missing validation or
-            # incorrect adapter state. Log at ERROR level with full traceback.
-            logger.exception(
-                "Assertion failed in intent storage operation '%s'. "
-                "This indicates a programming error - request validation may be incomplete.",
-                request.operation,
+        except CircuitBreakerOpenError as e:
+            # Circuit breaker is open - external service unavailable
+            structured_logger.warning(
+                "circuit_breaker_open",
+                operation=request.operation,
+                failure_count=self._circuit_breaker.failure_count,
+                state=self._circuit_breaker.state.value,
             )
             response = ModelIntentStorageResponse(
                 status="error",
-                error_message=f"Internal error: assertion failed - {e}",
-            )
-        except RuntimeError as e:
-            # RuntimeError typically indicates adapter initialization issues
-            # or infrastructure problems that the underlying adapter couldn't handle
-            logger.error(
-                "Runtime error during intent storage operation '%s': %s",
-                request.operation,
-                e,
-            )
-            response = ModelIntentStorageResponse(
-                status="error",
-                error_message=f"Runtime error: {e}",
+                error_message=f"Service temporarily unavailable: {e}",
             )
         except ValueError as e:
             # ValueError indicates invalid input data or configuration
-            logger.warning(
-                "Validation error during intent storage operation '%s': %s",
-                request.operation,
-                e,
+            structured_logger.warning(
+                "validation_error",
+                operation=request.operation,
+                error=str(e),
             )
             response = ModelIntentStorageResponse(
                 status="error",
@@ -227,11 +264,10 @@ class HandlerIntentStorageAdapter:
             # Safety net for truly unexpected errors - log at ERROR level with
             # full traceback to aid debugging. These should be rare since the
             # underlying adapter handles most exceptions internally.
-            logger.exception(
-                "Unexpected error (%s) during intent storage operation '%s'. "
-                "This may indicate a bug or unhandled edge case.",
-                type(e).__name__,
-                request.operation,
+            structured_logger.exception(
+                "unexpected_error",
+                error_type=type(e).__name__,
+                operation=request.operation,
             )
             response = ModelIntentStorageResponse(
                 status="error",
@@ -247,20 +283,49 @@ class HandlerIntentStorageAdapter:
         self,
         request: ModelIntentStorageRequest,
     ) -> ModelIntentStorageResponse:
-        """Store a classified intent."""
-        assert self._adapter is not None
-        assert request.session_id is not None
-        assert request.intent_data is not None
+        """Store a classified intent.
+
+        Args:
+            request: The storage request with session_id and intent_data.
+
+        Returns:
+            Response with storage result.
+
+        Raises:
+            ValueError: If adapter is not initialized or required fields are missing.
+        """
+        # Explicit validation (asserts can be disabled with python -O)
+        if self._adapter is None:
+            raise ValueError("Adapter not initialized")
+        if request.session_id is None:
+            raise ValueError("session_id is required for store operation")
+        if request.intent_data is None:
+            raise ValueError("intent_data is required for store operation")
+
+        # PII detection/redaction for user_context before persistence
+        sanitized_context = request.user_context
+        if sanitized_context:
+            pii_result = self._pii_detector.detect_pii(
+                sanitized_context, sensitivity_level="medium"
+            )
+            if pii_result.has_pii:
+                # Use sanitized content with PII redacted
+                sanitized_context = pii_result.sanitized_content
+                structured_logger.info(
+                    "pii_redacted_before_storage",
+                    pii_types=[t.value for t in pii_result.pii_types_detected],
+                    session_id=request.session_id,
+                )
 
         # Generate correlation_id if not provided
         correlation_id = request.correlation_id or uuid4()
 
-        # Call the adapter
+        # Call the adapter with sanitized context
         result = await self._adapter.store_intent(
             session_id=request.session_id,
             intent_data=request.intent_data,
             correlation_id=correlation_id,
-            user_context=request.user_context,
+            user_context=sanitized_context,
         )
 
         if result.status == "success":
@@ -282,9 +347,22 @@ class HandlerIntentStorageAdapter:
         self,
         request: ModelIntentStorageRequest,
     ) -> ModelIntentStorageResponse:
-        """Get intents for a specific session."""
-        assert self._adapter is not None
-        assert request.session_id is not None
+        """Get intents for a specific session.
+
+        Args:
+            request: The query request with session_id.
+
+        Returns:
+            Response with list of intents for the session.
+
+        Raises:
+            ValueError: If adapter is not initialized or session_id is missing.
+        """
+        # Explicit validation (asserts can be disabled with python -O)
+        if self._adapter is None:
+            raise ValueError("Adapter not initialized")
+        if request.session_id is None:
+            raise ValueError("session_id is required for get_session operation")
 
         result = await self._adapter.get_session_intents(
             session_id=request.session_id,
@@ -332,8 +410,20 @@ class HandlerIntentStorageAdapter:
         self,
         request: ModelIntentStorageRequest,
     ) -> ModelIntentStorageResponse:
-        """Get intent category distribution."""
-        assert self._adapter is not None
+        """Get intent category distribution.
+
+        Args:
+            request: The query request with time_range_hours.
+
+        Returns:
+            Response with intent category distribution.
+
+        Raises:
+            ValueError: If adapter is not initialized.
+        """
+        # Explicit validation (asserts can be disabled with python -O)
+        if self._adapter is None:
+            raise ValueError("Adapter not initialized")
 
         result = await self._adapter.get_intent_distribution(
             time_range_hours=request.time_range_hours,

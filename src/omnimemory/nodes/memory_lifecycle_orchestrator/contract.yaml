@@ -10,6 +10,13 @@
 # Processes RuntimeTick events to evaluate timeout conditions and trigger
 # lifecycle state transitions for memory entities.
 #
+# Lifecycle States (EnumLifecycleState):
+#   - ACTIVE: Memory is available for retrieval and actively used
+#   - STALE: Memory is outdated but still accessible (soft TTL exceeded)
+#   - EXPIRED: Memory has exceeded hard TTL, pending cleanup
+#   - ARCHIVED: Memory has been moved to cold storage
+#   - DELETED: Memory has been permanently removed (terminal state)
+#
 # Related to: OMN-1453 (OmniMemory P4b - Lifecycle Orchestrator Database Integration)
 #
 # =============================================================================
@@ -23,12 +30,14 @@
 #   - Protocol: ProtocolProjectionReader from omnibase_spi.protocols
 #   - Projections: memory_lifecycle_state, memory_access_patterns
 #
-# Handler Routing:
+# Handler Routing (Implemented):
 #   - ModelRuntimeTick -> HandlerMemoryTick (TTL expiration evaluation)
-#   - ModelArchiveMemoryCommand -> HandlerMemoryArchive
-#   - ModelExpireMemoryCommand -> HandlerMemoryExpire
-#   - ModelRestoreMemoryCommand -> HandlerRestoreMemory
-#   - ModelMemoryAccessedEvent -> HandlerMemoryAccessed
+#   - ModelArchiveMemoryCommand -> HandlerMemoryArchive (EXPIRED -> ARCHIVED)
+#   - ModelExpireMemoryCommand -> HandlerMemoryExpire (ACTIVE -> EXPIRED)
+#
+# Handler Routing (Planned - OMN-1453):
+#   - ModelRestoreMemoryCommand -> HandlerRestoreMemory (ARCHIVED -> ACTIVE)
+#   - ModelMemoryAccessedEvent -> HandlerMemoryAccessed (TTL extension tracking)
 #
 # Published Event Topics:
 #   - {env}.{namespace}.memory.evt.memory-expired.v1

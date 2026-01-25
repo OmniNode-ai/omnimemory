@@ -17,7 +17,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- Memories Table
 -- ============================================================================
 -- Stores memory content with lifecycle state management.
--- Lifecycle states: active -> expired -> archived -> deleted
+-- Lifecycle states: active -> stale -> expired -> archived -> deleted
 -- Supports optimistic locking via lifecycle_revision column.
 
 CREATE TABLE IF NOT EXISTS memories (
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS memories (
 
     -- Constraints
     CONSTRAINT chk_memories_lifecycle_state CHECK (
-        lifecycle_state IN ('active', 'expired', 'archived', 'deleted')
+        lifecycle_state IN ('active', 'stale', 'expired', 'archived', 'deleted')
     )
 );
 
@@ -63,6 +63,23 @@ CREATE INDEX IF NOT EXISTS idx_memories_archive_candidates
 
 -- Optimizes: UPDATE memories SET ... WHERE id = $1 AND lifecycle_revision = $2
 -- Index for optimistic locking queries (concurrent update protection)
+--
+-- Purpose: This composite index enables efficient optimistic locking patterns where
+-- updates include both the primary key (id) and the expected revision number.
+-- When multiple concurrent processes attempt to update the same memory, only one
+-- succeeds (the one with the matching revision). Others get rows_affected=0,
+-- indicating a conflict that requires retry or conflict resolution.
+--
+-- Why needed despite id being PRIMARY KEY:
+--   The primary key index only covers (id). For queries like:
+--     UPDATE memories SET ... WHERE id = $1 AND lifecycle_revision = $2
+--   PostgreSQL must check lifecycle_revision after finding the row by id.
+--   This index allows the query planner to verify both conditions in a single
+--   index lookup, improving performance for high-contention workloads.
+--
+-- Trade-off: This index adds storage overhead and write amplification.
+-- Keep if: High-concurrency lifecycle state transitions are expected.
+-- Remove if: Single-writer patterns or low update frequency.
 CREATE INDEX IF NOT EXISTS idx_memories_id_revision
     ON memories(id, lifecycle_revision);
 
@@ -103,7 +120,7 @@ CREATE TRIGGER omnimemory_trigger_memories_updated_at
 -- ============================================================================
 
 COMMENT ON TABLE memories IS
-    'Memory storage with lifecycle management. States: active, expired, archived, deleted.';
+    'Memory storage with lifecycle management. States: active, stale, expired, archived, deleted.';
 
 COMMENT ON COLUMN memories.id IS
     'Unique identifier for the memory (UUID v4)';
@@ -115,7 +132,7 @@ COMMENT ON COLUMN memories.content_type IS
     'MIME type of the content (e.g., text/plain, application/json)';
 
 COMMENT ON COLUMN memories.lifecycle_state IS
-    'Current lifecycle state: active (in use), expired (past TTL), archived (cold storage), deleted (soft delete)';
+    'Current lifecycle state: active (in use), stale (outdated), expired (past TTL), archived (cold storage), deleted (soft delete)';
 
 COMMENT ON COLUMN memories.expires_at IS
     'Optional expiration timestamp. NULL means no expiration.';

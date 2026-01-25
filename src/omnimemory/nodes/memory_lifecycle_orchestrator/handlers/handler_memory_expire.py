@@ -72,29 +72,46 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from asyncpg import Pool
-    from asyncpg.exceptions import PostgresError
+    from asyncpg.exceptions import InterfaceError, InternalClientError, PostgresError
 else:
     try:
-        from asyncpg.exceptions import PostgresError
+        from asyncpg.exceptions import (
+            InterfaceError,
+            InternalClientError,
+            PostgresError,
+        )
     except ImportError:
         # Fallback if asyncpg not installed - use base Exception
         # This allows the module to be imported even without asyncpg
         PostgresError = Exception  # type: ignore[misc,assignment]
+        InterfaceError = Exception  # type: ignore[misc,assignment]
+        InternalClientError = Exception  # type: ignore[misc,assignment]
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums import EnumLifecycleState
+from omnimemory.utils.concurrency import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    CircuitBreakerState,
+)
 
 logger = logging.getLogger(__name__)
 
 # Query timeout for database operations (seconds)
 _QUERY_TIMEOUT_SECONDS: float = 30.0
 
+# Circuit breaker configuration for database operations
+_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
+_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: float = 60.0
+_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
+
 __all__ = [
     "HandlerMemoryExpire",
     "ModelExpireMemoryCommand",
     "ModelMemoryExpireResult",
     "ModelMemoryCurrentState",
+    "CircuitBreakerOpenError",
 ]
 
 
@@ -289,16 +306,22 @@ class HandlerMemoryExpire:
         self,
         db_pool: Pool | None = None,
         max_retries: int = 3,
+        circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         """Initialize the expiration handler.
 
         Args:
             db_pool: Database connection pool. Required for database operations.
                 If None, calling handle() or _read_current_state() will raise
-                RuntimeError.
+                RuntimeError. The handler requires a database pool for all
+                operations - there is no in-memory fallback mode.
             max_retries: Maximum retry attempts for handle_with_retry().
                 Defaults to 3, which balances retry opportunity against
                 excessive contention scenarios.
+            circuit_breaker: Optional circuit breaker for database operations.
+                If None, a default circuit breaker is created with standard
+                settings (5 failures to open, 60s recovery, 2 successes to close).
+                Protects against cascading failures during database outages.
 
         Raises:
             ValueError: If max_retries is less than 1.
@@ -308,11 +331,36 @@ class HandlerMemoryExpire:
 
         self._db_pool = db_pool
         self._max_retries = max_retries
+        self._circuit_breaker = circuit_breaker or CircuitBreaker(
+            failure_threshold=_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            recovery_timeout=_CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+            success_threshold=_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+        )
 
     @property
     def max_retries(self) -> int:
         """Maximum retry attempts for handle_with_retry()."""
         return self._max_retries
+
+    @property
+    def circuit_breaker(self) -> CircuitBreaker:
+        """Circuit breaker protecting database operations.
+
+        Exposed for monitoring and testing purposes. The circuit breaker
+        tracks database failures and opens to prevent cascading failures.
+        """
+        return self._circuit_breaker
+
+    @property
+    def circuit_breaker_state(self) -> CircuitBreakerState:
+        """Current state of the circuit breaker.
+
+        Returns:
+            CircuitBreakerState.CLOSED: Normal operation
+            CircuitBreakerState.OPEN: Failing fast, DB assumed unavailable
+            CircuitBreakerState.HALF_OPEN: Testing if DB has recovered
+        """
+        return self._circuit_breaker.state
 
     async def handle(
         self,
@@ -350,6 +398,22 @@ class HandlerMemoryExpire:
                 "Initialize handler with db_pool parameter."
             )
 
+        # Check circuit breaker before attempting database operation
+        if not self._circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker open, failing fast for memory %s",
+                command.memory_id,
+            )
+            return ModelMemoryExpireResult(
+                memory_id=command.memory_id,
+                success=False,
+                conflict=False,
+                error_message=(
+                    "Database circuit breaker is open. "
+                    "Service is temporarily unavailable."
+                ),
+            )
+
         # Determine expiration timestamp
         expired_at = command.expired_at or datetime.now(timezone.utc)
 
@@ -371,9 +435,45 @@ class HandlerMemoryExpire:
                 if row is None:
                     # No rows updated - either revision mismatch or invalid state
                     # Try to read current state for better error message
-                    current_state = await self._read_current_state(command.memory_id)
+                    try:
+                        current_state = await self._read_current_state(
+                            command.memory_id
+                        )
+                    except CircuitBreakerOpenError:
+                        # Circuit breaker opened during state read
+                        return ModelMemoryExpireResult(
+                            memory_id=command.memory_id,
+                            success=False,
+                            conflict=False,
+                            error_message=(
+                                "Database circuit breaker is open. "
+                                "Unable to read current state for diagnostics."
+                            ),
+                        )
+                    except (
+                        PostgresError,
+                        InterfaceError,
+                        InternalClientError,
+                        TimeoutError,
+                    ) as e:
+                        # Database error during state read - log and return generic error
+                        logger.warning(
+                            "Error reading current state for memory %s: %s",
+                            command.memory_id,
+                            e,
+                        )
+                        return ModelMemoryExpireResult(
+                            memory_id=command.memory_id,
+                            success=False,
+                            conflict=False,
+                            error_message=(
+                                "Expiration failed and unable to determine cause. "
+                                f"State read error: {e}"
+                            ),
+                        )
 
                     if current_state is None:
+                        self._circuit_breaker.record_success()
                         return ModelMemoryExpireResult(
                             memory_id=command.memory_id,
                             success=False,
@@ -382,6 +482,7 @@ class HandlerMemoryExpire:
                         )
 
                     if current_state.lifecycle_revision != command.expected_revision:
+                        self._circuit_breaker.record_success()
                         return ModelMemoryExpireResult(
                             memory_id=command.memory_id,
                             success=False,
@@ -394,6 +495,7 @@ class HandlerMemoryExpire:
                         )
 
                     # Revision matched but state was wrong
+                    self._circuit_breaker.record_success()
                     return ModelMemoryExpireResult(
                         memory_id=command.memory_id,
                         success=False,
@@ -406,6 +508,7 @@ class HandlerMemoryExpire:
                     )
 
                 # Success - row contains the new revision
+                self._circuit_breaker.record_success()
                 return ModelMemoryExpireResult(
                     memory_id=command.memory_id,
                     success=True,
@@ -414,6 +517,7 @@ class HandlerMemoryExpire:
                 )
 
         except TimeoutError:
+            self._circuit_breaker.record_timeout()
             logger.error(
                 "Database query timeout for memory %s",
                 command.memory_id,
@@ -425,6 +529,7 @@ class HandlerMemoryExpire:
                 error_message="Database query timeout",
             )
         except PostgresError as e:
+            self._circuit_breaker.record_failure()
             logger.error(
                 "Database error during expiration of memory %s: %s",
                 command.memory_id,
@@ -435,6 +540,22 @@ class HandlerMemoryExpire:
                 success=False,
                 conflict=False,
                 error_message=f"Database error: {e}",
+            )
+        except (InterfaceError, InternalClientError) as e:
+            # Handle asyncpg client-side errors:
+            # - InterfaceError: Pool closing, connection already acquired, etc.
+            # - InternalClientError: Protocol errors, schema cache issues, etc.
+            self._circuit_breaker.record_failure()
+            logger.error(
+                "Client error during expiration of memory %s: %s",
+                command.memory_id,
+                e,
+            )
+            return ModelMemoryExpireResult(
+                memory_id=command.memory_id,
+                success=False,
+                conflict=False,
+                error_message=f"Client error: {e}",
             )
 
     async def handle_with_retry(
@@ -504,7 +625,46 @@ class HandlerMemoryExpire:
                 memory_id,
             )
 
-            current_state = await self._read_current_state(memory_id)
+            try:
+                current_state = await self._read_current_state(memory_id)
+            except CircuitBreakerOpenError:
+                logger.warning(
+                    "Circuit breaker open during retry state read for memory %s",
+                    memory_id,
+                )
+                return ModelMemoryExpireResult(
+                    memory_id=memory_id,
+                    success=False,
+                    conflict=False,
+                    error_message=(
+                        "Database circuit breaker is open. "
+                        "Unable to retry - service temporarily unavailable."
+                    ),
+                )
+            except (PostgresError, InterfaceError, InternalClientError) as e:
+                logger.error(
+                    "Database error reading state during retry for memory %s: %s",
+                    memory_id,
+                    e,
+                )
+                return ModelMemoryExpireResult(
+                    memory_id=memory_id,
+                    success=False,
+                    conflict=False,
+                    error_message=f"Database error during retry state read: {e}",
+                )
+            except TimeoutError:
+                logger.error(
+                    "Timeout reading state during retry for memory %s",
+                    memory_id,
+                )
+                return ModelMemoryExpireResult(
+                    memory_id=memory_id,
+                    success=False,
+                    conflict=False,
+                    error_message="Timeout during retry state read",
+                )
+
             if current_state is None:
                 return ModelMemoryExpireResult(
                     memory_id=memory_id,
@@ -554,12 +714,26 @@ class HandlerMemoryExpire:
 
         Raises:
             RuntimeError: If database pool is not configured.
+            PostgresError: If a database error occurs during the query.
+            InterfaceError: If a client-side asyncpg error occurs.
+            InternalClientError: If a protocol-level asyncpg error occurs.
+            TimeoutError: If the database query exceeds the timeout.
         """
         # Require database pool for all operations
         if self._db_pool is None:
             raise RuntimeError(
                 "Database pool not configured. "
                 "Initialize handler with db_pool parameter."
+            )
+
+        # Check circuit breaker before attempting database operation
+        if not self._circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker open, failing fast for state read of memory %s",
+                memory_id,
+            )
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker is {self._circuit_breaker.state.value}"
             )
 
         try:
@@ -570,8 +744,10 @@ class HandlerMemoryExpire:
                 )
 
                 if row is None:
+                    self._circuit_breaker.record_success()
                     return None
 
+                self._circuit_breaker.record_success()
                 return ModelMemoryCurrentState(
                     memory_id=row["id"],
                     lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
@@ -579,8 +755,25 @@ class HandlerMemoryExpire:
                     updated_at=row["updated_at"],
                 )
         except TimeoutError:
+            self._circuit_breaker.record_timeout()
             logger.error(
                 "Database query timeout reading state for memory %s",
                 memory_id,
             )
-            return None
+            raise
+        except PostgresError as e:
+            self._circuit_breaker.record_failure()
+            logger.error(
+                "Database error reading state for memory %s: %s",
+                memory_id,
+                e,
+            )
+            raise
+        except (InterfaceError, InternalClientError) as e:
+            self._circuit_breaker.record_failure()
+            logger.error(
+                "Client error reading state for memory %s: %s",
+                memory_id,
+                e,
+            )
+            raise

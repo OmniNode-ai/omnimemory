@@ -34,6 +34,7 @@ Related Tickets:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime
@@ -44,11 +45,17 @@ from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
 from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.enums import EnumLifecycleState
+from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerOpenError
+
 if TYPE_CHECKING:
     from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
 logger = logging.getLogger(__name__)
+
+# Timeout for projection reader calls (seconds)
+_PROJECTION_READER_TIMEOUT_SECONDS: float = 10.0
 
 
 # =============================================================================
@@ -235,7 +242,7 @@ class ModelMemoryLifecycleProjection(  # omnimemory-model-exempt: projection mod
 
     Attributes:
         entity_id: The memory entity UUID.
-        lifecycle_state: Current state (active, expired, archived, deleted).
+        lifecycle_state: Current state (active, stale, expired, archived, deleted).
         expires_at: TTL deadline (None = no expiration).
         expired_at: When memory transitioned to EXPIRED.
         archived_at: When memory was archived (None = not archived).
@@ -272,7 +279,7 @@ class ModelMemoryLifecycleProjection(  # omnimemory-model-exempt: projection mod
         """Check if this memory needs an expiration event emitted.
 
         Returns True if:
-            - lifecycle_state == 'active'
+            - lifecycle_state == ACTIVE (using EnumLifecycleState)
             - expires_at is not None AND expires_at <= now
             - expiration_emitted_at is None (not already emitted)
 
@@ -283,7 +290,7 @@ class ModelMemoryLifecycleProjection(  # omnimemory-model-exempt: projection mod
             True if expiration event should be emitted.
         """
         return (
-            self.lifecycle_state == "active"
+            self.lifecycle_state == EnumLifecycleState.ACTIVE.value
             and self.expires_at is not None
             and self.expires_at <= now
             and self.expiration_emitted_at is None
@@ -293,7 +300,7 @@ class ModelMemoryLifecycleProjection(  # omnimemory-model-exempt: projection mod
         """Check if this memory needs an archive initiation event.
 
         Returns True if:
-            - lifecycle_state == 'expired'
+            - lifecycle_state == EXPIRED (using EnumLifecycleState)
             - archived_at is None (not yet archived)
             - archive_initiated_at is None (not already initiated)
 
@@ -304,7 +311,7 @@ class ModelMemoryLifecycleProjection(  # omnimemory-model-exempt: projection mod
             True if archive initiation event should be emitted.
         """
         return (
-            self.lifecycle_state == "expired"
+            self.lifecycle_state == EnumLifecycleState.EXPIRED.value
             and self.archived_at is None
             and self.archive_initiated_at is None
         )
@@ -365,6 +372,7 @@ class HandlerMemoryTick:
         self,
         projection_reader: ProtocolMemoryLifecycleProjectionReader | None = None,
         batch_size: int = 100,
+        circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         """Initialize the handler with a projection reader.
 
@@ -373,9 +381,18 @@ class HandlerMemoryTick:
                 If None, handler will return empty results (useful for testing).
             batch_size: Maximum number of memories to process per tick.
                 Prevents tick processing from blocking too long.
+            circuit_breaker: Optional circuit breaker for projection reader resilience.
+                If None, a default circuit breaker is created with conservative settings.
         """
         self._projection_reader = projection_reader
         self._batch_size = batch_size
+        # Circuit breaker for projection reader calls - protects against
+        # cascading failures when the projection reader is unavailable
+        self._circuit_breaker = circuit_breaker or CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            success_threshold=2,
+        )
 
     @property
     def handler_id(self) -> str:
@@ -425,7 +442,9 @@ class HandlerMemoryTick:
 
         # Extract from envelope
         tick = envelope.payload
-        now = envelope.envelope_timestamp
+        # Use tick.now (injected time) for consistent evaluation across distributed
+        # deployments and deterministic testing - NOT envelope_timestamp
+        now = tick.now
         correlation_id = envelope.correlation_id or uuid4()
 
         events: list[BaseModel] = []
@@ -514,14 +533,57 @@ class HandlerMemoryTick:
             )
             return []
 
+        # Check circuit breaker before attempting external call
+        if not self._circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker OPEN for projection reader, skipping expiration check",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "circuit_breaker_state": self._circuit_breaker.state.value,
+                },
+            )
+            return []
+
         # TODO(OMN-1524): Use infra projection reader primitives
-        # Query projection for expired candidates
-        expired_projections = await self._projection_reader.get_expired_candidates(
-            now=now,
-            domain="memory",
-            correlation_id=correlation_id,
-            limit=self._batch_size,
-        )
+        # Query projection for expired candidates with timeout and circuit breaker
+        try:
+            expired_projections = await asyncio.wait_for(
+                self._projection_reader.get_expired_candidates(
+                    now=now,
+                    domain="memory",
+                    correlation_id=correlation_id,
+                    limit=self._batch_size,
+                ),
+                timeout=_PROJECTION_READER_TIMEOUT_SECONDS,
+            )
+            self._circuit_breaker.record_success()
+        except TimeoutError:
+            self._circuit_breaker.record_timeout()
+            logger.error(
+                "Projection reader timeout during expiration check",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "timeout_seconds": _PROJECTION_READER_TIMEOUT_SECONDS,
+                },
+            )
+            return []
+        except CircuitBreakerOpenError:
+            logger.warning(
+                "Circuit breaker rejected expiration check request",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            return []
+        except Exception as exc:
+            self._circuit_breaker.record_failure()
+            logger.error(
+                "Projection reader error during expiration check",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
+            return []
 
         events: list[ModelMemoryExpiredEvent] = []
 
@@ -597,14 +659,57 @@ class HandlerMemoryTick:
             )
             return []
 
+        # Check circuit breaker before attempting external call
+        if not self._circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker OPEN for projection reader, skipping archive check",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "circuit_breaker_state": self._circuit_breaker.state.value,
+                },
+            )
+            return []
+
         # TODO(OMN-1524): Use infra projection reader primitives
-        # Query projection for archive candidates
-        archive_projections = await self._projection_reader.get_archive_candidates(
-            now=now,
-            domain="memory",
-            correlation_id=correlation_id,
-            limit=self._batch_size,
-        )
+        # Query projection for archive candidates with timeout and circuit breaker
+        try:
+            archive_projections = await asyncio.wait_for(
+                self._projection_reader.get_archive_candidates(
+                    now=now,
+                    domain="memory",
+                    correlation_id=correlation_id,
+                    limit=self._batch_size,
+                ),
+                timeout=_PROJECTION_READER_TIMEOUT_SECONDS,
+            )
+            self._circuit_breaker.record_success()
+        except TimeoutError:
+            self._circuit_breaker.record_timeout()
+            logger.error(
+                "Projection reader timeout during archive check",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "timeout_seconds": _PROJECTION_READER_TIMEOUT_SECONDS,
+                },
+            )
+            return []
+        except CircuitBreakerOpenError:
+            logger.warning(
+                "Circuit breaker rejected archive check request",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            return []
+        except Exception as exc:
+            self._circuit_breaker.record_failure()
+            logger.error(
+                "Projection reader error during archive check",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
+            return []
 
         events: list[ModelMemoryArchiveInitiated] = []
 

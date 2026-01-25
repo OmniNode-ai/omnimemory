@@ -84,6 +84,7 @@ from omnibase_core.models.metadata.model_generic_metadata import ModelGenericMet
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums import EnumLifecycleState
+from omnimemory.utils.concurrency import CircuitBreaker
 
 if TYPE_CHECKING:
     from asyncpg import Pool
@@ -227,6 +228,7 @@ class ModelMemoryArchiveResult(BaseModel):  # omnimemory-model-exempt: handler r
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
         strict=True,
     )
@@ -411,11 +413,22 @@ class HandlerMemoryArchive:
     # database is under heavy load or experiencing issues.
     _QUERY_TIMEOUT_SECONDS: float = 30.0
 
+    # Circuit breaker configuration defaults.
+    #
+    # These defaults balance responsiveness with stability:
+    # - failure_threshold=5: Opens after 5 consecutive failures
+    # - recovery_timeout=60: Waits 60s before attempting recovery
+    # - success_threshold=2: Requires 2 successes to fully close
+    _CB_FAILURE_THRESHOLD: int = 5
+    _CB_RECOVERY_TIMEOUT: float = 60.0
+    _CB_SUCCESS_THRESHOLD: int = 2
+
     def __init__(
         self,
         db_pool: Pool | None = None,
         archive_base_path: Path | None = None,
         orphan_tracker: ProtocolOrphanedArchiveTracker | None = None,
+        db_circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         """Initialize the archive handler.
 
@@ -430,9 +443,19 @@ class HandlerMemoryArchive:
                 If provided, will be called when an archive file is written
                 but the database state update fails. This enables monitoring
                 and cleanup of orphaned files.
+            db_circuit_breaker: Optional circuit breaker for database operations.
+                If not provided, a default circuit breaker is created.
+                Protects against cascading failures when database is unhealthy.
         """
         self._db_pool = db_pool
         self._orphan_tracker = orphan_tracker
+
+        # Initialize circuit breaker for DB operations
+        self._db_circuit_breaker = db_circuit_breaker or CircuitBreaker(
+            failure_threshold=self._CB_FAILURE_THRESHOLD,
+            recovery_timeout=self._CB_RECOVERY_TIMEOUT,
+            success_threshold=self._CB_SUCCESS_THRESHOLD,
+        )
 
         if archive_base_path is not None:
             self._archive_base_path = archive_base_path
@@ -441,16 +464,16 @@ class HandlerMemoryArchive:
             if env_path:
                 self._archive_base_path = Path(env_path)
                 logger.debug(
-                    "Using archive path from OMNIMEMORY_ARCHIVE_PATH: %s",
-                    self._archive_base_path,
+                    "Using archive path from OMNIMEMORY_ARCHIVE_PATH",
+                    extra={"archive_path": str(self._archive_base_path)},
                 )
             else:
                 self._archive_base_path = (
                     Path(tempfile.gettempdir()) / "omnimemory" / "archives"
                 )
                 logger.info(
-                    "OMNIMEMORY_ARCHIVE_PATH not set, using default archive path: %s",
-                    self._archive_base_path,
+                    "OMNIMEMORY_ARCHIVE_PATH not set, using default archive path",
+                    extra={"archive_path": str(self._archive_base_path)},
                 )
 
     @property
@@ -478,23 +501,48 @@ class HandlerMemoryArchive:
         """
         now = datetime.now(timezone.utc)
 
+        # Check circuit breaker before any DB operations
+        if not self._db_circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker open, rejecting archive request",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "circuit_state": self._db_circuit_breaker.state.value,
+                },
+            )
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                error_message=(
+                    "Database circuit breaker is open. "
+                    "Service is protecting against cascading failures."
+                ),
+            )
+
         # Step 1: Read memory content (with optimistic lock check)
         try:
             memory = await self._read_memory(
                 command.memory_id,
                 command.expected_revision,
             )
+            # Record successful DB read (only for non-None results from actual DB query)
+            if memory is not None:
+                self._db_circuit_breaker.record_success()
         except ValueError as e:
+            # ValueError indicates memory not found - this is not a DB failure
             return ModelMemoryArchiveResult(
                 memory_id=command.memory_id,
                 success=False,
                 error_message=str(e),
             )
         except TimeoutError as e:
+            self._db_circuit_breaker.record_timeout()
             logger.error(
-                "Query timeout reading memory %s: %s",
-                command.memory_id,
-                e,
+                "Query timeout reading memory",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                },
             )
             return ModelMemoryArchiveResult(
                 memory_id=command.memory_id,
@@ -536,8 +584,8 @@ class HandlerMemoryArchive:
             metadata=memory.metadata,
         )
 
-        # Step 4: Serialize and compress
-        compressed_bytes = self._serialize_for_archive(record)
+        # Step 4: Serialize and compress (offloaded to thread pool for large payloads)
+        compressed_bytes = await self._serialize_for_archive_async(record)
 
         # Step 5: Determine archive path
         archive_path = command.archive_path or self._get_archive_path(
@@ -553,9 +601,13 @@ class HandlerMemoryArchive:
             )
         except OSError as e:
             logger.error(
-                "Failed to write archive for memory %s: %s",
-                command.memory_id,
-                e,
+                "Failed to write archive",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "archive_path": str(archive_path),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
             )
             return ModelMemoryArchiveResult(
                 memory_id=command.memory_id,
@@ -571,16 +623,22 @@ class HandlerMemoryArchive:
                 now,
                 archive_path,
             )
+            # Record successful DB operation
+            # Note: We record success even on revision conflict because
+            # the DB query itself succeeded - conflict is application logic
+            self._db_circuit_breaker.record_success()
+
             if not updated:
                 # Revision conflict during state update
                 # Note: Archive file was written but state not updated
                 # This is a known edge case - the file exists but memory
                 # may be re-archived. Idempotent archive format handles this.
                 logger.warning(
-                    "Revision conflict during state update for memory %s. "
-                    "Archive file written to %s but state not updated.",
-                    command.memory_id,
-                    archive_path,
+                    "Revision conflict during state update",
+                    extra={
+                        "memory_id": str(command.memory_id),
+                        "archive_path": str(archive_path),
+                    },
                 )
 
                 # Track orphaned file if tracker configured
@@ -604,10 +662,14 @@ class HandlerMemoryArchive:
                     ),
                 )
         except PostgresError as e:
+            self._db_circuit_breaker.record_failure()
             logger.error(
-                "Database error updating state for memory %s: %s",
-                command.memory_id,
-                e,
+                "Database error updating state",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
             )
 
             # Track orphaned file if tracker configured
@@ -630,10 +692,14 @@ class HandlerMemoryArchive:
             # Handle asyncpg client-side errors not covered by PostgresError:
             # - InterfaceError: Pool closing, connection already acquired, etc.
             # - InternalClientError: Protocol errors, schema cache issues, etc.
+            self._db_circuit_breaker.record_failure()
             logger.error(
-                "Client error updating state for memory %s: %s",
-                command.memory_id,
-                e,
+                "Client error updating state",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
             )
 
             # Track orphaned file if tracker configured
@@ -654,10 +720,13 @@ class HandlerMemoryArchive:
             )
         except TimeoutError as e:
             # Handle pool acquisition or query timeout
+            self._db_circuit_breaker.record_timeout()
             logger.error(
-                "Timeout updating state for memory %s: %s",
-                command.memory_id,
-                e,
+                "Timeout updating state",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                },
             )
 
             # Track orphaned file if tracker configured
@@ -678,10 +747,13 @@ class HandlerMemoryArchive:
             )
 
         logger.info(
-            "Successfully archived memory %s to %s (%d bytes)",
-            command.memory_id,
-            archive_path,
-            bytes_written,
+            "Successfully archived memory",
+            extra={
+                "memory_id": str(command.memory_id),
+                "archive_path": str(archive_path),
+                "bytes_written": bytes_written,
+                "lifecycle_revision": command.expected_revision,
+            },
         )
 
         return ModelMemoryArchiveResult(
@@ -722,8 +794,12 @@ class HandlerMemoryArchive:
             / f"{memory_id}.jsonl.gz"
         )
 
-    def _serialize_for_archive(self, record: ModelArchiveRecord) -> bytes:
-        """Serialize record to compressed JSONL bytes.
+    def _serialize_for_archive_sync(self, record: ModelArchiveRecord) -> bytes:
+        """Serialize record to compressed JSONL bytes (synchronous).
+
+        This is a synchronous CPU-bound operation that performs gzip compression.
+        For large payloads, use _serialize_for_archive_async() to avoid blocking
+        the event loop.
 
         The domain owns the format decision (gzip + JSONL).
         Infrastructure will own atomic write mechanics (OMN-1524).
@@ -743,6 +819,26 @@ class HandlerMemoryArchive:
         return gzip.compress(
             jsonl_line.encode("utf-8"),
             compresslevel=self._ARCHIVE_COMPRESSION_LEVEL,
+        )
+
+    async def _serialize_for_archive_async(
+        self,
+        record: ModelArchiveRecord,
+    ) -> bytes:
+        """Serialize record to compressed JSONL bytes (async, non-blocking).
+
+        Offloads the CPU-bound gzip compression to a thread pool to avoid
+        blocking the event loop. This is recommended for large payloads.
+
+        Args:
+            record: The archive record to serialize.
+
+        Returns:
+            Gzip-compressed JSONL bytes.
+        """
+        return await asyncio.to_thread(
+            self._serialize_for_archive_sync,
+            record,
         )
 
     def _write_archive_sync(
@@ -798,13 +894,21 @@ class HandlerMemoryArchive:
 
             return len(compressed_bytes)
 
-        except Exception:
+        except (OSError, ValueError):
             # Cleanup temp file on failure
+            # OSError: covers all filesystem errors (write, fsync, rename, unlink)
+            # ValueError: invalid file descriptor operations
             if fd >= 0:
-                os.close(fd)
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass  # Ignore close errors during cleanup
             temp_path_obj = Path(temp_path)
-            if temp_path_obj.exists():
-                temp_path_obj.unlink()
+            try:
+                if temp_path_obj.exists():
+                    temp_path_obj.unlink()
+            except OSError:
+                pass  # Ignore unlink errors during cleanup
             raise
 
     async def _write_archive_atomic(
@@ -889,10 +993,12 @@ class HandlerMemoryArchive:
             # Check revision matches
             if row["lifecycle_revision"] != expected_revision:
                 logger.debug(
-                    "Revision mismatch for memory %s: expected %d, got %d",
-                    memory_id,
-                    expected_revision,
-                    row["lifecycle_revision"],
+                    "Revision mismatch for memory",
+                    extra={
+                        "memory_id": str(memory_id),
+                        "expected_revision": expected_revision,
+                        "actual_revision": row["lifecycle_revision"],
+                    },
                 )
                 return None
 
@@ -974,9 +1080,11 @@ class HandlerMemoryArchive:
             match = re.match(r"UPDATE (\d+)", result)
             if not match:
                 logger.error(
-                    "Unexpected execute result format for memory %s: %r",
-                    memory_id,
-                    result,
+                    "Unexpected execute result format",
+                    extra={
+                        "memory_id": str(memory_id),
+                        "result": repr(result),
+                    },
                 )
                 raise RuntimeError(f"Unexpected DB result format: {result}")
             rows_affected = int(match.group(1))

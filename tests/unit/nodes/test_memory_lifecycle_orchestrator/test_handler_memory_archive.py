@@ -374,7 +374,7 @@ class TestArchiveFormat:
             lifecycle_revision=1,
         )
 
-        compressed = handler._serialize_for_archive(record)
+        compressed = handler._serialize_for_archive_sync(record)
 
         # Verify it's valid gzip by decompressing
         decompressed = gzip.decompress(compressed)
@@ -402,7 +402,7 @@ class TestArchiveFormat:
             lifecycle_revision=1,
         )
 
-        compressed = handler._serialize_for_archive(record)
+        compressed = handler._serialize_for_archive_sync(record)
         decompressed = gzip.decompress(compressed).decode("utf-8")
 
         # JSONL format: JSON followed by newline
@@ -446,7 +446,7 @@ class TestArchiveFormat:
             metadata=metadata,
         )
 
-        compressed = handler._serialize_for_archive(record)
+        compressed = handler._serialize_for_archive_sync(record)
         decompressed = gzip.decompress(compressed).decode("utf-8")
         parsed = json.loads(decompressed.rstrip("\n"))
 
@@ -478,7 +478,7 @@ class TestArchiveFormat:
             lifecycle_revision=1,
         )
 
-        compressed = handler._serialize_for_archive(record)
+        compressed = handler._serialize_for_archive_sync(record)
         decompressed = gzip.decompress(compressed).decode("utf-8")
         parsed = json.loads(decompressed.rstrip("\n"))
 
@@ -1046,7 +1046,7 @@ class TestEdgeCases:
             lifecycle_revision=1,
         )
 
-        compressed = handler._serialize_for_archive(record)
+        compressed = handler._serialize_for_archive_sync(record)
 
         # Compression should reduce size significantly
         original_size = len(large_content.encode("utf-8"))
@@ -1075,7 +1075,7 @@ class TestEdgeCases:
             lifecycle_revision=1,
         )
 
-        compressed = handler._serialize_for_archive(record)
+        compressed = handler._serialize_for_archive_sync(record)
         decompressed = gzip.decompress(compressed).decode("utf-8")
         parsed = json.loads(decompressed.rstrip("\n"))
 

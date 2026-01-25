@@ -8,15 +8,26 @@ Supports store, query, and distribution operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Self
+import logging
+from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-if TYPE_CHECKING:
-    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
+# Runtime import required for Pydantic model validation
+# (TYPE_CHECKING imports are not available at runtime for field type resolution)
+from omnimemory.handlers.adapters.models import (
+    ModelIntentClassificationOutput,  # noqa: TC001
+)
+from omnimemory.utils.pii_detector import PIIDetector
 
 __all__ = ["ModelIntentStorageRequest"]
+
+logger = logging.getLogger(__name__)
+
+# Module-level PII detector instance for validation
+# Using medium sensitivity for user context to balance security and usability
+_pii_detector = PIIDetector()
 
 
 class ModelIntentStorageRequest(BaseModel):
@@ -80,8 +91,40 @@ class ModelIntentStorageRequest(BaseModel):
     )
     user_context: str = Field(
         default="",
+        max_length=10000,
         description="Optional user context for storage operations",
     )
+
+    @model_validator(mode="after")
+    def validate_user_context_pii(self) -> Self:
+        """Validate user_context does not contain PII.
+
+        User-facing input must be checked for PII before processing/storage
+        to ensure compliance with privacy regulations.
+
+        Raises:
+            ValueError: If PII is detected in user_context.
+        """
+        if self.user_context:
+            # Use medium sensitivity to balance security and usability
+            result = _pii_detector.detect_pii(
+                self.user_context, sensitivity_level="medium"
+            )
+            if result.has_pii:
+                pii_types = ", ".join(t.value for t in result.pii_types_detected)
+                logger.warning(
+                    "PII detected in user_context",
+                    extra={
+                        "pii_types_detected": pii_types,
+                        "operation": self.operation,
+                    },
+                )
+                msg = (
+                    f"user_context contains PII ({pii_types}). "
+                    "Please remove sensitive information before submission."
+                )
+                raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def validate_operation_fields(self) -> Self:

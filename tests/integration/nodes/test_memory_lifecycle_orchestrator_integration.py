@@ -36,7 +36,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 import pytest
 
@@ -647,11 +646,17 @@ async def insert_test_memory(
     Returns:
         UUID of inserted memory.
 
+    Raises:
+        NotImplementedError: Always raised until OMN-1524 is implemented.
+
     Note:
-        Implementation pending OMN-1524.
+        Implementation pending OMN-1524. This stub raises NotImplementedError
+        to fail fast and prevent tests from silently passing with invalid data.
     """
-    # Placeholder - will be implemented with OMN-1524
-    return memory_id or uuid4()
+    raise NotImplementedError(
+        "insert_test_memory() requires OMN-1524 infra primitives (db.with_transaction). "
+        "See: https://linear.app/omninode/issue/OMN-1524"
+    )
 
 
 async def get_memory_state(memory_id: UUID) -> dict:
@@ -663,11 +668,17 @@ async def get_memory_state(memory_id: UUID) -> dict:
     Returns:
         Dict with lifecycle_state, lifecycle_revision, etc.
 
+    Raises:
+        NotImplementedError: Always raised until OMN-1524 is implemented.
+
     Note:
-        Implementation pending OMN-1524.
+        Implementation pending OMN-1524. This stub raises NotImplementedError
+        to fail fast and prevent tests from silently passing with invalid data.
     """
-    # Placeholder - will be implemented with OMN-1524
-    return {}
+    raise NotImplementedError(
+        "get_memory_state() requires OMN-1524 infra primitives (db.with_transaction). "
+        "See: https://linear.app/omninode/issue/OMN-1524"
+    )
 
 
 async def count_expired_events(correlation_id: UUID) -> int:
@@ -679,11 +690,17 @@ async def count_expired_events(correlation_id: UUID) -> int:
     Returns:
         Number of events emitted.
 
+    Raises:
+        NotImplementedError: Always raised until OMN-1524 is implemented.
+
     Note:
-        Implementation pending OMN-1524.
+        Implementation pending OMN-1524. This stub raises NotImplementedError
+        to fail fast and prevent tests from silently passing with invalid data.
     """
-    # Placeholder - will be implemented with OMN-1524
-    return 0
+    raise NotImplementedError(
+        "count_expired_events() requires OMN-1524 infra primitives (event tracking). "
+        "See: https://linear.app/omninode/issue/OMN-1524"
+    )
 
 
 # =============================================================================

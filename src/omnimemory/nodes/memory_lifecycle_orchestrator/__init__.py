@@ -2,7 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Lifecycle Orchestrator - ONEX Node (Core 8 Foundation).
 
-Manages memory lifecycle transitions: ACTIVE -> EXPIRED -> ARCHIVED -> DELETED.
+Manages memory lifecycle transitions: ACTIVE -> STALE -> EXPIRED -> ARCHIVED -> DELETED.
 Handles TTL expiration via RuntimeTick events and optimistic locking
 for concurrent safety.
 
@@ -18,8 +18,9 @@ Time Injection:
     than system clock, enabling deterministic testing and consistent behavior
     across distributed deployments.
 
-Lifecycle States:
+Lifecycle States (EnumLifecycleState):
     - ACTIVE: Memory is available for retrieval and actively used
+    - STALE: Memory is outdated but still accessible (soft TTL exceeded)
     - EXPIRED: Memory has exceeded TTL, pending cleanup
     - ARCHIVED: Memory has been moved to cold storage
     - DELETED: Memory has been permanently removed (terminal state)
@@ -27,7 +28,7 @@ Lifecycle States:
 ONEX 4.0 Declarative Pattern:
     This node follows the fully declarative ONEX pattern:
     - contract.yaml defines the node type, inputs, outputs, and dependencies
-    - Business logic lives in handlers (handler_memory_tick, handler_archive_memory, etc.)
+    - Business logic lives in handlers (HandlerMemoryTick, HandlerMemoryArchive, etc.)
     - No node.py class needed - the contract IS the node definition
 
 Handlers::
@@ -36,18 +37,19 @@ Handlers::
         HandlerMemoryTick,
         HandlerMemoryArchive,
         HandlerMemoryExpire,
-        HandlerRestoreMemory,
-        HandlerMemoryAccessed,
     )
+
+    # Planned handlers (not yet implemented):
+    # HandlerRestoreMemory, HandlerMemoryAccessed
 
 Models::
 
     from omnimemory.nodes.memory_lifecycle_orchestrator import (
-        ModelLifecycleOrchestratorInput,
-        ModelLifecycleOrchestratorOutput,
         ModelArchiveMemoryCommand,
         ModelExpireMemoryCommand,
-        ModelRestoreMemoryCommand,
+        ModelMemoryArchiveResult,
+        ModelMemoryExpireResult,
+        ModelMemoryTickResult,
     )
 
 .. versionadded:: 0.1.0
@@ -58,27 +60,41 @@ Ticket: OMN-1453
 
 # Implemented handler imports
 from .handlers import (
+    HandlerMemoryArchive,
     HandlerMemoryExpire,
     HandlerMemoryTick,
+    ModelArchiveMemoryCommand,
+    ModelArchiveRecord,
     ModelExpireMemoryCommand,
+    ModelMemoryArchiveResult,
     ModelMemoryCurrentState,
     ModelMemoryExpireResult,
     ModelMemoryTickResult,
+    ProtocolOrphanedArchiveTracker,
 )
 
 # TODO(OMN-1453): Add handler imports as implemented:
-#   HandlerMemoryArchive, HandlerRestoreMemory, HandlerMemoryAccessed
+#   HandlerRestoreMemory, HandlerMemoryAccessed
 
 # TODO(OMN-1453): Add model imports as implemented:
 #   ModelLifecycleOrchestratorInput, ModelLifecycleOrchestratorOutput,
-#   ModelArchiveMemoryCommand, ModelRestoreMemoryCommand
+#   ModelRestoreMemoryCommand
 
 __all__: list[str] = [
     # Implemented handlers
     "HandlerMemoryTick",
     "HandlerMemoryExpire",
+    "HandlerMemoryArchive",
+    # Tick handler models
     "ModelMemoryTickResult",
+    # Expire handler models
     "ModelExpireMemoryCommand",
     "ModelMemoryExpireResult",
     "ModelMemoryCurrentState",
+    # Archive handler models
+    "ModelArchiveMemoryCommand",
+    "ModelMemoryArchiveResult",
+    "ModelArchiveRecord",
+    # Protocols
+    "ProtocolOrphanedArchiveTracker",
 ]

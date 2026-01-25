@@ -37,15 +37,33 @@ service_configuration:
   requires_external_dependencies: true
 
 # === INPUT/OUTPUT STATE ===
+# Aligned with ModelIntentStorageRequest and ModelIntentStorageResponse Pydantic models
 input_state:
   object_type: "object"
-  required: ["operation", "session_id"]
-  optional: ["intent_data", "min_confidence", "limit", "time_range_hours"]
+  required: ["operation"]
+  optional:
+    - "session_id"  # Required for 'store' and 'get_session' operations
+    - "intent_data"  # Required for 'store' operation (ModelIntentClassificationOutput)
+    - "correlation_id"  # Optional UUID for request tracing
+    - "min_confidence"  # float 0.0-1.0, default 0.0
+    - "limit"  # int 1-1000, default 100
+    - "time_range_hours"  # int 1-720, default 24
+    - "user_context"  # string, max 10000 chars, PII-validated
 
 output_state:
   object_type: "object"
   required: ["status"]
-  optional: ["intent_id", "intents", "distribution", "error_message"]
+  optional:
+    - "intent_id"  # UUID for store operations
+    - "session_id"  # Session identifier echo
+    - "created"  # bool, True if new intent created
+    - "intents"  # list[ModelIntentRecordResponse] for get_session
+    - "total_count"  # int for get_session results
+    - "distribution"  # dict[str, int] for get_distribution
+    - "total_intents"  # int for get_distribution
+    - "time_range_hours"  # int for get_distribution echo
+    - "execution_time_ms"  # float, operation timing
+    - "error_message"  # string, error details
 
 # === ACTIONS ===
 actions:
@@ -100,14 +118,17 @@ validation_rules:
   input_validation_enabled: true
   output_validation_enabled: true
   performance_validation_enabled: true
+  pii_validation_enabled: true  # user_context is PII-validated
   constraint_definitions:
     operation: "Literal['store', 'get_session', 'get_distribution']"
     status: "Literal['success', 'error', 'not_found', 'no_results']"
-    session_id: "string type for session identifier"
-    intent_data: "ModelIntentClassificationOutput for storage operations"
-    min_confidence: "float from 0.0 to 1.0 for filtering"
-    limit: "int for pagination limit"
-    time_range_hours: "int for distribution query time range"
+    session_id: "str | None, min_length=1, required for store and get_session"
+    intent_data: "ModelIntentClassificationOutput | None, required for store"
+    correlation_id: "UUID | None, optional request tracing identifier"
+    min_confidence: "float, ge=0.0, le=1.0, default=0.0"
+    limit: "int, ge=1, le=1000, default=100"
+    time_range_hours: "int, ge=1, le=720, default=24"
+    user_context: "str, max_length=10000, PII-validated before processing"
 
 # === TAGS ===
 tags:

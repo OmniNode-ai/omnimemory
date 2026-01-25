@@ -379,7 +379,7 @@ class MemoryRecord(BaseMemoryModel):
     )
     lifecycle_revision: int = Field(
         1,
-        ge=1,
+        ge=0,
         description="Revision number for optimistic locking (incremented on each state change)",
     )
     provenance: ModelStringList = Field(
