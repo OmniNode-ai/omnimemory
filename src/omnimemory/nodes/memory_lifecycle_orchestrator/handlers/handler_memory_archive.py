@@ -78,15 +78,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from uuid import UUID
 
+from omnibase_core.models.metadata.model_generic_metadata import ModelGenericMetadata
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums import EnumLifecycleState
 
 if TYPE_CHECKING:
     from asyncpg import Pool
-
-# Type alias for JSON-compatible metadata values (zero Any types policy)
-JsonValue = str | int | float | bool | None
 
 logger = logging.getLogger(__name__)
 
@@ -313,7 +311,7 @@ class ModelArchiveRecord(BaseModel):  # omnimemory-model-exempt: archive record 
         default="1.0",
         description="Schema version for archive format migrations",
     )
-    metadata: dict[str, JsonValue] | None = Field(
+    metadata: ModelGenericMetadata | None = Field(
         default=None,
         description="Optional additional metadata from the memory",
     )
@@ -338,7 +336,7 @@ class ModelMemoryRow(BaseModel):  # omnimemory-model-exempt: handler internal
     expired_at: datetime | None
     lifecycle_state: EnumLifecycleState
     lifecycle_revision: int
-    metadata: dict[str, JsonValue] | None = None
+    metadata: ModelGenericMetadata | None = None
 
 
 class HandlerMemoryArchive:
@@ -764,6 +762,12 @@ class HandlerMemoryArchive:
                 )
                 return None
 
+            # Convert raw metadata dict to ModelGenericMetadata if present
+            raw_metadata = row["metadata"]
+            metadata: ModelGenericMetadata | None = None
+            if raw_metadata is not None:
+                metadata = ModelGenericMetadata.model_validate(raw_metadata)
+
             return ModelMemoryRow(
                 id=row["id"],
                 content=row["content"],
@@ -772,7 +776,7 @@ class HandlerMemoryArchive:
                 expired_at=row["expired_at"],
                 lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
                 lifecycle_revision=row["lifecycle_revision"],
-                metadata=row["metadata"],
+                metadata=metadata,
             )
 
     async def _mark_archived(

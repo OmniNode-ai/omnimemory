@@ -28,10 +28,11 @@ import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 import pytest
+from omnibase_core.models.infrastructure.model_value import ModelValue
+from omnibase_core.models.metadata.model_generic_metadata import ModelGenericMetadata
 from pydantic import ValidationError
 
 from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
@@ -137,7 +138,10 @@ def sample_archive_record(
         expired_at=fixed_now - timedelta(days=1),  # Expired 1 day ago
         archived_at=fixed_now,
         lifecycle_revision=5,
-        metadata={"source": "test", "tags": ["important", "archive"]},
+        metadata=ModelGenericMetadata(
+            tags=["important", "archive"],
+            custom_fields={"source": ModelValue.from_string("test")},
+        ),
     )
 
 
@@ -420,11 +424,17 @@ class TestArchiveFormat:
     ) -> None:
         """Test serialization preserves metadata in archive.
 
-        Given: An archive record with metadata
+        Given: An archive record with ModelGenericMetadata
         When: Serializing and deserializing
-        Then: Metadata is preserved correctly
+        Then: Metadata structure is preserved correctly
         """
-        metadata = {"source": "test", "priority": 1, "tags": ["a", "b"]}
+        metadata = ModelGenericMetadata(
+            tags=["a", "b"],
+            custom_fields={
+                "source": ModelValue.from_string("test"),
+                "priority": ModelValue.from_integer(1),
+            },
+        )
         record = ModelArchiveRecord(
             memory_id=memory_id,
             content="Content with metadata",
@@ -440,7 +450,11 @@ class TestArchiveFormat:
         decompressed = gzip.decompress(compressed).decode("utf-8")
         parsed = json.loads(decompressed.rstrip("\n"))
 
-        assert parsed["metadata"] == metadata
+        # Verify metadata structure is preserved after serialization
+        assert parsed["metadata"] is not None
+        assert parsed["metadata"]["tags"] == ["a", "b"]
+        assert parsed["metadata"]["custom_fields"]["source"]["raw_value"] == "test"
+        assert parsed["metadata"]["custom_fields"]["priority"]["raw_value"] == 1
 
     def test_serialize_includes_archive_version(
         self,
@@ -736,6 +750,7 @@ class TestArchiveResultModel:
 
         assert result.success is False
         assert result.conflict is True
+        assert result.error_message is not None
         assert "Revision conflict" in result.error_message
         assert result.archived_at is None
         assert result.archive_path is None
@@ -757,6 +772,7 @@ class TestArchiveResultModel:
 
         assert result.success is False
         assert result.conflict is False
+        assert result.error_message is not None
         assert "Cannot archive" in result.error_message
 
     def test_result_bytes_written_default(self, memory_id: UUID) -> None:
@@ -875,17 +891,19 @@ class TestArchiveRecordModel:
         memory_id: UUID,
         fixed_now: datetime,
     ) -> None:
-        """Test record accepts metadata dict.
+        """Test record accepts ModelGenericMetadata.
 
-        Given: Metadata dictionary
+        Given: ModelGenericMetadata instance
         When: Creating ModelArchiveRecord
         Then: metadata is stored correctly
         """
-        metadata: dict[str, Any] = {
-            "source": "agent",
-            "priority": 1,
-            "tags": ["important"],
-        }
+        metadata = ModelGenericMetadata(
+            tags=["important"],
+            custom_fields={
+                "source": ModelValue.from_string("agent"),
+                "priority": ModelValue.from_integer(1),
+            },
+        )
         record = ModelArchiveRecord(
             memory_id=memory_id,
             content="Test",
@@ -898,6 +916,11 @@ class TestArchiveRecordModel:
         )
 
         assert record.metadata == metadata
+        assert record.metadata is not None
+        assert record.metadata.tags == ["important"]
+        assert record.metadata.custom_fields is not None
+        assert record.metadata.custom_fields["source"].to_python_value() == "agent"
+        assert record.metadata.custom_fields["priority"].to_python_value() == 1
 
     def test_record_is_frozen(
         self,
