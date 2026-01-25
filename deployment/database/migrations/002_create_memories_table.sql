@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS memories (
     expires_at TIMESTAMPTZ,
     archived_at TIMESTAMPTZ,
     lifecycle_revision INTEGER NOT NULL DEFAULT 1,
+    archive_path TEXT,
+
+    -- Optional metadata
+    metadata JSONB,
 
     -- Timestamps
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -106,6 +110,12 @@ COMMENT ON COLUMN memories.archived_at IS
 
 COMMENT ON COLUMN memories.lifecycle_revision IS
     'Optimistic locking revision. Incremented on each lifecycle state change.';
+
+COMMENT ON COLUMN memories.archive_path IS
+    'Path to the archive file after memory is archived. NULL if not archived.';
+
+COMMENT ON COLUMN memories.metadata IS
+    'Optional JSONB metadata for storing additional memory attributes.';
 
 COMMENT ON COLUMN memories.created_at IS
     'Timestamp when the memory was created';

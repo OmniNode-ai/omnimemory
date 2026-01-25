@@ -65,7 +65,7 @@ Example::
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -329,9 +329,6 @@ class HandlerMemoryExpire:
             will be implemented when OMN-1524 provides transaction helpers.
             The current implementation returns success for testing the interface.
         """
-        # Note: `now` will be used for database operations in OMN-1524
-        _now = command.expired_at or datetime.now(timezone.utc)
-
         # Log the operation for observability
         logger.info(
             "Expiring memory %s (expected_revision=%d, reason=%s)",

@@ -22,7 +22,7 @@ contract_version:
   major: 0
   minor: 1
   patch: 0
-node_version: "0.1.0"
+node_version: {major: 0, minor: 1, patch: 0}
 name: "memory_lifecycle_orchestrator"
 node_type: "ORCHESTRATOR_GENERIC"
 description: "Memory lifecycle orchestrator that manages expiration, archival, and cleanup of memory entities

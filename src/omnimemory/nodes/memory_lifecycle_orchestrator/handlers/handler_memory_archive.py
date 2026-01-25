@@ -70,7 +70,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -79,6 +79,9 @@ from omnimemory.enums import EnumLifecycleState
 
 if TYPE_CHECKING:
     from asyncpg import Pool
+
+# Type alias for JSON-compatible metadata values (zero Any types policy)
+JsonValue = str | int | float | bool | None
 
 logger = logging.getLogger(__name__)
 
@@ -241,7 +244,7 @@ class ModelArchiveRecord(BaseModel):  # omnimemory-model-exempt: archive record 
         default="1.0",
         description="Schema version for archive format migrations",
     )
-    metadata: dict[str, Any] | None = Field(
+    metadata: dict[str, JsonValue] | None = Field(
         default=None,
         description="Optional additional metadata from the memory",
     )
@@ -266,7 +269,7 @@ class ModelMemoryRow(BaseModel):  # omnimemory-model-exempt: handler internal
     expired_at: datetime | None
     lifecycle_state: EnumLifecycleState
     lifecycle_revision: int
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, JsonValue] | None = None
 
 
 class HandlerMemoryArchive:
