@@ -1,0 +1,651 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+"""Handler for RuntimeTick - memory lifecycle TTL evaluation.
+
+This handler processes RuntimeTick events from the runtime scheduler
+and evaluates memory entities for TTL expiration and archive eligibility.
+It queries the memory lifecycle projection for entities that need lifecycle
+transition events emitted.
+
+Detection Logic:
+    For Memory Expiration:
+        - Query projection for ACTIVE memories with expires_at <= now
+        - Use projection.needs_expiration_event() for deduplication
+        - Emit ModelMemoryExpiredEvent for each expired memory
+
+    For Archive Initiation:
+        - Query projection for EXPIRED memories with archived_at IS NULL
+        - Use projection.needs_archive_event() for deduplication
+        - Emit ModelMemoryArchiveInitiated for each archive candidate
+
+Deduplication:
+    The projection stores emission markers (expiration_emitted_at,
+    archive_initiated_at) to prevent duplicate lifecycle events.
+    The projection reader filters out already-emitted transitions.
+
+Coroutine Safety:
+    This handler is stateless and coroutine-safe for concurrent calls
+    with different tick instances.
+
+Related Tickets:
+    - OMN-1453: OmniMemory P4b - Lifecycle Orchestrator Database Integration
+    - OMN-1524: Infra projection reader primitives (future dependency)
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from datetime import datetime
+from typing import TYPE_CHECKING, Protocol
+from uuid import UUID, uuid4
+
+from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
+from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
+from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
+    from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# EVENT MODELS (Placeholder - will be extracted to separate module)
+# =============================================================================
+# TODO(OMN-1453): Extract to omnimemory/models/events/model_memory_expired_event.py
+#                 These are inline placeholders for handler structure validation.
+
+
+class ModelMemoryExpiredEvent(BaseModel):  # omnimemory-model-exempt: handler event
+    """Event emitted when a memory entity's TTL has expired.
+
+    This event signals that a memory has transitioned from ACTIVE to EXPIRED
+    state due to its TTL being reached. Downstream handlers should update
+    projections and potentially initiate archival.
+
+    Attributes:
+        entity_id: The memory entity that expired.
+        memory_id: Alias for entity_id (memory-specific semantic).
+        correlation_id: Correlation ID for distributed tracing.
+        causation_id: The tick_id that triggered this expiration.
+        emitted_at: Timestamp when this event was emitted (from tick.now).
+        expires_at: The original expiration deadline that was exceeded.
+        lifecycle_revision: Current revision for optimistic locking.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    entity_id: UUID = Field(..., description="The memory entity that expired.")
+    memory_id: UUID = Field(..., description="The memory ID (alias for entity_id).")
+    correlation_id: UUID = Field(..., description="Correlation ID for tracing.")
+    causation_id: UUID = Field(..., description="The tick_id that triggered this.")
+    emitted_at: datetime = Field(..., description="When this event was emitted.")
+    expires_at: datetime = Field(..., description="The original expiration deadline.")
+    lifecycle_revision: int = Field(
+        default=1, ge=1, description="Revision for optimistic locking."
+    )
+
+
+class ModelMemoryArchiveInitiated(BaseModel):  # omnimemory-model-exempt: handler event
+    """Event emitted when archival is initiated for an expired memory.
+
+    This event signals that a memory in EXPIRED state should be moved to
+    archive storage. The actual archival is performed by the archive effect
+    handler which subscribes to this event.
+
+    Attributes:
+        entity_id: The memory entity to archive.
+        memory_id: Alias for entity_id (memory-specific semantic).
+        correlation_id: Correlation ID for distributed tracing.
+        causation_id: The tick_id that triggered this archival.
+        emitted_at: Timestamp when this event was emitted (from tick.now).
+        expired_at: When the memory transitioned to EXPIRED state.
+        lifecycle_revision: Current revision for optimistic locking.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    entity_id: UUID = Field(..., description="The memory entity to archive.")
+    memory_id: UUID = Field(..., description="The memory ID (alias for entity_id).")
+    correlation_id: UUID = Field(..., description="Correlation ID for tracing.")
+    causation_id: UUID = Field(..., description="The tick_id that triggered this.")
+    emitted_at: datetime = Field(..., description="When this event was emitted.")
+    expired_at: datetime | None = Field(
+        default=None, description="When the memory transitioned to EXPIRED."
+    )
+    lifecycle_revision: int = Field(
+        default=1, ge=1, description="Revision for optimistic locking."
+    )
+
+
+# =============================================================================
+# RESULT MODEL
+# =============================================================================
+
+
+class ModelMemoryTickResult(BaseModel):  # omnimemory-model-exempt: handler result
+    """Result of memory lifecycle tick evaluation.
+
+    Captures metrics and identifiers from a single tick evaluation cycle.
+    Used for observability and debugging of lifecycle processing.
+
+    Attributes:
+        expired_count: Number of memories transitioned to EXPIRED state.
+        archive_initiated_count: Number of archive jobs initiated.
+        tick_id: The tick that triggered this evaluation.
+        sequence_number: The tick's sequence number for ordering.
+        evaluated_at: Timestamp of evaluation (from tick.now).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    expired_count: int = Field(
+        default=0, ge=0, description="Number of memories expired this tick."
+    )
+    archive_initiated_count: int = Field(
+        default=0, ge=0, description="Number of archive jobs started this tick."
+    )
+    tick_id: UUID = Field(..., description="The tick that triggered this evaluation.")
+    sequence_number: int = Field(
+        ..., ge=0, description="Tick sequence for ordering and restart detection."
+    )
+    evaluated_at: datetime = Field(
+        ..., description="Timestamp of evaluation (from injected now)."
+    )
+
+
+# =============================================================================
+# PROJECTION READER PROTOCOL (Placeholder for OMN-1524)
+# =============================================================================
+
+
+class ProtocolMemoryLifecycleProjectionReader(Protocol):
+    """Protocol for reading memory lifecycle projection state.
+
+    This protocol defines the interface for querying memory entities
+    that are candidates for lifecycle transitions. Implementations
+    will be provided by OMN-1524 (Infra Projection Reader Primitives).
+
+    Note:
+        This is a placeholder protocol. The actual implementation will
+        use omnibase_infra projection reader primitives when available.
+    """
+
+    async def get_expired_candidates(
+        self,
+        now: datetime,
+        domain: str,
+        correlation_id: UUID,
+        limit: int = 100,
+    ) -> list[ModelMemoryLifecycleProjection]:
+        """Get ACTIVE memories that have passed their TTL.
+
+        Query: lifecycle_state = 'active' AND expires_at IS NOT NULL AND expires_at <= :now
+               AND expiration_emitted_at IS NULL
+
+        Args:
+            now: Current time for deadline comparison.
+            domain: Domain scope for the query.
+            correlation_id: Correlation ID for tracing.
+            limit: Maximum number of results to return.
+
+        Returns:
+            List of projections for memories eligible for expiration.
+        """
+        ...
+
+    async def get_archive_candidates(
+        self,
+        now: datetime,
+        domain: str,
+        correlation_id: UUID,
+        limit: int = 100,
+    ) -> list[ModelMemoryLifecycleProjection]:
+        """Get EXPIRED memories that are ready for archival.
+
+        Query: lifecycle_state = 'expired' AND archived_at IS NULL
+               AND archive_initiated_at IS NULL
+
+        Args:
+            now: Current time (for consistent evaluation).
+            domain: Domain scope for the query.
+            correlation_id: Correlation ID for tracing.
+            limit: Maximum number of results to return.
+
+        Returns:
+            List of projections for memories eligible for archival.
+        """
+        ...
+
+
+class ModelMemoryLifecycleProjection(  # omnimemory-model-exempt: projection model
+    BaseModel
+):
+    """Projection of memory lifecycle state for tick evaluation.
+
+    This is a read-optimized view of memory state specifically for
+    lifecycle orchestration decisions. It contains only the fields
+    needed for expiration and archival evaluation.
+
+    Note:
+        This is a placeholder model. The actual projection will be
+        managed by the memory lifecycle reducer (OMN-1453 P4c).
+
+    Attributes:
+        entity_id: The memory entity UUID.
+        lifecycle_state: Current state (active, expired, archived, deleted).
+        expires_at: TTL deadline (None = no expiration).
+        expired_at: When memory transitioned to EXPIRED.
+        archived_at: When memory was archived (None = not archived).
+        lifecycle_revision: Revision for optimistic locking.
+        expiration_emitted_at: When expiration event was emitted (dedup marker).
+        archive_initiated_at: When archive initiation was emitted (dedup marker).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    entity_id: UUID = Field(..., description="The memory entity UUID.")
+    lifecycle_state: str = Field(..., description="Current lifecycle state.")
+    expires_at: datetime | None = Field(
+        default=None, description="TTL deadline (None = no expiration)."
+    )
+    expired_at: datetime | None = Field(
+        default=None, description="When memory transitioned to EXPIRED."
+    )
+    archived_at: datetime | None = Field(
+        default=None, description="When memory was archived."
+    )
+    lifecycle_revision: int = Field(
+        default=1, ge=1, description="Revision for optimistic locking."
+    )
+    # Deduplication markers
+    expiration_emitted_at: datetime | None = Field(
+        default=None, description="When expiration event was emitted."
+    )
+    archive_initiated_at: datetime | None = Field(
+        default=None, description="When archive initiation was emitted."
+    )
+
+    def needs_expiration_event(self, now: datetime) -> bool:
+        """Check if this memory needs an expiration event emitted.
+
+        Returns True if:
+            - lifecycle_state == 'active'
+            - expires_at is not None AND expires_at <= now
+            - expiration_emitted_at is None (not already emitted)
+
+        Args:
+            now: Current time for deadline comparison.
+
+        Returns:
+            True if expiration event should be emitted.
+        """
+        return (
+            self.lifecycle_state == "active"
+            and self.expires_at is not None
+            and self.expires_at <= now
+            and self.expiration_emitted_at is None
+        )
+
+    def needs_archive_event(self, now: datetime) -> bool:
+        """Check if this memory needs an archive initiation event.
+
+        Returns True if:
+            - lifecycle_state == 'expired'
+            - archived_at is None (not yet archived)
+            - archive_initiated_at is None (not already initiated)
+
+        Args:
+            now: Current time (unused, for consistent interface).
+
+        Returns:
+            True if archive initiation event should be emitted.
+        """
+        return (
+            self.lifecycle_state == "expired"
+            and self.archived_at is None
+            and self.archive_initiated_at is None
+        )
+
+
+# =============================================================================
+# HANDLER
+# =============================================================================
+
+
+class HandlerMemoryTick:
+    """Handler for RuntimeTick - memory lifecycle TTL evaluation.
+
+    This handler processes runtime tick events and scans the memory
+    lifecycle projection for entities with expired TTLs or pending
+    archival. It emits lifecycle transition events for entities that
+    need them, using projection emission markers for deduplication.
+
+    Lifecycle Evaluation:
+        The handler performs two scans on each tick:
+        1. Expiration: Find ACTIVE memories with expires_at <= now
+        2. Archive initiation: Find EXPIRED memories pending archive
+
+    Projection Queries:
+        Uses dedicated projection reader methods that filter by:
+        - Deadline < now (TTL has passed)
+        - Emission marker IS NULL (not yet emitted)
+        - Appropriate lifecycle state (ACTIVE for expiration, EXPIRED for archive)
+
+    Time Injection:
+        Uses the `now` timestamp from RuntimeTick for deterministic
+        evaluation, enabling reproducible tests and consistent behavior
+        across distributed deployments.
+
+    Attributes:
+        _projection_reader: Reader for memory lifecycle projection state.
+        _batch_size: Maximum memories to process per tick (default: 100).
+
+    Example:
+        >>> from datetime import datetime, timezone
+        >>> from uuid import uuid4
+        >>> tick_time = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        >>> runtime_tick = ModelRuntimeTick(
+        ...     now=tick_time,
+        ...     tick_id=uuid4(),
+        ...     sequence_number=1,
+        ...     scheduled_at=tick_time,
+        ...     correlation_id=uuid4(),
+        ...     scheduler_id="runtime-001",
+        ...     tick_interval_ms=1000,
+        ... )
+        >>> handler = HandlerMemoryTick(projection_reader)
+        >>> output = await handler.handle(envelope)
+        >>> # Output events: ModelMemoryExpiredEvent, ModelMemoryArchiveInitiated
+    """
+
+    def __init__(
+        self,
+        projection_reader: ProtocolMemoryLifecycleProjectionReader | None = None,
+        batch_size: int = 100,
+    ) -> None:
+        """Initialize the handler with a projection reader.
+
+        Args:
+            projection_reader: Reader for querying memory lifecycle projection state.
+                If None, handler will return empty results (useful for testing).
+            batch_size: Maximum number of memories to process per tick.
+                Prevents tick processing from blocking too long.
+        """
+        self._projection_reader = projection_reader
+        self._batch_size = batch_size
+
+    @property
+    def handler_id(self) -> str:
+        """Return unique identifier for this handler."""
+        return "handler-memory-tick"
+
+    @property
+    def category(self) -> EnumMessageCategory:
+        """Return the message category this handler processes."""
+        return EnumMessageCategory.EVENT
+
+    @property
+    def message_types(self) -> set[str]:
+        """Return the set of message types this handler processes."""
+        return {"ModelRuntimeTick"}
+
+    @property
+    def node_kind(self) -> EnumNodeKind:
+        """Return the node kind this handler belongs to."""
+        return EnumNodeKind.ORCHESTRATOR
+
+    async def handle(
+        self,
+        envelope: ModelEventEnvelope[ModelRuntimeTick],
+    ) -> ModelHandlerOutput[None]:
+        """Process runtime tick and emit lifecycle transition events.
+
+        Scans the memory lifecycle projection for:
+        1. ACTIVE memories with expired TTL -> emit ModelMemoryExpiredEvent
+        2. EXPIRED memories pending archive -> emit ModelMemoryArchiveInitiated
+
+        Uses projection emission markers to prevent duplicate events.
+
+        Args:
+            envelope: The event envelope containing the runtime tick event.
+
+        Returns:
+            ModelHandlerOutput containing lifecycle events (ModelMemoryExpiredEvent,
+            ModelMemoryArchiveInitiated). Events tuple may be empty if no
+            transitions detected.
+
+        Note:
+            The actual projection queries are placeholders (return empty lists)
+            until OMN-1524 (Infra Projection Reader Primitives) is implemented.
+        """
+        start_time = time.perf_counter()
+
+        # Extract from envelope
+        tick = envelope.payload
+        now = envelope.envelope_timestamp
+        correlation_id = envelope.correlation_id or uuid4()
+
+        events: list[BaseModel] = []
+
+        # 1. Check for expired memories (ACTIVE -> EXPIRED)
+        expired_events = await self._check_memory_expirations(
+            tick=tick,
+            now=now,
+            correlation_id=correlation_id,
+        )
+        events.extend(expired_events)
+
+        # 2. Check for archive candidates (EXPIRED -> ARCHIVED)
+        archive_events = await self._check_archive_candidates(
+            tick=tick,
+            now=now,
+            correlation_id=correlation_id,
+        )
+        events.extend(archive_events)
+
+        if events:
+            logger.info(
+                "MemoryTick processed, emitting lifecycle events",
+                extra={
+                    "tick_id": str(tick.tick_id),
+                    "sequence_number": tick.sequence_number,
+                    "expired_count": len(expired_events),
+                    "archive_initiated_count": len(archive_events),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+        # Build result for metrics/observability
+        result = ModelMemoryTickResult(
+            expired_count=len(expired_events),
+            archive_initiated_count=len(archive_events),
+            tick_id=tick.tick_id,
+            sequence_number=tick.sequence_number,
+            evaluated_at=now,
+        )
+
+        # Calculate processing time
+        processing_time_ms = (time.perf_counter() - start_time) * 1000
+
+        # Return handler output (ORCHESTRATOR: events only, no result)
+        return ModelHandlerOutput.for_orchestrator(
+            input_envelope_id=envelope.envelope_id,
+            correlation_id=correlation_id,
+            handler_id=self.handler_id,
+            events=tuple(events),
+            metrics={
+                "expired_count": float(result.expired_count),
+                "archive_initiated_count": float(result.archive_initiated_count),
+                "batch_size": float(self._batch_size),
+            },
+            processing_time_ms=processing_time_ms,
+        )
+
+    async def _check_memory_expirations(
+        self,
+        tick: ModelRuntimeTick,
+        now: datetime,
+        correlation_id: UUID,
+    ) -> list[ModelMemoryExpiredEvent]:
+        """Check for ACTIVE memories with expired TTL.
+
+        Queries the projection for memories that:
+        - Have lifecycle_state = 'active'
+        - Have expires_at IS NOT NULL AND expires_at <= now
+        - Have NOT already had expiration event emitted
+
+        Args:
+            tick: The runtime tick event (used for causation_id).
+            now: Current time for deadline comparison.
+            correlation_id: Correlation ID for tracing.
+
+        Returns:
+            List of ModelMemoryExpiredEvent events to emit.
+        """
+        if self._projection_reader is None:
+            # No projection reader configured - return empty
+            # This is expected during initial development and testing
+            logger.debug(
+                "No projection reader configured, skipping expiration check",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            return []
+
+        # TODO(OMN-1524): Use infra projection reader primitives
+        # Query projection for expired candidates
+        expired_projections = await self._projection_reader.get_expired_candidates(
+            now=now,
+            domain="memory",
+            correlation_id=correlation_id,
+            limit=self._batch_size,
+        )
+
+        events: list[ModelMemoryExpiredEvent] = []
+
+        for projection in expired_projections:
+            # Double-check with projection helper (defensive)
+            if not projection.needs_expiration_event(now):
+                continue
+
+            # Type narrowing: needs_expiration_event() guarantees expires_at is not None
+            expires_at = projection.expires_at
+            if expires_at is None:
+                # This should never happen - needs_expiration_event() ensures expires_at
+                # is not None. Log and skip as defensive measure.
+                logger.warning(
+                    "Skipping projection with None expires_at despite passing "
+                    "needs_expiration_event() check - this indicates a bug",
+                    extra={
+                        "entity_id": str(projection.entity_id),
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+                continue
+
+            event = ModelMemoryExpiredEvent(
+                entity_id=projection.entity_id,
+                memory_id=projection.entity_id,
+                correlation_id=correlation_id,
+                causation_id=tick.tick_id,
+                emitted_at=now,
+                expires_at=expires_at,
+                lifecycle_revision=projection.lifecycle_revision,
+            )
+            events.append(event)
+
+            logger.info(
+                "Detected memory expiration",
+                extra={
+                    "memory_id": str(projection.entity_id),
+                    "expires_at": expires_at.isoformat(),
+                    "lifecycle_revision": projection.lifecycle_revision,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+        return events
+
+    async def _check_archive_candidates(
+        self,
+        tick: ModelRuntimeTick,
+        now: datetime,
+        correlation_id: UUID,
+    ) -> list[ModelMemoryArchiveInitiated]:
+        """Check for EXPIRED memories ready for archival.
+
+        Queries the projection for memories that:
+        - Have lifecycle_state = 'expired'
+        - Have archived_at IS NULL (not yet archived)
+        - Have NOT already had archive initiation emitted
+
+        Args:
+            tick: The runtime tick event (used for causation_id).
+            now: Current time for consistent evaluation.
+            correlation_id: Correlation ID for tracing.
+
+        Returns:
+            List of ModelMemoryArchiveInitiated events to emit.
+        """
+        if self._projection_reader is None:
+            # No projection reader configured - return empty
+            logger.debug(
+                "No projection reader configured, skipping archive check",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            return []
+
+        # TODO(OMN-1524): Use infra projection reader primitives
+        # Query projection for archive candidates
+        archive_projections = await self._projection_reader.get_archive_candidates(
+            now=now,
+            domain="memory",
+            correlation_id=correlation_id,
+            limit=self._batch_size,
+        )
+
+        events: list[ModelMemoryArchiveInitiated] = []
+
+        for projection in archive_projections:
+            # Double-check with projection helper (defensive)
+            if not projection.needs_archive_event(now):
+                continue
+
+            event = ModelMemoryArchiveInitiated(
+                entity_id=projection.entity_id,
+                memory_id=projection.entity_id,
+                correlation_id=correlation_id,
+                causation_id=tick.tick_id,
+                emitted_at=now,
+                expired_at=projection.expired_at,
+                lifecycle_revision=projection.lifecycle_revision,
+            )
+            events.append(event)
+
+            logger.info(
+                "Initiating memory archival",
+                extra={
+                    "memory_id": str(projection.entity_id),
+                    "expired_at": (
+                        projection.expired_at.isoformat()
+                        if projection.expired_at
+                        else None
+                    ),
+                    "lifecycle_revision": projection.lifecycle_revision,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+        return events
+
+
+__all__: list[str] = [
+    "HandlerMemoryTick",
+    "ModelMemoryTickResult",
+    "ModelMemoryExpiredEvent",
+    "ModelMemoryArchiveInitiated",
+    "ModelMemoryLifecycleProjection",
+    "ProtocolMemoryLifecycleProjectionReader",
+]

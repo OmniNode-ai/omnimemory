@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..enums import EnumLifecycleState
 from ..models.foundation import (
     ModelConfiguration,
     ModelMetadata,
@@ -369,6 +370,17 @@ class MemoryRecord(BaseMemoryModel):
     )
     expires_at: datetime | None = Field(
         None, description="Expiration timestamp (for temporal memory)"
+    )
+    lifecycle_state: EnumLifecycleState = Field(
+        EnumLifecycleState.ACTIVE, description="Current lifecycle state of the memory"
+    )
+    archived_at: datetime | None = Field(
+        None, description="Timestamp when memory was archived to cold storage"
+    )
+    lifecycle_revision: int = Field(
+        1,
+        ge=1,
+        description="Revision number for optimistic locking (incremented on each state change)",
     )
     provenance: ModelStringList = Field(
         default_factory=ModelStringList, description="Memory provenance chain"

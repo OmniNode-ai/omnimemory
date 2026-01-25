@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ...enums import EnumLifecycleState
 from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC001
 
 
@@ -78,6 +79,21 @@ class ModelMemoryItem(BaseModel):
     expires_at: datetime | None = Field(
         default=None,
         description="When the memory item expires (optional)",
+    )
+
+    # Lifecycle management
+    lifecycle_state: EnumLifecycleState = Field(
+        default=EnumLifecycleState.ACTIVE,
+        description="Current lifecycle state of the memory",
+    )
+    archived_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when memory was archived to cold storage",
+    )
+    lifecycle_revision: int = Field(
+        default=1,
+        ge=1,
+        description="Revision number for optimistic locking (incremented on each state change)",
     )
 
     # Usage tracking

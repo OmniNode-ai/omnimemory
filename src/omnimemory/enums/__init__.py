@@ -6,6 +6,7 @@ All enums are centralized here for better maintainability and ONEX compliance.
 
 from .enum_error_code import EnumOmniMemoryErrorCode
 from .enum_intelligence_operation_type import EnumIntelligenceOperationType
+from .enum_lifecycle_state import EnumLifecycleState
 from .enum_memory_operation_type import EnumMemoryOperationType
 from .enum_memory_storage_type import EnumMemoryStorageType
 from .enum_migration_status import (
@@ -21,6 +22,7 @@ __all__ = [
     "EnumDecayFunction",
     "EnumFileProcessingStatus",
     "EnumIntelligenceOperationType",
+    "EnumLifecycleState",
     "EnumMemoryOperationType",
     "EnumMemoryStorageType",
     "EnumMigrationPriority",

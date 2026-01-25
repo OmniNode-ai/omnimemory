@@ -2,9 +2,85 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Lifecycle Orchestrator - ONEX Node (Core 8 Foundation).
 
-Full lifecycle management: store -> analyze -> consolidate -> archive.
+Manages memory lifecycle transitions: ACTIVE -> STALE -> EXPIRED -> ARCHIVED.
+Handles TTL expiration via RuntimeTick events and optimistic locking
+for concurrent safety.
 
-Status: Scaffold only - implementation pending.
+Node Type: ORCHESTRATOR
+- Workflow coordination for memory lifecycle state transitions
+- TTL expiration evaluation triggered by RuntimeTick events
+- Explicit archival, expiration, and restoration commands
+- Access tracking for TTL extension and pattern analysis
+
+Time Injection:
+    The orchestrator receives deterministic timestamps from RuntimeTick events
+    via the `now` parameter. All timeout evaluation uses injected time rather
+    than system clock, enabling deterministic testing and consistent behavior
+    across distributed deployments.
+
+Lifecycle States:
+    - ACTIVE: Memory is available for retrieval and actively used
+    - STALE: Memory hasn't been accessed recently, candidate for expiration
+    - PENDING_ARCHIVE: Memory is queued for archival to cold storage
+    - EXPIRED: Memory has exceeded TTL, pending cleanup
+    - ARCHIVED: Memory has been moved to cold storage
+    - DELETED: Memory has been permanently removed
+
+ONEX 4.0 Declarative Pattern:
+    This node follows the fully declarative ONEX pattern:
+    - contract.yaml defines the node type, inputs, outputs, and dependencies
+    - Business logic lives in handlers (handler_memory_tick, handler_archive_memory, etc.)
+    - No node.py class needed - the contract IS the node definition
+
+Handlers::
+
+    from omnimemory.nodes.memory_lifecycle_orchestrator import (
+        HandlerMemoryTick,
+        HandlerArchiveMemory,
+        HandlerExpireMemory,
+        HandlerRestoreMemory,
+        HandlerMemoryAccessed,
+    )
+
+Models::
+
+    from omnimemory.nodes.memory_lifecycle_orchestrator import (
+        ModelLifecycleOrchestratorInput,
+        ModelLifecycleOrchestratorOutput,
+        ModelArchiveMemoryCommand,
+        ModelExpireMemoryCommand,
+        ModelRestoreMemoryCommand,
+    )
+
+.. versionadded:: 0.1.0
+    Initial implementation for OMN-1453.
+
+Ticket: OMN-1453
 """
 
-__all__: list[str] = []
+# Implemented handler imports
+from .handlers import (
+    HandlerMemoryExpire,
+    HandlerMemoryTick,
+    ModelExpireMemoryCommand,
+    ModelMemoryCurrentState,
+    ModelMemoryExpireResult,
+    ModelMemoryTickResult,
+)
+
+# TODO(OMN-1453): Add handler imports as implemented:
+#   HandlerArchiveMemory, HandlerRestoreMemory, HandlerMemoryAccessed
+
+# TODO(OMN-1453): Add model imports as implemented:
+#   ModelLifecycleOrchestratorInput, ModelLifecycleOrchestratorOutput,
+#   ModelArchiveMemoryCommand, ModelRestoreMemoryCommand
+
+__all__: list[str] = [
+    # Implemented handlers
+    "HandlerMemoryTick",
+    "HandlerMemoryExpire",
+    "ModelMemoryTickResult",
+    "ModelExpireMemoryCommand",
+    "ModelMemoryExpireResult",
+    "ModelMemoryCurrentState",
+]

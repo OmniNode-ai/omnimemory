@@ -1,0 +1,376 @@
+---
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+# ONEX Node Contract - Memory Lifecycle Orchestrator Node
+#
+# =============================================================================
+# MEMORY LIFECYCLE ORCHESTRATOR
+# =============================================================================
+# Manages memory lifecycle transitions: expiration, archival, and cleanup.
+# Processes RuntimeTick events to evaluate timeout conditions and trigger
+# lifecycle state transitions for memory entities.
+#
+# Related to: OMN-1453 (OmniMemory P4b - Lifecycle Orchestrator Database Integration)
+#
+# Patterns derived from:
+#   - omnibase_infra/nodes/node_registration_orchestrator/contract.yaml
+#   - Handler routing with payload_type_match strategy
+#   - Time injection from RuntimeTick events
+# =============================================================================
+
+contract_version:
+  major: 0
+  minor: 1
+  patch: 0
+node_version: "0.1.0"
+name: "memory_lifecycle_orchestrator"
+node_type: "ORCHESTRATOR_GENERIC"
+description: "Memory lifecycle orchestrator that manages expiration, archival, and cleanup of memory entities
+  based on configurable TTL and retention policies."
+
+input_model:
+  name: "ModelLifecycleOrchestratorInput"
+  module: "omnimemory.nodes.memory_lifecycle_orchestrator.models"
+  description: "Input containing lifecycle event and orchestration configuration."
+output_model:
+  name: "ModelLifecycleOrchestratorOutput"
+  module: "omnimemory.nodes.memory_lifecycle_orchestrator.models"
+  description: "Output containing lifecycle transition results and workflow status."
+
+# =============================================================================
+# TIME INJECTION CONFIGURATION
+# =============================================================================
+# Enables deterministic timeout evaluation using injected timestamps from
+# RuntimeTick events. The DispatchContextEnforcer injects `now` timestamps
+# into orchestrator dispatch context, enabling deterministic lifecycle
+# expiration checks regardless of clock drift or test environments.
+time_injection:
+  enabled: true
+  source: "RuntimeTick"
+  field: "now"
+  description: "Use injected timestamp from RuntimeTick for TTL and expiration evaluation"
+
+# =============================================================================
+# PROJECTION READER CONFIGURATION
+# =============================================================================
+# Memory lifecycle decisions require reading current memory state projections.
+# The orchestrator queries memory_lifecycle_state to determine which memories
+# are eligible for expiration or archival based on TTL and access patterns.
+projection_reader:
+  protocol: "ProtocolProjectionReader"
+  module: "omnibase_spi.protocols"
+  projections:
+    - name: "memory_lifecycle_state"
+      description: "Current lifecycle state for all memory entities"
+    - name: "memory_access_patterns"
+      description: "Access frequency and recency patterns for consolidation decisions"
+
+# =============================================================================
+# CONSUMED EVENTS
+# =============================================================================
+# Events that trigger lifecycle orchestration logic.
+consumed_events:
+  # RuntimeTick - Periodic lifecycle evaluation trigger
+  - topic: "{env}.{namespace}.onex.internal.runtime-tick.v1"
+    event_type: "RuntimeTick"
+    internal: true
+    description: "Internal tick for TTL expiration and archival evaluation"
+
+  # Memory lifecycle command events
+  - topic: "{env}.{namespace}.memory.cmd.archive-memory.v1"
+    event_type: "ArchiveMemoryCommand"
+    message_category: "COMMAND"
+    description: "Explicit command to archive specific memory entities"
+
+  - topic: "{env}.{namespace}.memory.cmd.expire-memory.v1"
+    event_type: "ExpireMemoryCommand"
+    message_category: "COMMAND"
+    description: "Explicit command to expire specific memory entities"
+
+  - topic: "{env}.{namespace}.memory.cmd.restore-memory.v1"
+    event_type: "RestoreMemoryCommand"
+    message_category: "COMMAND"
+    description: "Command to restore archived memory back to active state"
+
+  # Memory access events for lifecycle tracking
+  - topic: "{env}.{namespace}.memory.evt.memory-accessed.v1"
+    event_type: "MemoryAccessedEvent"
+    description: "Memory access notification for TTL extension and access pattern tracking"
+    direct_handler: true
+
+# =============================================================================
+# HANDLER ROUTING CONFIGURATION
+# =============================================================================
+# Declarative mapping of consumed events to handler implementations.
+# Each handler is stateless and returns EVENTS only.
+#
+# Handler Pattern:
+#   async def handle(event, now, correlation_id) -> list[BaseModel]
+#
+# All handlers:
+#   - Receive `now` parameter for deterministic time-based decisions
+#   - Query projection state via ProtocolProjectionReader (read-only)
+#   - Return a list of event models (never intents or projections)
+handler_routing:
+  routing_strategy: "payload_type_match"
+  handlers:
+    # ModelRuntimeTick -> HandlerMemoryTick
+    # Periodic lifecycle evaluation - evaluates memory entities for TTL expiration
+    # and archival eligibility. Queries all entities with active lifecycle states
+    # and emits expiration/archival events for those past their deadlines.
+    - event_model:
+        name: "ModelRuntimeTick"
+        module: "omnibase_infra.runtime.models.model_runtime_tick"
+      handler:
+        name: "HandlerMemoryTick"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_tick"
+      output_events:
+        - "ModelMemoryExpiredEvent"
+        - "ModelMemoryArchivedEvent"
+        - "ModelMemoryConsolidatedEvent"
+      timeout_evaluation:
+        uses_injected_now: true
+        queries_pending_entities: true
+        state_filters:
+          - "ACTIVE"
+          - "STALE"
+          - "PENDING_ARCHIVE"
+
+    # ArchiveMemoryCommand -> HandlerArchiveMemory
+    # Explicit archival request - validates memory state and initiates archival
+    - event_model:
+        name: "ModelArchiveMemoryCommand"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.models.commands"
+      handler:
+        name: "HandlerArchiveMemory"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_archive_memory"
+      message_category: "COMMAND"
+      output_events:
+        - "ModelMemoryArchiveInitiated"
+        - "ModelMemoryArchivedEvent"
+      state_transition:
+        valid_from_states:
+          - "ACTIVE"
+          - "STALE"
+          - "EXPIRED"
+        target_state: "ARCHIVED"
+
+    # ExpireMemoryCommand -> HandlerExpireMemory
+    # Explicit expiration request - marks memory as expired and triggers cleanup
+    - event_model:
+        name: "ModelExpireMemoryCommand"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.models.commands"
+      handler:
+        name: "HandlerExpireMemory"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_expire_memory"
+      message_category: "COMMAND"
+      output_events:
+        - "ModelMemoryExpiredEvent"
+      state_transition:
+        valid_from_states:
+          - "ACTIVE"
+          - "STALE"
+        target_state: "EXPIRED"
+
+    # RestoreMemoryCommand -> HandlerRestoreMemory
+    # Restore archived memory back to active state
+    - event_model:
+        name: "ModelRestoreMemoryCommand"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.models.commands"
+      handler:
+        name: "HandlerRestoreMemory"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_restore_memory"
+      message_category: "COMMAND"
+      output_events:
+        - "ModelMemoryRestoredEvent"
+      state_transition:
+        valid_from_states:
+          - "ARCHIVED"
+        target_state: "ACTIVE"
+
+    # MemoryAccessedEvent -> HandlerMemoryAccessed
+    # Updates access tracking for TTL extension and pattern analysis
+    - event_model:
+        name: "ModelMemoryAccessedEvent"
+        module: "omnimemory.models.events.model_memory_accessed_event"
+      handler:
+        name: "HandlerMemoryAccessed"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_accessed"
+      output_events: []
+      direct_handler: true
+      description: "Updates memory access tracking and extends TTL if configured"
+
+  # Handler initialization configuration
+  handler_dependencies:
+    projection_reader:
+      protocol: "ProtocolProjectionReader"
+      implementation: "ProjectionReaderMemoryLifecycle"
+      module: "omnimemory.projectors.projection_reader_memory_lifecycle"
+      shared: true
+      description: "Shared projection reader for all lifecycle handlers"
+
+# =============================================================================
+# PUBLISHED EVENTS
+# =============================================================================
+# Events emitted by lifecycle orchestration handlers.
+published_events:
+  - topic: "{env}.{namespace}.memory.evt.memory-expired.v1"
+    event_type: "MemoryExpiredEvent"
+    description: "Memory entity has expired due to TTL or explicit expiration command"
+
+  - topic: "{env}.{namespace}.memory.evt.memory-archived.v1"
+    event_type: "MemoryArchivedEvent"
+    description: "Memory entity has been archived to cold storage"
+
+  - topic: "{env}.{namespace}.memory.evt.memory-archive-initiated.v1"
+    event_type: "MemoryArchiveInitiated"
+    description: "Archival process has started for memory entity"
+
+  - topic: "{env}.{namespace}.memory.evt.memory-restored.v1"
+    event_type: "MemoryRestoredEvent"
+    description: "Archived memory entity has been restored to active state"
+
+  - topic: "{env}.{namespace}.memory.evt.memory-consolidated.v1"
+    event_type: "MemoryConsolidatedEvent"
+    description: "Memory entities have been consolidated based on similarity or redundancy"
+
+  - topic: "{env}.{namespace}.memory.evt.lifecycle-transition-failed.v1"
+    event_type: "LifecycleTransitionFailedEvent"
+    description: "Lifecycle state transition failed due to validation or execution error"
+
+# =============================================================================
+# OPERATION BINDINGS (DOCUMENTATION ONLY)
+# =============================================================================
+# NOTE: This section documents the intended operation bindings for the lifecycle
+# orchestrator. The runtime interpreter for operation_bindings is NOT YET
+# IMPLEMENTED. This serves as validated documentation for future implementation.
+#
+# When implemented, these bindings will:
+# 1. Map high-level operations to handler invocations
+# 2. Define pre/post conditions for each operation
+# 3. Enable declarative workflow composition
+# =============================================================================
+operation_bindings:
+  # Operation: evaluate_expirations
+  # Triggered by RuntimeTick to check all active memories for TTL expiration
+  - operation: "evaluate_expirations"
+    description: "Evaluate all active memory entities for TTL expiration"
+    trigger:
+      event_type: "RuntimeTick"
+      condition: "periodic"
+    handler: "HandlerMemoryTick"
+    pre_conditions:
+      - "projection_reader_available"
+      - "time_injection_enabled"
+    post_conditions:
+      - "expired_memories_emit_events"
+      # NOTE: Runtime interpreter not yet implemented - this is documentation only
+
+  # Operation: archive_memory
+  # Explicitly archive a memory entity to cold storage
+  - operation: "archive_memory"
+    description: "Archive memory entity to cold storage"
+    trigger:
+      event_type: "ArchiveMemoryCommand"
+      condition: "on_command"
+    handler: "HandlerArchiveMemory"
+    pre_conditions:
+      - "memory_exists"
+      - "memory_state_allows_archive"
+    post_conditions:
+      - "memory_moved_to_archive_storage"
+      - "archive_event_emitted"
+      # NOTE: Runtime interpreter not yet implemented - this is documentation only
+
+  # Operation: restore_memory
+  # Restore archived memory back to active state
+  - operation: "restore_memory"
+    description: "Restore archived memory to active state"
+    trigger:
+      event_type: "RestoreMemoryCommand"
+      condition: "on_command"
+    handler: "HandlerRestoreMemory"
+    pre_conditions:
+      - "memory_exists_in_archive"
+      - "archive_storage_accessible"
+    post_conditions:
+      - "memory_restored_to_active"
+      - "restore_event_emitted"
+      # NOTE: Runtime interpreter not yet implemented - this is documentation only
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+dependencies:
+  - name: "projection_reader"
+    type: "protocol"
+    module: "omnibase_spi.protocols"
+    description: "Protocol for reading memory lifecycle projection state."
+
+  - name: "memory_storage_effect"
+    type: "node"
+    module: "omnimemory.nodes.memory_storage_effect"
+    description: "Effect node for memory persistence operations."
+
+  - name: "archive_storage_adapter"
+    type: "adapter"
+    module: "omnimemory.nodes.memory_lifecycle_orchestrator.adapters"
+    description: "Adapter for cold/archive storage operations."
+
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+error_handling:
+  retry_policy:
+    max_retries: 3
+    initial_delay_ms: 100
+    max_delay_ms: 5000
+    exponential_base: 2
+    retry_on:
+      - "StorageError"
+      - "ConnectionError"
+      - "TimeoutError"
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    reset_timeout_ms: 60000
+  error_types:
+    - name: "LifecycleTransitionError"
+      description: "Error during lifecycle state transition"
+      recoverable: true
+      retry_strategy: "exponential_backoff"
+    - name: "ArchiveStorageError"
+      description: "Error accessing archive storage"
+      recoverable: true
+      retry_strategy: "exponential_backoff"
+    - name: "ProjectionReadError"
+      description: "Error reading lifecycle projection state"
+      recoverable: true
+      retry_strategy: "exponential_backoff"
+    - name: "InvalidStateTransition"
+      description: "Attempted invalid lifecycle state transition"
+      recoverable: false
+      retry_strategy: "none"
+
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
+health_check:
+  enabled: true
+  endpoint: "/health"
+  interval_seconds: 30
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  author: "OmniNode Team"
+  created: "2026-01-25"
+  ticket: "OMN-1453"
+  tags:
+    - "orchestrator"
+    - "lifecycle"
+    - "memory"
+    - "ttl"
+    - "archival"
+    - "expiration"

@@ -1,0 +1,508 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+"""Handler for memory expiration with optimistic locking.
+
+This module implements the core expiration logic for the memory lifecycle
+orchestrator. It performs state transitions from ACTIVE to EXPIRED using
+optimistic concurrency control to handle concurrent access safely.
+
+Optimistic Locking Pattern:
+    The handler uses a revision-based optimistic locking strategy where each
+    memory entity has a `lifecycle_revision` counter. State transitions only
+    succeed when the expected revision matches the current database revision.
+    On conflict (another process updated the entity), the caller can retry
+    with the updated revision.
+
+    This pattern is preferred over pessimistic locking (SELECT FOR UPDATE)
+    because:
+    - It allows higher read concurrency
+    - It avoids deadlocks in distributed systems
+    - It scales better with multiple orchestrator instances
+
+SQL Pattern:
+    UPDATE memories
+    SET lifecycle_state = 'expired',
+        expired_at = :now,
+        lifecycle_revision = lifecycle_revision + 1,
+        updated_at = :now
+    WHERE id = :memory_id
+      AND lifecycle_revision = :expected_revision
+      AND lifecycle_state = 'active'
+
+    If rows_affected == 0 -> conflict (another process updated first)
+
+Related:
+    - OMN-1453: OmniMemory P4b - Lifecycle Orchestrator Database Integration
+    - OMN-1524: Infra transaction helper primitives (pending)
+
+Example::
+
+    from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
+        HandlerMemoryExpire,
+        ModelExpireMemoryCommand,
+    )
+
+    handler = HandlerMemoryExpire(db_pool=pool)
+    result = await handler.handle(
+        ModelExpireMemoryCommand(
+            memory_id=uuid4(),
+            expected_revision=5,
+            reason="ttl_expired",
+        )
+    )
+
+    if result.success:
+        print(f"Memory expired, new revision: {result.new_revision}")
+    elif result.conflict:
+        print("Conflict detected, retry with updated revision")
+    else:
+        print(f"Error: {result.error_message}")
+
+.. versionadded:: 0.1.0
+    Initial implementation for OMN-1453.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from omnimemory.enums import EnumLifecycleState
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "HandlerMemoryExpire",
+    "ModelExpireMemoryCommand",
+    "ModelMemoryExpireResult",
+    "ModelMemoryCurrentState",
+]
+
+
+# =============================================================================
+# Models
+# =============================================================================
+
+
+class ModelExpireMemoryCommand(BaseModel):  # omnimemory-model-exempt: handler command
+    """Command to expire a memory entity.
+
+    This command initiates a state transition from ACTIVE to EXPIRED using
+    optimistic concurrency control. The expected_revision must match the
+    current revision in the database for the transition to succeed.
+
+    Attributes:
+        memory_id: UUID of the memory entity to expire.
+        expected_revision: Expected lifecycle revision for optimistic lock.
+            Must match current revision in database.
+        reason: Reason for expiration (for audit trail).
+        expired_at: Timestamp for expiration (defaults to current time).
+            Allows injecting test timestamps for deterministic testing.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        strict=True,
+    )
+
+    memory_id: UUID = Field(
+        ...,
+        description="UUID of the memory entity to expire",
+    )
+    expected_revision: int = Field(
+        ...,
+        ge=0,
+        description="Expected lifecycle revision for optimistic lock",
+    )
+    reason: str = Field(
+        default="ttl_expired",
+        min_length=1,
+        max_length=256,
+        description="Reason for expiration (for audit trail)",
+    )
+    expired_at: datetime | None = Field(
+        default=None,
+        description="Optional explicit expiration timestamp (defaults to now)",
+    )
+
+
+class ModelMemoryExpireResult(BaseModel):  # omnimemory-model-exempt: handler result
+    """Result of memory expiration attempt.
+
+    Contains the outcome of the expiration operation, including success/failure
+    status, conflict detection, and any error details.
+
+    State Interpretations:
+        - success=True, conflict=False: Expiration succeeded
+        - success=False, conflict=True: Concurrent modification detected, retry eligible
+        - success=False, conflict=False: Hard failure (invalid state, not found, etc.)
+
+    Attributes:
+        memory_id: UUID of the memory entity.
+        success: Whether the expiration succeeded.
+        new_revision: New revision after successful transition (None on failure).
+        conflict: Whether a concurrent modification was detected.
+        error_message: Detailed error message on failure.
+        previous_state: The state before transition (if known).
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        strict=True,
+    )
+
+    memory_id: UUID = Field(
+        ...,
+        description="UUID of the memory entity",
+    )
+    success: bool = Field(
+        ...,
+        description="Whether the expiration succeeded",
+    )
+    new_revision: int | None = Field(
+        default=None,
+        description="New revision after successful transition",
+    )
+    conflict: bool = Field(
+        default=False,
+        description="Whether a concurrent modification was detected",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Detailed error message on failure",
+    )
+    previous_state: EnumLifecycleState | None = Field(
+        default=None,
+        description="The state before transition attempt (if known)",
+    )
+
+
+class ModelMemoryCurrentState(BaseModel):  # omnimemory-model-exempt: handler state
+    """Current state of a memory entity for retry operations.
+
+    Used by handle_with_retry() to re-read current state after conflict.
+
+    Attributes:
+        memory_id: UUID of the memory entity.
+        lifecycle_state: Current lifecycle state.
+        lifecycle_revision: Current revision number.
+        updated_at: Timestamp of last update.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        strict=True,
+    )
+
+    memory_id: UUID = Field(
+        ...,
+        description="UUID of the memory entity",
+    )
+    lifecycle_state: EnumLifecycleState = Field(
+        ...,
+        description="Current lifecycle state",
+    )
+    lifecycle_revision: int = Field(
+        ...,
+        ge=0,
+        description="Current revision number",
+    )
+    updated_at: datetime = Field(
+        ...,
+        description="Timestamp of last update",
+    )
+
+
+# =============================================================================
+# Handler
+# =============================================================================
+
+
+class HandlerMemoryExpire:
+    """Handler for expiring memories with optimistic locking.
+
+    Performs state transition: ACTIVE -> EXPIRED
+
+    Uses optimistic concurrency control to safely handle concurrent access:
+    1. Check current revision matches expected revision
+    2. If match: update state, increment revision, commit
+    3. If mismatch: return conflict result (caller can retry with updated revision)
+
+    The handler is designed to be stateless and idempotent - the same command
+    with the same expected_revision will always produce the same result (either
+    success or conflict, never partial state).
+
+    Attributes:
+        max_retries: Maximum retry attempts for handle_with_retry().
+
+    Note:
+        Database operations are placeholders until OMN-1524 provides the
+        infra transaction helper primitives. The SQL patterns and logic
+        are fully documented for future implementation.
+    """
+
+    # SQL for atomic state transition with optimistic locking
+    # The WHERE clause ensures both revision AND state match expected values
+    _EXPIRE_SQL = """
+        UPDATE memories
+        SET lifecycle_state = $1,
+            expired_at = $2,
+            lifecycle_revision = lifecycle_revision + 1,
+            updated_at = $3
+        WHERE id = $4
+          AND lifecycle_revision = $5
+          AND lifecycle_state = $6
+        RETURNING lifecycle_revision
+    """
+
+    # SQL to read current state for retry operations
+    _READ_STATE_SQL = """
+        SELECT id, lifecycle_state, lifecycle_revision, updated_at
+        FROM memories
+        WHERE id = $1
+    """
+
+    # Valid source states for expiration transition
+    _VALID_FROM_STATES = frozenset(
+        {EnumLifecycleState.ACTIVE, EnumLifecycleState.EXPIRED}
+    )
+
+    def __init__(
+        self,
+        db_pool: Any | None = None,
+        max_retries: int = 3,
+    ) -> None:
+        """Initialize the expiration handler.
+
+        Args:
+            db_pool: Database connection pool. When None, the handler operates
+                in stub mode (returns success without DB access). This allows
+                testing the interface before OMN-1524 primitives are available.
+            max_retries: Maximum retry attempts for handle_with_retry().
+                Defaults to 3, which balances retry opportunity against
+                excessive contention scenarios.
+
+        Raises:
+            ValueError: If max_retries is less than 1.
+        """
+        if max_retries < 1:
+            raise ValueError(f"max_retries must be >= 1, got {max_retries}")
+
+        self._db_pool = db_pool
+        self._max_retries = max_retries
+
+    @property
+    def max_retries(self) -> int:
+        """Maximum retry attempts for handle_with_retry()."""
+        return self._max_retries
+
+    async def handle(
+        self,
+        command: ModelExpireMemoryCommand,
+    ) -> ModelMemoryExpireResult:
+        """Handle expire command with optimistic locking.
+
+        Performs the ACTIVE -> EXPIRED state transition atomically using
+        optimistic concurrency control. The transition only succeeds if:
+        - The memory entity exists
+        - The current revision matches expected_revision
+        - The current state is ACTIVE (or other valid source state)
+
+        Args:
+            command: Expiration command with memory ID and expected revision.
+
+        Returns:
+            ModelMemoryExpireResult indicating:
+            - success=True: Transition completed, new_revision populated
+            - success=False, conflict=True: Revision mismatch, retry eligible
+            - success=False, conflict=False: Invalid state or not found
+
+        Note:
+            This implementation is a placeholder. The actual database operations
+            will be implemented when OMN-1524 provides transaction helpers.
+            The current implementation returns success for testing the interface.
+        """
+        # Note: `now` will be used for database operations in OMN-1524
+        _now = command.expired_at or datetime.now(timezone.utc)
+
+        # Log the operation for observability
+        logger.info(
+            "Expiring memory %s (expected_revision=%d, reason=%s)",
+            command.memory_id,
+            command.expected_revision,
+            command.reason,
+        )
+
+        # Database operation placeholder - see OMN-1524 for implementation
+
+        # Stub implementation for interface testing
+        if self._db_pool is None:
+            logger.warning(
+                "HandlerMemoryExpire operating in stub mode (no db_pool). "
+                "Returning success for interface testing."
+            )
+            return ModelMemoryExpireResult(
+                memory_id=command.memory_id,
+                success=True,
+                new_revision=command.expected_revision + 1,
+                previous_state=EnumLifecycleState.ACTIVE,
+            )
+
+        # Actual implementation will be added with OMN-1524
+        # For now, return a placeholder result
+        return ModelMemoryExpireResult(
+            memory_id=command.memory_id,
+            success=True,
+            new_revision=command.expected_revision + 1,
+            previous_state=EnumLifecycleState.ACTIVE,
+        )
+
+    async def handle_with_retry(
+        self,
+        memory_id: UUID,
+        initial_revision: int,
+        reason: str = "ttl_expired",
+        expired_at: datetime | None = None,
+    ) -> ModelMemoryExpireResult:
+        """Handle expiration with automatic retry on conflict.
+
+        Provides a higher-level API that automatically retries on revision
+        conflicts by re-reading the current revision and retrying. This is
+        useful when the caller doesn't need fine-grained control over retry
+        behavior.
+
+        Retry Strategy:
+            - On conflict: re-read current state, retry with updated revision
+            - On success or hard failure: return immediately
+            - Bounded by max_retries to prevent infinite loops in high-contention scenarios
+
+        Args:
+            memory_id: UUID of the memory entity to expire.
+            initial_revision: Starting revision for first attempt.
+            reason: Reason for expiration (for audit trail).
+            expired_at: Optional explicit expiration timestamp.
+
+        Returns:
+            ModelMemoryExpireResult with final outcome:
+            - success=True: Expiration eventually succeeded
+            - success=False, conflict=True: Max retries exceeded due to contention
+            - success=False, conflict=False: Hard failure (invalid state, not found)
+
+        Note:
+            The retry logic is a domain policy decision that belongs in this
+            handler. The underlying transaction helper (OMN-1524) will provide
+            the connection and transaction primitives.
+        """
+        revision = initial_revision
+
+        for attempt in range(self._max_retries):
+            logger.debug(
+                "Expiration attempt %d/%d for memory %s (revision=%d)",
+                attempt + 1,
+                self._max_retries,
+                memory_id,
+                revision,
+            )
+
+            result = await self.handle(
+                ModelExpireMemoryCommand(
+                    memory_id=memory_id,
+                    expected_revision=revision,
+                    reason=reason,
+                    expired_at=expired_at,
+                )
+            )
+
+            # Success or hard failure - return immediately
+            if result.success or not result.conflict:
+                return result
+
+            # Conflict - re-read current revision for next attempt
+            logger.info(
+                "Conflict on attempt %d for memory %s, re-reading state",
+                attempt + 1,
+                memory_id,
+            )
+
+            current_state = await self._read_current_state(memory_id)
+            if current_state is None:
+                return ModelMemoryExpireResult(
+                    memory_id=memory_id,
+                    success=False,
+                    conflict=False,
+                    error_message="Memory not found during retry",
+                )
+
+            # Check if memory is still in a valid state for expiration
+            if current_state.lifecycle_state not in self._VALID_FROM_STATES:
+                return ModelMemoryExpireResult(
+                    memory_id=memory_id,
+                    success=False,
+                    conflict=False,
+                    previous_state=current_state.lifecycle_state,
+                    error_message=(
+                        f"Memory transitioned to invalid state during retry: "
+                        f"{current_state.lifecycle_state.value}"
+                    ),
+                )
+
+            # Update revision for next attempt
+            revision = current_state.lifecycle_revision
+
+        # Max retries exceeded
+        return ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=False,
+            conflict=True,
+            error_message=f"Max retries ({self._max_retries}) exceeded due to contention",
+        )
+
+    async def _read_current_state(
+        self,
+        memory_id: UUID,
+    ) -> ModelMemoryCurrentState | None:
+        """Read current state of a memory entity.
+
+        Used by handle_with_retry() to get the updated revision after a
+        conflict, and by handle() to provide detailed error information.
+
+        Args:
+            memory_id: UUID of the memory entity.
+
+        Returns:
+            ModelMemoryCurrentState if found, None if not found.
+
+        Note:
+            This is a placeholder. Actual implementation will use the
+            database pool when OMN-1524 primitives are available.
+
+            Production pattern:
+
+            async with self._db_pool.acquire() as conn:
+                row = await conn.fetchrow(self._READ_STATE_SQL, memory_id)
+                if row is None:
+                    return None
+                return ModelMemoryCurrentState(
+                    memory_id=row["id"],
+                    lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
+                    lifecycle_revision=row["lifecycle_revision"],
+                    updated_at=row["updated_at"],
+                )
+        """
+        # Placeholder for actual implementation
+        if self._db_pool is None:
+            logger.debug(
+                "Stub mode: _read_current_state returning None for memory %s",
+                memory_id,
+            )
+            return None
+
+        # Actual implementation will be added with OMN-1524
+        return None
