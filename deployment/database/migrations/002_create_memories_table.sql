@@ -4,6 +4,16 @@
 -- Ticket: OMN-1453
 
 -- ============================================================================
+-- Extension: pgcrypto
+-- ============================================================================
+-- Required for gen_random_uuid() function on PostgreSQL versions < 13.
+-- PostgreSQL 13+ includes gen_random_uuid() natively, but this extension
+-- ensures compatibility with PostgreSQL 12 and earlier versions.
+-- Using IF NOT EXISTS to avoid errors if already enabled.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- ============================================================================
 -- Memories Table
 -- ============================================================================
 -- Stores memory content with lifecycle state management.

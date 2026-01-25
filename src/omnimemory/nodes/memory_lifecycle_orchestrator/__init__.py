@@ -2,7 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Lifecycle Orchestrator - ONEX Node (Core 8 Foundation).
 
-Manages memory lifecycle transitions: ACTIVE -> STALE -> EXPIRED -> ARCHIVED.
+Manages memory lifecycle transitions: ACTIVE -> EXPIRED -> ARCHIVED -> DELETED.
 Handles TTL expiration via RuntimeTick events and optimistic locking
 for concurrent safety.
 
@@ -20,11 +20,9 @@ Time Injection:
 
 Lifecycle States:
     - ACTIVE: Memory is available for retrieval and actively used
-    - STALE: Memory hasn't been accessed recently, candidate for expiration
-    - PENDING_ARCHIVE: Memory is queued for archival to cold storage
     - EXPIRED: Memory has exceeded TTL, pending cleanup
     - ARCHIVED: Memory has been moved to cold storage
-    - DELETED: Memory has been permanently removed
+    - DELETED: Memory has been permanently removed (terminal state)
 
 ONEX 4.0 Declarative Pattern:
     This node follows the fully declarative ONEX pattern:
@@ -36,8 +34,8 @@ Handlers::
 
     from omnimemory.nodes.memory_lifecycle_orchestrator import (
         HandlerMemoryTick,
-        HandlerArchiveMemory,
-        HandlerExpireMemory,
+        HandlerMemoryArchive,
+        HandlerMemoryExpire,
         HandlerRestoreMemory,
         HandlerMemoryAccessed,
     )
@@ -69,7 +67,7 @@ from .handlers import (
 )
 
 # TODO(OMN-1453): Add handler imports as implemented:
-#   HandlerArchiveMemory, HandlerRestoreMemory, HandlerMemoryAccessed
+#   HandlerMemoryArchive, HandlerRestoreMemory, HandlerMemoryAccessed
 
 # TODO(OMN-1453): Add model imports as implemented:
 #   ModelLifecycleOrchestratorInput, ModelLifecycleOrchestratorOutput,

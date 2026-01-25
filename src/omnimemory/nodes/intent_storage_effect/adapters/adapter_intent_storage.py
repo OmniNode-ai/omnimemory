@@ -164,10 +164,9 @@ class HandlerIntentStorageAdapter:
             request: The storage request.
 
         Returns:
-            Response with operation results.
-
-        Raises:
-            RuntimeError: If adapter not initialized.
+            Response with operation results. If adapter is not initialized,
+            returns a response with status="error" and error_message
+            instructing to call initialize() first.
         """
         if not self._initialized or self._adapter is None:
             return ModelIntentStorageResponse(

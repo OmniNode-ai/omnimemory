@@ -25,8 +25,8 @@
 #
 # Handler Routing:
 #   - ModelRuntimeTick -> HandlerMemoryTick (TTL expiration evaluation)
-#   - ModelArchiveMemoryCommand -> HandlerArchiveMemory
-#   - ModelExpireMemoryCommand -> HandlerExpireMemory
+#   - ModelArchiveMemoryCommand -> HandlerMemoryArchive
+#   - ModelExpireMemoryCommand -> HandlerMemoryExpire
 #   - ModelRestoreMemoryCommand -> HandlerRestoreMemory
 #   - ModelMemoryAccessedEvent -> HandlerMemoryAccessed
 #

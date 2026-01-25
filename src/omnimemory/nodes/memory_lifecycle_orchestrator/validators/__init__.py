@@ -9,18 +9,16 @@ Validators (to be implemented):
 
 Validation Rules:
     State transitions must follow the lifecycle state machine:
-    - ACTIVE -> STALE (access timeout)
-    - ACTIVE -> EXPIRED (explicit expiration)
+    - ACTIVE -> EXPIRED (TTL expiration)
     - ACTIVE -> ARCHIVED (explicit archival)
-    - STALE -> EXPIRED (TTL expiration)
-    - STALE -> ARCHIVED (explicit archival)
     - EXPIRED -> ARCHIVED (post-expiration archival)
     - ARCHIVED -> ACTIVE (restore command)
+    - Any -> DELETED (terminal state)
 
 Invalid Transitions:
-    - DELETED -> any state (terminal)
+    - DELETED -> any state (terminal, no recovery)
     - ARCHIVED -> EXPIRED (must restore first)
-    - any state -> ACTIVE (except restore from ARCHIVED)
+    - EXPIRED -> ACTIVE (must archive then restore)
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1453.

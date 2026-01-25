@@ -73,6 +73,7 @@ import asyncio
 import gzip
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -403,6 +404,13 @@ class HandlerMemoryArchive:
     # content which already compresses well.
     _ARCHIVE_COMPRESSION_LEVEL: int = 6
 
+    # Query timeout for database operations (seconds).
+    #
+    # This timeout applies to individual database queries (SELECT, UPDATE),
+    # not connection acquisition. It prevents indefinite blocking when the
+    # database is under heavy load or experiencing issues.
+    _QUERY_TIMEOUT_SECONDS: float = 30.0
+
     def __init__(
         self,
         db_pool: Pool | None = None,
@@ -481,6 +489,17 @@ class HandlerMemoryArchive:
                 memory_id=command.memory_id,
                 success=False,
                 error_message=str(e),
+            )
+        except TimeoutError as e:
+            logger.error(
+                "Query timeout reading memory %s: %s",
+                command.memory_id,
+                e,
+            )
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                error_message=f"Query timeout reading memory: {e}",
             )
 
         if memory is None:
@@ -634,9 +653,9 @@ class HandlerMemoryArchive:
                 error_message=f"Client error during state update: {e}",
             )
         except TimeoutError as e:
-            # Handle pool acquisition timeout (pool exhaustion)
+            # Handle pool acquisition or query timeout
             logger.error(
-                "Pool timeout updating state for memory %s: %s",
+                "Timeout updating state for memory %s: %s",
                 command.memory_id,
                 e,
             )
@@ -646,7 +665,7 @@ class HandlerMemoryArchive:
                 await self._orphan_tracker.track_orphan(
                     memory_id=command.memory_id,
                     archive_path=archive_path,
-                    reason="pool_timeout_during_state_update",
+                    reason="timeout_during_state_update",
                 )
 
             return ModelMemoryArchiveResult(
@@ -655,7 +674,7 @@ class HandlerMemoryArchive:
                 orphaned=True,
                 archive_path=archive_path,
                 bytes_written=bytes_written,
-                error_message=f"Pool timeout during state update: {e}",
+                error_message=f"Timeout during state update: {e}",
             )
 
         logger.info(
@@ -835,6 +854,7 @@ class HandlerMemoryArchive:
         Raises:
             RuntimeError: If database pool is not configured.
             ValueError: If memory is not found.
+            TimeoutError: If database query exceeds timeout.
         """
         if self._db_pool is None:
             raise RuntimeError(
@@ -843,21 +863,24 @@ class HandlerMemoryArchive:
             )
 
         async with self._db_pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """
-                SELECT
-                    id,
-                    content,
-                    content_type,
-                    created_at,
-                    expired_at,
-                    lifecycle_state,
-                    lifecycle_revision,
-                    metadata
-                FROM memories
-                WHERE id = $1
-                """,
-                memory_id,
+            row = await asyncio.wait_for(
+                conn.fetchrow(
+                    """
+                    SELECT
+                        id,
+                        content,
+                        content_type,
+                        created_at,
+                        expired_at,
+                        lifecycle_state,
+                        lifecycle_revision,
+                        metadata
+                    FROM memories
+                    WHERE id = $1
+                    """,
+                    memory_id,
+                ),
+                timeout=self._QUERY_TIMEOUT_SECONDS,
             )
 
             if row is None:
@@ -914,6 +937,7 @@ class HandlerMemoryArchive:
 
         Raises:
             RuntimeError: If database pool is not configured.
+            TimeoutError: If database query exceeds timeout.
         """
         if self._db_pool is None:
             raise RuntimeError(
@@ -922,27 +946,38 @@ class HandlerMemoryArchive:
             )
 
         async with self._db_pool.acquire() as conn:
-            result = await conn.execute(
-                """
-                UPDATE memories
-                SET
-                    lifecycle_state = $1,
-                    lifecycle_revision = lifecycle_revision + 1,
-                    archived_at = $2,
-                    archive_path = $3,
-                    updated_at = $2
-                WHERE id = $4
-                  AND lifecycle_revision = $5
-                  AND lifecycle_state = $6
-                """,
-                EnumLifecycleState.ARCHIVED.value,
-                archived_at,
-                str(archive_path),
-                memory_id,
-                expected_revision,
-                EnumLifecycleState.EXPIRED.value,
+            result = await asyncio.wait_for(
+                conn.execute(
+                    """
+                    UPDATE memories
+                    SET
+                        lifecycle_state = $1,
+                        lifecycle_revision = lifecycle_revision + 1,
+                        archived_at = $2,
+                        archive_path = $3,
+                        updated_at = $2
+                    WHERE id = $4
+                      AND lifecycle_revision = $5
+                      AND lifecycle_state = $6
+                    """,
+                    EnumLifecycleState.ARCHIVED.value,
+                    archived_at,
+                    str(archive_path),
+                    memory_id,
+                    expected_revision,
+                    EnumLifecycleState.EXPIRED.value,
+                ),
+                timeout=self._QUERY_TIMEOUT_SECONDS,
             )
 
             # Check if update affected any rows
-            rows_affected = int(result.split()[-1])
+            match = re.match(r"UPDATE (\d+)", result)
+            if not match:
+                logger.error(
+                    "Unexpected execute result format for memory %s: %r",
+                    memory_id,
+                    result,
+                )
+                raise RuntimeError(f"Unexpected DB result format: {result}")
+            rows_affected = int(match.group(1))
             return rows_affected > 0

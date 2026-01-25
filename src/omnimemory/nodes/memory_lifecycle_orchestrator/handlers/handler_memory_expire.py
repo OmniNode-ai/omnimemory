@@ -64,6 +64,7 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -85,6 +86,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnimemory.enums import EnumLifecycleState
 
 logger = logging.getLogger(__name__)
+
+# Query timeout for database operations (seconds)
+_QUERY_TIMEOUT_SECONDS: float = 30.0
 
 __all__ = [
     "HandlerMemoryExpire",
@@ -351,14 +355,17 @@ class HandlerMemoryExpire:
 
         try:
             async with self._db_pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    self._EXPIRE_SQL,
-                    EnumLifecycleState.EXPIRED.value,  # $1: new state
-                    expired_at,  # $2: expired_at
-                    expired_at,  # $3: updated_at
-                    command.memory_id,  # $4: id
-                    command.expected_revision,  # $5: expected revision
-                    EnumLifecycleState.ACTIVE.value,  # $6: required current state
+                row = await asyncio.wait_for(
+                    conn.fetchrow(
+                        self._EXPIRE_SQL,
+                        EnumLifecycleState.EXPIRED.value,  # $1: new state
+                        expired_at,  # $2: expired_at
+                        expired_at,  # $3: updated_at
+                        command.memory_id,  # $4: id
+                        command.expected_revision,  # $5: expected revision
+                        EnumLifecycleState.ACTIVE.value,  # $6: required current state
+                    ),
+                    timeout=_QUERY_TIMEOUT_SECONDS,
                 )
 
                 if row is None:
@@ -406,6 +413,17 @@ class HandlerMemoryExpire:
                     previous_state=EnumLifecycleState.ACTIVE,
                 )
 
+        except TimeoutError:
+            logger.error(
+                "Database query timeout for memory %s",
+                command.memory_id,
+            )
+            return ModelMemoryExpireResult(
+                memory_id=command.memory_id,
+                success=False,
+                conflict=False,
+                error_message="Database query timeout",
+            )
         except PostgresError as e:
             logger.error(
                 "Database error during expiration of memory %s: %s",
@@ -544,15 +562,25 @@ class HandlerMemoryExpire:
                 "Initialize handler with db_pool parameter."
             )
 
-        async with self._db_pool.acquire() as conn:
-            row = await conn.fetchrow(self._READ_STATE_SQL, memory_id)
+        try:
+            async with self._db_pool.acquire() as conn:
+                row = await asyncio.wait_for(
+                    conn.fetchrow(self._READ_STATE_SQL, memory_id),
+                    timeout=_QUERY_TIMEOUT_SECONDS,
+                )
 
-            if row is None:
-                return None
+                if row is None:
+                    return None
 
-            return ModelMemoryCurrentState(
-                memory_id=row["id"],
-                lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
-                lifecycle_revision=row["lifecycle_revision"],
-                updated_at=row["updated_at"],
+                return ModelMemoryCurrentState(
+                    memory_id=row["id"],
+                    lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
+                    lifecycle_revision=row["lifecycle_revision"],
+                    updated_at=row["updated_at"],
+                )
+        except TimeoutError:
+            logger.error(
+                "Database query timeout reading state for memory %s",
+                memory_id,
             )
+            return None
