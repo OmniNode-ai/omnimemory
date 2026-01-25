@@ -189,11 +189,54 @@ class HandlerIntentStorageAdapter:
                     status="error",
                     error_message=f"Unknown operation: {request.operation}",
                 )
-        except Exception as e:
-            logger.exception("Error executing intent storage operation")
+        except AssertionError as e:
+            # AssertionError indicates a programming bug - missing validation or
+            # incorrect adapter state. Log at ERROR level with full traceback.
+            logger.exception(
+                "Assertion failed in intent storage operation '%s'. "
+                "This indicates a programming error - request validation may be incomplete.",
+                request.operation,
+            )
             response = ModelIntentStorageResponse(
                 status="error",
-                error_message=str(e),
+                error_message=f"Internal error: assertion failed - {e}",
+            )
+        except RuntimeError as e:
+            # RuntimeError typically indicates adapter initialization issues
+            # or infrastructure problems that the underlying adapter couldn't handle
+            logger.error(
+                "Runtime error during intent storage operation '%s': %s",
+                request.operation,
+                e,
+            )
+            response = ModelIntentStorageResponse(
+                status="error",
+                error_message=f"Runtime error: {e}",
+            )
+        except ValueError as e:
+            # ValueError indicates invalid input data or configuration
+            logger.warning(
+                "Validation error during intent storage operation '%s': %s",
+                request.operation,
+                e,
+            )
+            response = ModelIntentStorageResponse(
+                status="error",
+                error_message=f"Validation error: {e}",
+            )
+        except Exception as e:
+            # Safety net for truly unexpected errors - log at ERROR level with
+            # full traceback to aid debugging. These should be rare since the
+            # underlying adapter handles most exceptions internally.
+            logger.exception(
+                "Unexpected error (%s) during intent storage operation '%s'. "
+                "This may indicate a bug or unhandled edge case.",
+                type(e).__name__,
+                request.operation,
+            )
+            response = ModelIntentStorageResponse(
+                status="error",
+                error_message=f"Unexpected error ({type(e).__name__}): {e}",
             )
 
         # Set execution time

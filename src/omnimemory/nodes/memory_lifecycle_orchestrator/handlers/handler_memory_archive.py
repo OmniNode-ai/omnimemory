@@ -86,14 +86,20 @@ from omnimemory.enums import EnumLifecycleState
 
 if TYPE_CHECKING:
     from asyncpg import Pool
-    from asyncpg.exceptions import PostgresError
+    from asyncpg.exceptions import InterfaceError, InternalClientError, PostgresError
 else:
     try:
-        from asyncpg.exceptions import PostgresError
+        from asyncpg.exceptions import (
+            InterfaceError,
+            InternalClientError,
+            PostgresError,
+        )
     except ImportError:
         # Fallback if asyncpg not installed - use base Exception
         # This allows the module to be imported even without asyncpg
         PostgresError = Exception  # type: ignore[misc,assignment]
+        InterfaceError = Exception  # type: ignore[misc,assignment]
+        InternalClientError = Exception  # type: ignore[misc,assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -383,6 +389,20 @@ class HandlerMemoryArchive:
         The current implementation uses a local atomic write pattern.
     """
 
+    # Gzip compression level for archive files (valid range: 1-9).
+    #
+    # Level 6 is the gzip default and provides an optimal balance between
+    # compression ratio and CPU time for archive storage workloads:
+    #   - Levels 1-3: Faster compression but lower ratio (~20-30% savings)
+    #   - Level 6: Balanced - good ratio (~60-70% savings) with moderate CPU
+    #   - Levels 7-9: Higher ratio (~70-75% savings) but significantly slower
+    #
+    # For cold storage archives where read latency is acceptable and storage
+    # cost matters, level 6 optimizes throughput while maintaining substantial
+    # space savings. Higher levels provide diminishing returns for JSON/JSONL
+    # content which already compresses well.
+    _ARCHIVE_COMPRESSION_LEVEL: int = 6
+
     def __init__(
         self,
         db_pool: Pool | None = None,
@@ -587,11 +607,12 @@ class HandlerMemoryArchive:
                 bytes_written=bytes_written,
                 error_message=f"Database error during state update: {e}",
             )
-        except (OSError, RuntimeError) as e:
-            # Handle connection-related errors that may not be PostgresError
-            # (e.g., pool exhaustion, connection timeout)
+        except (InterfaceError, InternalClientError) as e:
+            # Handle asyncpg client-side errors not covered by PostgresError:
+            # - InterfaceError: Pool closing, connection already acquired, etc.
+            # - InternalClientError: Protocol errors, schema cache issues, etc.
             logger.error(
-                "Connection error updating state for memory %s: %s",
+                "Client error updating state for memory %s: %s",
                 command.memory_id,
                 e,
             )
@@ -601,7 +622,7 @@ class HandlerMemoryArchive:
                 await self._orphan_tracker.track_orphan(
                     memory_id=command.memory_id,
                     archive_path=archive_path,
-                    reason="connection_error_during_state_update",
+                    reason="client_error_during_state_update",
                 )
 
             return ModelMemoryArchiveResult(
@@ -610,7 +631,31 @@ class HandlerMemoryArchive:
                 orphaned=True,
                 archive_path=archive_path,
                 bytes_written=bytes_written,
-                error_message=f"Connection error during state update: {e}",
+                error_message=f"Client error during state update: {e}",
+            )
+        except TimeoutError as e:
+            # Handle pool acquisition timeout (pool exhaustion)
+            logger.error(
+                "Pool timeout updating state for memory %s: %s",
+                command.memory_id,
+                e,
+            )
+
+            # Track orphaned file if tracker configured
+            if self._orphan_tracker is not None:
+                await self._orphan_tracker.track_orphan(
+                    memory_id=command.memory_id,
+                    archive_path=archive_path,
+                    reason="pool_timeout_during_state_update",
+                )
+
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                orphaned=True,
+                archive_path=archive_path,
+                bytes_written=bytes_written,
+                error_message=f"Pool timeout during state update: {e}",
             )
 
         logger.info(
@@ -676,7 +721,10 @@ class HandlerMemoryArchive:
             Gzip-compressed JSONL bytes.
         """
         jsonl_line = record.model_dump_json() + "\n"
-        return gzip.compress(jsonl_line.encode("utf-8"), compresslevel=6)
+        return gzip.compress(
+            jsonl_line.encode("utf-8"),
+            compresslevel=self._ARCHIVE_COMPRESSION_LEVEL,
+        )
 
     def _write_archive_sync(
         self,
