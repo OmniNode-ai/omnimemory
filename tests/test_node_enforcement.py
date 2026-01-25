@@ -33,9 +33,22 @@ import yaml
 
 from tests.conftest import CORE_8_NODES, NODES_DIR
 
-# Valid ONEX node types
+# Valid ONEX node types (includes both simple and _GENERIC forms)
+# The _GENERIC suffix is used by EnumNodeType in omnibase_core
+# The validation lowercases the input, so these must be lowercase
 VALID_NODE_TYPES: frozenset[str] = frozenset(
-    {"effect", "compute", "reducer", "orchestrator"}
+    {
+        "effect",
+        "compute",
+        "reducer",
+        "orchestrator",
+        # _GENERIC suffix variants (from EnumNodeType)
+        "effect_generic",
+        "compute_generic",
+        "reducer_generic",
+        "orchestrator_generic",
+        "runtime_host_generic",
+    }
 )
 
 

@@ -67,7 +67,13 @@ class TestContractValidation:
 
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
     def test_contract_validates_with_pydantic(self, node_name: str) -> None:
-        """Verify contract validates against appropriate Pydantic model."""
+        """Verify contract validates against appropriate Pydantic model.
+
+        Note: Uses constructor (**data) instead of model_validate() due to a bug
+        in omnibase_core 0.9.x where model_validate() passes an unsupported 'extra'
+        parameter to Pydantic's BaseModel.model_validate(). The constructor performs
+        identical validation.
+        """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
             pytest.skip(f"File not yet implemented: {contract_path}")
@@ -84,23 +90,25 @@ class TestContractValidation:
         node_type = node_type.upper()
 
         # Import appropriate contract model based on node type
+        # Note: Using constructor (**data) instead of model_validate() to work around
+        # omnibase_core bug where model_validate() passes unsupported 'extra' kwarg
         try:
             if "EFFECT" in node_type:
                 from omnibase_core.models.contracts import ModelContractEffect
 
-                ModelContractEffect.model_validate(data)
+                ModelContractEffect(**data)
             elif "COMPUTE" in node_type:
                 from omnibase_core.models.contracts import ModelContractCompute
 
-                ModelContractCompute.model_validate(data)
+                ModelContractCompute(**data)
             elif "REDUCER" in node_type:
                 from omnibase_core.models.contracts import ModelContractReducer
 
-                ModelContractReducer.model_validate(data)
+                ModelContractReducer(**data)
             elif "ORCHESTRATOR" in node_type:
                 from omnibase_core.models.contracts import ModelContractOrchestrator
 
-                ModelContractOrchestrator.model_validate(data)
+                ModelContractOrchestrator(**data)
             else:
                 pytest.fail(f"Unknown node_type: {node_type}")
         except ImportError:

@@ -86,6 +86,8 @@ class TestNodeStructure:
     #   which are fundamentally different from infrastructure handlers
     # - Nodes with mock handlers: Temporary development/testing implementations
     #   until omnibase_infra handlers are available
+    # - ORCHESTRATOR nodes with domain-specific handlers: Memory lifecycle handlers
+    #   contain domain logic that doesn't belong in omnibase_infra
     NODES_WITH_ALLOWED_HANDLERS: set[str] = {
         # COMPUTE node: Pure math computation handler for vector similarity.
         # Not an infrastructure handler - performs no I/O operations.
@@ -94,6 +96,12 @@ class TestNodeStructure:
         # development/testing. Will be removed when omnibase_infra is integrated.
         # TODO: Remove from exclusion list when migrating to real handlers.
         "memory_retrieval_effect",
+        # ORCHESTRATOR node with domain-specific lifecycle handlers:
+        # - handler_memory_tick: TTL evaluation and event emission
+        # - handler_memory_expire: ACTIVE->EXPIRED with optimistic locking
+        # - handler_memory_archive: Archive to cold storage with gzip compression
+        # These contain memory-domain logic (not generic infrastructure).
+        "memory_lifecycle_orchestrator",
     }
 
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
