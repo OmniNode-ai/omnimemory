@@ -14,6 +14,8 @@ Example::
         ModelIntentStorageRequest,
     )
 
+    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
+
     async def example():
         adapter = HandlerIntentStorageAdapter()
         await adapter.initialize(connection_uri="bolt://localhost:7687")
@@ -22,11 +24,11 @@ Example::
         request = ModelIntentStorageRequest(
             operation="store",
             session_id="session_123",
-            intent_data={
-                "intent_category": "debugging",
-                "confidence": 0.92,
-                "keywords": ["error", "fix"],
-            },
+            intent_data=ModelIntentClassificationOutput(
+                intent_category="debugging",
+                confidence=0.92,
+                keywords=["error", "fix"],
+            ),
         )
         response = await adapter.execute(request)
         print(f"Stored intent: {response.intent_id}")
@@ -45,10 +47,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from omnimemory.handlers.adapters.models import (
-    ModelAdapterIntentGraphConfig,
-    ModelIntentClassificationOutput,
-)
+from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
 from omnimemory.nodes.intent_storage_effect.models import (
     ModelIntentRecordResponse,
     ModelIntentStorageRequest,
@@ -211,16 +210,13 @@ class HandlerIntentStorageAdapter:
         assert request.session_id is not None
         assert request.intent_data is not None
 
-        # Convert dict to ModelIntentClassificationOutput
-        intent_output = ModelIntentClassificationOutput(**request.intent_data)
-
         # Generate correlation_id if not provided
         correlation_id = request.correlation_id or uuid4()
 
         # Call the adapter
         result = await self._adapter.store_intent(
             session_id=request.session_id,
-            intent_data=intent_output,
+            intent_data=request.intent_data,
             correlation_id=correlation_id,
             user_context=request.user_context,
         )

@@ -8,10 +8,13 @@ Supports store, query, and distribution operations.
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+if TYPE_CHECKING:
+    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
 
 __all__ = ["ModelIntentStorageRequest"]
 
@@ -49,9 +52,9 @@ class ModelIntentStorageRequest(BaseModel):
         min_length=1,
         description="Session identifier (required for store and get_session)",
     )
-    intent_data: dict[str, object] | None = Field(
+    intent_data: ModelIntentClassificationOutput | None = Field(
         default=None,
-        description="Intent classification data as dict (required for store)",
+        description="Intent classification output (required for store)",
     )
     correlation_id: UUID | None = Field(
         default=None,
