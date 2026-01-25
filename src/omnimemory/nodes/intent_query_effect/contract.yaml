@@ -1,0 +1,139 @@
+---
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
+
+# Intent Query EFFECT - ONEX Contract
+# EFFECT node for event-driven intent queries via Kafka.
+
+# === REQUIRED ROOT FIELDS ===
+name: "intent_query_effect"
+contract_version: {major: 0, minor: 1, patch: 0}
+node_version: {major: 0, minor: 1, patch: 0}
+description: "Effect node for event-driven intent queries via Kafka. Provides distribution analysis, session-based
+  lookups, and recent intent retrieval from Memgraph."
+node_type: "EFFECT"
+input_model: "ModelIntentQueryRequestedEvent"
+output_model: "ModelIntentQueryResponseEvent"
+
+# === IO OPERATIONS (Required for EFFECT nodes) ===
+# Graph traversal queries - read-only, no atomicity required
+io_operations:
+  - operation_type: "graph_traversal"
+    atomic: false
+    timeout_seconds: 10
+    validation_enabled: true
+
+# === TRANSACTION MANAGEMENT ===
+# Disabled: All operations are read-only queries, no transactions needed
+transaction_management:
+  enabled: false
+
+# === NODE CONFIGURATION ===
+# NOTE: tool_name and main_tool_class are required per ModelContractEffect validation
+tool_specification:
+  tool_name: "intent_query_effect"
+  main_tool_class: "HandlerIntentQuery"
+
+# === SERVICE CONFIGURATION ===
+service_configuration:
+  is_persistent_service: false
+  requires_external_dependencies: true
+
+# === INPUT/OUTPUT STATE ===
+input_state:
+  object_type: "object"
+  required: ["query_type", "query_id"]
+  optional: ["session_ref", "time_range_hours", "min_confidence", "limit"]
+
+output_state:
+  object_type: "object"
+  required: ["query_id", "query_type", "status"]
+  optional: ["distribution", "intents", "total_count", "execution_time_ms", "error_message"]
+
+# === ACTIONS ===
+actions:
+  - name: "query_distribution"
+    description: "Get intent distribution across categories"
+    inputs: ["time_range_hours", "min_confidence"]
+    outputs: ["distribution", "total_intents"]
+
+  - name: "query_session"
+    description: "Get intents for a specific session"
+    inputs: ["session_ref", "min_confidence", "limit"]
+    outputs: ["intents", "total_count"]
+
+  - name: "query_recent"
+    description: "Get recent intents across all sessions"
+    inputs: ["time_range_hours", "min_confidence", "limit"]
+    outputs: ["intents", "total_count"]
+
+  - name: "health_check"
+    description: "Check node health status"
+    inputs: []
+    outputs: ["status"]
+
+# === DEPENDENCIES ===
+dependencies:
+  # Primary Backend
+  - name: memgraph
+    dependency_type: service
+    description: Memgraph graph database for intent storage and queries
+    required: true
+
+  # Adapter Dependencies
+  - name: AdapterIntentGraph
+    dependency_type: adapter
+    description: Intent graph adapter for Memgraph queries
+    required: true
+
+  # Event Bus
+  - name: kafka
+    dependency_type: service
+    description: Kafka event bus for request/response events
+    required: true
+
+# === PERFORMANCE ===
+performance:
+  max_response_time_ms: 100
+
+# === EVENT TYPE CONFIGURATION ===
+# NOTE: Using version per ModelEventTypeSubcontract from omnibase_core
+event_type:
+  version: {major: 1, minor: 0, patch: 0}
+  primary_events: ["intent_queried"]
+  event_categories: ["intent", "effect", "query"]
+  publish_events: true
+  subscribe_events: true
+  event_routing: "intent"
+  input_topic: "onex.cmd.omnimemory.intent-query-requested.v1"
+  output_topic: "onex.evt.omnimemory.intent-query-response.v1"
+
+# === INFRASTRUCTURE ===
+infrastructure:
+  query_backends:
+    - memgraph  # Primary - graph queries
+
+# === VALIDATION RULES ===
+validation_rules:
+  strict_typing_enabled: true
+  input_validation_enabled: true
+  output_validation_enabled: true
+  performance_validation_enabled: true
+  constraint_definitions:
+    query_type: "Literal['distribution', 'session', 'recent'] - type of intent query"
+    query_id: "string type - unique identifier for this query request"
+    status: "Literal['success', 'error', 'no_results'] - query result status"
+    session_ref: "string type - session reference for session-based queries"
+    time_range_hours: "int (1-720) - time window in hours for queries"
+    min_confidence: "float (0.0-1.0) - minimum confidence threshold"
+    limit: "int (1-1000) - maximum number of results"
+
+# === TAGS ===
+tags:
+  - intent
+  - query
+  - effect
+  - memgraph
+  - kafka
+  - distribution
+  - session

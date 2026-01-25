@@ -8,6 +8,7 @@ HandlerGraph to provide intent-specific operations:
 
 - store_intent(): Store an intent classification linked to a session
 - get_session_intents(): Retrieve intents for a given session
+- get_recent_intents(): Query recent intents across all sessions within a time range
 - get_intent_distribution(): Get aggregate intent statistics
 
 The adapter handles:
@@ -171,6 +172,39 @@ class IntentCypherTemplates:
         """
 
     @staticmethod
+    def get_recent_intents_query(
+        session_label: str, intent_label: str, rel_type: str
+    ) -> str:
+        """Generate query to retrieve recent intents across all sessions.
+
+        Returns intents created within a time range, optionally filtered by
+        confidence threshold, ordered by creation time (most recent first).
+
+        Args:
+            session_label: Label for session nodes (e.g., "Session").
+            intent_label: Label for intent nodes (e.g., "Intent").
+            rel_type: Relationship type connecting sessions to intents
+                (e.g., "HAD_INTENT").
+
+        Returns:
+            Parameterized Cypher query string expecting:
+            - $cutoff_time: ISO datetime string for time boundary
+            - $min_confidence: Minimum confidence threshold (or null to skip)
+            - $limit: Maximum number of results to return
+        """
+        return f"""
+        MATCH (s:{session_label})-[r:{rel_type}]->(i:{intent_label})
+        WHERE i.created_at_utc >= $cutoff_time
+          AND ($min_confidence IS NULL OR i.confidence >= $min_confidence)
+        RETURN s.session_id AS session_id, i.intent_id AS intent_id,
+               i.intent_category AS intent_category, i.confidence AS confidence,
+               i.keywords AS keywords, i.created_at_utc AS created_at_utc,
+               r.correlation_id AS correlation_id
+        ORDER BY i.created_at_utc DESC
+        LIMIT $limit
+        """
+
+    @staticmethod
     def create_indexes_queries(
         session_label: str, intent_label: str, rel_type: str
     ) -> list[str]:
@@ -226,6 +260,7 @@ class AdapterIntentGraph:
 
     - store_intent(session_id, intent_data): Store intent linked to session
     - get_session_intents(session_id): Retrieve intents for a session
+    - get_recent_intents(time_range, min_confidence): Query recent intents across sessions
     - get_intent_distribution(time_range): Get intent category statistics
 
     The adapter handles:
@@ -984,6 +1019,242 @@ class AdapterIntentGraph:
             return ModelIntentDistributionResult(
                 status="error",
                 time_range_hours=time_range_hours,
+                execution_time_ms=execution_time_ms,
+                error_message=f"Query failed: {e}",
+            )
+
+    async def get_recent_intents(
+        self,
+        time_range_hours: int = 24,
+        min_confidence: float | None = None,
+        limit: int | None = None,
+    ) -> ModelIntentQueryResult:
+        """Get recent intents across all sessions within a time range.
+
+        Retrieves intent classifications created within the specified time
+        range, optionally filtered by confidence threshold. Results are
+        ordered by creation time (most recent first) and include the
+        associated session reference.
+
+        Args:
+            time_range_hours: Number of hours to look back from now.
+                Defaults to 24 hours. Values less than 1 are clamped to
+                a minimum of 1 hour.
+            min_confidence: Minimum confidence threshold (0.0-1.0).
+                If None, no confidence filtering is applied.
+            limit: Maximum number of results to return.
+                Defaults to config.max_intents_per_session.
+                Clamped to config.max_intents_per_session maximum.
+
+        Returns:
+            ModelIntentQueryResult with the list of intents or error status.
+            Each intent record includes session_ref populated with the
+            session_id it belongs to.
+
+            Possible status values:
+            - "success": Query completed with results
+            - "no_results": No intents found matching criteria
+            - "error": Query failed
+
+        Example::
+
+            # Get all intents from the last 48 hours with high confidence
+            result = await adapter.get_recent_intents(
+                time_range_hours=48,
+                min_confidence=0.8,
+                limit=100,
+            )
+            if result.status == "success":
+                for intent in result.intents:
+                    print(f"Session {intent.session_ref}: {intent.intent_category}")
+
+        Note:
+            This method never raises on business errors - it returns
+            an error status in the result model instead.
+
+        .. versionadded:: 0.1.0
+            Added for OMN-1504 to support querying recent intents across sessions.
+        """
+        start_time = time.perf_counter()
+
+        try:
+            handler = self._ensure_initialized()
+        except RuntimeError as e:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
+            return ModelIntentQueryResult(
+                status="error",
+                execution_time_ms=execution_time_ms,
+                error_message=str(e),
+            )
+
+        # Clamp time_range_hours to valid range (minimum 1 hour)
+        effective_time_range = max(1, time_range_hours)
+
+        # Apply defaults from config for limit
+        effective_limit = (
+            limit if limit is not None else self._config.max_intents_per_session
+        )
+        # Clamp limit to valid range
+        effective_limit = max(
+            1, min(effective_limit, self._config.max_intents_per_session)
+        )
+
+        # Clamp min_confidence if provided
+        effective_min_confidence: float | None = None
+        if min_confidence is not None:
+            effective_min_confidence = max(0.0, min(min_confidence, 1.0))
+
+        # Calculate time boundary
+        cutoff_time = (
+            datetime.now(UTC) - timedelta(hours=effective_time_range)
+        ).isoformat()
+
+        try:
+            async with asyncio.timeout(self._config.timeout_seconds):
+                query = IntentCypherTemplates.get_recent_intents_query(
+                    session_label=self._config.session_node_label,
+                    intent_label=self._config.intent_node_label,
+                    rel_type=self._config.relationship_type,
+                )
+
+                parameters: dict[str, JsonType] = {
+                    "cutoff_time": cutoff_time,
+                    "min_confidence": effective_min_confidence,
+                    "limit": effective_limit,
+                }
+
+                result = await handler.execute_query(
+                    query=query,
+                    parameters=parameters,
+                )
+
+                end_time = time.perf_counter()
+                execution_time_ms = (end_time - start_time) * 1000
+
+                if not result.records:
+                    logger.debug(
+                        "No recent intents found in last %d hours",
+                        effective_time_range,
+                    )
+                    return ModelIntentQueryResult(
+                        status="no_results",
+                        intents=[],
+                        total_count=0,
+                        execution_time_ms=execution_time_ms,
+                    )
+
+                # Convert records to intent models
+                intents: list[ModelIntentRecord] = []
+                for record in result.records:
+                    intent_id_raw = record.get("intent_id")
+                    if not isinstance(intent_id_raw, str):
+                        logger.warning(
+                            "Skipping intent record with missing or non-string intent_id: %s",
+                            intent_id_raw,
+                        )
+                        continue
+
+                    # Parse UUID from database string
+                    try:
+                        intent_id = UUID(intent_id_raw)
+                    except ValueError:
+                        logger.warning(
+                            "Skipping intent record with invalid intent_id UUID: %s",
+                            intent_id_raw,
+                        )
+                        continue
+
+                    # Extract session_id for session_ref field
+                    session_id_raw = record.get("session_id")
+                    session_ref: str | None = (
+                        str(session_id_raw) if session_id_raw is not None else None
+                    )
+
+                    keywords_raw = record.get("keywords", [])
+                    keywords: list[str] = (
+                        [str(k) for k in keywords_raw]
+                        if isinstance(keywords_raw, list)
+                        else []
+                    )
+
+                    # Extract and validate confidence (defaults to 0.0 if not a number)
+                    confidence_raw = record.get("confidence", 0.0)
+                    confidence_val = (
+                        float(confidence_raw)
+                        if isinstance(confidence_raw, int | float)
+                        else 0.0
+                    )
+
+                    # Parse correlation_id UUID from database string
+                    correlation_id_raw = record.get("correlation_id")
+                    correlation_id: UUID | None = None
+                    if correlation_id_raw is not None:
+                        try:
+                            correlation_id = UUID(str(correlation_id_raw))
+                        except ValueError:
+                            logger.warning(
+                                "Invalid correlation_id UUID: %s", correlation_id_raw
+                            )
+
+                    # Parse datetime from ISO string
+                    created_at_raw = record.get("created_at_utc", "")
+                    try:
+                        created_at_utc = datetime.fromisoformat(str(created_at_raw))
+                    except ValueError:
+                        logger.warning(
+                            "Skipping intent record with invalid created_at_utc: %s",
+                            created_at_raw,
+                        )
+                        continue
+
+                    intents.append(
+                        ModelIntentRecord(
+                            intent_id=intent_id,
+                            session_ref=session_ref,
+                            intent_category=str(record.get("intent_category", "")),
+                            confidence=confidence_val,
+                            keywords=keywords,
+                            created_at_utc=created_at_utc,
+                            correlation_id=correlation_id,
+                        )
+                    )
+
+                logger.debug(
+                    "Retrieved %d recent intents from last %d hours",
+                    len(intents),
+                    effective_time_range,
+                )
+
+                return ModelIntentQueryResult(
+                    status="success",
+                    intents=intents,
+                    total_count=len(intents),
+                    execution_time_ms=execution_time_ms,
+                )
+
+        except TimeoutError:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
+            logger.warning(
+                "Timeout querying recent intents after %.2fms",
+                execution_time_ms,
+            )
+            return ModelIntentQueryResult(
+                status="error",
+                execution_time_ms=execution_time_ms,
+                error_message=f"Query timed out after {self._config.timeout_seconds}s",
+            )
+
+        except Exception as e:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
+            logger.error(
+                "Error querying recent intents: %s",
+                e,
+            )
+            return ModelIntentQueryResult(
+                status="error",
                 execution_time_ms=execution_time_ms,
                 error_message=f"Query failed: {e}",
             )
