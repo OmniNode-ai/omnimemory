@@ -65,7 +65,7 @@ Example::
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -244,11 +244,6 @@ class HandlerMemoryExpire:
 
     Attributes:
         max_retries: Maximum retry attempts for handle_with_retry().
-
-    Note:
-        Database operations are placeholders until OMN-1524 provides the
-        infra transaction helper primitives. The SQL patterns and logic
-        are fully documented for future implementation.
     """
 
     # SQL for atomic state transition with optimistic locking
@@ -285,9 +280,9 @@ class HandlerMemoryExpire:
         """Initialize the expiration handler.
 
         Args:
-            db_pool: Database connection pool. When None, the handler operates
-                in stub mode (returns success without DB access). This allows
-                testing the interface before OMN-1524 primitives are available.
+            db_pool: Database connection pool. Required for database operations.
+                If None, calling handle() or _read_current_state() will raise
+                RuntimeError.
             max_retries: Maximum retry attempts for handle_with_retry().
                 Defaults to 3, which balances retry opportunity against
                 excessive contention scenarios.
@@ -326,11 +321,6 @@ class HandlerMemoryExpire:
             - success=True: Transition completed, new_revision populated
             - success=False, conflict=True: Revision mismatch, retry eligible
             - success=False, conflict=False: Invalid state or not found
-
-        Note:
-            This implementation is a placeholder. The actual database operations
-            will be implemented when OMN-1524 provides transaction helpers.
-            The current implementation returns success for testing the interface.
         """
         # Log the operation for observability
         logger.info(
@@ -347,14 +337,78 @@ class HandlerMemoryExpire:
                 "Initialize handler with db_pool parameter."
             )
 
-        # Actual implementation will be added with OMN-1524
-        # For now, return a placeholder result
-        return ModelMemoryExpireResult(
-            memory_id=command.memory_id,
-            success=True,
-            new_revision=command.expected_revision + 1,
-            previous_state=EnumLifecycleState.ACTIVE,
-        )
+        # Determine expiration timestamp
+        expired_at = command.expired_at or datetime.now(timezone.utc)
+
+        try:
+            async with self._db_pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    self._EXPIRE_SQL,
+                    EnumLifecycleState.EXPIRED.value,  # $1: new state
+                    expired_at,  # $2: expired_at
+                    expired_at,  # $3: updated_at
+                    command.memory_id,  # $4: id
+                    command.expected_revision,  # $5: expected revision
+                    EnumLifecycleState.ACTIVE.value,  # $6: required current state
+                )
+
+                if row is None:
+                    # No rows updated - either revision mismatch or invalid state
+                    # Try to read current state for better error message
+                    current_state = await self._read_current_state(command.memory_id)
+
+                    if current_state is None:
+                        return ModelMemoryExpireResult(
+                            memory_id=command.memory_id,
+                            success=False,
+                            conflict=False,
+                            error_message="Memory not found",
+                        )
+
+                    if current_state.lifecycle_revision != command.expected_revision:
+                        return ModelMemoryExpireResult(
+                            memory_id=command.memory_id,
+                            success=False,
+                            conflict=True,
+                            previous_state=current_state.lifecycle_state,
+                            error_message=(
+                                f"Revision conflict: expected {command.expected_revision}, "
+                                f"found {current_state.lifecycle_revision}"
+                            ),
+                        )
+
+                    # Revision matched but state was wrong
+                    return ModelMemoryExpireResult(
+                        memory_id=command.memory_id,
+                        success=False,
+                        conflict=False,
+                        previous_state=current_state.lifecycle_state,
+                        error_message=(
+                            f"Cannot expire memory in state {current_state.lifecycle_state.value}. "
+                            "Only ACTIVE memories can be expired."
+                        ),
+                    )
+
+                # Success - row contains the new revision
+                return ModelMemoryExpireResult(
+                    memory_id=command.memory_id,
+                    success=True,
+                    new_revision=row["lifecycle_revision"],
+                    previous_state=EnumLifecycleState.ACTIVE,
+                )
+
+        except Exception as e:
+            logger.error(
+                "Database error during expiration of memory %s: %s",
+                command.memory_id,
+                e,
+            )
+            return ModelMemoryExpireResult(
+                memory_id=command.memory_id,
+                success=False,
+                conflict=False,
+                error_message=f"Database error: {e}",
+            )
 
     async def handle_with_retry(
         self,
@@ -471,22 +525,8 @@ class HandlerMemoryExpire:
         Returns:
             ModelMemoryCurrentState if found, None if not found.
 
-        Note:
-            This is a placeholder. Actual implementation will use the
-            database pool when OMN-1524 primitives are available.
-
-            Production pattern:
-
-            async with self._db_pool.acquire() as conn:
-                row = await conn.fetchrow(self._READ_STATE_SQL, memory_id)
-                if row is None:
-                    return None
-                return ModelMemoryCurrentState(
-                    memory_id=row["id"],
-                    lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
-                    lifecycle_revision=row["lifecycle_revision"],
-                    updated_at=row["updated_at"],
-                )
+        Raises:
+            RuntimeError: If database pool is not configured.
         """
         # Require database pool for all operations
         if self._db_pool is None:
@@ -495,5 +535,15 @@ class HandlerMemoryExpire:
                 "Initialize handler with db_pool parameter."
             )
 
-        # Actual implementation will be added with OMN-1524
-        return None
+        async with self._db_pool.acquire() as conn:
+            row = await conn.fetchrow(self._READ_STATE_SQL, memory_id)
+
+            if row is None:
+                return None
+
+            return ModelMemoryCurrentState(
+                memory_id=row["id"],
+                lifecycle_state=EnumLifecycleState(row["lifecycle_state"]),
+                lifecycle_revision=row["lifecycle_revision"],
+                updated_at=row["updated_at"],
+            )

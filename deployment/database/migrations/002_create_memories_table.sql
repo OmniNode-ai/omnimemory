@@ -72,6 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_memories_active_content_type
     ON memories(content_type)
     WHERE lifecycle_state = 'active';
 
+-- Optimizes: SELECT * FROM memories WHERE updated_at < NOW() - INTERVAL '30 days'
+-- Index for cleanup and maintenance queries based on last update time
+CREATE INDEX IF NOT EXISTS idx_memories_updated_at
+    ON memories(updated_at);
+
 -- ============================================================================
 -- Trigger for updated_at Auto-Update
 -- ============================================================================

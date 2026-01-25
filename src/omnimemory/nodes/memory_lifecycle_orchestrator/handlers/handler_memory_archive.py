@@ -69,6 +69,7 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
 import gzip
 import logging
 import os
@@ -85,6 +86,14 @@ from omnimemory.enums import EnumLifecycleState
 
 if TYPE_CHECKING:
     from asyncpg import Pool
+    from asyncpg.exceptions import PostgresError
+else:
+    try:
+        from asyncpg.exceptions import PostgresError
+    except ImportError:
+        # Fallback if asyncpg not installed - use base Exception
+        # This allows the module to be imported even without asyncpg
+        PostgresError = Exception  # type: ignore[misc,assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -555,9 +564,9 @@ class HandlerMemoryArchive:
                         "Archive file written but state not updated."
                     ),
                 )
-        except Exception as e:
+        except PostgresError as e:
             logger.error(
-                "Failed to update state for memory %s: %s",
+                "Database error updating state for memory %s: %s",
                 command.memory_id,
                 e,
             )
@@ -576,7 +585,32 @@ class HandlerMemoryArchive:
                 orphaned=True,
                 archive_path=archive_path,
                 bytes_written=bytes_written,
-                error_message=f"State update failed: {e}",
+                error_message=f"Database error during state update: {e}",
+            )
+        except (OSError, RuntimeError) as e:
+            # Handle connection-related errors that may not be PostgresError
+            # (e.g., pool exhaustion, connection timeout)
+            logger.error(
+                "Connection error updating state for memory %s: %s",
+                command.memory_id,
+                e,
+            )
+
+            # Track orphaned file if tracker configured
+            if self._orphan_tracker is not None:
+                await self._orphan_tracker.track_orphan(
+                    memory_id=command.memory_id,
+                    archive_path=archive_path,
+                    reason="connection_error_during_state_update",
+                )
+
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                orphaned=True,
+                archive_path=archive_path,
+                bytes_written=bytes_written,
+                error_message=f"Connection error during state update: {e}",
             )
 
         logger.info(
@@ -644,18 +678,21 @@ class HandlerMemoryArchive:
         jsonl_line = record.model_dump_json() + "\n"
         return gzip.compress(jsonl_line.encode("utf-8"), compresslevel=6)
 
-    async def _write_archive_atomic(
+    def _write_archive_sync(
         self,
         archive_path: Path,
         compressed_bytes: bytes,
     ) -> int:
-        """Write archive file atomically.
+        """Synchronous atomic write - runs in thread pool.
 
         Uses the temp file + rename pattern to ensure atomic writes:
         1. Create parent directories if needed
         2. Write to temporary file in same directory
         3. fsync to ensure durability
         4. Atomic rename to final path
+
+        This method performs blocking I/O and should be called via
+        asyncio.to_thread() from async contexts.
 
         Note: This will be replaced by omnibase_infra.write_atomic_bytes()
         when OMN-1524 is implemented.
@@ -702,6 +739,32 @@ class HandlerMemoryArchive:
             if temp_path_obj.exists():
                 temp_path_obj.unlink()
             raise
+
+    async def _write_archive_atomic(
+        self,
+        archive_path: Path,
+        compressed_bytes: bytes,
+    ) -> int:
+        """Write archive file atomically using thread pool.
+
+        Delegates to _write_archive_sync via asyncio.to_thread() to avoid
+        blocking the event loop during file I/O operations.
+
+        Args:
+            archive_path: Target path for the archive file.
+            compressed_bytes: Compressed archive data to write.
+
+        Returns:
+            Number of bytes written.
+
+        Raises:
+            OSError: If directory creation or file write fails.
+        """
+        return await asyncio.to_thread(
+            self._write_archive_sync,
+            archive_path,
+            compressed_bytes,
+        )
 
     async def _read_memory(
         self,
