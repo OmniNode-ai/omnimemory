@@ -59,6 +59,8 @@ from .error_models import (  # Error handling; Error codes
 )
 from .protocol_embedding import ProtocolEmbeddingClient, ProtocolRateLimiter
 from .protocol_embedding_provider import ProtocolEmbeddingProvider, ProtocolLLMProvider
+from .protocol_handler_intent import ProtocolHandlerIntent
+from .protocol_intent_graph_adapter import ProtocolIntentGraphAdapter
 from .protocol_secrets_provider import ProtocolSecretsProvider
 
 __all__ = [
@@ -120,4 +122,8 @@ __all__ = [
     # Provider protocols (for handler dependencies)
     "ProtocolEmbeddingProvider",
     "ProtocolLLMProvider",
+    # Handler protocols (for contract-driven handler interfaces)
+    "ProtocolHandlerIntent",
+    # Adapter protocols (for contract-driven dependency injection)
+    "ProtocolIntentGraphAdapter",
 ]

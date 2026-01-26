@@ -900,7 +900,7 @@ class TestConfig:
         config = ModelHandlerSemanticComputeConfig()
 
         assert config.handler_name == "semantic-compute"
-        assert config.handler_version == "1.0.0"
+        assert str(config.handler_version) == "1.0.0"
         assert config.enable_caching is True
         assert config.max_cache_size == 1000
 
