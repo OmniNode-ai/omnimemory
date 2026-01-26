@@ -210,6 +210,7 @@ class HandlerIntentQuery:
 
     Example::
 
+        import os
         from omnibase_core.container import ModelONEXContainer
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
@@ -219,8 +220,8 @@ class HandlerIntentQuery:
 
         # Initialize (creates and owns adapter internally)
         await handler.initialize(
-            connection_uri="bolt://localhost:7687",
-            auth=("user", "password"),
+            connection_uri=os.getenv("MEMGRAPH_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("MEMGRAPH_USER", ""), os.getenv("MEMGRAPH_PASSWORD", "")),
         )
 
         # Execute a query

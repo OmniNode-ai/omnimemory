@@ -165,26 +165,6 @@ def handler_config(
 
 
 @pytest.fixture
-def unique_agent_id() -> str:
-    """Generate a unique agent ID for test isolation.
-
-    Returns:
-        Unique agent identifier.
-    """
-    return f"test_agent_{uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def unique_topic() -> str:
-    """Generate a unique topic for test isolation.
-
-    Returns:
-        Unique topic in memory.<entity>.<event> format.
-    """
-    return f"memory.test_{uuid4().hex[:8]}.created"
-
-
-@pytest.fixture
 def sample_event(unique_topic: str) -> ModelNotificationEvent:
     """Create a sample notification event for testing.
 

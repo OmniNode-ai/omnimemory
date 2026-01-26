@@ -50,6 +50,7 @@ Performance:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from typing import TYPE_CHECKING, Literal
@@ -198,6 +199,7 @@ class HandlerSimilarityCompute:
         self._container = container
         self._config: ModelHandlerSimilarityComputeConfig | None = None
         self._initialized = False
+        self._init_lock = asyncio.Lock()
 
     async def initialize(
         self,
@@ -208,23 +210,30 @@ class HandlerSimilarityCompute:
         This method must be called before using the handler's compute methods.
         If no config is provided, a default configuration will be used.
 
+        Thread-safe: Uses an asyncio.Lock to prevent concurrent double-initialization.
+
         Args:
             config: Optional handler configuration. If None, uses defaults.
         """
-        self._config = config or ModelHandlerSimilarityComputeConfig()
-        self._initialized = True
+        async with self._init_lock:
+            if self._initialized:
+                logger.debug("HandlerSimilarityCompute already initialized, skipping")
+                return
+            self._config = config or ModelHandlerSimilarityComputeConfig()
+            self._initialized = True
+            logger.debug("HandlerSimilarityCompute initialization complete")
 
     async def health_check(self) -> ModelSimilarityComputeHealth:
         """Return health status of the handler.
 
-        For a pure compute handler, this always returns healthy since
-        there are no external dependencies to check.
+        For a pure compute handler, health is determined by initialization state.
+        An uninitialized handler is not healthy since it cannot perform computations.
 
         Returns:
             ModelSimilarityComputeHealth with status information.
         """
         return ModelSimilarityComputeHealth(
-            healthy=True,
+            healthy=self._initialized,
             handler="similarity_compute",
             initialized=self._initialized,
         )
@@ -282,7 +291,13 @@ class HandlerSimilarityCompute:
             RuntimeError: If handler is not initialized.
         """
         self._ensure_initialized()
-        assert self._config is not None  # For type checker
+        # Defensive check: after _ensure_initialized(), _config should never be None
+        # Using explicit check instead of assert for production safety
+        if self._config is None:
+            raise RuntimeError(
+                "HandlerSimilarityCompute config is None after initialization check. "
+                "This indicates an internal state inconsistency."
+            )
         return self._config
 
     def _validate_vectors(

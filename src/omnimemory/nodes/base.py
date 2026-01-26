@@ -13,8 +13,7 @@ Node Types:
 - ORCHESTRATOR: Workflow coordination and routing
 
 Container Support:
-- Uses local ModelONEXContainer from compat layer
-- Will seamlessly support omnibase_core containers when available
+- Uses ModelONEXContainer from omnibase_core.container
 - Auto-injection supported via container.resolve()
 """
 
@@ -40,8 +39,8 @@ class BaseNode(ABC):
 
     Attributes:
         _container: The ONEX node container for dependency injection
-                   and handler registration. Supports both local
-                   ModelONEXContainer and future omnibase_core containers.
+                   and handler registration. Uses ModelONEXContainer
+                   from omnibase_core.
 
     Example:
         ```python
@@ -56,8 +55,8 @@ class BaseNode(ABC):
 
         Args:
             container: ONEX node container providing dependency injection
-                      and handler registration capabilities. Can be either
-                      ModelONEXContainer (local) or NodeContainer (omnibase_core).
+                      and handler registration capabilities. Uses
+                      ModelONEXContainer from omnibase_core.
         """
         self._container = container
 

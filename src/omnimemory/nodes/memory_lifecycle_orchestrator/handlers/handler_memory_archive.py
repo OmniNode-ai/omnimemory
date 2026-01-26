@@ -729,8 +729,13 @@ class HandlerMemoryArchive:
 
         now = datetime.now(timezone.utc)
 
-        # Type narrowing for circuit breaker (guaranteed set after initialize())
-        assert self._db_circuit_breaker is not None
+        # Explicit guard for circuit breaker (guaranteed set after initialize())
+        # Note: Using explicit guard instead of assert because assertions can be
+        # disabled in production with -O flag, making this a critical path check.
+        if self._db_circuit_breaker is None:
+            raise RuntimeError(
+                "Circuit breaker not initialized. This indicates a bug in initialize()."
+            )
 
         # Check circuit breaker before any DB operations
         if not self._db_circuit_breaker.should_allow_request():
@@ -765,6 +770,40 @@ class HandlerMemoryArchive:
                 memory_id=command.memory_id,
                 success=False,
                 error_message=str(e),
+            )
+        except PostgresError as e:
+            # Handle asyncpg database errors (query errors, constraint violations, etc.)
+            self._db_circuit_breaker.record_failure()
+            logger.error(
+                "Database error reading memory",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                error_message=f"Database error reading memory: {e}",
+            )
+        except (InterfaceError, InternalClientError) as e:
+            # Handle asyncpg client-side errors not covered by PostgresError:
+            # - InterfaceError: Pool closing, connection already acquired, etc.
+            # - InternalClientError: Protocol errors, schema cache issues, etc.
+            self._db_circuit_breaker.record_failure()
+            logger.error(
+                "Client error reading memory",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                error_message=f"Client error reading memory: {e}",
             )
         except TimeoutError as e:
             self._db_circuit_breaker.record_timeout()
@@ -823,6 +862,25 @@ class HandlerMemoryArchive:
             command.memory_id,
             now,
         )
+
+        # Step 5b: Validate archive path to prevent directory traversal attacks
+        # Custom paths must be within the allowed archive base directory
+        if command.archive_path is not None:
+            validation_error = self._validate_archive_path(command.archive_path)
+            if validation_error is not None:
+                logger.warning(
+                    "Rejected archive path outside allowed directory",
+                    extra={
+                        "memory_id": str(command.memory_id),
+                        "requested_path": str(command.archive_path),
+                        "archive_base_path": str(self._archive_base_path),
+                    },
+                )
+                return ModelMemoryArchiveResult(
+                    memory_id=command.memory_id,
+                    success=False,
+                    error_message=validation_error,
+                )
 
         # Step 6: Write atomically
         try:
@@ -1017,8 +1075,14 @@ class HandlerMemoryArchive:
             ... )
             Path("/var/omnimemory/archives/2026/01/25/abc12345-....jsonl.gz")
         """
-        # Type narrowing (guaranteed set after initialize())
-        assert self._archive_base_path is not None
+        # Explicit guard for archive base path (guaranteed set after initialize())
+        # Note: Using explicit guard instead of assert because assertions can be
+        # disabled in production with -O flag, making this a critical path check.
+        if self._archive_base_path is None:
+            raise RuntimeError(
+                "Archive base path not initialized. "
+                "This indicates a bug in initialize()."
+            )
 
         return (
             self._archive_base_path
@@ -1027,6 +1091,56 @@ class HandlerMemoryArchive:
             / f"{archived_at.day:02d}"
             / f"{memory_id}.jsonl.gz"
         )
+
+    def _validate_archive_path(self, archive_path: Path) -> str | None:
+        """Validate that an archive path is within the allowed base directory.
+
+        Prevents directory traversal attacks (e.g., ../../../etc/passwd) by
+        ensuring the resolved path is under the configured archive base path.
+
+        Security Note:
+            This method uses Path.resolve() to normalize the path and eliminate
+            any '..' components, symlinks, or other path manipulation attempts.
+            The resolved path must start with the resolved base path.
+
+        Args:
+            archive_path: The path to validate (may be user-provided).
+
+        Returns:
+            None if the path is valid, or an error message string if invalid.
+        """
+        # Explicit guard for archive base path
+        if self._archive_base_path is None:
+            return (
+                "Archive base path not initialized. "
+                "Call initialize() before validating paths."
+            )
+
+        # Resolve both paths to eliminate '..' components and symlinks
+        try:
+            # Resolve the base path (should already exist or will be created)
+            resolved_base = self._archive_base_path.resolve()
+
+            # For the archive path, we need to handle the case where parent
+            # directories don't exist yet. We resolve what we can.
+            # Note: resolve() on a non-existent path returns the normalized
+            # absolute path without following symlinks for non-existent parts.
+            resolved_archive = archive_path.resolve()
+
+            # Check if the resolved archive path is under the resolved base path
+            # Using is_relative_to() for clean path containment check (Python 3.9+)
+            if not resolved_archive.is_relative_to(resolved_base):
+                return (
+                    f"Archive path '{archive_path}' is outside allowed directory. "
+                    f"Path must be under '{self._archive_base_path}'."
+                )
+
+            return None  # Path is valid
+
+        except (OSError, ValueError) as e:
+            # OSError: Path resolution failed (e.g., permission denied on symlink)
+            # ValueError: Path operations failed (e.g., invalid path characters)
+            return f"Failed to validate archive path: {e}"
 
     def _serialize_for_archive_sync(self, record: ModelArchiveRecord) -> bytes:
         """Serialize record to compressed JSONL bytes (synchronous).

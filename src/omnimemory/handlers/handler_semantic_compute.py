@@ -105,12 +105,20 @@ __all__ = [
     "HandlerSemanticCompute",
     "HandlerSemanticComputePolicy",
     "ModelHandlerSemanticComputeConfig",
+    "ModelSemanticComputeCapabilities",
+    "ModelSemanticComputeConfigInfo",
     "ModelSemanticComputeHealth",
     "ModelSemanticComputeMetadata",
 ]
 
 # TypeVar for generic retry helper
 _T = TypeVar("_T")
+
+# Health check timeout - shorter than operation timeout since health checks should be quick
+_HEALTH_CHECK_TIMEOUT_SECONDS: float = 5.0
+
+# Minimum cache size for LRUCache (cachetools requires maxsize > 0)
+_MIN_CACHE_SIZE: int = 1
 
 
 # =============================================================================
@@ -639,7 +647,12 @@ class HandlerSemanticCompute:
 
         # Set up policy and cache
         self._policy = HandlerSemanticComputePolicy(self._config.policy_config)
-        self._embedding_cache = LRUCache(maxsize=self._config.max_cache_size)
+
+        # Guard against max_cache_size=0: cachetools LRUCache requires maxsize > 0
+        # If caching is disabled (max_cache_size=0), use minimum size but caching
+        # will be bypassed by enable_caching=False or the cache will just evict quickly
+        effective_cache_size = max(self._config.max_cache_size, _MIN_CACHE_SIZE)
+        self._embedding_cache = LRUCache(maxsize=effective_cache_size)
 
         self._initialized = True
         logger.debug(
@@ -680,18 +693,34 @@ class HandlerSemanticCompute:
 
         if self._initialized and self._embedding_provider is not None:
             try:
-                embedding_provider_healthy = (
-                    await self._embedding_provider.health_check()
+                # Use explicit timeout to prevent health check from hanging
+                embedding_provider_healthy = await asyncio.wait_for(
+                    self._embedding_provider.health_check(),
+                    timeout=_HEALTH_CHECK_TIMEOUT_SECONDS,
                 )
                 embedding_provider_name = self._embedding_provider.provider_name
+            except TimeoutError:
+                embedding_provider_healthy = False
+                embedding_provider_error = (
+                    f"Health check timed out after {_HEALTH_CHECK_TIMEOUT_SECONDS}s"
+                )
             except Exception as e:
                 embedding_provider_healthy = False
                 embedding_provider_error = str(e)
 
         if self._initialized and self._llm_provider is not None:
             try:
-                llm_provider_healthy = await self._llm_provider.health_check()
+                # Use explicit timeout to prevent health check from hanging
+                llm_provider_healthy = await asyncio.wait_for(
+                    self._llm_provider.health_check(),
+                    timeout=_HEALTH_CHECK_TIMEOUT_SECONDS,
+                )
                 llm_provider_name = self._llm_provider.provider_name
+            except TimeoutError:
+                llm_provider_healthy = False
+                llm_provider_error = (
+                    f"Health check timed out after {_HEALTH_CHECK_TIMEOUT_SECONDS}s"
+                )
             except Exception as e:
                 llm_provider_healthy = False
                 llm_provider_error = str(e)

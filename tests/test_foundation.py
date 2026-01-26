@@ -310,6 +310,7 @@ class TestFoundationArchitecture:
         assert "reducer" in architecture["nodes"]
         assert "orchestrator" in architecture["nodes"]
 
+    @pytest.mark.asyncio
     async def test_memory_operation_e2e(
         self, container: ModelONEXContainer, sample_memory_record: MemoryRecord
     ) -> None:

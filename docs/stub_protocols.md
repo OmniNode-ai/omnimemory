@@ -105,9 +105,11 @@ db = container.resolve("db_handler")
 ### Phase 1: Monitoring (Current)
 
 Monitor `omnibase_core` releases for availability of:
-- `omnibase_core.core.monadic.model_node_result`
-- `omnibase_core.core.errors.core_errors`
-- `omnibase_core.core.model_onex_container`
+- `omnibase_core.core.errors.core_errors` (OnexError, BaseOnexError)
+- `omnibase_core.core.model_onex_container` (ModelOnexContainer)
+
+**Already migrated** (no longer monitoring):
+- ~~`omnibase_core.core.monadic.model_node_result`~~ - Migrated to `ModelBaseResult` (see Section 1)
 
 ### Phase 2: Migration
 

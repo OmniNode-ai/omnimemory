@@ -49,6 +49,8 @@ _DEPENDENCIES_AVAILABLE = False
 _SKIP_REASON = "Required dependencies not installed"
 
 try:
+    from omnibase_core.container import ModelONEXContainer
+
     from omnimemory.enums.enum_subscription_status import EnumSubscriptionStatus
     from omnimemory.handlers import (
         HandlerSubscription,
@@ -67,6 +69,7 @@ try:
     _DEPENDENCIES_AVAILABLE = True
     _SKIP_REASON = ""
 except ImportError as e:
+    ModelONEXContainer = None  # type: ignore[assignment, misc]
     _SKIP_REASON = f"Required dependencies not available: {e}"
 
 
@@ -123,8 +126,6 @@ class NodeAgentCoordinatorOrchestrator:
 
     async def initialize(self) -> None:
         """Initialize the underlying handler."""
-        from omnibase_core.container import ModelONEXContainer
-
         if self._initialized:
             return
 
@@ -311,26 +312,6 @@ async def orchestrator_node(
     yield node
 
     await node.shutdown()
-
-
-@pytest.fixture
-def unique_agent_id() -> str:
-    """Generate a unique agent ID for test isolation.
-
-    Returns:
-        Unique agent identifier.
-    """
-    return f"test_agent_{uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def unique_topic() -> str:
-    """Generate a unique topic for test isolation.
-
-    Returns:
-        Unique topic in memory.<entity>.<event> format.
-    """
-    return f"memory.test_{uuid4().hex[:8]}.created"
 
 
 # =============================================================================
