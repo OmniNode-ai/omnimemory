@@ -442,15 +442,6 @@ class HandlerIntentQuery:
                         return await self._handle_session(request, start)
                     case "recent":
                         return await self._handle_recent(request, start)
-                    case "health_check":
-                        return await self._handle_health_check(request, start)
-                    case _:
-                        return ModelIntentQueryResponseEvent.from_error(
-                            query_id=request.query_id,
-                            query_type=request.query_type,
-                            error_message=f"Unknown query_type: {request.query_type}",
-                            correlation_id=request.correlation_id,
-                        )
         except TimeoutError:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
@@ -540,7 +531,7 @@ class HandlerIntentQuery:
         result = await self._adapter.get_session_intents(
             session_id=request.session_ref,
             min_confidence=request.min_confidence
-            if request.min_confidence is not None and request.min_confidence > 0
+            if request.min_confidence > 0
             else None,
             limit=request.limit,
         )
@@ -611,7 +602,7 @@ class HandlerIntentQuery:
         result = await self._adapter.get_recent_intents(
             time_range_hours=request.time_range_hours,
             min_confidence=request.min_confidence
-            if request.min_confidence is not None and request.min_confidence > 0
+            if request.min_confidence > 0
             else None,
             limit=request.limit,
         )
