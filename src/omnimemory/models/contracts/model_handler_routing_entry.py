@@ -28,6 +28,8 @@ class ModelHandlerRoutingEntry(BaseModel):
         handler: Handler specification (name + module).
         operation: Operation name for operation-based routing.
         action: Action name for action-based routing.
+        event_pattern: Event pattern string for pattern-based routing.
+        backend: Backend identifier for multi-backend routing.
         description: Human-readable description of this routing entry.
         output_events: List of event types this handler may emit.
     """
@@ -49,6 +51,14 @@ class ModelHandlerRoutingEntry(BaseModel):
     action: str | None = Field(
         default=None,
         description="Action name for action-based routing",
+    )
+    event_pattern: str | None = Field(
+        default=None,
+        description="Event pattern string for pattern-based routing",
+    )
+    backend: str | None = Field(
+        default=None,
+        description="Backend identifier for multi-backend routing",
     )
     description: str | None = Field(
         default=None,

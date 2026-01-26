@@ -20,6 +20,7 @@ class ModelHandlerSpec(BaseModel):
         name: Handler class name (e.g., "HandlerNodeIntrospected").
         module: Fully qualified module path containing the handler.
         method: Optional method name if handler has multiple entry points.
+        config_model: Configuration model class name for this handler.
     """
 
     model_config = ConfigDict(extra="ignore", frozen=True)
@@ -27,3 +28,6 @@ class ModelHandlerSpec(BaseModel):
     name: str = Field(..., description="Handler class name")
     module: str = Field(..., description="Module path containing the handler")
     method: str | None = Field(default=None, description="Optional handler method name")
+    config_model: str | None = Field(
+        default=None, description="Configuration model class name for this handler"
+    )
