@@ -8,7 +8,8 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "semantic_analyzer_compute"
-version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 0, minor: 1, patch: 0}
+node_version: {major: 0, minor: 1, patch: 0}
 description: >
   Compute node for semantic analysis including embedding generation, entity extraction, and topic modeling.
   Delegates I/O to provider protocols (ProtocolEmbeddingProvider, ProtocolLLMProvider) to maintain compute

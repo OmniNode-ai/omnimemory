@@ -37,6 +37,7 @@ from omnimemory.handlers import (
     ModelHandlerSemanticComputeConfig,
 )
 from omnimemory.models.config import ModelSemanticComputePolicyConfig
+from omnimemory.models.foundation import ModelSemVer
 from omnimemory.models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
@@ -635,7 +636,7 @@ class TestAnalyze:
         result = await handler.analyze("Test content.")
 
         assert result.model_name == "fake-model-v1"
-        assert result.model_version == "1.0.0"
+        assert result.model_version == ModelSemVer(major=1, minor=0, patch=0)
 
 
 # =============================================================================
