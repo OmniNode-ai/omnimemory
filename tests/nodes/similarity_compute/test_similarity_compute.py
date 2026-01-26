@@ -57,19 +57,6 @@ def config() -> ModelHandlerSimilarityComputeConfig:
 
 
 @pytest.fixture
-def handler(config: ModelHandlerSimilarityComputeConfig) -> HandlerSimilarityCompute:
-    """Create a handler for testing.
-
-    Args:
-        config: Handler configuration fixture.
-
-    Returns:
-        Configured HandlerSimilarityCompute instance.
-    """
-    return HandlerSimilarityCompute(config)
-
-
-@pytest.fixture
 def container() -> ModelOnexContainer:
     """Create an ONEX container for node testing.
 
@@ -77,6 +64,22 @@ def container() -> ModelOnexContainer:
         ModelOnexContainer instance.
     """
     return ModelOnexContainer()
+
+
+@pytest.fixture
+def handler(container: ModelOnexContainer) -> HandlerSimilarityCompute:
+    """Create a handler for testing.
+
+    Uses the container-driven pattern. The handler works with default
+    config even without explicit initialization (lazy default config).
+
+    Args:
+        container: ONEX container fixture.
+
+    Returns:
+        HandlerSimilarityCompute instance with container injection.
+    """
+    return HandlerSimilarityCompute(container)
 
 
 @pytest.fixture
@@ -1523,7 +1526,8 @@ class TestHandlerConfig:
                 unknown_param=True,  # type: ignore[call-arg]
             )
 
-    def test_handler_uses_config_epsilon(self) -> None:
+    @pytest.mark.asyncio
+    async def test_handler_uses_config_epsilon(self) -> None:
         """Handler uses epsilon from config for magnitude checks.
 
         Given: Custom config with larger epsilon
@@ -1532,7 +1536,9 @@ class TestHandlerConfig:
         """
         # With larger epsilon, more vectors are considered "zero"
         config = ModelHandlerSimilarityComputeConfig(epsilon=1e-3)
-        handler = HandlerSimilarityCompute(config)
+        container = ModelOnexContainer()
+        handler = HandlerSimilarityCompute(container)
+        await handler.initialize(config)
 
         # This vector has magnitude ~1.4e-4 which is < 1e-3
         with pytest.raises(ValueError, match="[Zz]ero|[Mm]agnitude"):

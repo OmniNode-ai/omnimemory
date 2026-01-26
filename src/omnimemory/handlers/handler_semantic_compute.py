@@ -8,6 +8,7 @@ protocols for I/O abstraction, keeping the handler testable and the
 architecture clean.
 
 Key Design Principles:
+    - **Container-driven**: Handler receives ModelONEXContainer and resolves dependencies
     - **Pure compute**: Handler contains orchestration and transformation logic
     - **Protocol dependencies**: I/O is abstracted via ProtocolEmbeddingProvider
       and ProtocolLLMProvider
@@ -25,10 +26,19 @@ Example::
         HandlerSemanticCompute,
         ModelHandlerSemanticComputeConfig,
     )
+    from omnimemory.compat import ModelONEXContainer
 
-    config = ModelHandlerSemanticComputeConfig()
-    handler = HandlerSemanticCompute(
-        config=config,
+    # Container-driven pattern (recommended)
+    container = ModelONEXContainer()
+    container.register_singleton(ProtocolEmbeddingProvider, my_embedding_provider_factory)
+
+    handler = HandlerSemanticCompute(container=container)
+    await handler.initialize()
+
+    # Or with explicit providers passed to initialize
+    handler = HandlerSemanticCompute(container=container)
+    await handler.initialize(
+        config=ModelHandlerSemanticComputeConfig(),
         embedding_provider=my_embedding_provider,
         llm_provider=my_llm_provider,  # optional
     )
@@ -42,8 +52,14 @@ Example::
     # Full analysis
     result = await handler.analyze("Complex content to analyze...")
 
+    # Cleanup
+    await handler.shutdown()
+
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1390.
+
+.. versionchanged:: 0.2.0
+    Refactored to container-driven pattern for OMN-1577.
 """
 
 from __future__ import annotations
@@ -62,6 +78,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
 from ..models.config import ModelSemanticComputePolicyConfig
+from ..models.foundation.model_semver import ModelSemVer
 from ..models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
@@ -78,6 +95,7 @@ from ..utils.handler_constants import (
 )
 
 if TYPE_CHECKING:
+    from ..compat import ModelONEXContainer
     from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
 
 logger = logging.getLogger(__name__)
@@ -97,7 +115,9 @@ _T = TypeVar("_T")
 # =============================================================================
 
 
-class ModelHandlerSemanticComputeConfig(BaseModel):
+class ModelHandlerSemanticComputeConfig(  # omnimemory-model-exempt: handler config
+    BaseModel
+):
     """Configuration for the semantic compute handler.
 
     This model configures the handler's behavior and wraps the policy config.
@@ -320,66 +340,294 @@ class HandlerSemanticCompute:
     The handler is "pure compute" in the ONEX sense: it orchestrates
     transformations and delegates I/O to injected provider protocols.
 
+    Following the container-driven pattern (OMN-1577):
+    - Constructor takes only ModelONEXContainer
+    - Providers are resolved from container or passed to initialize()
+    - Lifecycle methods: initialize(), health_check(), describe(), shutdown()
+
     Attributes:
-        config: Handler configuration.
-        policy: Policy for runtime decisions.
+        container: The ONEX container for dependency injection.
+        config: Handler configuration (after initialization).
+        policy: Policy for runtime decisions (after initialization).
 
     Example::
 
-        handler = HandlerSemanticCompute(
-            config=ModelHandlerSemanticComputeConfig(),
-            embedding_provider=http_embedding_provider,
-        )
+        # Container-driven pattern
+        container = ModelONEXContainer()
+        handler = HandlerSemanticCompute(container=container)
+        await handler.initialize(embedding_provider=my_provider)
 
         # Generate embedding
         embedding = await handler.embed("Hello world")
 
         # Full analysis
         result = await handler.analyze("Analyze this text for insights.")
+
+        # Check health
+        health = await handler.health_check()
+
+        # Cleanup
+        await handler.shutdown()
     """
 
-    def __init__(
-        self,
-        config: ModelHandlerSemanticComputeConfig,
-        embedding_provider: ProtocolEmbeddingProvider,
-        llm_provider: ProtocolLLMProvider | None = None,
-    ) -> None:
-        """Initialize the semantic compute handler.
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize the semantic compute handler with container.
+
+        The handler is not ready for use until initialize() is called.
+        This follows the container-driven pattern where:
+        - Constructor only stores the container reference
+        - initialize() resolves dependencies and sets up state
 
         Args:
-            config: Handler configuration.
-            embedding_provider: Provider for embedding generation.
-            llm_provider: Optional provider for LLM-backed operations.
+            container: ONEX container for dependency injection.
         """
-        self._config = config
-        self._embedding_provider = embedding_provider
-        self._llm_provider = llm_provider
-        self._policy = HandlerSemanticComputePolicy(config.policy_config)
+        self._container = container
+        self._config: ModelHandlerSemanticComputeConfig | None = None
+        self._embedding_provider: ProtocolEmbeddingProvider | None = None
+        self._llm_provider: ProtocolLLMProvider | None = None
+        self._policy: HandlerSemanticComputePolicy | None = None
+        self._embedding_cache: LRUCache[str, list[float]] | None = None
+        self._initialized = False
 
-        # LRU cache for embeddings with automatic eviction
-        self._embedding_cache: LRUCache[str, list[float]] = LRUCache(
-            maxsize=config.max_cache_size
+    async def initialize(
+        self,
+        config: ModelHandlerSemanticComputeConfig | None = None,
+        embedding_provider: ProtocolEmbeddingProvider | None = None,
+        llm_provider: ProtocolLLMProvider | None = None,
+    ) -> None:
+        """Initialize the handler by resolving dependencies.
+
+        Dependencies can be:
+        1. Passed explicitly to this method (highest priority)
+        2. Resolved from the container if registered
+        3. Default config is created if not provided
+
+        Args:
+            config: Optional handler configuration. Defaults to
+                ModelHandlerSemanticComputeConfig() if not provided.
+            embedding_provider: Optional embedding provider. If not provided,
+                attempts to resolve ProtocolEmbeddingProvider from container.
+            llm_provider: Optional LLM provider. If not provided,
+                attempts to resolve ProtocolLLMProvider from container.
+
+        Raises:
+            RuntimeError: If embedding_provider is not provided and not
+                registered in container (embedding provider is required).
+        """
+        # Import here to avoid circular imports at module level
+        from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
+
+        # Resolve config
+        self._config = config or ModelHandlerSemanticComputeConfig()
+
+        # Resolve embedding provider (required)
+        if embedding_provider is not None:
+            self._embedding_provider = embedding_provider
+        elif self._container.is_registered(ProtocolEmbeddingProvider):
+            self._embedding_provider = self._container.resolve(
+                ProtocolEmbeddingProvider
+            )
+        else:
+            raise RuntimeError(
+                "HandlerSemanticCompute requires an embedding provider. "
+                "Either pass embedding_provider to initialize() or register "
+                "ProtocolEmbeddingProvider in the container."
+            )
+
+        # Resolve LLM provider (optional)
+        if llm_provider is not None:
+            self._llm_provider = llm_provider
+        elif self._container.is_registered(ProtocolLLMProvider):
+            self._llm_provider = self._container.resolve(ProtocolLLMProvider)
+        else:
+            self._llm_provider = None
+
+        # Set up policy and cache
+        self._policy = HandlerSemanticComputePolicy(self._config.policy_config)
+        self._embedding_cache = LRUCache(maxsize=self._config.max_cache_size)
+
+        self._initialized = True
+        logger.debug(
+            "HandlerSemanticCompute initialized: embedding_provider=%s, llm_provider=%s",
+            self._embedding_provider.provider_name
+            if self._embedding_provider
+            else None,
+            self._llm_provider.provider_name if self._llm_provider else None,
         )
+
+    async def health_check(self) -> dict[str, object]:
+        """Check handler health and return status.
+
+        Returns:
+            Dictionary with health status including:
+            - initialized: Whether handler is initialized
+            - embedding_provider_healthy: Embedding provider health (if initialized)
+            - llm_provider_healthy: LLM provider health (if configured)
+            - cache_size: Current cache size
+            - cache_max_size: Maximum cache size
+
+        Example::
+
+            health = await handler.health_check()
+            if health["initialized"] and health["embedding_provider_healthy"]:
+                print("Handler is ready")
+        """
+        result: dict[str, object] = {
+            "initialized": self._initialized,
+            "handler_name": self._config.handler_name if self._config else None,
+            "handler_version": self._config.handler_version if self._config else None,
+        }
+
+        if self._initialized and self._embedding_provider is not None:
+            try:
+                result[
+                    "embedding_provider_healthy"
+                ] = await self._embedding_provider.health_check()
+                result["embedding_provider_name"] = (
+                    self._embedding_provider.provider_name
+                )
+            except Exception as e:
+                result["embedding_provider_healthy"] = False
+                result["embedding_provider_error"] = str(e)
+
+        if self._initialized and self._llm_provider is not None:
+            try:
+                result["llm_provider_healthy"] = await self._llm_provider.health_check()
+                result["llm_provider_name"] = self._llm_provider.provider_name
+            except Exception as e:
+                result["llm_provider_healthy"] = False
+                result["llm_provider_error"] = str(e)
+        else:
+            result["llm_provider_configured"] = self._llm_provider is not None
+
+        if self._embedding_cache is not None:
+            result["cache_size"] = len(self._embedding_cache)
+            result["cache_max_size"] = self._embedding_cache.maxsize
+
+        return result
+
+    async def describe(self) -> dict[str, object]:
+        """Return handler metadata and capabilities.
+
+        Returns:
+            Dictionary with handler metadata including:
+            - name: Handler name
+            - version: Handler version
+            - operations: Supported operations
+            - capabilities: Handler capabilities
+
+        Example::
+
+            metadata = await handler.describe()
+            print(f"Handler: {metadata['name']} v{metadata['version']}")
+        """
+        return {
+            "name": self._config.handler_name if self._config else "semantic-compute",
+            "version": self._config.handler_version if self._config else "1.0.0",
+            "initialized": self._initialized,
+            "operations": ["embed", "extract_entities", "analyze"],
+            "capabilities": {
+                "embedding_generation": True,
+                "entity_extraction_heuristic": True,
+                "entity_extraction_llm": self._llm_provider is not None,
+                "full_semantic_analysis": True,
+                "caching": self._config.enable_caching if self._config else True,
+            },
+            "config": {
+                "max_cache_size": self._config.max_cache_size if self._config else 1000,
+                "entity_extraction_mode": (
+                    self._config.policy_config.entity_extraction_mode.value
+                    if self._config
+                    else "deterministic"
+                ),
+                "is_deterministic": (
+                    self._config.policy_config.is_deterministic
+                    if self._config
+                    else True
+                ),
+            },
+        }
+
+    async def shutdown(self) -> None:
+        """Clean up handler resources.
+
+        Clears the embedding cache and resets state.
+        After shutdown, initialize() must be called again to use the handler.
+
+        Example::
+
+            await handler.shutdown()
+            # Handler is no longer usable until initialize() is called
+        """
+        if self._embedding_cache is not None:
+            self._embedding_cache.clear()
+        self._initialized = False
+        logger.debug("HandlerSemanticCompute shutdown complete")
+
+    def _ensure_initialized(self) -> None:
+        """Ensure the handler is initialized before operations.
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        if not self._initialized:
+            raise RuntimeError(
+                "HandlerSemanticCompute is not initialized. "
+                "Call initialize() before using the handler."
+            )
+
+    @property
+    def container(self) -> ModelONEXContainer:
+        """Get the ONEX container."""
+        return self._container
 
     @property
     def config(self) -> ModelHandlerSemanticComputeConfig:
-        """Get the handler configuration."""
+        """Get the handler configuration.
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        self._ensure_initialized()
+        assert self._config is not None  # For type checker
         return self._config
 
     @property
     def policy(self) -> HandlerSemanticComputePolicy:
-        """Get the policy instance."""
+        """Get the policy instance.
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        self._ensure_initialized()
+        assert self._policy is not None  # For type checker
         return self._policy
 
     @property
     def embedding_provider(self) -> ProtocolEmbeddingProvider:
-        """Get the embedding provider."""
+        """Get the embedding provider.
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        self._ensure_initialized()
+        assert self._embedding_provider is not None  # For type checker
         return self._embedding_provider
 
     @property
     def llm_provider(self) -> ProtocolLLMProvider | None:
-        """Get the LLM provider (may be None)."""
+        """Get the LLM provider (may be None).
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        self._ensure_initialized()
         return self._llm_provider
+
+    @property
+    def is_initialized(self) -> bool:
+        """Check if handler is initialized."""
+        return self._initialized
 
     # =========================================================================
     # Retry Logic
@@ -406,7 +654,13 @@ class HandlerSemanticCompute:
         Raises:
             The last exception if all retries are exhausted, or immediately
             for non-transient errors.
+
+        Note:
+            Assumes handler is initialized (caller should check).
         """
+        assert self._config is not None  # For type checker
+        assert self._policy is not None  # For type checker
+
         last_error: Exception | None = None
         max_attempts = self._config.policy_config.max_retries + 1  # initial + retries
 
@@ -475,8 +729,15 @@ class HandlerSemanticCompute:
 
         Raises:
             ValueError: If content is empty or too long.
+            RuntimeError: If handler is not initialized.
             EmbeddingProviderError: If embedding generation fails.
         """
+        self._ensure_initialized()
+        assert self._config is not None  # For type checker
+        assert self._embedding_provider is not None  # For type checker
+        assert self._policy is not None  # For type checker
+        assert self._embedding_cache is not None  # For type checker
+
         # Validate content
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
@@ -499,6 +760,9 @@ class HandlerSemanticCompute:
 
         async def _do_embed() -> list[float]:
             async with asyncio.timeout(timeout):
+                assert (
+                    self._embedding_provider is not None
+                )  # For type checker in closure
                 return await self._embedding_provider.generate_embedding(
                     text=content,
                     model=effective_model,
@@ -561,7 +825,9 @@ class HandlerSemanticCompute:
         Example::
 
             # DETERMINISTIC mode (default) - fast, limited accuracy
-            handler = HandlerSemanticCompute(
+            container = ModelONEXContainer()
+            handler = HandlerSemanticCompute(container=container)
+            await handler.initialize(
                 config=ModelHandlerSemanticComputeConfig(
                     policy_config=ModelSemanticComputePolicyConfig(
                         entity_extraction_mode=EnumEntityExtractionMode.DETERMINISTIC,
@@ -572,7 +838,9 @@ class HandlerSemanticCompute:
             # "NYC" -> MISC, "New York City" -> "New", "York", "City" separately
 
             # BEST_EFFORT mode - higher accuracy, requires LLM
-            handler = HandlerSemanticCompute(
+            container = ModelONEXContainer()
+            handler = HandlerSemanticCompute(container=container)
+            await handler.initialize(
                 config=ModelHandlerSemanticComputeConfig(
                     policy_config=ModelSemanticComputePolicyConfig(
                         entity_extraction_mode=EnumEntityExtractionMode.BEST_EFFORT,
@@ -593,9 +861,13 @@ class HandlerSemanticCompute:
 
         Raises:
             ValueError: If content is empty.
-            RuntimeError: If ``entity_extraction_mode=BEST_EFFORT`` but no
-                LLM provider is configured.
+            RuntimeError: If handler is not initialized, or if
+                ``entity_extraction_mode=BEST_EFFORT`` but no LLM provider is configured.
         """
+        self._ensure_initialized()
+        assert self._config is not None  # For type checker
+        assert self._policy is not None  # For type checker
+
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
 
@@ -702,7 +974,15 @@ class HandlerSemanticCompute:
 
             **Entity Extraction**: See :meth:`extract_entities` for detailed documentation
             on entity extraction modes, capabilities, and limitations.
+
+        Raises:
+            ValueError: If content is empty or analysis_type is invalid.
+            RuntimeError: If handler is not initialized.
         """
+        self._ensure_initialized()
+        assert self._config is not None  # For type checker
+        assert self._embedding_provider is not None  # For type checker
+
         if not content or not content.strip():
             raise ValueError("Content cannot be empty")
 
@@ -759,7 +1039,7 @@ class HandlerSemanticCompute:
             relevance_score=None,  # Relevance analysis not implemented
             confidence_score=0.9 if embedding else 0.7,
             model_name=self._embedding_provider.model_name,
-            model_version=self._config.handler_version,
+            model_version=ModelSemVer.parse(self._config.handler_version),
             processing_time_ms=processing_time_ms,
         )
 
@@ -768,7 +1048,11 @@ class HandlerSemanticCompute:
     # =========================================================================
 
     def _compute_cache_key(self, content: str, model: str | None) -> str:
-        """Compute a cache key for content and model."""
+        """Compute a cache key for content and model.
+
+        Note: Assumes handler is initialized (caller should check).
+        """
+        assert self._config is not None  # For type checker
         model_name = model or self._config.policy_config.default_embedding_model
         key_input = f"{model_name}:{content}"
 
@@ -826,7 +1110,11 @@ class HandlerSemanticCompute:
 
         Returns:
             List of extracted entities with type, text, confidence (0.7), and spans.
+
+        Note:
+            Assumes handler is initialized (caller should check).
         """
+        assert self._config is not None  # For type checker
         entities: list[ModelSemanticEntity] = []
         words = content.split()
 
@@ -951,7 +1239,13 @@ class HandlerSemanticCompute:
         Raises:
             RuntimeError: If LLM provider is not configured.
             Exception: If LLM provider fails (propagated from provider).
+
+        Note:
+            Assumes handler is initialized (caller should check).
         """
+        assert self._config is not None  # For type checker
+        assert self._policy is not None  # For type checker
+
         if not self._llm_provider:
             raise RuntimeError(
                 "LLM provider not configured but LLM entity extraction requested"
@@ -969,8 +1263,9 @@ class HandlerSemanticCompute:
 
         # Define the LLM call to be retried
         async def _do_llm_extract() -> dict[str, object]:
-            # self._llm_provider is checked at method entry, assert for type checker
+            # Check providers in closure for type checker
             assert self._llm_provider is not None
+            assert self._config is not None
             async with asyncio.timeout(timeout):
                 return await self._llm_provider.complete_structured(
                     prompt=prompt,

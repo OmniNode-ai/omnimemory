@@ -123,11 +123,14 @@ class NodeAgentCoordinatorOrchestrator:
 
     async def initialize(self) -> None:
         """Initialize the underlying handler."""
+        from omnimemory.compat import ModelONEXContainer
+
         if self._initialized:
             return
 
-        self._handler = HandlerSubscription(self._config)
-        await self._handler.initialize()
+        container = ModelONEXContainer()
+        self._handler = HandlerSubscription(container)
+        await self._handler.initialize(self._config)
         self._initialized = True
 
     async def shutdown(self) -> None:

@@ -50,6 +50,7 @@ from omnimemory.handlers.handler_semantic_compute import (
 )
 from omnimemory.handlers.handler_subscription import (
     HandlerSubscription,
+    ModelHandlerMetadata,
     ModelHandlerSubscriptionConfig,
     ModelSubscriptionHealth,
     ModelSubscriptionMetrics,
@@ -62,6 +63,7 @@ __all__ = [
     "ModelHandlerSemanticComputeConfig",
     # Subscription Handler
     "HandlerSubscription",
+    "ModelHandlerMetadata",
     "ModelHandlerSubscriptionConfig",
     "ModelSubscriptionHealth",
     "ModelSubscriptionMetrics",

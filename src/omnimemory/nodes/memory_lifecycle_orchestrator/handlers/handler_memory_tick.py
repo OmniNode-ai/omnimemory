@@ -27,9 +27,16 @@ Coroutine Safety:
     This handler is stateless and coroutine-safe for concurrent calls
     with different tick instances.
 
+Container-Driven Pattern:
+    This handler follows the ONEX container-driven initialization pattern:
+    - Constructor takes only ModelONEXContainer
+    - Dependencies are injected via initialize()
+    - health_check() and describe() provide introspection
+
 Related Tickets:
     - OMN-1453: OmniMemory P4b - Lifecycle Orchestrator Database Integration
     - OMN-1524: Infra projection reader primitives (future dependency)
+    - OMN-1577: Refactor to container-driven pattern
 """
 
 from __future__ import annotations
@@ -51,6 +58,8 @@ from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerOpenError
 if TYPE_CHECKING:
     from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
+
+    from omnimemory.compat import ModelONEXContainer
 
 logger = logging.getLogger(__name__)
 
@@ -330,6 +339,13 @@ class HandlerMemoryTick:
     archival. It emits lifecycle transition events for entities that
     need them, using projection emission markers for deduplication.
 
+    Container-Driven Pattern:
+        This handler follows the ONEX container-driven initialization pattern:
+        - Constructor takes only ModelONEXContainer for DI compliance
+        - Dependencies are injected via async initialize() method
+        - health_check() provides health status for monitoring
+        - describe() provides handler metadata for introspection
+
     Lifecycle Evaluation:
         The handler performs two scans on each tick:
         1. Expiration: Find ACTIVE memories with expires_at <= now
@@ -347,12 +363,18 @@ class HandlerMemoryTick:
         across distributed deployments.
 
     Attributes:
+        _container: ONEX container for dependency injection.
         _projection_reader: Reader for memory lifecycle projection state.
         _batch_size: Maximum memories to process per tick (default: 100).
+        _initialized: Whether initialize() has been called.
 
     Example:
         >>> from datetime import datetime, timezone
         >>> from uuid import uuid4
+        >>> from omnimemory.compat import ModelONEXContainer
+        >>> container = ModelONEXContainer()
+        >>> handler = HandlerMemoryTick(container)
+        >>> await handler.initialize(projection_reader=reader, batch_size=100)
         >>> tick_time = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
         >>> runtime_tick = ModelRuntimeTick(
         ...     now=tick_time,
@@ -363,18 +385,39 @@ class HandlerMemoryTick:
         ...     scheduler_id="runtime-001",
         ...     tick_interval_ms=1000,
         ... )
-        >>> handler = HandlerMemoryTick(projection_reader)
         >>> output = await handler.handle(envelope)
         >>> # Output events: ModelMemoryExpiredEvent, ModelMemoryArchiveInitiated
     """
 
-    def __init__(
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize HandlerMemoryTick with ONEX container for dependency injection.
+
+        Args:
+            container: ONEX container providing dependency injection for
+                services, configuration, and runtime context.
+
+        Note:
+            The container is stored for interface compliance with the standard ONEX
+            handler pattern (def __init__(self, container: ModelONEXContainer)) and
+            to enable future DI-based service resolution. Call initialize() to
+            configure the handler with its dependencies before use.
+        """
+        self._container = container
+        self._projection_reader: ProtocolMemoryLifecycleProjectionReader | None = None
+        self._batch_size: int = 100
+        self._circuit_breaker: CircuitBreaker | None = None
+        self._initialized: bool = False
+
+    async def initialize(
         self,
         projection_reader: ProtocolMemoryLifecycleProjectionReader | None = None,
         batch_size: int = 100,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
-        """Initialize the handler with a projection reader.
+        """Initialize the handler with its dependencies.
+
+        This method must be called after construction to configure the handler
+        with a projection reader and optional settings.
 
         Args:
             projection_reader: Reader for querying memory lifecycle projection state.
@@ -393,6 +436,80 @@ class HandlerMemoryTick:
             recovery_timeout=30.0,
             success_threshold=2,
         )
+        self._initialized = True
+
+        logger.info(
+            "HandlerMemoryTick initialized",
+            extra={
+                "handler_id": self.handler_id,
+                "batch_size": self._batch_size,
+                "has_projection_reader": self._projection_reader is not None,
+            },
+        )
+
+    @property
+    def initialized(self) -> bool:
+        """Return whether the handler has been initialized.
+
+        Returns:
+            True if initialize() has been called, False otherwise.
+        """
+        return self._initialized
+
+    async def health_check(self) -> dict[str, object]:
+        """Check the health status of the handler.
+
+        Returns a dictionary containing health information about the handler's
+        dependencies and current state. This enables monitoring and diagnostics.
+
+        Returns:
+            Dictionary with health status information including:
+            - initialized: Whether the handler has been initialized
+            - circuit_breaker_state: Current state of the circuit breaker
+            - projection_reader_available: Whether a projection reader is configured
+            - batch_size: Configured batch size for tick processing
+        """
+        circuit_state: str | None = None
+        if self._circuit_breaker is not None:
+            circuit_state = self._circuit_breaker.state.value
+
+        return {
+            "initialized": self._initialized,
+            "circuit_breaker_state": circuit_state,
+            "projection_reader_available": self._projection_reader is not None,
+            "batch_size": self._batch_size,
+        }
+
+    async def describe(self) -> dict[str, object]:
+        """Return metadata and capabilities of this handler.
+
+        Provides introspection information about the handler, including
+        its purpose, supported operations, and configuration.
+
+        Returns:
+            Dictionary with handler metadata including:
+            - name: Handler class name
+            - description: Brief description of handler purpose
+            - capabilities: List of supported operations
+            - initialized: Whether initialize() has been called
+        """
+        return {
+            "name": "HandlerMemoryTick",
+            "description": (
+                "Handler for RuntimeTick - evaluates memory entities for TTL "
+                "expiration and archive eligibility. Emits lifecycle transition "
+                "events for expired and archive-ready memories."
+            ),
+            "capabilities": [
+                "memory_expiration",
+                "archive_initiation",
+                "batch_processing",
+                "circuit_breaker_protection",
+            ],
+            "initialized": self._initialized,
+            "message_types": list(self.message_types),
+            "node_kind": self.node_kind.value,
+        }
 
     @property
     def handler_id(self) -> str:

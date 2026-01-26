@@ -89,6 +89,8 @@ from omnimemory.utils.concurrency import CircuitBreaker
 if TYPE_CHECKING:
     from asyncpg import Pool
     from asyncpg.exceptions import InterfaceError, InternalClientError, PostgresError
+
+    from omnimemory.compat import ModelONEXContainer
 else:
     try:
         from asyncpg.exceptions import (
@@ -423,14 +425,38 @@ class HandlerMemoryArchive:
     _CB_RECOVERY_TIMEOUT: float = 60.0
     _CB_SUCCESS_THRESHOLD: int = 2
 
-    def __init__(
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize the archive handler with a dependency container.
+
+        Args:
+            container: ONEX dependency injection container for service resolution.
+                The container follows the ONEX DI pattern where handlers receive
+                all dependencies through the container rather than as constructor
+                parameters.
+
+        Note:
+            After construction, call initialize() to set up runtime dependencies
+            (db_pool, archive_base_path, orphan_tracker). The handler will raise
+            RuntimeError if handle() is called before initialization.
+        """
+        self._container = container
+        self._db_pool: Pool | None = None
+        self._archive_base_path: Path | None = None
+        self._orphan_tracker: ProtocolOrphanedArchiveTracker | None = None
+        self._db_circuit_breaker: CircuitBreaker | None = None
+        self._initialized = False
+
+    async def initialize(
         self,
         db_pool: Pool | None = None,
         archive_base_path: Path | None = None,
         orphan_tracker: ProtocolOrphanedArchiveTracker | None = None,
-        db_circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
-        """Initialize the archive handler.
+        """Initialize runtime dependencies for the handler.
+
+        This method must be called after construction and before handle() to
+        set up the handler's runtime dependencies. This pattern separates
+        construction (container injection) from initialization (runtime setup).
 
         Args:
             db_pool: PostgreSQL connection pool for database operations.
@@ -443,15 +469,12 @@ class HandlerMemoryArchive:
                 If provided, will be called when an archive file is written
                 but the database state update fails. This enables monitoring
                 and cleanup of orphaned files.
-            db_circuit_breaker: Optional circuit breaker for database operations.
-                If not provided, a default circuit breaker is created.
-                Protects against cascading failures when database is unhealthy.
         """
         self._db_pool = db_pool
         self._orphan_tracker = orphan_tracker
 
         # Initialize circuit breaker for DB operations
-        self._db_circuit_breaker = db_circuit_breaker or CircuitBreaker(
+        self._db_circuit_breaker = CircuitBreaker(
             failure_threshold=self._CB_FAILURE_THRESHOLD,
             recovery_timeout=self._CB_RECOVERY_TIMEOUT,
             success_threshold=self._CB_SUCCESS_THRESHOLD,
@@ -476,9 +499,87 @@ class HandlerMemoryArchive:
                     extra={"archive_path": str(self._archive_base_path)},
                 )
 
+        self._initialized = True
+
+    async def health_check(self) -> dict[str, object]:
+        """Check the health status of the handler.
+
+        Returns a dictionary containing health information about the handler's
+        dependencies and current state. This enables monitoring and diagnostics.
+
+        Returns:
+            Dictionary with health status information including:
+            - initialized: Whether the handler has been initialized
+            - db_pool_available: Whether a database pool is configured
+            - archive_base_path: The configured archive base path
+            - circuit_breaker_state: Current state of the DB circuit breaker
+        """
+        circuit_state = "not_configured"
+        if self._db_circuit_breaker is not None:
+            circuit_state = self._db_circuit_breaker.state.value
+
+        return {
+            "initialized": self._initialized,
+            "db_pool_available": self._db_pool is not None,
+            "archive_base_path": str(self._archive_base_path)
+            if self._archive_base_path
+            else None,
+            "orphan_tracker_configured": self._orphan_tracker is not None,
+            "circuit_breaker_state": circuit_state,
+        }
+
+    async def describe(self) -> dict[str, object]:
+        """Return metadata and capabilities of this handler.
+
+        Provides introspection information about the handler, including
+        its purpose, supported operations, and configuration.
+
+        Returns:
+            Dictionary with handler metadata including:
+            - name: Handler class name
+            - description: Brief description of handler purpose
+            - capabilities: List of supported operations
+            - archive_format: Description of the archive file format
+            - compression_level: Configured gzip compression level
+        """
+        return {
+            "name": "HandlerMemoryArchive",
+            "description": (
+                "Archives EXPIRED memories to cold storage with gzip compression "
+                "and atomic writes. Uses optimistic locking for concurrency safety."
+            ),
+            "capabilities": [
+                "archive_expired_memory",
+                "atomic_file_write",
+                "optimistic_locking",
+                "orphan_tracking",
+            ],
+            "archive_format": "JSONL with gzip compression (.jsonl.gz)",
+            "compression_level": self._ARCHIVE_COMPRESSION_LEVEL,
+            "query_timeout_seconds": self._QUERY_TIMEOUT_SECONDS,
+            "circuit_breaker_config": {
+                "failure_threshold": self._CB_FAILURE_THRESHOLD,
+                "recovery_timeout": self._CB_RECOVERY_TIMEOUT,
+                "success_threshold": self._CB_SUCCESS_THRESHOLD,
+            },
+        }
+
     @property
-    def archive_base_path(self) -> Path:
-        """Get the base path for archives."""
+    def initialized(self) -> bool:
+        """Check if the handler has been initialized.
+
+        Returns:
+            True if initialize() has been called successfully.
+        """
+        return self._initialized
+
+    @property
+    def archive_base_path(self) -> Path | None:
+        """Get the base path for archives.
+
+        Returns:
+            The configured archive base path, or None if not yet initialized.
+        """
         return self._archive_base_path
 
     async def handle(
@@ -497,8 +598,14 @@ class HandlerMemoryArchive:
             Result indicating success, conflict, or failure with details.
 
         Raises:
-            RuntimeError: If database pool is not configured.
+            RuntimeError: If handler is not initialized or database pool is not configured.
         """
+        # Require handler to be initialized
+        if not self._initialized:
+            raise RuntimeError(
+                "Handler not initialized. Call initialize() before handle()."
+            )
+
         now = datetime.now(timezone.utc)
 
         # Check circuit breaker before any DB operations

@@ -18,13 +18,15 @@ Supported Metrics:
 
 Example::
 
+    from omnimemory.compat import ModelONEXContainer
     from omnimemory.nodes.similarity_compute.handlers import (
         HandlerSimilarityCompute,
         ModelHandlerSimilarityComputeConfig,
     )
 
-    config = ModelHandlerSimilarityComputeConfig()
-    handler = HandlerSimilarityCompute(config)
+    container = ModelONEXContainer()
+    handler = HandlerSimilarityCompute(container)
+    await handler.initialize()
 
     # Compute cosine distance
     vec_a = [0.1, 0.2, 0.3, 0.4]
@@ -41,6 +43,9 @@ Performance:
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1388.
+
+.. versionchanged:: 0.2.0
+    Refactored to container-driven pattern for OMN-1577.
 """
 
 from __future__ import annotations
@@ -50,6 +55,8 @@ from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from omnimemory.compat import ModelONEXContainer
 
 from omnimemory.models.memory.model_similarity_result import ModelSimilarityResult
 from omnimemory.nodes.similarity_compute.models import (
@@ -75,12 +82,19 @@ class HandlerSimilarityCompute:
         - **Performance**: Single-pass algorithms minimize overhead
         - **Portability**: Pure Python with no external dependencies
 
+    Follows the container-driven pattern where:
+        - Constructor takes only the DI container
+        - Configuration is provided via initialize()
+        - Handler provides health_check() and describe() for introspection
+
     Attributes:
-        config: The handler configuration.
+        config: The handler configuration (available after initialize()).
 
     Example::
 
-        handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
+        container = ModelONEXContainer()
+        handler = HandlerSimilarityCompute(container)
+        await handler.initialize()
 
         # Identical vectors have distance 0
         vec = [1.0, 2.0, 3.0]
@@ -92,17 +106,76 @@ class HandlerSimilarityCompute:
         assert handler.cosine_distance(vec_a, vec_b) == 1.0
     """
 
-    def __init__(self, config: ModelHandlerSimilarityComputeConfig) -> None:
-        """Initialize the similarity compute handler.
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize the similarity compute handler with container injection.
 
         Args:
-            config: The handler configuration.
+            container: ONEX container for dependency injection.
         """
-        self._config = config
+        self._container = container
+        self._config: ModelHandlerSimilarityComputeConfig | None = None
+        self._initialized = False
+
+    async def initialize(
+        self,
+        config: ModelHandlerSimilarityComputeConfig | None = None,
+    ) -> None:
+        """Initialize the handler with optional configuration.
+
+        This method must be called before using the handler's compute methods.
+        If no config is provided, a default configuration will be used.
+
+        Args:
+            config: Optional handler configuration. If None, uses defaults.
+        """
+        self._config = config or ModelHandlerSimilarityComputeConfig()
+        self._initialized = True
+
+    async def health_check(self) -> dict[str, object]:
+        """Return health status of the handler.
+
+        For a pure compute handler, this always returns healthy since
+        there are no external dependencies to check.
+
+        Returns:
+            Health status dictionary with handler information.
+        """
+        return {
+            "healthy": True,
+            "handler": "similarity_compute",
+            "initialized": self._initialized,
+        }
+
+    async def describe(self) -> dict[str, object]:
+        """Return handler metadata and capabilities.
+
+        Returns:
+            Dictionary describing the handler's capabilities.
+        """
+        return {
+            "handler_type": "similarity_compute",
+            "capabilities": ["cosine_distance", "euclidean_distance", "compare"],
+            "is_pure_compute": True,
+            "initialized": self._initialized,
+            "supported_metrics": ["cosine", "euclidean"],
+        }
+
+    @property
+    def container(self) -> ModelONEXContainer:
+        """Get the ONEX container."""
+        return self._container
 
     @property
     def config(self) -> ModelHandlerSimilarityComputeConfig:
-        """Get the handler configuration."""
+        """Get the handler configuration.
+
+        If the handler has not been initialized, returns a default config.
+        This allows synchronous access for compute operations.
+        """
+        if self._config is None:
+            # Return default config for backwards compatibility
+            # and to allow sync usage without explicit initialize()
+            return ModelHandlerSimilarityComputeConfig()
         return self._config
 
     def _validate_vectors(
@@ -182,11 +255,11 @@ class HandlerSimilarityCompute:
             mag_a = math.sqrt(sum_sq_a)
             mag_b = math.sqrt(sum_sq_b)
 
-            if mag_a < self._config.epsilon:
+            if mag_a < self.config.epsilon:
                 raise ValueError(
                     f"vec_a has zero magnitude (sum of squares: {sum_sq_a:.2e})"
                 )
-            if mag_b < self._config.epsilon:
+            if mag_b < self.config.epsilon:
                 raise ValueError(
                     f"vec_b has zero magnitude (sum of squares: {sum_sq_b:.2e})"
                 )

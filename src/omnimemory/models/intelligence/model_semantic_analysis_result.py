@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.models.foundation.model_semver import ModelSemVer
+from omnimemory.models.foundation.model_semver import ModelSemVer  # noqa: TC001
 
 from .model_semantic_entity_list import ModelSemanticEntityList  # noqa: TC001
 

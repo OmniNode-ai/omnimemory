@@ -63,6 +63,7 @@ class NodeSimilarityCompute(BaseComputeNode):
         - Node is a thin wrapper (minimal logic)
         - All business logic is in the handler
         - Error handling converts exceptions to error responses
+        - Handler follows container-driven pattern
 
     Attributes:
         container: The ONEX container for dependency injection.
@@ -101,9 +102,48 @@ class NodeSimilarityCompute(BaseComputeNode):
             container: ONEX container for dependency injection.
         """
         super().__init__(container)
-        self._handler = HandlerSimilarityCompute(
-            config=ModelHandlerSimilarityComputeConfig()
-        )
+        # Handler follows container-driven pattern
+        # Config is provided via initialize() or uses defaults
+        self._handler = HandlerSimilarityCompute(container)
+        self._handler_initialized = False
+
+    async def initialize(
+        self,
+        config: ModelHandlerSimilarityComputeConfig | None = None,
+    ) -> None:
+        """Initialize the node and its handler.
+
+        Args:
+            config: Optional handler configuration.
+        """
+        await self._handler.initialize(config)
+        self._handler_initialized = True
+
+    async def health_check(self) -> dict[str, object]:
+        """Return health status of the node and handler.
+
+        Returns:
+            Health status dictionary.
+        """
+        handler_health = await self._handler.health_check()
+        return {
+            "healthy": handler_health.get("healthy", False),
+            "node": "similarity_compute",
+            "handler": handler_health,
+        }
+
+    async def describe(self) -> dict[str, object]:
+        """Return node metadata and capabilities.
+
+        Returns:
+            Dictionary describing the node's capabilities.
+        """
+        handler_desc = await self._handler.describe()
+        return {
+            "node_type": "COMPUTE",
+            "node_name": "similarity_compute",
+            "handler": handler_desc,
+        }
 
     def execute(
         self,

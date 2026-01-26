@@ -31,18 +31,20 @@ Models::
 
 Handler Integration::
 
+    from omnimemory.compat import ModelONEXContainer
     from omnimemory.handlers import (
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,
     )
 
+    container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
         db_dsn="postgresql://user:pass@localhost:5432/omnimemory",
         valkey_host="localhost",
         kafka_bootstrap_servers="localhost:9092",
     )
-    handler = HandlerSubscription(config)
-    await handler.initialize()
+    handler = HandlerSubscription(container)
+    await handler.initialize(config)
 
     # Subscribe an agent
     subscription = await handler.subscribe(
