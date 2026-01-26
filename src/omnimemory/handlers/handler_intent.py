@@ -609,11 +609,9 @@ class HandlerIntent:
                 user_context=user_context,
             )
             # Record success if operation completed without exception
+            # Business errors (e.g., validation) are not circuit breaker failures
             if result.status == "success":
                 circuit_breaker.record_success()
-            else:
-                # Business errors (e.g., validation) are not circuit breaker failures
-                pass
             return result
         except Exception as e:
             circuit_breaker.record_failure()
