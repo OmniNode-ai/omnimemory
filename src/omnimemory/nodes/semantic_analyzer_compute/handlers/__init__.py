@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 OmniNode Team
-"""Re-export handlers for semantic analyzer compute node.
+"""Handlers for the semantic analyzer compute node.
 
-The handler implementation lives in the central handlers module.
-This re-exports for consistency with the node package structure.
+This module exports the handler implementations for semantic analysis
+operations. Following ONEX patterns, handlers live inside their node's
+directory structure.
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1390.
 """
 
-from ....handlers import (
+# Re-export config from models for convenience
+from omnimemory.models.config import ModelHandlerSemanticComputeConfig
+from omnimemory.nodes.semantic_analyzer_compute.handlers.handler_semantic_compute import (
     HandlerSemanticCompute,
     HandlerSemanticComputePolicy,
-    ModelHandlerSemanticComputeConfig,
 )
 
 __all__ = [

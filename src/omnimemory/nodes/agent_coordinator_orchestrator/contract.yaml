@@ -69,3 +69,90 @@ tags:
   - cross-agent
   - kafka
   - coordination
+
+# =============================================================================
+# HANDLER ROUTING - ONEX Declarative Dispatch Configuration
+# =============================================================================
+# Maps action types to handler methods for the ONEX runtime.
+# This orchestrator uses action-based routing (via EnumAgentCoordinatorAction)
+# rather than event-type routing. All actions dispatch to HandlerSubscription.
+#
+# Routing Strategy:
+#   - action_type_match: Match by action enum value in request
+#
+# Execution Mode:
+#   - sequential: Single action per request, no parallelism needed
+# =============================================================================
+handler_routing:
+  routing_strategy: "action_type_match"
+  execution_mode: "sequential"
+  handlers:
+    # Subscribe action - register agent subscription to memory topic
+    - action: "subscribe"
+      event_pattern: "omnimemory.coordination.cmd.subscribe.v1"
+      handler:
+        name: "HandlerSubscription"
+        module: "omnimemory.handlers"
+        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
+        method: "subscribe"
+      description: "Register an agent's subscription to a memory topic"
+
+    # Unsubscribe action - remove agent subscription from topic
+    - action: "unsubscribe"
+      event_pattern: "omnimemory.coordination.cmd.unsubscribe.v1"
+      handler:
+        name: "HandlerSubscription"
+        module: "omnimemory.handlers"
+        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
+        method: "unsubscribe"
+      description: "Remove an agent's subscription from a memory topic"
+
+    # List subscriptions action - get all subscriptions for an agent
+    - action: "list_subscriptions"
+      event_pattern: "omnimemory.coordination.cmd.list-subscriptions.v1"
+      handler:
+        name: "HandlerSubscription"
+        module: "omnimemory.handlers"
+        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
+        method: "list_subscriptions"
+      description: "List all subscriptions for a given agent"
+
+    # Notify action - publish notification event to Kafka
+    - action: "notify"
+      event_pattern: "omnimemory.coordination.cmd.notify.v1"
+      handler:
+        name: "HandlerSubscription"
+        module: "omnimemory.handlers"
+        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
+        method: "notify"
+      description: "Publish notification event to Kafka for subscriber consumption"
+
+# =============================================================================
+# CONSUMED EVENTS - Event Subscriptions
+# =============================================================================
+# Events this orchestrator can receive for processing.
+# Uses action field to route to appropriate handler method.
+# =============================================================================
+consumed_events:
+  - event_pattern: "omnimemory.coordination.cmd.subscribe.v1"
+    handler_function: "handle_subscribe"
+
+  - event_pattern: "omnimemory.coordination.cmd.unsubscribe.v1"
+    handler_function: "handle_unsubscribe"
+
+  - event_pattern: "omnimemory.coordination.cmd.list-subscriptions.v1"
+    handler_function: "handle_list_subscriptions"
+
+  - event_pattern: "omnimemory.coordination.cmd.notify.v1"
+    handler_function: "handle_notify"
+
+# Published events - notification events go to Kafka
+published_events:
+  - event_pattern: "omnimemory.memory.notification.v1"
+    description: "Memory change notification published for subscriber consumption"
+
+# Orchestration configuration
+load_balancing_enabled: false
+failure_isolation_enabled: true
+monitoring_enabled: true
+metrics_collection_enabled: true

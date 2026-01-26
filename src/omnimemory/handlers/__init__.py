@@ -9,10 +9,16 @@ while adapters translate between memory-domain concepts and handler-level operat
 Available Handlers:
     - HandlerIntent: Direct protocol handler for intent storage and query operations
     - HandlerSubscription: Agent subscription and notification delivery management
-    - HandlerSemanticCompute: Semantic analysis with policy hooks
+    - HandlerSemanticCompute: Semantic analysis with policy hooks (lives in node's handlers/)
 
 Subpackages:
     - adapters: Adapter layers wrapping omnibase_infra handlers
+
+Note:
+    HandlerSemanticCompute now lives in its node's handlers directory following ONEX patterns:
+    ``omnimemory.nodes.semantic_analyzer_compute.handlers.handler_semantic_compute``
+
+    It is re-exported here for backwards compatibility.
 
 Example::
 
@@ -51,10 +57,6 @@ from omnimemory.handlers.handler_intent import (
     HandlerIntent,
     ModelHandlerIntentMetadata,
 )
-from omnimemory.handlers.handler_semantic_compute import (
-    HandlerSemanticCompute,
-    HandlerSemanticComputePolicy,
-)
 from omnimemory.handlers.handler_subscription import (
     HandlerSubscription,
     ModelHandlerSubscriptionConfig,
@@ -63,6 +65,12 @@ from omnimemory.handlers.handler_subscription import (
 )
 from omnimemory.handlers.models import ModelHandlerIntentConfig
 from omnimemory.models.config import ModelHandlerSemanticComputeConfig
+
+# Re-export from node's handlers directory for backwards compatibility
+from omnimemory.nodes.semantic_analyzer_compute.handlers import (
+    HandlerSemanticCompute,
+    HandlerSemanticComputePolicy,
+)
 
 __all__ = [
     # Intent Handler

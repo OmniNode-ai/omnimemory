@@ -37,7 +37,6 @@ from omnimemory.handlers import (
     ModelHandlerSemanticComputeConfig,
 )
 from omnimemory.models.config import ModelSemanticComputePolicyConfig
-from omnimemory.models.foundation import ModelSemVer
 from omnimemory.models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
@@ -636,7 +635,10 @@ class TestAnalyze:
         result = await handler.analyze("Test content.")
 
         assert result.model_name == "fake-model-v1"
-        assert result.model_version == ModelSemVer(major=1, minor=0, patch=0)
+        # ModelSemVer is used directly per NO BACKWARDS COMPATIBILITY policy
+        assert result.model_version.major == 1
+        assert result.model_version.minor == 0
+        assert result.model_version.patch == 0
 
 
 # =============================================================================
@@ -875,7 +877,12 @@ class TestConfig:
         config = ModelHandlerSemanticComputeConfig()
 
         assert config.handler_name == "semantic-compute"
-        assert str(config.handler_version) == "1.0.0"
+        # ModelSemVer is used directly per NO BACKWARDS COMPATIBILITY policy
+        assert (
+            config.handler_version.major,
+            config.handler_version.minor,
+            config.handler_version.patch,
+        ) == (1, 0, 0)
         assert config.enable_caching is True
         assert config.max_cache_size == 1000
 

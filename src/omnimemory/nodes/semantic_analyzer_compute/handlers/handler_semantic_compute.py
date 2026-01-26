@@ -21,7 +21,7 @@ Operations:
 
 Example::
 
-    from omnimemory.handlers import (
+    from omnimemory.nodes.semantic_analyzer_compute.handlers import (
         HandlerSemanticCompute,
         ModelHandlerSemanticComputeConfig,
     )
@@ -60,18 +60,18 @@ from uuid import UUID, uuid4
 from cachetools import LRUCache
 from pydantic import ValidationError
 
-from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
-from ..models.config import (
+from omnimemory.enums import EnumEntityExtractionMode, EnumSemanticEntityType
+from omnimemory.models.config import (
     ModelHandlerSemanticComputeConfig,  # noqa: TC001
     ModelSemanticComputePolicyConfig,  # noqa: TC001
 )
-from ..models.foundation import ModelSemVer
-from ..models.intelligence import (
+from omnimemory.models.foundation import ModelSemVer
+from omnimemory.models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
     ModelSemanticEntityList,
 )
-from ..utils.handler_constants import (
+from omnimemory.utils.handler_constants import (
     COMPLEXITY_SENTENCE_LEN_MIN,
     COMPLEXITY_SENTENCE_LEN_RANGE,
     COMPLEXITY_WORD_LEN_MIN,
@@ -82,7 +82,7 @@ from ..utils.handler_constants import (
 )
 
 if TYPE_CHECKING:
-    from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
+    from omnimemory.protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
 
 logger = logging.getLogger(__name__)
 

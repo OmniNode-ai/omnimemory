@@ -146,6 +146,47 @@ validation_rules:
     traversal_depth: "int (1-10) - maximum depth for graph traversal"
     relationship_types: "list[str] - filter graph traversal by relationship types"
 
+# === HANDLER ROUTING (ONEX Multi-Backend Effect Pattern) ===
+# Declarative routing configuration for backend handlers.
+# The main HandlerMemoryRetrieval acts as router, dispatching to backend handlers.
+handler_routing:
+  routing_strategy: "operation_type_match"
+  execution_mode: "single"  # One backend per request based on operation type
+  partial_failure_handling: false  # Single backend per operation
+  handlers:
+    # Semantic similarity search via Qdrant
+    - operation: "search"
+      backend: "qdrant"
+      handler:
+        name: "HandlerQdrantMock"
+        module: "omnimemory.nodes.memory_retrieval_effect.handlers"
+        config_model: "ModelHandlerQdrantMockConfig"
+      description: "Semantic similarity search using vector embeddings"
+
+    # Full-text search via PostgreSQL
+    - operation: "search_text"
+      backend: "db"
+      handler:
+        name: "HandlerDbMock"
+        module: "omnimemory.nodes.memory_retrieval_effect.handlers"
+        config_model: "ModelHandlerDbMockConfig"
+      description: "Full-text search using SQL LIKE/FTS"
+
+    # Graph traversal via Neo4j/Memgraph
+    - operation: "search_graph"
+      backend: "graph"
+      handler:
+        name: "HandlerGraphMock"
+        module: "omnimemory.nodes.memory_retrieval_effect.handlers"
+        config_model: "ModelHandlerGraphMockConfig"
+      description: "Graph traversal for relationship-based retrieval"
+
+  # Main routing handler that dispatches to backend handlers
+  router_handler:
+    name: "HandlerMemoryRetrieval"
+    module: "omnimemory.nodes.memory_retrieval_effect.handlers"
+    config_model: "ModelHandlerMemoryRetrievalConfig"
+
 # === TAGS ===
 tags:
   - memory

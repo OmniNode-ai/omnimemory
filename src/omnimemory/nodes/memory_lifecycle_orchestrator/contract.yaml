@@ -127,6 +127,71 @@ consumed_events:
 # See ARCHITECTURAL NOTES above for the event topics this orchestrator publishes
 published_events: []
 
+# =============================================================================
+# HANDLER ROUTING - ONEX Declarative Dispatch Configuration
+# =============================================================================
+# Maps event/command models to handler implementations for the ONEX runtime.
+# The routing strategy determines how incoming messages are matched to handlers.
+#
+# Routing Strategies:
+#   - event_type_match: Match by event model class name
+#   - event_pattern_match: Match by event pattern string
+#
+# Execution Modes:
+#   - sequential: Handlers execute one at a time, in order
+#   - parallel: Independent handlers may execute concurrently
+# =============================================================================
+handler_routing:
+  routing_strategy: "event_type_match"
+  execution_mode: "sequential"
+  handlers:
+    # RuntimeTick handler - evaluates memory TTL expiration and archive candidates
+    - event_model: "ModelRuntimeTick"
+      event_pattern: "onex.internal.runtime-tick.v1"
+      handler:
+        name: "HandlerMemoryTick"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
+        class_path: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_tick.HandlerMemoryTick"
+      description: "Evaluates memory TTL expirations and initiates archival for expired memories"
+
+    # Expire command handler - ACTIVE -> EXPIRED state transition
+    - event_model: "ModelExpireMemoryCommand"
+      event_pattern: "memory.cmd.expire-memory.v1"
+      handler:
+        name: "HandlerMemoryExpire"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
+        class_path: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire.HandlerMemoryExpire"
+      description: "Performs ACTIVE -> EXPIRED state transition with optimistic locking"
+
+    # Archive command handler - EXPIRED -> ARCHIVED state transition
+    - event_model: "ModelArchiveMemoryCommand"
+      event_pattern: "memory.cmd.archive-memory.v1"
+      handler:
+        name: "HandlerMemoryArchive"
+        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
+        class_path: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_archive.HandlerMemoryArchive"
+      description: "Archives EXPIRED memories to cold storage with gzip compression"
+
+  # Restore command handler - ARCHIVED -> ACTIVE state transition (planned)
+  # TODO(OMN-1453): Implement HandlerRestoreMemory
+  # - event_model: "ModelRestoreMemoryCommand"
+  #   event_pattern: "memory.cmd.restore-memory.v1"
+  #   handler:
+  #     name: "HandlerRestoreMemory"
+  #     module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
+  #     class_path: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_restore_memory.HandlerRestoreMemory"
+  #   description: "Restores ARCHIVED memories back to ACTIVE state"
+
+  # Memory accessed event handler - TTL extension tracking (planned)
+  # TODO(OMN-1453): Implement HandlerMemoryAccessed
+  # - event_model: "ModelMemoryAccessedEvent"
+  #   event_pattern: "memory.evt.memory-accessed.v1"
+  #   handler:
+  #     name: "HandlerMemoryAccessed"
+  #     module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
+  #     class_path: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_accessed.HandlerMemoryAccessed"
+  #   description: "Tracks memory access patterns for TTL extension decisions"
+
 # Orchestration configuration - use defaults
 load_balancing_enabled: true
 failure_isolation_enabled: true

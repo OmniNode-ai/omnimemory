@@ -49,7 +49,7 @@ Example::
 Status: Implementation complete with mock adapters.
 """
 
-from .handler_memory_retrieval import (
+from .handlers import (
     HandlerMemoryRetrieval,
     ModelHandlerMemoryRetrievalConfig,
 )

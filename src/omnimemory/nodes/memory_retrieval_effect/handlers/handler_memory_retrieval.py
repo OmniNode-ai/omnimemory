@@ -14,9 +14,12 @@ for memory retrieval operations.
 Example::
 
     import asyncio
-    from omnimemory.nodes.memory_retrieval_effect import (
+    from omnimemory.nodes.memory_retrieval_effect.handlers import (
         HandlerMemoryRetrieval,
+    )
+    from omnimemory.nodes.memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
+        ModelMemoryRetrievalRequest,
     )
 
     async def example():
@@ -50,22 +53,19 @@ from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
 )
 
-from .handlers import (
-    HandlerDbMock,
-    HandlerGraphMock,
-    HandlerQdrantMock,
-)
-from .models import (
+from ..models import (
     ModelHandlerMemoryRetrievalConfig,
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
 )
+from .handler_db_mock import HandlerDbMock
+from .handler_graph_mock import HandlerGraphMock
+from .handler_qdrant_mock import HandlerQdrantMock
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerMemoryRetrieval",
-    "ModelHandlerMemoryRetrievalConfig",
 ]
 
 

@@ -6,7 +6,8 @@ This package contains IHandler implementations for the memory_retrieval_effect n
 Currently provides mock handlers for development and testing. Real handlers
 wrapping omnibase_infra can be added when infrastructure is available.
 
-Mock Handlers:
+Handlers:
+    - HandlerMemoryRetrieval: Main routing handler that dispatches to backend handlers
     - HandlerQdrantMock: Simulates semantic similarity search
     - HandlerDbMock: Simulates full-text SQL search
     - HandlerGraphMock: Simulates graph traversal
@@ -18,6 +19,7 @@ Mock Handlers:
 from ..models import (
     ModelHandlerDbMockConfig,
     ModelHandlerGraphMockConfig,
+    ModelHandlerMemoryRetrievalConfig,
     ModelHandlerQdrantMockConfig,
 )
 from .handler_db_mock import HandlerDbMock
@@ -25,9 +27,13 @@ from .handler_graph_mock import (
     HandlerGraphMock,
     HandlerGraphRelationship,
 )
+from .handler_memory_retrieval import HandlerMemoryRetrieval
 from .handler_qdrant_mock import HandlerQdrantMock
 
 __all__ = [
+    # Main routing handler
+    "HandlerMemoryRetrieval",
+    "ModelHandlerMemoryRetrievalConfig",
     # Qdrant - semantic search
     "HandlerQdrantMock",
     "ModelHandlerQdrantMockConfig",
