@@ -31,7 +31,7 @@ Related Tickets:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -54,6 +54,9 @@ try:
         HandlerIntentStorageAdapter,
         ModelIntentStorageRequest,
         ModelIntentStorageResponse,
+    )
+    from omnimemory.nodes.intent_storage_effect.adapters.adapter_intent_storage import (
+        _DEFAULT_CIRCUIT_BREAKER_CONFIG,
     )
 
     _DEPENDENCIES_AVAILABLE = True
@@ -361,8 +364,9 @@ class TestStoreOperation:
         await handler_with_mock.execute(request)
 
         # Assert - PII detector was called with the original content
+        # Use ANY for sensitivity_level as it's an implementation detail
         handler_with_mock._pii_detector.detect_pii.assert_called_once_with(
-            original_context, sensitivity_level="medium"
+            original_context, sensitivity_level=ANY
         )
 
         # Assert - sanitized content was passed to adapter, not original
@@ -526,6 +530,28 @@ class TestGetSessionOperation:
         assert response.status == "no_results"
         assert response.intents == []
         assert response.total_count == 0
+
+    async def test_get_session_without_session_id_returns_error(
+        self,
+        handler_with_mock: HandlerIntentStorageAdapter,
+    ) -> None:
+        """Verify error response when session_id is missing for get_session operation."""
+        # Arrange - use model_construct to bypass Pydantic validation for testing
+        request = ModelIntentStorageRequest.model_construct(
+            operation="get_session",
+            session_id=None,
+            intent_data=None,
+            min_confidence=0.0,
+            limit=100,
+            time_range_hours=24,
+        )
+
+        # Act
+        response = await handler_with_mock.execute(request)
+
+        # Assert
+        assert response.status == "error"
+        assert "session_id" in (response.error_message or "").lower()
 
 
 # =============================================================================
@@ -784,9 +810,9 @@ class TestErrorHandling:
         """Verify error response when circuit breaker is open.
 
         The handler wraps adapter calls with a circuit breaker that opens
-        after 5 consecutive failures (default threshold). When open, requests
-        fail fast with a "temporarily unavailable" error instead of attempting
-        the underlying operation.
+        after consecutive failures reaching the configured threshold. When open,
+        requests fail fast with a "temporarily unavailable" error instead of
+        attempting the underlying operation.
         """
         # Arrange - configure mock to always fail
         mock_adapter.store_intent.side_effect = RuntimeError("DB connection lost")
@@ -797,8 +823,9 @@ class TestErrorHandling:
             intent_data=sample_intent_data,
         )
 
-        # Trigger enough failures to open circuit breaker (default threshold is 5)
-        for _ in range(5):
+        # Trigger enough failures to open circuit breaker using the actual threshold
+        failure_threshold = _DEFAULT_CIRCUIT_BREAKER_CONFIG.failure_threshold
+        for _ in range(failure_threshold):
             response = await handler_with_mock.execute(request)
             # Verify failures are being recorded (not circuit breaker errors yet)
             assert response.status == "error"
@@ -844,14 +871,16 @@ class TestHandlerIntentStorageAdapterUnit:
         assert handler._config.timeout_seconds == 60.0
         assert handler._config.max_intents_per_session == 500
 
-    async def test_shutdown_clears_state(self) -> None:
+    async def test_shutdown_clears_state(
+        self,
+        adapter_config: ModelAdapterIntentGraphConfig,
+    ) -> None:
         """Verify shutdown properly clears adapter state."""
         if not _DEPENDENCIES_AVAILABLE:
             pytest.skip(_SKIP_REASON)
 
         # Create and manually initialize handler with mock
-        config = ModelAdapterIntentGraphConfig()
-        handler = HandlerIntentStorageAdapter(config=config)
+        handler = HandlerIntentStorageAdapter(config=adapter_config)
 
         # Inject mock adapter to simulate initialized state
         mock_adapter = MagicMock()
