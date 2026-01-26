@@ -54,7 +54,6 @@ from omnimemory.handlers.handler_intent import (
 from omnimemory.handlers.handler_semantic_compute import (
     HandlerSemanticCompute,
     HandlerSemanticComputePolicy,
-    ModelHandlerSemanticComputeConfig,
 )
 from omnimemory.handlers.handler_subscription import (
     HandlerSubscription,
@@ -63,6 +62,7 @@ from omnimemory.handlers.handler_subscription import (
     ModelSubscriptionMetrics,
 )
 from omnimemory.handlers.models import ModelHandlerIntentConfig
+from omnimemory.models.config import ModelHandlerSemanticComputeConfig
 
 __all__ = [
     # Intent Handler

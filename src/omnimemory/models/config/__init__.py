@@ -23,6 +23,9 @@ from omnimemory.models.config.model_embedding_config import (
     ModelEmbeddingHttpClientConfig,
 )
 from omnimemory.models.config.model_filesystem_config import ModelFilesystemConfig
+from omnimemory.models.config.model_handler_semantic_compute_config import (
+    ModelHandlerSemanticComputeConfig,
+)
 from omnimemory.models.config.model_memory_service_config import (
     ModelMemoryServiceConfig,
 )
@@ -41,6 +44,7 @@ __all__ = [
     "EnumEmbeddingProviderType",
     "ModelEmbeddingHttpClientConfig",
     "ModelFilesystemConfig",
+    "ModelHandlerSemanticComputeConfig",
     "ModelMemoryServiceConfig",
     "ModelPostgresConfig",
     "ModelQdrantConfig",
