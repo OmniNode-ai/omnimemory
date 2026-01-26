@@ -404,7 +404,11 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
+            from omnibase_core.container import ModelONEXContainer
+
+            container = ModelONEXContainer()
+            handler = HandlerSimilarityCompute(container)
+            await handler.initialize()
 
             # Identical vectors: distance = 0
             vec = [1.0, 2.0, 3.0]
@@ -460,7 +464,11 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
+            from omnibase_core.container import ModelONEXContainer
+
+            container = ModelONEXContainer()
+            handler = HandlerSimilarityCompute(container)
+            await handler.initialize()
 
             # Identical vectors: distance = 0
             vec = [1.0, 2.0, 3.0]
@@ -518,7 +526,11 @@ class HandlerSimilarityCompute:
 
         Example::
 
-            handler = HandlerSimilarityCompute(ModelHandlerSimilarityComputeConfig())
+            from omnibase_core.container import ModelONEXContainer
+
+            container = ModelONEXContainer()
+            handler = HandlerSimilarityCompute(container)
+            await handler.initialize()
 
             vec_a = [0.1, 0.2, 0.3]
             vec_b = [0.15, 0.25, 0.35]

@@ -39,12 +39,18 @@ Example::
     from pathlib import Path
     from uuid import UUID
 
+    from omnibase_core.container import ModelONEXContainer
+
+    # Create handler with container
+    container = ModelONEXContainer()
+    handler = HandlerMemoryArchive(container)
+
     # Option 1: Use OMNIMEMORY_ARCHIVE_PATH environment variable (recommended)
     # export OMNIMEMORY_ARCHIVE_PATH=/var/omnimemory/archives
-    handler = HandlerMemoryArchive(db_pool=pool)
+    await handler.initialize(db_pool=pool)
 
     # Option 2: Explicit path (useful for testing)
-    handler = HandlerMemoryArchive(
+    await handler.initialize(
         db_pool=pool,
         archive_base_path=Path("/custom/archive/path"),
     )
