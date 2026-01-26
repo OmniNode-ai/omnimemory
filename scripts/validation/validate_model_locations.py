@@ -165,14 +165,15 @@ class PydanticModelVisitor(ast.NodeVisitor):
             # For multi-line class definitions, check from lineno to the line with ":"
             is_exempt = False
             start_line = node.lineno - 1  # 0-indexed
-            # Check up to 10 lines for the exemption (covers most multi-line definitions)
+            # Scan from class start to the line ending with ":" (class signature end)
             for line_idx in range(start_line, min(start_line + 10, len(self.source_lines))):
                 line = self.source_lines[line_idx]
                 if EXEMPTION_PATTERN.search(line):
                     is_exempt = True
                     break
-                # Stop at the colon that ends the class definition
-                if "):" in line or (line.strip().endswith(":") and "class " not in line):
+                # Stop AFTER checking the line that ends the class signature
+                # (the signature always ends with ":")
+                if line.rstrip().endswith(":"):
                     break
 
             self.models.append((node.name, node.lineno, is_exempt))
