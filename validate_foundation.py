@@ -248,9 +248,6 @@ def main() -> int:
     results["container"] = validate_container_creation()
     results["base_implementations"] = validate_base_implementations()
 
-    # Note: Skipping async validation due to omnibase_core dependency issues
-    # results['async_patterns'] = await validate_async_patterns()
-
     print("\n📊 Validation Results:")
     print("=" * 30)
 

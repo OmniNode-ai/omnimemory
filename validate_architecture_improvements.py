@@ -5,8 +5,8 @@ Validation script for advanced architecture improvements.
 This script validates the implementation without requiring external dependencies.
 """
 
-import os
 import sys
+from pathlib import Path
 
 
 def validate_file_syntax(file_path: str) -> tuple[bool, str]:
@@ -45,7 +45,7 @@ def validate_architecture_improvements() -> list[tuple[str, bool, str]]:
     results = []
 
     for file_path in files_to_validate:
-        if os.path.exists(file_path):
+        if Path(file_path).exists():
             is_valid, message = validate_file_syntax(file_path)
             results.append((file_path, is_valid, message))
         else:
@@ -88,7 +88,7 @@ def check_model_completeness():
         "src/omnimemory/models/foundation/model_migration_progress.py"
     )
 
-    if os.path.exists(migration_model_path):
+    if Path(migration_model_path).exists():
         with open(migration_model_path, encoding="utf-8") as f:
             content = f.read()
 
@@ -130,7 +130,7 @@ def validate_integration_patterns():
 
     utils_init_path = "src/omnimemory/utils/__init__.py"
 
-    if os.path.exists(utils_init_path):
+    if Path(utils_init_path).exists():
         with open(utils_init_path, encoding="utf-8") as f:
             content = f.read()
 

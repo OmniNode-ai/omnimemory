@@ -50,7 +50,7 @@ import logging
 import warnings
 from collections.abc import AsyncGenerator, Awaitable
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
@@ -63,11 +63,11 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
     from redis.asyncio.client import Pipeline
 
-    RedisClientType = AsyncRedis
-    PipelineType = Pipeline
+    RedisClientType: TypeAlias = AsyncRedis[bytes]  # noqa: UP040 - can't use type keyword in conditional
+    PipelineType: TypeAlias = Pipeline[bytes]  # noqa: UP040 - can't use type keyword in conditional
 else:
-    RedisClientType = object
-    PipelineType = object
+    RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
+    PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
 
 _REDIS_AVAILABLE = False
 _REDIS_IMPORT_ERROR: str | None = None
@@ -78,7 +78,7 @@ try:
     _REDIS_AVAILABLE = True
 except ImportError as e:
     _REDIS_IMPORT_ERROR = str(e)
-    aioredis = None  # type: ignore[assignment]
+    aioredis = None
 
 
 logger = logging.getLogger(__name__)
@@ -527,9 +527,12 @@ class AdapterValkey:
                     username=self._config.username,
                     socket_timeout=self._config.socket_timeout,
                     socket_connect_timeout=self._config.socket_connect_timeout,
-                    decode_responses=self._config.decode_responses,
+                    decode_responses=self._config.decode_responses,  # pyright: ignore[reportArgumentType]
                     max_connections=self._config.max_connections,
                 )
+                # Assert for type narrowing: pyright doesn't narrow instance
+                # attributes after assignment due to potential concurrent modification
+                assert self._client is not None
 
                 # Test connection with PING
                 await self._client.ping()
@@ -777,7 +780,7 @@ class AdapterValkey:
             return 0
         client = self._ensure_initialized()
         result = await self._ensure_awaited(
-            client.hset(self._prefixed_key(key), mapping=mapping)
+            client.hset(self._prefixed_key(key), mapping=mapping)  # pyright: ignore[reportArgumentType]
         )
         return int(result)
 
@@ -909,8 +912,7 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            # Note: reset() is untyped in redis-py stubs
-            await pipe.reset()  # type: ignore[no-untyped-call]
+            await pipe.reset()
 
     # =========================================================================
     # Utility Methods

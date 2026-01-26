@@ -435,6 +435,9 @@ class AdapterIntentGraph:
                             )
 
                         self._handler = HandlerGraph(self._container)
+                        # Assert for type narrowing: pyright doesn't narrow instance
+                        # attributes after assignment due to potential concurrent modification
+                        assert self._handler is not None
 
                         init_options: dict[str, JsonType] = {
                             "timeout_seconds": self._config.timeout_seconds,
