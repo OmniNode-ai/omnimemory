@@ -17,7 +17,7 @@ Test Categories:
     - Store operation: Verify store_intent() calls and response mapping
     - Get session operation: Verify get_session_intents() calls and response mapping
     - Get distribution operation: Verify get_intent_distribution() calls and response
-    - Error handling: Verify error states (not initialized, circuit breaker open)
+    - Error handling: Verify error states (not initialized, unknown operation, exceptions, timing)
     - Correlation ID: Verify auto-generation when not provided
 
 Prerequisites:
@@ -62,6 +62,7 @@ except ImportError as e:
 
 # Module-level pytest markers
 pytestmark = [
+    pytest.mark.asyncio,
     pytest.mark.integration,
     pytest.mark.skipif(not _DEPENDENCIES_AVAILABLE, reason=_SKIP_REASON),
 ]
@@ -159,7 +160,6 @@ def sample_intent_record() -> ModelIntentRecord:
 class TestStoreOperation:
     """Tests for the store operation."""
 
-    @pytest.mark.asyncio
     async def test_store_calls_adapter_with_correct_args(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -194,7 +194,6 @@ class TestStoreOperation:
         assert call_kwargs["correlation_id"] == TEST_CORRELATION_ID
         assert call_kwargs["user_context"] == ""
 
-    @pytest.mark.asyncio
     async def test_store_returns_correct_response_model(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -229,7 +228,6 @@ class TestStoreOperation:
         assert response.created is True
         assert response.execution_time_ms > 0  # Handler adds its own timing
 
-    @pytest.mark.asyncio
     async def test_store_generates_correlation_id_when_not_provided(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -264,7 +262,6 @@ class TestStoreOperation:
         # Verify it's a valid UUID (not the test constant)
         assert generated_correlation_id != TEST_CORRELATION_ID
 
-    @pytest.mark.asyncio
     async def test_store_propagates_user_context(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -296,7 +293,6 @@ class TestStoreOperation:
         call_kwargs = mock_adapter.store_intent.call_args.kwargs
         assert call_kwargs["user_context"] == user_context
 
-    @pytest.mark.asyncio
     async def test_store_handles_adapter_error(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -333,7 +329,6 @@ class TestStoreOperation:
 class TestGetSessionOperation:
     """Tests for the get_session operation."""
 
-    @pytest.mark.asyncio
     async def test_get_session_calls_adapter_with_correct_args(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -366,7 +361,6 @@ class TestGetSessionOperation:
             limit=50,
         )
 
-    @pytest.mark.asyncio
     async def test_get_session_returns_correct_response_model(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -404,7 +398,6 @@ class TestGetSessionOperation:
         assert intent.keywords == ["error", "traceback"]
         assert intent.correlation_id == TEST_CORRELATION_ID
 
-    @pytest.mark.asyncio
     async def test_get_session_handles_not_found(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -431,7 +424,6 @@ class TestGetSessionOperation:
         assert response.status == "not_found"
         assert "not found" in (response.error_message or "").lower()
 
-    @pytest.mark.asyncio
     async def test_get_session_handles_no_results(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -467,7 +459,6 @@ class TestGetSessionOperation:
 class TestGetDistributionOperation:
     """Tests for the get_distribution operation."""
 
-    @pytest.mark.asyncio
     async def test_get_distribution_calls_adapter_with_correct_args(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -498,7 +489,6 @@ class TestGetDistributionOperation:
             time_range_hours=48,
         )
 
-    @pytest.mark.asyncio
     async def test_get_distribution_returns_correct_response_model(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -536,7 +526,6 @@ class TestGetDistributionOperation:
         assert response.total_intents == 18
         assert response.time_range_hours == 24
 
-    @pytest.mark.asyncio
     async def test_get_distribution_uses_default_time_range(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -576,7 +565,6 @@ class TestGetDistributionOperation:
 class TestErrorHandling:
     """Tests for error handling scenarios."""
 
-    @pytest.mark.asyncio
     async def test_execute_without_initialize_returns_error(
         self,
         adapter_config: ModelAdapterIntentGraphConfig,
@@ -599,18 +587,18 @@ class TestErrorHandling:
         assert response.status == "error"
         assert "not initialized" in (response.error_message or "").lower()
 
-    @pytest.mark.asyncio
     async def test_unknown_operation_returns_error(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
     ) -> None:
         """Verify error response for unknown operation type."""
-        # Arrange - use get_distribution (no extra required fields) then patch
-        request = ModelIntentStorageRequest(
-            operation="get_distribution",  # Valid operation for construction
+        # Arrange - use model_construct to bypass Pydantic validation
+        # This tests handler's internal operation routing with an invalid operation
+        request = ModelIntentStorageRequest.model_construct(
+            operation="invalid_op",
+            session_id=None,
+            intent_data=None,
         )
-        # Bypass Pydantic validation to test handler's internal operation routing
-        object.__setattr__(request, "operation", "invalid_op")
 
         # Act
         response = await handler_with_mock.execute(request)
@@ -619,7 +607,6 @@ class TestErrorHandling:
         assert response.status == "error"
         assert "unknown operation" in (response.error_message or "").lower()
 
-    @pytest.mark.asyncio
     async def test_adapter_exception_returns_error(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -643,7 +630,6 @@ class TestErrorHandling:
         assert response.status == "error"
         assert "RuntimeError" in (response.error_message or "")
 
-    @pytest.mark.asyncio
     async def test_execution_time_always_set(
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
@@ -674,14 +660,14 @@ class TestErrorHandling:
 
 
 # =============================================================================
-# Unit Tests (No markers - run without integration dependencies)
+# Unit Tests (Explicit markers override module-level)
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestHandlerIntentStorageAdapterUnit:
     """Unit tests that don't require integration markers."""
 
-    @pytest.mark.asyncio
     async def test_handler_initialization(self) -> None:
         """Verify handler can be instantiated with default config."""
         if not _DEPENDENCIES_AVAILABLE:
@@ -691,7 +677,6 @@ class TestHandlerIntentStorageAdapterUnit:
         assert handler._initialized is False
         assert handler._adapter is None
 
-    @pytest.mark.asyncio
     async def test_handler_with_custom_config(self) -> None:
         """Verify handler accepts custom configuration."""
         if not _DEPENDENCIES_AVAILABLE:
@@ -705,7 +690,3 @@ class TestHandlerIntentStorageAdapterUnit:
 
         assert handler._config.timeout_seconds == 60.0
         assert handler._config.max_intents_per_session == 500
-
-
-# Remove integration markers from unit test class
-TestHandlerIntentStorageAdapterUnit.pytestmark = []  # type: ignore[attr-defined]
