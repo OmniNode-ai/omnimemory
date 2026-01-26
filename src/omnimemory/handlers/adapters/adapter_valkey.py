@@ -63,8 +63,8 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
     from redis.asyncio.client import Pipeline
 
-    RedisClientType: TypeAlias = AsyncRedis[bytes]  # noqa: UP040 - can't use type keyword in conditional
-    PipelineType: TypeAlias = Pipeline[bytes]  # noqa: UP040 - can't use type keyword in conditional
+    RedisClientType: TypeAlias = AsyncRedis  # noqa: UP040 - can't use type keyword in conditional
+    PipelineType: TypeAlias = Pipeline  # noqa: UP040 - can't use type keyword in conditional
 else:
     RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
     PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
