@@ -104,6 +104,8 @@ __all__ = [
     "HandlerSemanticCompute",
     "HandlerSemanticComputePolicy",
     "ModelHandlerSemanticComputeConfig",
+    "ModelSemanticComputeHealth",
+    "ModelSemanticComputeMetadata",
 ]
 
 # TypeVar for generic retry helper
@@ -113,6 +115,116 @@ _T = TypeVar("_T")
 # =============================================================================
 # Configuration Model
 # =============================================================================
+
+
+class ModelSemanticComputeCapabilities(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Capabilities of the semantic compute handler.
+
+    Attributes:
+        embedding_generation: Whether embedding generation is supported.
+        entity_extraction_heuristic: Whether heuristic entity extraction is supported.
+        entity_extraction_llm: Whether LLM-based entity extraction is available.
+        full_semantic_analysis: Whether full semantic analysis is supported.
+        caching: Whether result caching is enabled.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    embedding_generation: bool = Field(
+        ...,
+        description="Whether embedding generation is supported",
+    )
+    entity_extraction_heuristic: bool = Field(
+        ...,
+        description="Whether heuristic entity extraction is supported",
+    )
+    entity_extraction_llm: bool = Field(
+        ...,
+        description="Whether LLM-based entity extraction is available",
+    )
+    full_semantic_analysis: bool = Field(
+        ...,
+        description="Whether full semantic analysis is supported",
+    )
+    caching: bool = Field(
+        ...,
+        description="Whether result caching is enabled",
+    )
+
+
+class ModelSemanticComputeConfigInfo(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Configuration info for the semantic compute handler metadata.
+
+    Attributes:
+        max_cache_size: Maximum number of cached items.
+        entity_extraction_mode: Mode for entity extraction.
+        is_deterministic: Whether handler operates in deterministic mode.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    max_cache_size: int = Field(
+        ...,
+        ge=0,
+        description="Maximum number of cached items",
+    )
+    entity_extraction_mode: str = Field(
+        ...,
+        description="Mode for entity extraction (deterministic or best_effort)",
+    )
+    is_deterministic: bool = Field(
+        ...,
+        description="Whether handler operates in deterministic mode",
+    )
+
+
+class ModelSemanticComputeMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing semantic compute handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's capabilities, operations, and current configuration.
+
+    Attributes:
+        name: Handler name identifier.
+        version: Handler version string.
+        initialized: Whether the handler has been initialized.
+        operations: List of supported operations.
+        capabilities: Handler capability flags.
+        config: Current configuration information.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler name identifier",
+    )
+    version: str = Field(
+        ...,
+        description="Handler version string",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    operations: list[str] = Field(
+        ...,
+        description="List of supported operations",
+    )
+    capabilities: ModelSemanticComputeCapabilities = Field(
+        ...,
+        description="Handler capability flags",
+    )
+    config: ModelSemanticComputeConfigInfo = Field(
+        ...,
+        description="Current configuration information",
+    )
 
 
 class ModelHandlerSemanticComputeConfig(  # omnimemory-model-exempt: handler config
@@ -165,6 +277,86 @@ class ModelHandlerSemanticComputeConfig(  # omnimemory-model-exempt: handler con
         ge=0,
         le=100000,
         description="Maximum number of cached items (0 to disable)",
+    )
+
+
+class ModelSemanticComputeHealth(  # omnimemory-model-exempt: handler health
+    BaseModel
+):
+    """Health status for the Semantic Compute Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its dependencies.
+
+    Attributes:
+        initialized: Whether the handler has been initialized.
+        handler_name: Name identifier for this handler instance.
+        handler_version: Semantic version of the handler.
+        embedding_provider_healthy: Embedding provider health status.
+        embedding_provider_name: Name of the configured embedding provider.
+        embedding_provider_error: Error message if embedding provider is unhealthy.
+        llm_provider_healthy: LLM provider health status.
+        llm_provider_name: Name of the configured LLM provider.
+        llm_provider_error: Error message if LLM provider is unhealthy.
+        llm_provider_configured: Whether an LLM provider is configured.
+        cache_size: Current number of cached embeddings.
+        cache_max_size: Maximum cache capacity.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    handler_name: str | None = Field(
+        default=None,
+        description="Name identifier for this handler instance",
+    )
+    handler_version: str | None = Field(
+        default=None,
+        description="Semantic version of the handler",
+    )
+    embedding_provider_healthy: bool | None = Field(
+        default=None,
+        description="Embedding provider health status",
+    )
+    embedding_provider_name: str | None = Field(
+        default=None,
+        description="Name of the configured embedding provider",
+    )
+    embedding_provider_error: str | None = Field(
+        default=None,
+        description="Error message if embedding provider is unhealthy",
+    )
+    llm_provider_healthy: bool | None = Field(
+        default=None,
+        description="LLM provider health status",
+    )
+    llm_provider_name: str | None = Field(
+        default=None,
+        description="Name of the configured LLM provider",
+    )
+    llm_provider_error: str | None = Field(
+        default=None,
+        description="Error message if LLM provider is unhealthy",
+    )
+    llm_provider_configured: bool | None = Field(
+        default=None,
+        description="Whether an LLM provider is configured",
+    )
+    cache_size: int | None = Field(
+        default=None,
+        ge=0,
+        description="Current number of cached embeddings",
+    )
+    cache_max_size: int | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum cache capacity",
     )
 
 
@@ -455,11 +647,11 @@ class HandlerSemanticCompute:
             self._llm_provider.provider_name if self._llm_provider else None,
         )
 
-    async def health_check(self) -> dict[str, object]:
+    async def health_check(self) -> ModelSemanticComputeHealth:
         """Check handler health and return status.
 
         Returns:
-            Dictionary with health status including:
+            ModelSemanticComputeHealth with detailed health information including:
             - initialized: Whether handler is initialized
             - embedding_provider_healthy: Embedding provider health (if initialized)
             - llm_provider_healthy: LLM provider health (if configured)
@@ -469,84 +661,97 @@ class HandlerSemanticCompute:
         Example::
 
             health = await handler.health_check()
-            if health["initialized"] and health["embedding_provider_healthy"]:
+            if health.initialized and health.embedding_provider_healthy:
                 print("Handler is ready")
         """
-        result: dict[str, object] = {
-            "initialized": self._initialized,
-            "handler_name": self._config.handler_name if self._config else None,
-            "handler_version": self._config.handler_version if self._config else None,
-        }
+        # Build health status with typed model
+        embedding_provider_healthy: bool | None = None
+        embedding_provider_name: str | None = None
+        embedding_provider_error: str | None = None
+        llm_provider_healthy: bool | None = None
+        llm_provider_name: str | None = None
+        llm_provider_error: str | None = None
+        llm_provider_configured: bool | None = None
+        cache_size: int | None = None
+        cache_max_size: int | None = None
 
         if self._initialized and self._embedding_provider is not None:
             try:
-                result[
-                    "embedding_provider_healthy"
-                ] = await self._embedding_provider.health_check()
-                result["embedding_provider_name"] = (
-                    self._embedding_provider.provider_name
+                embedding_provider_healthy = (
+                    await self._embedding_provider.health_check()
                 )
+                embedding_provider_name = self._embedding_provider.provider_name
             except Exception as e:
-                result["embedding_provider_healthy"] = False
-                result["embedding_provider_error"] = str(e)
+                embedding_provider_healthy = False
+                embedding_provider_error = str(e)
 
         if self._initialized and self._llm_provider is not None:
             try:
-                result["llm_provider_healthy"] = await self._llm_provider.health_check()
-                result["llm_provider_name"] = self._llm_provider.provider_name
+                llm_provider_healthy = await self._llm_provider.health_check()
+                llm_provider_name = self._llm_provider.provider_name
             except Exception as e:
-                result["llm_provider_healthy"] = False
-                result["llm_provider_error"] = str(e)
+                llm_provider_healthy = False
+                llm_provider_error = str(e)
         else:
-            result["llm_provider_configured"] = self._llm_provider is not None
+            llm_provider_configured = self._llm_provider is not None
 
         if self._embedding_cache is not None:
-            result["cache_size"] = len(self._embedding_cache)
-            result["cache_max_size"] = self._embedding_cache.maxsize
+            cache_size = len(self._embedding_cache)
+            cache_max_size = self._embedding_cache.maxsize
 
-        return result
+        return ModelSemanticComputeHealth(
+            initialized=self._initialized,
+            handler_name=self._config.handler_name if self._config else None,
+            handler_version=self._config.handler_version if self._config else None,
+            embedding_provider_healthy=embedding_provider_healthy,
+            embedding_provider_name=embedding_provider_name,
+            embedding_provider_error=embedding_provider_error,
+            llm_provider_healthy=llm_provider_healthy,
+            llm_provider_name=llm_provider_name,
+            llm_provider_error=llm_provider_error,
+            llm_provider_configured=llm_provider_configured,
+            cache_size=cache_size,
+            cache_max_size=cache_max_size,
+        )
 
-    async def describe(self) -> dict[str, object]:
+    async def describe(self) -> ModelSemanticComputeMetadata:
         """Return handler metadata and capabilities.
 
         Returns:
-            Dictionary with handler metadata including:
-            - name: Handler name
-            - version: Handler version
-            - operations: Supported operations
-            - capabilities: Handler capabilities
+            ModelSemanticComputeMetadata with handler information including
+            name, version, operations, capabilities, and configuration.
 
         Example::
 
             metadata = await handler.describe()
-            print(f"Handler: {metadata['name']} v{metadata['version']}")
+            print(f"Handler: {metadata.name} v{metadata.version}")
         """
-        return {
-            "name": self._config.handler_name if self._config else "semantic-compute",
-            "version": self._config.handler_version if self._config else "1.0.0",
-            "initialized": self._initialized,
-            "operations": ["embed", "extract_entities", "analyze"],
-            "capabilities": {
-                "embedding_generation": True,
-                "entity_extraction_heuristic": True,
-                "entity_extraction_llm": self._llm_provider is not None,
-                "full_semantic_analysis": True,
-                "caching": self._config.enable_caching if self._config else True,
-            },
-            "config": {
-                "max_cache_size": self._config.max_cache_size if self._config else 1000,
-                "entity_extraction_mode": (
+        return ModelSemanticComputeMetadata(
+            name=self._config.handler_name if self._config else "semantic-compute",
+            version=self._config.handler_version if self._config else "1.0.0",
+            initialized=self._initialized,
+            operations=["embed", "extract_entities", "analyze"],
+            capabilities=ModelSemanticComputeCapabilities(
+                embedding_generation=True,
+                entity_extraction_heuristic=True,
+                entity_extraction_llm=self._llm_provider is not None,
+                full_semantic_analysis=True,
+                caching=self._config.enable_caching if self._config else True,
+            ),
+            config=ModelSemanticComputeConfigInfo(
+                max_cache_size=self._config.max_cache_size if self._config else 1000,
+                entity_extraction_mode=(
                     self._config.policy_config.entity_extraction_mode.value
                     if self._config
                     else "deterministic"
                 ),
-                "is_deterministic": (
+                is_deterministic=(
                     self._config.policy_config.is_deterministic
                     if self._config
                     else True
                 ),
-            },
-        }
+            ),
+        )
 
     async def shutdown(self) -> None:
         """Clean up handler resources.

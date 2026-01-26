@@ -172,6 +172,86 @@ class ModelMemoryTickResult(BaseModel):  # omnimemory-model-exempt: handler resu
     )
 
 
+class ModelMemoryTickHealth(BaseModel):  # omnimemory-model-exempt: handler health
+    """Health status for the Memory Tick Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its dependencies.
+
+    Attributes:
+        initialized: Whether the handler has been initialized.
+        circuit_breaker_state: Current state of the circuit breaker.
+        projection_reader_available: Whether a projection reader is configured.
+        batch_size: Configured batch size for tick processing.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    circuit_breaker_state: str | None = Field(
+        default=None,
+        description="Current state of the circuit breaker (closed, open, half_open)",
+    )
+    projection_reader_available: bool = Field(
+        ...,
+        description="Whether a projection reader is configured",
+    )
+    batch_size: int = Field(
+        ...,
+        ge=1,
+        description="Configured batch size for tick processing",
+    )
+
+
+class ModelMemoryTickMetadata(BaseModel):  # omnimemory-model-exempt: handler metadata
+    """Metadata describing memory tick handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's purpose, capabilities, and message types.
+
+    Attributes:
+        name: Handler class name.
+        description: Brief description of handler purpose.
+        capabilities: List of supported capabilities.
+        initialized: Whether the handler has been initialized.
+        message_types: Set of message types this handler processes.
+        node_kind: The node kind this handler belongs to.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    description: str = Field(
+        ...,
+        description="Brief description of handler purpose",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported capabilities",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    message_types: list[str] = Field(
+        ...,
+        description="Message types this handler processes",
+    )
+    node_kind: str = Field(
+        ...,
+        description="The node kind this handler belongs to",
+    )
+
+
 # =============================================================================
 # PROJECTION READER PROTOCOL (Placeholder for OMN-1524)
 # =============================================================================
@@ -456,14 +536,11 @@ class HandlerMemoryTick:
         """
         return self._initialized
 
-    async def health_check(self) -> dict[str, object]:
+    async def health_check(self) -> ModelMemoryTickHealth:
         """Check the health status of the handler.
 
-        Returns a dictionary containing health information about the handler's
-        dependencies and current state. This enables monitoring and diagnostics.
-
         Returns:
-            Dictionary with health status information including:
+            ModelMemoryTickHealth with detailed status information:
             - initialized: Whether the handler has been initialized
             - circuit_breaker_state: Current state of the circuit breaker
             - projection_reader_available: Whether a projection reader is configured
@@ -473,43 +550,40 @@ class HandlerMemoryTick:
         if self._circuit_breaker is not None:
             circuit_state = self._circuit_breaker.state.value
 
-        return {
-            "initialized": self._initialized,
-            "circuit_breaker_state": circuit_state,
-            "projection_reader_available": self._projection_reader is not None,
-            "batch_size": self._batch_size,
-        }
+        return ModelMemoryTickHealth(
+            initialized=self._initialized,
+            circuit_breaker_state=circuit_state,
+            projection_reader_available=self._projection_reader is not None,
+            batch_size=self._batch_size,
+        )
 
-    async def describe(self) -> dict[str, object]:
+    async def describe(self) -> ModelMemoryTickMetadata:
         """Return metadata and capabilities of this handler.
 
         Provides introspection information about the handler, including
         its purpose, supported operations, and configuration.
 
         Returns:
-            Dictionary with handler metadata including:
-            - name: Handler class name
-            - description: Brief description of handler purpose
-            - capabilities: List of supported operations
-            - initialized: Whether initialize() has been called
+            ModelMemoryTickMetadata with handler information including
+            name, description, capabilities, and message types.
         """
-        return {
-            "name": "HandlerMemoryTick",
-            "description": (
+        return ModelMemoryTickMetadata(
+            name="HandlerMemoryTick",
+            description=(
                 "Handler for RuntimeTick - evaluates memory entities for TTL "
                 "expiration and archive eligibility. Emits lifecycle transition "
                 "events for expired and archive-ready memories."
             ),
-            "capabilities": [
+            capabilities=[
                 "memory_expiration",
                 "archive_initiation",
                 "batch_processing",
                 "circuit_breaker_protection",
             ],
-            "initialized": self._initialized,
-            "message_types": list(self.message_types),
-            "node_kind": self.node_kind.value,
-        }
+            initialized=self._initialized,
+            message_types=list(self.message_types),
+            node_kind=self.node_kind.value,
+        )
 
     @property
     def handler_id(self) -> str:
@@ -865,6 +939,8 @@ class HandlerMemoryTick:
 
 __all__: list[str] = [
     "HandlerMemoryTick",
+    "ModelMemoryTickHealth",
+    "ModelMemoryTickMetadata",
     "ModelMemoryTickResult",
     "ModelMemoryExpiredEvent",
     "ModelMemoryArchiveInitiated",

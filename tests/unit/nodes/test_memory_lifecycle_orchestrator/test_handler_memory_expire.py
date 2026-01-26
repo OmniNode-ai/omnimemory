@@ -743,15 +743,15 @@ class TestHealthCheck:
 
         Given: Handler not initialized
         When: Calling health_check()
-        Then: Returns status indicating not initialized
+        Then: Returns typed health model indicating not initialized
         """
         handler = HandlerMemoryExpire(container)
         health = await handler.health_check()
 
-        assert health["initialized"] is False
-        assert health["db_pool_available"] is False
-        assert health["circuit_breaker_state"] == "not_configured"
-        assert health["max_retries"] == 3  # Default value
+        assert health.initialized is False
+        assert health.db_pool_available is False
+        assert health.circuit_breaker_state == "not_configured"
+        assert health.max_retries == 3  # Default value
 
     @pytest.mark.asyncio
     async def test_health_check_after_initialization(
@@ -762,7 +762,7 @@ class TestHealthCheck:
 
         Given: Handler initialized with mock pool
         When: Calling health_check()
-        Then: Returns status indicating initialized
+        Then: Returns typed health model indicating initialized
         """
         handler = HandlerMemoryExpire(container)
         mock_pool = object()  # type: ignore[assignment]
@@ -770,10 +770,10 @@ class TestHealthCheck:
 
         health = await handler.health_check()
 
-        assert health["initialized"] is True
-        assert health["db_pool_available"] is True
-        assert health["circuit_breaker_state"] == "closed"
-        assert health["max_retries"] == 5
+        assert health.initialized is True
+        assert health.db_pool_available is True
+        assert health.circuit_breaker_state == "closed"
+        assert health.max_retries == 5
 
 
 # =============================================================================
@@ -793,18 +793,18 @@ class TestDescribe:
 
         Given: Handler instance
         When: Calling describe()
-        Then: Returns metadata dictionary
+        Then: Returns typed metadata model with handler information
         """
         handler = HandlerMemoryExpire(container)
         metadata = await handler.describe()
 
-        assert metadata["name"] == "HandlerMemoryExpire"
-        assert "description" in metadata
-        assert metadata["version"] == "1.0.0"
-        assert "memory_expiration" in metadata["capabilities"]
-        assert "optimistic_locking" in metadata["capabilities"]
-        assert metadata["target_state"] == "expired"
-        assert "active" in metadata["valid_from_states"]
+        assert metadata.name == "HandlerMemoryExpire"
+        assert metadata.description  # Non-empty description
+        assert metadata.version == "1.0.0"
+        assert "memory_expiration" in metadata.capabilities
+        assert "optimistic_locking" in metadata.capabilities
+        assert metadata.target_state == "expired"
+        assert "active" in metadata.valid_from_states
 
     @pytest.mark.asyncio
     async def test_describe_reflects_initialization_state(
@@ -821,11 +821,11 @@ class TestDescribe:
 
         # Before initialization
         metadata_before = await handler.describe()
-        assert metadata_before["initialized"] is False
+        assert metadata_before.initialized is False
 
         # After initialization
         mock_pool = object()  # type: ignore[assignment]
         await handler.initialize(db_pool=mock_pool)  # type: ignore[arg-type]
 
         metadata_after = await handler.describe()
-        assert metadata_after["initialized"] is True
+        assert metadata_after.initialized is True

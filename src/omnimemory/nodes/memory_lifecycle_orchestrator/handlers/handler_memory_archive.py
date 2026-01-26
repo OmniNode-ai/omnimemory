@@ -111,6 +111,8 @@ __all__ = [
     "HandlerMemoryArchive",
     "ModelArchiveMemoryCommand",
     "ModelArchiveRecord",
+    "ModelMemoryArchiveHealth",
+    "ModelMemoryArchiveMetadata",
     "ModelMemoryArchiveResult",
     "ProtocolOrphanedArchiveTracker",
 ]
@@ -359,6 +361,126 @@ class ModelMemoryRow(BaseModel):  # omnimemory-model-exempt: handler internal
     metadata: ModelGenericMetadata | None = None
 
 
+class ModelCircuitBreakerConfigInfo(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Circuit breaker configuration info for handler metadata.
+
+    Attributes:
+        failure_threshold: Number of failures before opening circuit.
+        recovery_timeout: Seconds to wait before attempting recovery.
+        success_threshold: Successes needed to close circuit.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    failure_threshold: int = Field(
+        ...,
+        description="Number of failures before opening circuit",
+    )
+    recovery_timeout: float = Field(
+        ...,
+        description="Seconds to wait before attempting recovery",
+    )
+    success_threshold: int = Field(
+        ...,
+        description="Successes needed to close circuit",
+    )
+
+
+class ModelMemoryArchiveHealth(BaseModel):  # omnimemory-model-exempt: handler health
+    """Health status for the Memory Archive Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its dependencies.
+
+    Attributes:
+        initialized: Whether the handler has been initialized.
+        db_pool_available: Whether a database connection pool is configured.
+        archive_base_path: The configured archive base path.
+        orphan_tracker_configured: Whether an orphan tracker is configured.
+        circuit_breaker_state: Current state of the database circuit breaker.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    db_pool_available: bool = Field(
+        ...,
+        description="Whether a database connection pool is configured",
+    )
+    archive_base_path: str | None = Field(
+        default=None,
+        description="The configured archive base path",
+    )
+    orphan_tracker_configured: bool = Field(
+        ...,
+        description="Whether an orphan tracker is configured for handling orphaned archives",
+    )
+    circuit_breaker_state: str = Field(
+        ...,
+        description="Current state of the database circuit breaker (closed, open, half_open, not_configured)",
+    )
+
+
+class ModelMemoryArchiveMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing memory archive handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's purpose, capabilities, archive format, and configuration.
+
+    Attributes:
+        name: Handler class name.
+        description: Brief description of handler purpose.
+        capabilities: List of supported capabilities.
+        archive_format: Description of the archive file format.
+        compression_level: Configured gzip compression level.
+        query_timeout_seconds: Database query timeout in seconds.
+        circuit_breaker_config: Circuit breaker configuration.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    description: str = Field(
+        ...,
+        description="Brief description of handler purpose",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported capabilities",
+    )
+    archive_format: str = Field(
+        ...,
+        description="Description of the archive file format",
+    )
+    compression_level: int = Field(
+        ...,
+        ge=1,
+        le=9,
+        description="Configured gzip compression level (1-9)",
+    )
+    query_timeout_seconds: float = Field(
+        ...,
+        description="Database query timeout in seconds",
+    )
+    circuit_breaker_config: ModelCircuitBreakerConfigInfo = Field(
+        ...,
+        description="Circuit breaker configuration",
+    )
+
+
 class HandlerMemoryArchive:
     """Handler for archiving memories to cold storage.
 
@@ -501,68 +623,62 @@ class HandlerMemoryArchive:
 
         self._initialized = True
 
-    async def health_check(self) -> dict[str, object]:
+    async def health_check(self) -> ModelMemoryArchiveHealth:
         """Check the health status of the handler.
 
-        Returns a dictionary containing health information about the handler's
-        dependencies and current state. This enables monitoring and diagnostics.
-
         Returns:
-            Dictionary with health status information including:
+            ModelMemoryArchiveHealth with detailed status information:
             - initialized: Whether the handler has been initialized
             - db_pool_available: Whether a database pool is configured
             - archive_base_path: The configured archive base path
+            - orphan_tracker_configured: Whether an orphan tracker is configured
             - circuit_breaker_state: Current state of the DB circuit breaker
         """
         circuit_state = "not_configured"
         if self._db_circuit_breaker is not None:
             circuit_state = self._db_circuit_breaker.state.value
 
-        return {
-            "initialized": self._initialized,
-            "db_pool_available": self._db_pool is not None,
-            "archive_base_path": str(self._archive_base_path)
+        return ModelMemoryArchiveHealth(
+            initialized=self._initialized,
+            db_pool_available=self._db_pool is not None,
+            archive_base_path=str(self._archive_base_path)
             if self._archive_base_path
             else None,
-            "orphan_tracker_configured": self._orphan_tracker is not None,
-            "circuit_breaker_state": circuit_state,
-        }
+            orphan_tracker_configured=self._orphan_tracker is not None,
+            circuit_breaker_state=circuit_state,
+        )
 
-    async def describe(self) -> dict[str, object]:
+    async def describe(self) -> ModelMemoryArchiveMetadata:
         """Return metadata and capabilities of this handler.
 
         Provides introspection information about the handler, including
         its purpose, supported operations, and configuration.
 
         Returns:
-            Dictionary with handler metadata including:
-            - name: Handler class name
-            - description: Brief description of handler purpose
-            - capabilities: List of supported operations
-            - archive_format: Description of the archive file format
-            - compression_level: Configured gzip compression level
+            ModelMemoryArchiveMetadata with handler information including
+            name, description, capabilities, and archive configuration.
         """
-        return {
-            "name": "HandlerMemoryArchive",
-            "description": (
+        return ModelMemoryArchiveMetadata(
+            name="HandlerMemoryArchive",
+            description=(
                 "Archives EXPIRED memories to cold storage with gzip compression "
                 "and atomic writes. Uses optimistic locking for concurrency safety."
             ),
-            "capabilities": [
+            capabilities=[
                 "archive_expired_memory",
                 "atomic_file_write",
                 "optimistic_locking",
                 "orphan_tracking",
             ],
-            "archive_format": "JSONL with gzip compression (.jsonl.gz)",
-            "compression_level": self._ARCHIVE_COMPRESSION_LEVEL,
-            "query_timeout_seconds": self._QUERY_TIMEOUT_SECONDS,
-            "circuit_breaker_config": {
-                "failure_threshold": self._CB_FAILURE_THRESHOLD,
-                "recovery_timeout": self._CB_RECOVERY_TIMEOUT,
-                "success_threshold": self._CB_SUCCESS_THRESHOLD,
-            },
-        }
+            archive_format="JSONL with gzip compression (.jsonl.gz)",
+            compression_level=self._ARCHIVE_COMPRESSION_LEVEL,
+            query_timeout_seconds=self._QUERY_TIMEOUT_SECONDS,
+            circuit_breaker_config=ModelCircuitBreakerConfigInfo(
+                failure_threshold=self._CB_FAILURE_THRESHOLD,
+                recovery_timeout=self._CB_RECOVERY_TIMEOUT,
+                success_threshold=self._CB_SUCCESS_THRESHOLD,
+            ),
+        )
 
     @property
     def initialized(self) -> bool:

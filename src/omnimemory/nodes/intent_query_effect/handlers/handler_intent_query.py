@@ -36,12 +36,13 @@ import asyncio
 import logging
 import time
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from omnibase_core.models.events import (
     ModelIntentQueryRequestedEvent,
     ModelIntentQueryResponseEvent,
 )
+from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.handlers.adapters import AdapterIntentGraph
 from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
@@ -56,7 +57,134 @@ logger = logging.getLogger(__name__)
 # Contract SLA: max response time in milliseconds
 _CONTRACT_MAX_RESPONSE_TIME_MS = 100.0
 
-__all__ = ["HandlerIntentQuery"]
+__all__ = ["HandlerIntentQuery", "ModelIntentQueryHealth", "ModelIntentQueryMetadata"]
+
+
+class ModelIntentQueryConfigInfo(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Configuration info for intent query handler metadata.
+
+    Attributes:
+        timeout_seconds: Query timeout in seconds.
+        default_time_range_hours: Default time range for queries.
+        default_limit: Default result limit.
+        default_min_confidence: Default minimum confidence threshold.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    timeout_seconds: float = Field(
+        ...,
+        description="Query timeout in seconds",
+    )
+    default_time_range_hours: int = Field(
+        ...,
+        description="Default time range for queries in hours",
+    )
+    default_limit: int = Field(
+        ...,
+        description="Default result limit",
+    )
+    default_min_confidence: float = Field(
+        ...,
+        description="Default minimum confidence threshold",
+    )
+
+
+class ModelIntentQueryHealth(  # omnimemory-model-exempt: handler health
+    BaseModel
+):
+    """Health status for the Intent Query Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its owned adapter.
+
+    Attributes:
+        healthy: Overall health status.
+        initialized: Whether the handler has been initialized.
+        adapter_healthy: Adapter health status.
+        error_message: Error details if unhealthy.
+        session_count: Number of sessions in the graph database.
+        intent_count: Number of intents in the graph database.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    healthy: bool = Field(
+        ...,
+        description="Overall health status",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    adapter_healthy: bool | None = Field(
+        default=None,
+        description="Adapter health status",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Error details if unhealthy",
+    )
+    session_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of sessions in the graph database",
+    )
+    intent_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of intents in the graph database",
+    )
+
+
+class ModelIntentQueryMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing intent query handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's capabilities, supported query types, and configuration.
+
+    Attributes:
+        name: Handler class name.
+        node_type: ONEX node type identifier.
+        capabilities: List of supported operations.
+        supported_query_types: List of supported query type values.
+        initialized: Whether handler is ready.
+        config: Current configuration (None if not initialized).
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    node_type: str = Field(
+        ...,
+        description="ONEX node type identifier",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported operations",
+    )
+    supported_query_types: list[str] = Field(
+        ...,
+        description="List of supported query type values",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether handler is ready",
+    )
+    config: ModelIntentQueryConfigInfo | None = Field(
+        default=None,
+        description="Current configuration (None if not initialized)",
+    )
 
 
 class HandlerIntentQuery:
@@ -195,90 +323,87 @@ class HandlerIntentQuery:
             self._initialized = True
             logger.info("HandlerIntentQuery initialized with owned adapter")
 
-    async def health_check(self) -> dict[str, Any]:
+    async def health_check(self) -> ModelIntentQueryHealth:
         """Check the health status of this handler.
 
         Returns health information about the handler and its owned adapter.
 
         Returns:
-            Dictionary containing health status:
-                - healthy: Overall health status (bool)
-                - initialized: Whether handler is initialized (bool)
-                - adapter_healthy: Adapter health status (bool or None)
-                - error_message: Error details if unhealthy (str or None)
+            ModelIntentQueryHealth with detailed status information:
+                - healthy: Overall health status
+                - initialized: Whether handler is initialized
+                - adapter_healthy: Adapter health status
+                - error_message: Error details if unhealthy
+                - session_count: Number of sessions in graph database
+                - intent_count: Number of intents in graph database
         """
         if not self._initialized:
-            return {
-                "healthy": False,
-                "initialized": False,
-                "adapter_healthy": None,
-                "error_message": "Handler not initialized",
-            }
+            return ModelIntentQueryHealth(
+                healthy=False,
+                initialized=False,
+                adapter_healthy=None,
+                error_message="Handler not initialized",
+            )
 
         if self._adapter is None:
-            return {
-                "healthy": False,
-                "initialized": True,
-                "adapter_healthy": None,
-                "error_message": "Adapter is None despite initialization",
-            }
+            return ModelIntentQueryHealth(
+                healthy=False,
+                initialized=True,
+                adapter_healthy=None,
+                error_message="Adapter is None despite initialization",
+            )
 
         try:
             adapter_health = await self._adapter.health_check()
-            return {
-                "healthy": adapter_health.is_healthy,
-                "initialized": True,
-                "adapter_healthy": adapter_health.is_healthy,
-                "error_message": adapter_health.error_message,
-                "session_count": adapter_health.session_count,
-                "intent_count": adapter_health.intent_count,
-            }
+            return ModelIntentQueryHealth(
+                healthy=adapter_health.is_healthy,
+                initialized=True,
+                adapter_healthy=adapter_health.is_healthy,
+                error_message=adapter_health.error_message,
+                session_count=adapter_health.session_count,
+                intent_count=adapter_health.intent_count,
+            )
         except Exception as e:
             logger.warning("Health check failed: %s", e)
-            return {
-                "healthy": False,
-                "initialized": True,
-                "adapter_healthy": None,
-                "error_message": f"Health check failed: {e}",
-            }
+            return ModelIntentQueryHealth(
+                healthy=False,
+                initialized=True,
+                adapter_healthy=None,
+                error_message=f"Health check failed: {e}",
+            )
 
-    async def describe(self) -> dict[str, Any]:
+    async def describe(self) -> ModelIntentQueryMetadata:
         """Return handler metadata and capabilities.
 
         Provides introspection information about this handler including
         supported operations, configuration, and status.
 
         Returns:
-            Dictionary containing handler metadata:
-                - name: Handler class name
-                - node_type: ONEX node type (EFFECT)
-                - capabilities: List of supported operations
-                - supported_query_types: List of query type values
-                - initialized: Whether handler is ready
-                - config: Current configuration (if initialized)
+            ModelIntentQueryMetadata with handler information including
+            name, node_type, capabilities, supported query types, and configuration.
         """
-        result: dict[str, Any] = {
-            "name": "HandlerIntentQuery",
-            "node_type": "EFFECT",
-            "capabilities": [
+        config_info: ModelIntentQueryConfigInfo | None = None
+        if self._config is not None:
+            config_info = ModelIntentQueryConfigInfo(
+                timeout_seconds=self._config.timeout_seconds,
+                default_time_range_hours=self._config.default_time_range_hours,
+                default_limit=self._config.default_limit,
+                default_min_confidence=self._config.default_min_confidence,
+            )
+
+        return ModelIntentQueryMetadata(
+            name="HandlerIntentQuery",
+            node_type="EFFECT",
+            capabilities=[
                 "intent_distribution_query",
                 "intent_session_query",
                 "intent_recent_query",
                 "event_driven_response",
             ],
-            "supported_query_types": ["distribution", "session", "recent"],
-            "initialized": self._initialized,
-        }
-
-        if self._config is not None:
-            result["config"] = {
-                "timeout_seconds": self._config.timeout_seconds,
-                "default_time_range_hours": self._config.default_time_range_hours,
-                "default_limit": self._config.default_limit,
-                "default_min_confidence": self._config.default_min_confidence,
-            }
-
-        return result
+            supported_query_types=["distribution", "session", "recent"],
+            initialized=self._initialized,
+            config=config_info,
+        )
 
     async def execute(
         self,

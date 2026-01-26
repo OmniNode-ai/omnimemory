@@ -67,32 +67,36 @@ def container() -> ModelOnexContainer:
 
 
 @pytest.fixture
-def handler(container: ModelOnexContainer) -> HandlerSimilarityCompute:
-    """Create a handler for testing.
+async def handler(container: ModelOnexContainer) -> HandlerSimilarityCompute:
+    """Create an initialized handler for testing.
 
-    Uses the container-driven pattern. The handler works with default
-    config even without explicit initialization (lazy default config).
+    Uses the container-driven pattern. The handler must be initialized
+    before use (fail-fast behavior).
 
     Args:
         container: ONEX container fixture.
 
     Returns:
-        HandlerSimilarityCompute instance with container injection.
+        Initialized HandlerSimilarityCompute instance with container injection.
     """
-    return HandlerSimilarityCompute(container)
+    h = HandlerSimilarityCompute(container)
+    await h.initialize()
+    return h
 
 
 @pytest.fixture
-def node(container: ModelOnexContainer) -> NodeSimilarityCompute:
-    """Create a node for testing.
+async def node(container: ModelOnexContainer) -> NodeSimilarityCompute:
+    """Create an initialized node for testing.
 
     Args:
         container: ONEX container fixture.
 
     Returns:
-        Configured NodeSimilarityCompute instance.
+        Initialized NodeSimilarityCompute instance.
     """
-    return NodeSimilarityCompute(container)
+    n = NodeSimilarityCompute(container)
+    await n.initialize()
+    return n
 
 
 @pytest.fixture
@@ -1543,3 +1547,89 @@ class TestHandlerConfig:
         # This vector has magnitude ~1.4e-4 which is < 1e-3
         with pytest.raises(ValueError, match="[Zz]ero|[Mm]agnitude"):
             handler.cosine_distance([1e-4, 1e-4], [1.0, 1.0])
+
+
+# =============================================================================
+# Fail-Fast Behavior Tests
+# =============================================================================
+
+
+class TestFailFastBehavior:
+    """Tests for handler fail-fast behavior before initialization."""
+
+    def test_config_raises_before_initialization(self) -> None:
+        """Accessing config before initialization raises RuntimeError.
+
+        Given: An uninitialized handler
+        When: Accessing the config property
+        Then: RuntimeError should be raised with descriptive message
+        """
+        container = ModelOnexContainer()
+        handler = HandlerSimilarityCompute(container)
+
+        with pytest.raises(RuntimeError, match="not initialized"):
+            _ = handler.config
+
+    def test_cosine_distance_raises_before_initialization(self) -> None:
+        """Calling cosine_distance before initialization raises RuntimeError.
+
+        Given: An uninitialized handler
+        When: Calling cosine_distance
+        Then: RuntimeError should be raised
+        """
+        container = ModelOnexContainer()
+        handler = HandlerSimilarityCompute(container)
+
+        with pytest.raises(RuntimeError, match="not initialized"):
+            handler.cosine_distance([1.0, 2.0], [3.0, 4.0])
+
+    def test_euclidean_distance_raises_before_initialization(self) -> None:
+        """Calling euclidean_distance before initialization raises RuntimeError.
+
+        Given: An uninitialized handler
+        When: Calling euclidean_distance
+        Then: RuntimeError should be raised
+        """
+        container = ModelOnexContainer()
+        handler = HandlerSimilarityCompute(container)
+
+        with pytest.raises(RuntimeError, match="not initialized"):
+            handler.euclidean_distance([1.0, 2.0], [3.0, 4.0])
+
+    def test_compare_raises_before_initialization(self) -> None:
+        """Calling compare before initialization raises RuntimeError.
+
+        Given: An uninitialized handler
+        When: Calling compare
+        Then: RuntimeError should be raised
+        """
+        container = ModelOnexContainer()
+        handler = HandlerSimilarityCompute(container)
+
+        with pytest.raises(RuntimeError, match="not initialized"):
+            handler.compare([1.0, 2.0], [3.0, 4.0])
+
+    @pytest.mark.asyncio
+    async def test_methods_work_after_initialization(self) -> None:
+        """All methods work normally after initialization.
+
+        Given: A properly initialized handler
+        When: Calling compute methods
+        Then: Methods should succeed without errors
+        """
+        container = ModelOnexContainer()
+        handler = HandlerSimilarityCompute(container)
+        await handler.initialize()
+
+        # All these should succeed after initialization
+        config = handler.config
+        assert config is not None
+
+        distance = handler.cosine_distance([1.0, 0.0], [1.0, 0.0])
+        assert distance == 0.0
+
+        distance = handler.euclidean_distance([0.0, 0.0], [3.0, 4.0])
+        assert distance == 5.0
+
+        result = handler.compare([1.0, 0.0], [0.0, 1.0])
+        assert result.distance == 1.0

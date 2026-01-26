@@ -53,6 +53,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Literal
 
+from pydantic import BaseModel, ConfigDict, Field
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -66,7 +68,83 @@ from omnimemory.nodes.similarity_compute.models import (
 __all__ = [
     "HandlerSimilarityCompute",
     "ModelHandlerSimilarityComputeConfig",
+    "ModelSimilarityComputeHealth",
+    "ModelSimilarityComputeMetadata",
 ]
+
+
+class ModelSimilarityComputeHealth(  # omnimemory-model-exempt: handler health
+    BaseModel
+):
+    """Health status for the Similarity Compute Handler.
+
+    Returned by health_check() to provide detailed health information.
+    For a pure compute handler with no external dependencies, this
+    always reports as healthy when initialized.
+
+    Attributes:
+        healthy: Whether the handler is healthy.
+        handler: Handler identifier string.
+        initialized: Whether the handler has been initialized.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    healthy: bool = Field(
+        ...,
+        description="Whether the handler is healthy",
+    )
+    handler: str = Field(
+        ...,
+        description="Handler identifier string",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+
+
+class ModelSimilarityComputeMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing similarity compute handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's capabilities, supported metrics, and status.
+
+    Attributes:
+        handler_type: Type identifier for this handler.
+        capabilities: List of supported operations.
+        is_pure_compute: Whether handler performs only pure computation.
+        initialized: Whether the handler has been initialized.
+        supported_metrics: List of supported distance metrics.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    handler_type: str = Field(
+        ...,
+        description="Type identifier for this handler",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported operations",
+    )
+    is_pure_compute: bool = Field(
+        ...,
+        description="Whether handler performs only pure computation (no I/O)",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    supported_metrics: list[str] = Field(
+        ...,
+        description="List of supported distance metrics",
+    )
 
 
 class HandlerSimilarityCompute:
@@ -86,9 +164,11 @@ class HandlerSimilarityCompute:
         - Constructor takes only the DI container
         - Configuration is provided via initialize()
         - Handler provides health_check() and describe() for introspection
+        - Fail-fast behavior: raises RuntimeError if used before initialization
 
     Attributes:
-        config: The handler configuration (available after initialize()).
+        config: The handler configuration. Raises RuntimeError if accessed
+            before initialize() is called.
 
     Example::
 
@@ -131,34 +211,47 @@ class HandlerSimilarityCompute:
         self._config = config or ModelHandlerSimilarityComputeConfig()
         self._initialized = True
 
-    async def health_check(self) -> dict[str, object]:
+    async def health_check(self) -> ModelSimilarityComputeHealth:
         """Return health status of the handler.
 
         For a pure compute handler, this always returns healthy since
         there are no external dependencies to check.
 
         Returns:
-            Health status dictionary with handler information.
+            ModelSimilarityComputeHealth with status information.
         """
-        return {
-            "healthy": True,
-            "handler": "similarity_compute",
-            "initialized": self._initialized,
-        }
+        return ModelSimilarityComputeHealth(
+            healthy=True,
+            handler="similarity_compute",
+            initialized=self._initialized,
+        )
 
-    async def describe(self) -> dict[str, object]:
+    async def describe(self) -> ModelSimilarityComputeMetadata:
         """Return handler metadata and capabilities.
 
         Returns:
-            Dictionary describing the handler's capabilities.
+            ModelSimilarityComputeMetadata with handler information including
+            handler type, capabilities, and supported metrics.
         """
-        return {
-            "handler_type": "similarity_compute",
-            "capabilities": ["cosine_distance", "euclidean_distance", "compare"],
-            "is_pure_compute": True,
-            "initialized": self._initialized,
-            "supported_metrics": ["cosine", "euclidean"],
-        }
+        return ModelSimilarityComputeMetadata(
+            handler_type="similarity_compute",
+            capabilities=["cosine_distance", "euclidean_distance", "compare"],
+            is_pure_compute=True,
+            initialized=self._initialized,
+            supported_metrics=["cosine", "euclidean"],
+        )
+
+    def _ensure_initialized(self) -> None:
+        """Ensure the handler is initialized before operations.
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        if not self._initialized:
+            raise RuntimeError(
+                "HandlerSimilarityCompute is not initialized. "
+                "Call initialize() before using the handler."
+            )
 
     @property
     def container(self) -> ModelONEXContainer:
@@ -169,13 +262,11 @@ class HandlerSimilarityCompute:
     def config(self) -> ModelHandlerSimilarityComputeConfig:
         """Get the handler configuration.
 
-        If the handler has not been initialized, returns a default config.
-        This allows synchronous access for compute operations.
+        Raises:
+            RuntimeError: If handler is not initialized.
         """
-        if self._config is None:
-            # Return default config for backwards compatibility
-            # and to allow sync usage without explicit initialize()
-            return ModelHandlerSimilarityComputeConfig()
+        self._ensure_initialized()
+        assert self._config is not None  # For type checker
         return self._config
 
     def _validate_vectors(
@@ -291,6 +382,7 @@ class HandlerSimilarityCompute:
             Cosine distance in range [0, 2].
 
         Raises:
+            RuntimeError: If handler is not initialized.
             ValueError: If vectors are empty, have mismatched dimensions,
                 contain NaN/Inf values, or have zero magnitude.
 
@@ -307,6 +399,8 @@ class HandlerSimilarityCompute:
             vec_neg = [-1.0, 0.0]
             assert handler.cosine_distance(vec_pos, vec_neg) == 2.0
         """
+        self._ensure_initialized()
+
         # Validate and get magnitudes (single pass)
         mag_a, mag_b = self._validate_vectors(vec_a, vec_b, check_zero_magnitude=True)
 
@@ -344,6 +438,7 @@ class HandlerSimilarityCompute:
             Euclidean distance (non-negative).
 
         Raises:
+            RuntimeError: If handler is not initialized.
             ValueError: If vectors are empty, have mismatched dimensions,
                 or contain NaN/Inf values.
 
@@ -360,6 +455,8 @@ class HandlerSimilarityCompute:
             vec_b = [1.0, 0.0]
             assert handler.euclidean_distance(vec_a, vec_b) == 1.0
         """
+        self._ensure_initialized()
+
         # Validate vectors (no magnitude check needed for euclidean)
         self._validate_vectors(vec_a, vec_b, check_zero_magnitude=False)
 
@@ -400,6 +497,7 @@ class HandlerSimilarityCompute:
                 - dimensions: Number of dimensions in the vectors
 
         Raises:
+            RuntimeError: If handler is not initialized.
             ValueError: If vectors are invalid or metric is unknown.
 
         Example::
@@ -419,6 +517,8 @@ class HandlerSimilarityCompute:
             result = handler.compare(vec_a, vec_b, metric="euclidean")
             print(f"Distance: {result.distance:.4f}")
         """
+        self._ensure_initialized()
+
         dimensions = len(vec_a)
 
         if metric == "cosine":

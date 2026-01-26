@@ -122,6 +122,8 @@ _CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
 __all__ = [
     "HandlerMemoryExpire",
     "ModelExpireMemoryCommand",
+    "ModelMemoryExpireHealth",
+    "ModelMemoryExpireMetadata",
     "ModelMemoryExpireResult",
     "ModelMemoryCurrentState",
     "CircuitBreakerOpenError",
@@ -265,6 +267,91 @@ class ModelMemoryCurrentState(BaseModel):  # omnimemory-model-exempt: handler st
     )
 
 
+class ModelMemoryExpireHealth(BaseModel):  # omnimemory-model-exempt: handler health
+    """Health status for the Memory Expire Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its database connectivity.
+
+    Attributes:
+        initialized: Whether the handler has been initialized.
+        circuit_breaker_state: Current state of the circuit breaker.
+        db_pool_available: Whether the database connection pool is configured.
+        max_retries: Configured maximum retry attempts.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    circuit_breaker_state: str = Field(
+        ...,
+        description="Current state of the circuit breaker (closed, open, half_open, not_configured)",
+    )
+    db_pool_available: bool = Field(
+        ...,
+        description="Whether the database connection pool is configured",
+    )
+    max_retries: int = Field(
+        ...,
+        ge=1,
+        description="Configured maximum retry attempts",
+    )
+
+
+class ModelMemoryExpireMetadata(BaseModel):  # omnimemory-model-exempt: handler metadata
+    """Metadata describing memory expire handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's purpose, capabilities, and state transition rules.
+
+    Attributes:
+        name: Handler class name.
+        description: Brief description of handler purpose.
+        version: Handler version string.
+        capabilities: List of supported capabilities.
+        valid_from_states: States from which expiration can transition.
+        target_state: The state memories transition to after expiration.
+        initialized: Whether the handler has been initialized.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    description: str = Field(
+        ...,
+        description="Brief description of handler purpose",
+    )
+    version: str = Field(
+        ...,
+        description="Handler version string",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported capabilities",
+    )
+    valid_from_states: list[str] = Field(
+        ...,
+        description="States from which expiration can transition",
+    )
+    target_state: str = Field(
+        ...,
+        description="The state memories transition to after expiration",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+
+
 # =============================================================================
 # Handler
 # =============================================================================
@@ -379,17 +466,15 @@ class HandlerMemoryExpire:
         """
         return self._initialized
 
-    async def health_check(self) -> dict[str, object]:
+    async def health_check(self) -> ModelMemoryExpireHealth:
         """Check handler health status.
 
-        Returns a dictionary with health information including:
-        - initialized: Whether initialize() has been called
-        - circuit_breaker_state: Current circuit breaker state
-        - db_pool_available: Whether database pool is configured
-        - max_retries: Configured retry limit
-
         Returns:
-            Dictionary containing health status information.
+            ModelMemoryExpireHealth with detailed status information:
+            - initialized: Whether initialize() has been called
+            - circuit_breaker_state: Current circuit breaker state
+            - db_pool_available: Whether database pool is configured
+            - max_retries: Configured retry limit
         """
         cb_state = (
             self._circuit_breaker.state.value
@@ -397,38 +482,39 @@ class HandlerMemoryExpire:
             else "not_configured"
         )
 
-        return {
-            "initialized": self._initialized,
-            "circuit_breaker_state": cb_state,
-            "db_pool_available": self._db_pool is not None,
-            "max_retries": self._max_retries,
-        }
+        return ModelMemoryExpireHealth(
+            initialized=self._initialized,
+            circuit_breaker_state=cb_state,
+            db_pool_available=self._db_pool is not None,
+            max_retries=self._max_retries,
+        )
 
-    async def describe(self) -> dict[str, object]:
+    async def describe(self) -> ModelMemoryExpireMetadata:
         """Return handler metadata and capabilities.
 
         Provides information about the handler for introspection
         and service discovery.
 
         Returns:
-            Dictionary containing handler metadata.
+            ModelMemoryExpireMetadata with handler information including
+            name, description, capabilities, and state transition rules.
         """
-        return {
-            "name": "HandlerMemoryExpire",
-            "description": (
+        return ModelMemoryExpireMetadata(
+            name="HandlerMemoryExpire",
+            description=(
                 "Handles memory expiration with optimistic locking. "
                 "Performs ACTIVE -> EXPIRED state transitions."
             ),
-            "version": "1.0.0",
-            "capabilities": [
+            version="1.0.0",
+            capabilities=[
                 "memory_expiration",
                 "optimistic_locking",
                 "retry_with_backoff",
             ],
-            "valid_from_states": [s.value for s in self._VALID_FROM_STATES],
-            "target_state": EnumLifecycleState.EXPIRED.value,
-            "initialized": self._initialized,
-        }
+            valid_from_states=[s.value for s in self._VALID_FROM_STATES],
+            target_state=EnumLifecycleState.EXPIRED.value,
+            initialized=self._initialized,
+        )
 
     @property
     def max_retries(self) -> int:

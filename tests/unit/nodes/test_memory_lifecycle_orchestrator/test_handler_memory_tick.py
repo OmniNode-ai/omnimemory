@@ -363,16 +363,16 @@ class TestHandlerMemoryTickInitialization:
 
         Given: A handler that has not been initialized
         When: Calling health_check
-        Then: Returns initialized=False and no circuit breaker state
+        Then: Returns typed health model with initialized=False and no circuit breaker state
         """
         handler = HandlerMemoryTick(container)
 
         health = await handler.health_check()
 
-        assert health["initialized"] is False
-        assert health["circuit_breaker_state"] is None
-        assert health["projection_reader_available"] is False
-        assert health["batch_size"] == 100
+        assert health.initialized is False
+        assert health.circuit_breaker_state is None
+        assert health.projection_reader_available is False
+        assert health.batch_size == 100
 
     @pytest.mark.asyncio
     async def test_health_check_after_initialization(
@@ -383,7 +383,7 @@ class TestHandlerMemoryTickInitialization:
 
         Given: A handler that has been initialized
         When: Calling health_check
-        Then: Returns initialized=True with circuit breaker state
+        Then: Returns typed health model with initialized=True and circuit breaker state
         """
         reader = MockProjectionReader()
         handler = HandlerMemoryTick(container)
@@ -391,10 +391,10 @@ class TestHandlerMemoryTickInitialization:
 
         health = await handler.health_check()
 
-        assert health["initialized"] is True
-        assert health["circuit_breaker_state"] == "closed"
-        assert health["projection_reader_available"] is True
-        assert health["batch_size"] == 50
+        assert health.initialized is True
+        assert health.circuit_breaker_state == "closed"
+        assert health.projection_reader_available is True
+        assert health.batch_size == 50
 
     @pytest.mark.asyncio
     async def test_describe_returns_handler_metadata(
@@ -405,19 +405,19 @@ class TestHandlerMemoryTickInitialization:
 
         Given: A HandlerMemoryTick instance
         When: Calling describe
-        Then: Returns comprehensive handler metadata
+        Then: Returns typed metadata model with comprehensive handler information
         """
         handler = HandlerMemoryTick(container)
         await handler.initialize()
 
-        description = await handler.describe()
+        metadata = await handler.describe()
 
-        assert description["name"] == "HandlerMemoryTick"
-        assert "description" in description
-        assert "memory_expiration" in description["capabilities"]
-        assert "archive_initiation" in description["capabilities"]
-        assert description["initialized"] is True
-        assert "ModelRuntimeTick" in description["message_types"]
+        assert metadata.name == "HandlerMemoryTick"
+        assert metadata.description  # Non-empty description
+        assert "memory_expiration" in metadata.capabilities
+        assert "archive_initiation" in metadata.capabilities
+        assert metadata.initialized is True
+        assert "ModelRuntimeTick" in metadata.message_types
 
 
 # =============================================================================

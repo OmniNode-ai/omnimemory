@@ -348,7 +348,7 @@ class TestHandlerMemoryArchiveInitialization:
 
         Given: Initialized handler
         When: Calling health_check()
-        Then: Returns dictionary with health status
+        Then: Returns typed health model with status information
         """
         handler = HandlerMemoryArchive(container)
         await handler.initialize(
@@ -358,10 +358,10 @@ class TestHandlerMemoryArchiveInitialization:
 
         health = await handler.health_check()
 
-        assert health["initialized"] is True
-        assert health["db_pool_available"] is False
-        assert health["archive_base_path"] == str(archive_base_path)
-        assert "circuit_breaker_state" in health
+        assert health.initialized is True
+        assert health.db_pool_available is False
+        assert health.archive_base_path == str(archive_base_path)
+        assert health.circuit_breaker_state is not None
 
     @pytest.mark.asyncio
     async def test_describe(
@@ -373,7 +373,7 @@ class TestHandlerMemoryArchiveInitialization:
 
         Given: Initialized handler
         When: Calling describe()
-        Then: Returns dictionary with handler metadata
+        Then: Returns typed metadata model with handler information
         """
         handler = HandlerMemoryArchive(container)
         await handler.initialize(
@@ -383,10 +383,10 @@ class TestHandlerMemoryArchiveInitialization:
 
         metadata = await handler.describe()
 
-        assert metadata["name"] == "HandlerMemoryArchive"
-        assert "description" in metadata
-        assert "capabilities" in metadata
-        assert "archive_expired_memory" in metadata["capabilities"]
+        assert metadata.name == "HandlerMemoryArchive"
+        assert metadata.description  # Non-empty description
+        assert metadata.capabilities
+        assert "archive_expired_memory" in metadata.capabilities
 
 
 # =============================================================================
