@@ -69,6 +69,10 @@ class TestContractValidation:
     def test_contract_validates_with_pydantic(self, node_name: str) -> None:
         """Verify contract validates against appropriate Pydantic model.
 
+        Uses extended contract models from omnimemory.models.contracts that add
+        support for ONEX infra extension fields (handler_routing, etc.) not yet
+        in omnibase_core. See OMN-1588 for tracking the core fix.
+
         Note: Uses constructor (**data) instead of model_validate() due to a bug
         in omnibase_core 0.9.x where model_validate() passes an unsupported 'extra'
         parameter to Pydantic's BaseModel.model_validate(). The constructor performs
@@ -81,17 +85,10 @@ class TestContractValidation:
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
 
-        # Strip extension fields not yet in omnibase_core contract models (extra='forbid')
-        # These are ONEX infrastructure extensions that will be validated separately
-        # or added to omnibase_core in future versions
-        extension_fields = {
-            "handler_routing",  # Declarative handler dispatch (ONEX infra extension)
-            "version",  # Legacy field renamed to contract_version
-            "consumed_events",  # Orchestrator event subscription (ONEX infra extension)
-            "published_events",  # Orchestrator event publishing (ONEX infra extension)
-            "orchestration",  # Orchestrator config (ONEX infra extension)
-        }
-        data = {k: v for k, v in data.items() if k not in extension_fields}
+        # Strip legacy field that was renamed (not an extension field issue)
+        # TODO(OMN-1588): Remove this once all contracts use contract_version
+        if "version" in data:
+            del data["version"]
 
         # ONEX contracts must have node_type at root level (no legacy nested format)
         raw_node_type = data.get("node_type", "")
@@ -101,26 +98,38 @@ class TestContractValidation:
         ), f"Contract must have 'node_type' field at root level: {node_name}"
         node_type = node_type.upper()
 
-        # Import appropriate contract model based on node type
-        # Note: Using constructor (**data) instead of model_validate() to work around
-        # omnibase_core bug where model_validate() passes unsupported 'extra' kwarg
+        # Import extended contract models that support ONEX infra extension fields
+        # These models add handler_routing field and use extra="ignore" to allow
+        # other extension fields. See OMN-1588 for tracking the core fix.
         try:
             if "EFFECT" in node_type:
-                from omnibase_core.models.contracts import ModelContractEffect
+                from omnimemory.models.contracts import ModelContractEffectExtended
 
-                ModelContractEffect(**data)
+                ModelContractEffectExtended(**data)
             elif "COMPUTE" in node_type:
-                from omnibase_core.models.contracts import ModelContractCompute
+                from omnimemory.models.contracts import ModelContractComputeExtended
 
-                ModelContractCompute(**data)
+                ModelContractComputeExtended(**data)
             elif "REDUCER" in node_type:
-                from omnibase_core.models.contracts import ModelContractReducer
+                from omnimemory.models.contracts import ModelContractReducerExtended
 
-                ModelContractReducer(**data)
+                ModelContractReducerExtended(**data)
             elif "ORCHESTRATOR" in node_type:
-                from omnibase_core.models.contracts import ModelContractOrchestrator
+                from omnimemory.models.contracts import (
+                    ModelContractOrchestratorExtended,
+                )
 
-                ModelContractOrchestrator(**data)
+                # Orchestrator's consumed_events/published_events in YAML use different
+                # format than ModelContractOrchestrator expects (it expects
+                # ModelEventDescriptor/ModelEventSubscription types). Strip these fields
+                # since handler_routing is the primary routing mechanism we're validating.
+                # TODO(OMN-1588): Resolve format mismatch when core adds proper support
+                orchestrator_data = {
+                    k: v
+                    for k, v in data.items()
+                    if k not in ("consumed_events", "published_events")
+                }
+                ModelContractOrchestratorExtended(**orchestrator_data)
             else:
                 pytest.fail(f"Unknown node_type: {node_type}")
         except ImportError:
