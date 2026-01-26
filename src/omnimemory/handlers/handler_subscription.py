@@ -108,6 +108,7 @@ from omnimemory.enums.enum_subscription_status import EnumSubscriptionStatus
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
+
 from omnimemory.handlers.adapters.adapter_valkey import (
     AdapterValkey,
     AdapterValkeyConfig,
@@ -205,7 +206,7 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
     return ", ".join(f"${i}" for i in range(start, start + count))
 
 
-class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler-specific config
+class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
     BaseModel
 ):
     """Configuration for the Subscription Handler.
@@ -281,7 +282,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler-specif
     )
 
 
-class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler-specific metrics
+class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler internal
     BaseModel
 ):
     """Metrics for the Subscription Handler.
@@ -324,7 +325,7 @@ class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler-specific met
     )
 
 
-class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler-specific health
+class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler health
     BaseModel
 ):
     """Health status for the Subscription Handler.
@@ -375,7 +376,7 @@ class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler-specific heal
     )
 
 
-class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler-specific response
+class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler result
     BaseModel
 ):
     """Paginated subscription list response.
@@ -413,7 +414,7 @@ class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler-specific 
     )
 
 
-class ModelHandlerMetadata(  # omnimemory-model-exempt: handler-specific metadata
+class ModelHandlerMetadata(  # omnimemory-model-exempt: handler metadata
     BaseModel
 ):
     """Metadata describing handler capabilities and configuration.

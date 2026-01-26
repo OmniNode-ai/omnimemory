@@ -674,7 +674,7 @@ class HandlerSemanticCompute:
         llm_provider_healthy: bool | None = None
         llm_provider_name: str | None = None
         llm_provider_error: str | None = None
-        llm_provider_configured: bool | None = None
+        llm_provider_configured: bool = self._llm_provider is not None
         cache_size: int | None = None
         cache_max_size: int | None = None
 
@@ -695,8 +695,6 @@ class HandlerSemanticCompute:
             except Exception as e:
                 llm_provider_healthy = False
                 llm_provider_error = str(e)
-        else:
-            llm_provider_configured = self._llm_provider is not None
 
         if self._embedding_cache is not None:
             cache_size = len(self._embedding_cache)
