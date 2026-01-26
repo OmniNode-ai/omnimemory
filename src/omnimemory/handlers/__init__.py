@@ -7,6 +7,7 @@ Handlers interface with infrastructure services (databases, graph stores, vector
 while adapters translate between memory-domain concepts and handler-level operations.
 
 Available Handlers:
+    - HandlerIntent: Direct protocol handler for intent storage and query operations
     - HandlerSubscription: Agent subscription and notification delivery management
     - HandlerSemanticCompute: Semantic analysis with policy hooks
 
@@ -16,6 +17,8 @@ Subpackages:
 Example::
 
     from omnimemory.handlers import (
+        HandlerIntent,
+        ModelHandlerIntentMetadata,
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,
         HandlerSemanticCompute,
@@ -29,6 +32,7 @@ Example::
 .. versionadded:: 0.1.0
     HandlerSubscription added for OMN-1393.
     HandlerSemanticCompute added for OMN-1390.
+    HandlerIntent added for OMN-1536.
 """
 
 from omnimemory.handlers.adapters import (
@@ -43,6 +47,10 @@ from omnimemory.handlers.adapters import (
     ModelRelatedMemoryResult,
     ModelValkeyHealth,
 )
+from omnimemory.handlers.handler_intent import (
+    HandlerIntent,
+    ModelHandlerIntentMetadata,
+)
 from omnimemory.handlers.handler_semantic_compute import (
     HandlerSemanticCompute,
     HandlerSemanticComputePolicy,
@@ -54,8 +62,13 @@ from omnimemory.handlers.handler_subscription import (
     ModelSubscriptionHealth,
     ModelSubscriptionMetrics,
 )
+from omnimemory.handlers.models import ModelHandlerIntentConfig
 
 __all__ = [
+    # Intent Handler
+    "HandlerIntent",
+    "ModelHandlerIntentConfig",
+    "ModelHandlerIntentMetadata",
     # Semantic Compute Handler
     "HandlerSemanticCompute",
     "HandlerSemanticComputePolicy",
