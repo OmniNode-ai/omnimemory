@@ -36,7 +36,7 @@ class ModelHandlerRouting(BaseModel):
         router_handler: Optional main routing handler for multi-backend patterns.
     """
 
-    model_config = ConfigDict(extra="allow", frozen=True)
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     routing_strategy: Literal[
         "payload_type_match",

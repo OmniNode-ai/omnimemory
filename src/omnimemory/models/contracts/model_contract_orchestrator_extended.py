@@ -11,16 +11,14 @@ Temporary extension until OMN-1588 adds handler_routing to omnibase_core.
 from __future__ import annotations
 
 from omnibase_core.models.contracts import ModelContractOrchestrator
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
 
-from omnimemory.models.contracts.model_handler_routing import (
-    ModelHandlerRouting,  # noqa: TC001
-)
+from omnimemory.models.contracts.mixin_handler_routing import MixinHandlerRouting
 
 __all__ = ["ModelContractOrchestratorExtended"]
 
 
-class ModelContractOrchestratorExtended(ModelContractOrchestrator):
+class ModelContractOrchestratorExtended(MixinHandlerRouting, ModelContractOrchestrator):
     """Extended Orchestrator contract with handler_routing support.
 
     Temporary extension until OMN-1588 adds handler_routing to omnibase_core.
@@ -28,15 +26,7 @@ class ModelContractOrchestratorExtended(ModelContractOrchestrator):
     Note: ModelContractOrchestrator already has consumed_events and
     published_events fields, but this extension allows extra fields that
     may be in different formats from the ONEX infra patterns.
-
-    Adds:
-        - handler_routing: Declarative handler dispatch configuration
     """
-
-    handler_routing: ModelHandlerRouting | None = Field(
-        default=None,
-        description="Handler routing configuration for declarative dispatch",
-    )
 
     model_config = ConfigDict(
         extra="ignore",  # Allow additional ONEX extension fields

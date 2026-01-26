@@ -16,10 +16,15 @@ Usage::
         ModelContractComputeExtended,
         ModelContractReducerExtended,
         ModelContractOrchestratorExtended,
+        MixinHandlerRouting,
     )
 
     # Use in test validation
     ModelContractEffectExtended(**contract_data)
+
+    # Create custom extended contracts
+    class MyExtendedContract(MixinHandlerRouting, SomeBaseContract):
+        pass
 
 .. versionadded:: 0.1.0
     Temporary workaround for OMN-1588.
@@ -27,6 +32,7 @@ Usage::
 
 # TODO(OMN-1588): Remove this entire module when omnibase_core adds native handler_routing support
 
+from omnimemory.models.contracts.mixin_handler_routing import MixinHandlerRouting
 from omnimemory.models.contracts.model_contract_compute_extended import (
     ModelContractComputeExtended,
 )
@@ -47,6 +53,7 @@ from omnimemory.models.contracts.model_handler_routing_entry import (
 from omnimemory.models.contracts.model_handler_spec import ModelHandlerSpec
 
 __all__ = [
+    "MixinHandlerRouting",
     "ModelContractComputeExtended",
     "ModelContractEffectExtended",
     "ModelContractOrchestratorExtended",

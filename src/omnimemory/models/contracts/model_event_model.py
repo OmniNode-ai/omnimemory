@@ -23,7 +23,7 @@ class ModelEventModel(BaseModel):
         module: Fully qualified module path containing the event model (optional).
     """
 
-    model_config = ConfigDict(extra="allow", frozen=True)
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     name: str = Field(..., description="Event model class name")
     module: str | None = Field(

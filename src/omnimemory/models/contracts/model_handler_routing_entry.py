@@ -32,7 +32,7 @@ class ModelHandlerRoutingEntry(BaseModel):
         output_events: List of event types this handler may emit.
     """
 
-    model_config = ConfigDict(extra="allow", frozen=True)
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     event_model: ModelEventModel | None = Field(
         default=None,

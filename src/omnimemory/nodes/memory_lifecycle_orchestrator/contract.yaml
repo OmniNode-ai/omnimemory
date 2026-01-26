@@ -146,7 +146,8 @@ handler_routing:
   execution_mode: "sequential"
   handlers:
     # RuntimeTick handler - evaluates memory TTL expiration and archive candidates
-    - event_model:
+    - operation: "tick"
+      event_model:
         name: "ModelRuntimeTick"
       event_pattern: "onex.internal.runtime-tick.v1"
       handler:
@@ -155,7 +156,8 @@ handler_routing:
       description: "Evaluates memory TTL expirations and initiates archival for expired memories"
 
     # Expire command handler - ACTIVE -> EXPIRED state transition
-    - event_model:
+    - operation: "expire"
+      event_model:
         name: "ModelExpireMemoryCommand"
       event_pattern: "memory.cmd.expire-memory.v1"
       handler:
@@ -164,7 +166,8 @@ handler_routing:
       description: "Performs ACTIVE -> EXPIRED state transition with optimistic locking"
 
     # Archive command handler - EXPIRED -> ARCHIVED state transition
-    - event_model:
+    - operation: "archive"
+      event_model:
         name: "ModelArchiveMemoryCommand"
       event_pattern: "memory.cmd.archive-memory.v1"
       handler:

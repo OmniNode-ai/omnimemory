@@ -636,9 +636,11 @@ class TestAnalyze:
 
         assert result.model_name == "fake-model-v1"
         # ModelSemVer is used directly per NO BACKWARDS COMPATIBILITY policy
-        assert result.model_version.major == 1
-        assert result.model_version.minor == 0
-        assert result.model_version.patch == 0
+        assert (
+            result.model_version.major,
+            result.model_version.minor,
+            result.model_version.patch,
+        ) == (1, 0, 0)
 
 
 # =============================================================================

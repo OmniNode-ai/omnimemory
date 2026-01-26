@@ -22,7 +22,7 @@ class ModelHandlerSpec(BaseModel):
         method: Optional method name if handler has multiple entry points.
     """
 
-    model_config = ConfigDict(extra="allow", frozen=True)
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     name: str = Field(..., description="Handler class name")
     module: str = Field(..., description="Module path containing the handler")
