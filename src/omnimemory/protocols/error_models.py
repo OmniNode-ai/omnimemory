@@ -3,7 +3,7 @@ Error Models and Exception Classes for OmniMemory ONEX Architecture
 
 This module defines comprehensive error handling following ONEX standards,
 including structured error codes, exception chaining, and monadic error patterns
-that integrate with NodeResult for consistent error handling across the system.
+that integrate with ModelBaseResult for consistent error handling across the system.
 """
 
 from __future__ import annotations
@@ -20,11 +20,10 @@ FieldValueType = (
     str | int | float | bool | bytes | list[object] | dict[str, object] | None
 )
 
-# Use local compatibility stub - provides consistent interface
-# regardless of omnibase_core availability
+# Import ModelOnexError from omnibase_core
+from omnibase_core.models.errors.model_onex_error import ModelOnexError
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..compat.onex_error import OnexError as BaseOnexError
 from ..models.foundation import ModelMetadata
 
 
@@ -205,11 +204,11 @@ def get_error_category(
 # === BASE EXCEPTION CLASSES ===
 
 
-class ProtocolOmniMemoryError(BaseOnexError):  # pyright: ignore[reportGeneralTypeIssues]
+class ProtocolOmniMemoryError(ModelOnexError):
     """
     Base exception class for all OmniMemory errors.
 
-    Extends ONEX BaseOnexError with OmniMemory-specific functionality
+    Extends ONEX ModelOnexError with OmniMemory-specific functionality
     including error categorization, recovery hints, and monadic integration.
     """
 
@@ -257,12 +256,12 @@ class ProtocolOmniMemoryError(BaseOnexError):  # pyright: ignore[reportGeneralTy
         if retry_after:
             enhanced_context["retry_after_seconds"] = retry_after
 
-        # Initialize base OnexError
+        # Initialize base ModelOnexError
         super().__init__(
-            error_code=error_code.value,
             message=message,
-            context=enhanced_context,
+            error_code=error_code.value,
             correlation_id=correlation_id,
+            context=enhanced_context,
         )
 
         # Store additional OmniMemory-specific information

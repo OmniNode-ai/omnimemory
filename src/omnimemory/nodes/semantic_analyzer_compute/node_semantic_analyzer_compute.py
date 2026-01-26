@@ -17,9 +17,9 @@ Example::
         NodeSemanticAnalyzerCompute,
         ModelSemanticAnalyzerComputeRequest,
     )
-    from omnimemory.compat import ModelOnexContainer
+    from omnibase_core.container import ModelONEXContainer
 
-    container = ModelOnexContainer()
+    container = ModelONEXContainer()
     node = NodeSemanticAnalyzerCompute(
         container=container,
         embedding_provider=my_embedding_provider,
@@ -82,7 +82,7 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
 
     Example::
 
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         node = NodeSemanticAnalyzerCompute(
             container=container,
             embedding_provider=my_provider,
@@ -101,24 +101,39 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
     def __init__(
         self,
         container: ContainerType,
-        embedding_provider: ProtocolEmbeddingProvider,
+        embedding_provider: ProtocolEmbeddingProvider | None = None,
         llm_provider: ProtocolLLMProvider | None = None,
         config: ModelHandlerSemanticComputeConfig | None = None,
     ) -> None:
         """Initialize the node with container and provider injection.
 
+        The handler is not ready until initialize() is called (either
+        explicitly or via execute() which auto-initializes).
+
         Args:
             container: ONEX container for dependency injection.
-            embedding_provider: Provider for embedding generation.
+            embedding_provider: Optional provider for embedding generation.
+                If not provided, resolved from container during initialization.
             llm_provider: Optional provider for LLM-based operations.
+                If not provided, resolved from container during initialization.
             config: Optional handler configuration.
         """
         super().__init__(container)
-        self._handler = HandlerSemanticCompute(
-            config=config or ModelHandlerSemanticComputeConfig(),
-            embedding_provider=embedding_provider,
-            llm_provider=llm_provider,
-        )
+        self._handler = HandlerSemanticCompute(container=container)
+        self._pending_config = config
+        self._pending_embedding_provider = embedding_provider
+        self._pending_llm_provider = llm_provider
+        self._handler_initialized = False
+
+    async def _ensure_handler_initialized(self) -> None:
+        """Ensure the handler is initialized before operations."""
+        if not self._handler_initialized:
+            await self._handler.initialize(
+                config=self._pending_config,
+                embedding_provider=self._pending_embedding_provider,
+                llm_provider=self._pending_llm_provider,
+            )
+            self._handler_initialized = True
 
     @property
     def handler(self) -> HandlerSemanticCompute:
@@ -132,7 +147,7 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
         """Execute semantic analysis operation.
 
         Routes the request to the appropriate handler method based on
-        the operation type.
+        the operation type. Auto-initializes the handler if not already done.
 
         Args:
             request: The compute request with operation and content.
@@ -141,6 +156,9 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
             Compute response with results or error information.
         """
         try:
+            # Ensure handler is initialized (lazy initialization)
+            await self._ensure_handler_initialized()
+
             match request.operation:
                 case "embed":
                     embedding = await self._handler.embed(

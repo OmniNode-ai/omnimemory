@@ -44,6 +44,7 @@ Known Limitations:
 
 Example::
 
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.handlers import (
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,
@@ -53,14 +54,15 @@ Example::
         ModelNotificationEventPayload,
     )
 
+    container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
         db_dsn="postgresql://user:pass@localhost:5432/omnimemory",
         valkey_host="localhost",
         valkey_port=6379,
         kafka_bootstrap_servers="localhost:9092",
     )
-    handler = HandlerSubscription(config)
-    await handler.initialize()
+    handler = HandlerSubscription(container)
+    await handler.initialize(config)
 
     # Subscribe an agent
     subscription = await handler.subscribe(
@@ -97,7 +99,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
@@ -112,6 +114,9 @@ from omnimemory.models.subscription import (
     ModelSubscription,
 )
 from omnimemory.models.subscription.constants import TOPIC_PATTERN
+
+if TYPE_CHECKING:
+    from omnibase_core.container import ModelONEXContainer
 
 # Optional omnibase_infra imports for handler reuse
 # Note: Using lowercase names since these are reassigned (not true constants)
@@ -180,6 +185,7 @@ __all__ = [
     "ModelHandlerSubscriptionConfig",
     "ModelPaginatedSubscriptions",
     "ModelSubscriptionHealth",
+    "ModelSubscriptionMetadata",
     "ModelSubscriptionMetrics",
 ]
 
@@ -239,7 +245,7 @@ def _sql_placeholders(count: int, start: int = 1) -> str:
     return ", ".join(f"${i}" for i in range(start, start + count))
 
 
-class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler-specific config
+class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
     BaseModel
 ):
     """Configuration for the Subscription Handler.
@@ -315,7 +321,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler-specif
     )
 
 
-class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler-specific metrics
+class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler internal
     BaseModel
 ):
     """Metrics for the Subscription Handler.
@@ -358,7 +364,7 @@ class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler-specific met
     )
 
 
-class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler-specific health
+class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler health
     BaseModel
 ):
     """Health status for the Subscription Handler.
@@ -409,7 +415,7 @@ class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler-specific heal
     )
 
 
-class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler-specific response
+class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler result
     BaseModel
 ):
     """Paginated subscription list response.
@@ -447,6 +453,39 @@ class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler-specific 
     )
 
 
+class ModelSubscriptionMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's capabilities and current configuration.
+
+    Attributes:
+        handler_type: Type identifier for this handler.
+        capabilities: List of supported operations and features.
+        supports_transactions: Whether the handler supports transactional operations.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    handler_type: str = Field(
+        ...,
+        description="Type identifier for this handler",
+    )
+    capabilities: list[str] = Field(
+        default_factory=list,
+        description="List of supported operations and features",
+    )
+    supports_transactions: bool = Field(
+        default=False,
+        description="Whether the handler supports transactional operations",
+    )
+
+
 class HandlerSubscription:
     """Handler for agent subscriptions and memory change notifications.
 
@@ -463,15 +502,28 @@ class HandlerSubscription:
         WebhookEmitterEffect node that consumes Kafka events and handles
         HTTP delivery with its own retry/circuit breaker logic.
 
+    ONEX Container Pattern:
+        This handler follows the ONEX container-driven pattern:
+        - Constructor takes only ModelONEXContainer
+        - initialize() accepts configuration and creates dependencies
+        - Handler owns all dependency lifecycles
+        - describe() provides handler metadata
+
     Attributes:
-        config: The handler configuration.
+        config: The handler configuration (set during initialize).
     """
 
-    def __init__(self, config: ModelHandlerSubscriptionConfig) -> None:
-        """Initialize the handler with configuration.
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize HandlerSubscription with ONEX container.
 
         Args:
-            config: The handler configuration.
+            container: ONEX container providing dependency injection for
+                services, configuration, and runtime context.
+
+        Note:
+            The container is stored for interface compliance with the standard
+            ONEX handler pattern (def __init__(self, container: ModelONEXContainer))
+            and to enable future DI-based service resolution.
 
         Raises:
             ImportError: If omnibase_infra is not installed.
@@ -483,7 +535,8 @@ class HandlerSubscription:
                 f"Original error: {_omnibase_infra_import_error}"
             )
 
-        self._config = config
+        self._container = container
+        self._config: ModelHandlerSubscriptionConfig | None = None
         self._db_handler: HandlerDb | None = None
         self._kafka_handler: EventBusKafka | None = None
         self._valkey: AdapterValkey | None = None
@@ -496,8 +549,27 @@ class HandlerSubscription:
         self._metrics = ModelSubscriptionMetrics()
 
     @property
+    def handler_type(self) -> str:
+        """Return the handler type identifier.
+
+        Returns:
+            String "subscription" identifying this handler type.
+        """
+        return "subscription"
+
+    @property
     def config(self) -> ModelHandlerSubscriptionConfig:
-        """Get the handler configuration."""
+        """Get the handler configuration.
+
+        Raises:
+            RuntimeError: If handler is not initialized.
+        """
+        if not self._initialized:
+            raise RuntimeError(
+                "HandlerSubscription is not initialized. "
+                "Call initialize() before accessing config."
+            )
+        assert self._config is not None  # For type checker
         return self._config
 
     @property
@@ -505,11 +577,15 @@ class HandlerSubscription:
         """Check if the handler has been initialized."""
         return self._initialized
 
-    async def initialize(self) -> None:
+    async def initialize(self, config: ModelHandlerSubscriptionConfig) -> None:
         """Initialize DB, Valkey, and Kafka handlers.
 
         Creates connections to all required services and optionally
         rebuilds the Valkey cache from PostgreSQL on cold start.
+
+        Args:
+            config: The handler configuration specifying database, Valkey,
+                and Kafka connection details.
 
         Raises:
             RuntimeError: If initialization fails.
@@ -517,6 +593,9 @@ class HandlerSubscription:
         async with self._init_lock:
             if self._initialized:
                 return
+
+            # Store configuration
+            self._config = config
 
             try:
                 # Initialize Valkey adapter
@@ -604,11 +683,13 @@ class HandlerSubscription:
             self._initialized = False
             logger.info("HandlerSubscription shutdown complete")
 
-    def _ensure_initialized(self) -> tuple[AdapterValkey, HandlerDb, EventBusKafka]:
+    def _ensure_initialized(
+        self,
+    ) -> tuple[AdapterValkey, HandlerDb, EventBusKafka, ModelHandlerSubscriptionConfig]:
         """Ensure handler is initialized and return components.
 
         Returns:
-            Tuple of (valkey, db_handler, kafka_handler).
+            Tuple of (valkey, db_handler, kafka_handler, config).
 
         Raises:
             RuntimeError: If handler is not initialized.
@@ -618,11 +699,12 @@ class HandlerSubscription:
             or self._valkey is None
             or self._db_handler is None
             or self._kafka_handler is None
+            or self._config is None
         ):
             raise RuntimeError(
-                "HandlerSubscription not initialized. Call initialize() first."
+                "HandlerSubscription not initialized. Call initialize(config) first."
             )
-        return self._valkey, self._db_handler, self._kafka_handler
+        return self._valkey, self._db_handler, self._kafka_handler, self._config
 
     # =========================================================================
     # Core Operations
@@ -655,7 +737,7 @@ class HandlerSubscription:
             ValueError: If topic format is invalid.
             RuntimeError: If handler is not initialized.
         """
-        valkey, _, _ = self._ensure_initialized()
+        valkey, _, _, config = self._ensure_initialized()
 
         # Early topic validation with clear error message for better debugging
         # (ModelSubscription also validates, but this provides subscribe()-specific context)
@@ -712,13 +794,13 @@ class HandlerSubscription:
 
             async with valkey.pipeline() as pipe:
                 pipe.sadd(topic_key, subscription_id)
-                pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                pipe.expire(topic_key, config.cache_ttl_seconds)
                 pipe.sadd(agent_key, subscription_id)
-                pipe.expire(agent_key, self._config.cache_ttl_seconds)
+                pipe.expire(agent_key, config.cache_ttl_seconds)
                 pipe.set_key(
                     sub_key,
                     subscription.model_dump_json(),
-                    ttl=self._config.cache_ttl_seconds,
+                    ttl=config.cache_ttl_seconds,
                 )
         except Exception as e:
             logger.warning(
@@ -758,7 +840,7 @@ class HandlerSubscription:
         Raises:
             RuntimeError: If handler is not initialized.
         """
-        valkey, _, _ = self._ensure_initialized()
+        valkey, _, _, _ = self._ensure_initialized()
 
         # Find existing subscription
         subscription = await self._get_subscription_by_agent_and_topic(agent_id, topic)
@@ -827,7 +909,7 @@ class HandlerSubscription:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
         """
-        _, _, kafka_handler = self._ensure_initialized()
+        _, _, kafka_handler, config = self._ensure_initialized()
 
         # Validate that event topic matches the topic argument
         if event.topic != topic:
@@ -847,7 +929,7 @@ class HandlerSubscription:
 
         # Publish event to Kafka
         # Agents consume from this topic via consumer groups keyed by agent_id
-        kafka_topic = self._config.kafka_notification_topic
+        kafka_topic = config.kafka_notification_topic
         envelope = {
             "operation": "kafka.produce",
             "payload": {
@@ -947,16 +1029,16 @@ class HandlerSubscription:
             implementing UI pagination, always provide a ``limit`` parameter even if
             you want all results (e.g., ``limit=1000``).
         """
-        valkey, _, _ = self._ensure_initialized()
+        valkey, _, _, config = self._ensure_initialized()
 
         # Validate pagination parameters
         if offset < 0:
             raise ValueError(f"offset must be non-negative, got {offset}")
         if limit is not None and limit <= 0:
             raise ValueError(f"limit must be positive when provided, got {limit}")
-        if limit is not None and limit > self._config.pagination_max_limit:
+        if limit is not None and limit > config.pagination_max_limit:
             raise ValueError(
-                f"limit exceeds maximum ({self._config.pagination_max_limit}), got {limit}"
+                f"limit exceeds maximum ({config.pagination_max_limit}), got {limit}"
             )
 
         # For paginated queries, always use database to ensure consistent ordering
@@ -1015,7 +1097,7 @@ class HandlerSubscription:
             subscription: The subscription to persist.
             is_update: Whether this is an update (upsert).
         """
-        _, db_handler, _ = self._ensure_initialized()
+        _, db_handler, _, _ = self._ensure_initialized()
 
         if is_update:
             sql = """
@@ -1067,7 +1149,7 @@ class HandlerSubscription:
         Args:
             subscription_id: The subscription ID to delete.
         """
-        _, db_handler, _ = self._ensure_initialized()
+        _, db_handler, _, _ = self._ensure_initialized()
 
         sql = """
             UPDATE subscriptions
@@ -1101,7 +1183,7 @@ class HandlerSubscription:
         Returns:
             The subscription if found, None otherwise.
         """
-        _, db_handler, _ = self._ensure_initialized()
+        _, db_handler, _, _ = self._ensure_initialized()
 
         sql = """
             SELECT id, agent_id, topic, status,
@@ -1141,7 +1223,7 @@ class HandlerSubscription:
         Returns:
             List of all active subscriptions ordered by created_at DESC.
         """
-        _, db_handler, _ = self._ensure_initialized()
+        _, db_handler, _, _ = self._ensure_initialized()
 
         sql = """
             SELECT id, agent_id, topic, status,
@@ -1188,7 +1270,7 @@ class HandlerSubscription:
             - subscriptions: List of subscriptions for the requested page
             - total_count: Total number of matching subscriptions (before pagination)
         """
-        _, db_handler, _ = self._ensure_initialized()
+        _, db_handler, _, _ = self._ensure_initialized()
 
         # Use window function to get total count in the same query
         # COUNT(*) OVER() returns the total count for each row without grouping
@@ -1321,12 +1403,13 @@ class HandlerSubscription:
         async with self._cache_rebuild_lock:
             # Access components directly - this is called during initialize()
             # before _initialized is set, so we can't use _ensure_initialized()
-            if self._valkey is None or self._db_handler is None:
+            if self._valkey is None or self._db_handler is None or self._config is None:
                 raise RuntimeError(
                     "_rebuild_cache_from_db called before components initialized"
                 )
             valkey = self._valkey
             db_handler = self._db_handler
+            config = self._config
 
             logger.info("Rebuilding Valkey cache from PostgreSQL...")
 
@@ -1372,7 +1455,7 @@ class HandlerSubscription:
                         "sql": sql,
                         "parameters": [
                             EnumSubscriptionStatus.ACTIVE.value,
-                            self._config.cache_rebuild_batch_size,
+                            config.cache_rebuild_batch_size,
                             offset,
                         ],
                     },
@@ -1395,7 +1478,7 @@ class HandlerSubscription:
                         pipe.set_key(
                             sub_key,
                             subscription.model_dump_json(),
-                            ttl=self._config.cache_ttl_seconds,
+                            ttl=config.cache_ttl_seconds,
                         )
 
                         # Add to topic->subscribers mapping
@@ -1403,17 +1486,17 @@ class HandlerSubscription:
                             topic=subscription.topic
                         )
                         pipe.sadd(topic_key, subscription.id)
-                        pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                        pipe.expire(topic_key, config.cache_ttl_seconds)
 
                         # Add to agent->subscriptions mapping
                         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
                             agent_id=subscription.agent_id
                         )
                         pipe.sadd(agent_key, subscription.id)
-                        pipe.expire(agent_key, self._config.cache_ttl_seconds)
+                        pipe.expire(agent_key, config.cache_ttl_seconds)
 
                 processed += len(rows)
-                offset += self._config.cache_rebuild_batch_size
+                offset += config.cache_rebuild_batch_size
                 logger.info(
                     "Cache rebuild progress: %d/%d subscriptions",
                     processed,
@@ -1434,7 +1517,7 @@ class HandlerSubscription:
         Returns:
             Set of subscription IDs.
         """
-        valkey, db_handler, _ = self._ensure_initialized()
+        valkey, db_handler, _, config = self._ensure_initialized()
 
         # Try cache first (best-effort - DB is authoritative)
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
@@ -1444,7 +1527,7 @@ class HandlerSubscription:
             if subscriber_ids:
                 # Refresh TTL on cache hit to prevent expiry during active usage
                 try:
-                    await valkey.expire(topic_key, self._config.cache_ttl_seconds)
+                    await valkey.expire(topic_key, config.cache_ttl_seconds)
                 except Exception as e:
                     logger.debug(
                         "Failed to refresh cache TTL for topic %s: %s", topic, e
@@ -1485,7 +1568,7 @@ class HandlerSubscription:
             try:
                 async with valkey.pipeline() as pipe:
                     pipe.sadd(topic_key, *subscription_ids)
-                    pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                    pipe.expire(topic_key, config.cache_ttl_seconds)
             except Exception as e:
                 logger.warning(
                     "Failed to rebuild cache for topic %s (DB query succeeded): %s",
@@ -1554,7 +1637,7 @@ class HandlerSubscription:
         Returns:
             List of subscriptions.
         """
-        valkey, db_handler, _ = self._ensure_initialized()
+        valkey, db_handler, _, config = self._ensure_initialized()
 
         subscriptions: list[ModelSubscription] = []
         missing_ids: list[str] = list(subscription_ids)
@@ -1594,7 +1677,7 @@ class HandlerSubscription:
                                 sub_key = CACHE_KEY_SUBSCRIPTION.format(
                                     subscription_id=sub.id
                                 )
-                                pipe.expire(sub_key, self._config.cache_ttl_seconds)
+                                pipe.expire(sub_key, config.cache_ttl_seconds)
                     except Exception as e:
                         logger.debug("Failed to refresh cache TTL: %s", e)
 
@@ -1640,7 +1723,7 @@ class HandlerSubscription:
                     await valkey.set_key(
                         sub_key,
                         subscription.model_dump_json(),
-                        ttl=self._config.cache_ttl_seconds,
+                        ttl=config.cache_ttl_seconds,
                     )
                 except Exception as e:
                     logger.warning(
@@ -1789,4 +1872,35 @@ class HandlerSubscription:
             kafka_healthy=kafka_healthy,
             error_message="; ".join(errors) if errors else None,
             metrics=await self.get_metrics(),
+        )
+
+    async def describe(self) -> ModelSubscriptionMetadata:
+        """Return handler metadata and capabilities.
+
+        Provides introspection information about the handler's type,
+        supported operations, and configuration.
+
+        Returns:
+            ModelSubscriptionMetadata with handler information.
+
+        Note:
+            This method is async per ONEX protocol specification.
+        """
+        capabilities = [
+            "subscribe",
+            "unsubscribe",
+            "list_subscriptions",
+            "notify",
+            "pagination",
+            "metrics",
+            "health_check",
+            "kafka_delivery",
+            "valkey_caching",
+            "postgresql_persistence",
+        ]
+
+        return ModelSubscriptionMetadata(
+            handler_type=self.handler_type,
+            capabilities=capabilities,
+            supports_transactions=False,  # Operations are not transactional across services
         )

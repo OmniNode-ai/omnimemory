@@ -10,17 +10,20 @@ Available Handlers:
 
 Example::
 
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.similarity_compute.handlers import (
         HandlerSimilarityCompute,
         ModelHandlerSimilarityComputeConfig,
     )
 
-    config = ModelHandlerSimilarityComputeConfig()
-    handler = HandlerSimilarityCompute(config)
+    async def example():
+        container = ModelONEXContainer()
+        handler = HandlerSimilarityCompute(container)
+        await handler.initialize()
 
-    vec_a = [0.1, 0.2, 0.3]
-    vec_b = [0.2, 0.3, 0.4]
-    distance = handler.cosine_distance(vec_a, vec_b)
+        vec_a = [0.1, 0.2, 0.3]
+        vec_b = [0.2, 0.3, 0.4]
+        distance = handler.cosine_distance(vec_a, vec_b)
 
 .. versionadded:: 0.1.0
     Initial handlers for OMN-1388.
@@ -28,6 +31,8 @@ Example::
 
 from omnimemory.nodes.similarity_compute.handlers.handler_similarity_compute import (
     HandlerSimilarityCompute,
+    ModelSimilarityComputeHealth,
+    ModelSimilarityComputeMetadata,
 )
 from omnimemory.nodes.similarity_compute.models import (
     ModelHandlerSimilarityComputeConfig,
@@ -36,4 +41,6 @@ from omnimemory.nodes.similarity_compute.models import (
 __all__ = [
     "HandlerSimilarityCompute",
     "ModelHandlerSimilarityComputeConfig",
+    "ModelSimilarityComputeHealth",
+    "ModelSimilarityComputeMetadata",
 ]

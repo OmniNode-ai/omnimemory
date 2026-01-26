@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 from pydantic import ValidationError
 
 from omnimemory.enums import EnumLifecycleState
@@ -42,6 +43,16 @@ from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
 # =============================================================================
 # Test Fixtures
 # =============================================================================
+
+
+@pytest.fixture
+def container() -> ModelONEXContainer:
+    """Provide a container for testing.
+
+    Returns:
+        A ModelONEXContainer instance.
+    """
+    return ModelONEXContainer()
 
 
 @pytest.fixture
@@ -91,120 +102,148 @@ def expire_command(memory_id: UUID, fixed_now: datetime) -> ModelExpireMemoryCom
 class TestHandlerMemoryExpireInitialization:
     """Tests for HandlerMemoryExpire initialization."""
 
-    def test_handler_creates_without_db_pool(self) -> None:
-        """Test handler can be created without database pool.
+    def test_handler_creates_with_container(
+        self, container: ModelONEXContainer
+    ) -> None:
+        """Test handler can be created with container.
 
-        Given: No db_pool provided
+        Given: A ModelONEXContainer
         When: Creating HandlerMemoryExpire
-        Then: Handler is created in stub mode
+        Then: Handler is created but not initialized
         """
-        handler = HandlerMemoryExpire(db_pool=None)
+        handler = HandlerMemoryExpire(container)
         assert handler is not None
         assert handler._db_pool is None
+        assert handler.initialized is False
 
-    def test_handler_default_max_retries(self) -> None:
-        """Test handler uses default max_retries of 3.
+    @pytest.mark.asyncio
+    async def test_handler_default_max_retries(
+        self, container: ModelONEXContainer
+    ) -> None:
+        """Test handler uses default max_retries of 3 after initialization.
 
-        Given: No max_retries provided
-        When: Creating HandlerMemoryExpire
+        Given: No max_retries provided to initialize()
+        When: Calling initialize() with mock db_pool
         Then: Handler uses default max_retries of 3
         """
-        handler = HandlerMemoryExpire()
+        handler = HandlerMemoryExpire(container)
+        # Create a mock pool (we just need a non-None value for initialization)
+        mock_pool = object()  # type: ignore[assignment]
+        await handler.initialize(db_pool=mock_pool)  # type: ignore[arg-type]
         assert handler.max_retries == 3
+        assert handler.initialized is True
 
-    def test_handler_custom_max_retries(self) -> None:
-        """Test handler can be created with custom max_retries.
+    @pytest.mark.asyncio
+    async def test_handler_custom_max_retries(
+        self, container: ModelONEXContainer
+    ) -> None:
+        """Test handler can be initialized with custom max_retries.
 
         Given: Custom max_retries value
-        When: Creating HandlerMemoryExpire
+        When: Calling initialize()
         Then: Handler uses the custom value
         """
-        handler = HandlerMemoryExpire(max_retries=5)
+        handler = HandlerMemoryExpire(container)
+        mock_pool = object()  # type: ignore[assignment]
+        await handler.initialize(db_pool=mock_pool, max_retries=5)  # type: ignore[arg-type]
         assert handler.max_retries == 5
 
-    def test_handler_rejects_invalid_max_retries(self) -> None:
+    @pytest.mark.asyncio
+    async def test_handler_rejects_invalid_max_retries(
+        self, container: ModelONEXContainer
+    ) -> None:
         """Test handler rejects max_retries < 1.
 
         Given: max_retries = 0
-        When: Creating HandlerMemoryExpire
+        When: Calling initialize()
         Then: ValueError is raised
         """
+        handler = HandlerMemoryExpire(container)
+        mock_pool = object()  # type: ignore[assignment]
         with pytest.raises(ValueError, match="max_retries must be >= 1"):
-            HandlerMemoryExpire(max_retries=0)
+            await handler.initialize(db_pool=mock_pool, max_retries=0)  # type: ignore[arg-type]
 
-    def test_handler_rejects_negative_max_retries(self) -> None:
+    @pytest.mark.asyncio
+    async def test_handler_rejects_negative_max_retries(
+        self, container: ModelONEXContainer
+    ) -> None:
         """Test handler rejects negative max_retries.
 
         Given: max_retries = -1
-        When: Creating HandlerMemoryExpire
+        When: Calling initialize()
         Then: ValueError is raised
         """
+        handler = HandlerMemoryExpire(container)
+        mock_pool = object()  # type: ignore[assignment]
         with pytest.raises(ValueError, match="max_retries must be >= 1"):
-            HandlerMemoryExpire(max_retries=-1)
+            await handler.initialize(db_pool=mock_pool, max_retries=-1)  # type: ignore[arg-type]
 
 
 # =============================================================================
-# No Database Pool Tests
+# Not Initialized Tests
 # =============================================================================
 
 
-class TestNoDatabasePool:
-    """Tests for handler behavior when db_pool is not configured."""
+class TestNotInitialized:
+    """Tests for handler behavior when not initialized."""
 
     @pytest.mark.asyncio
-    async def test_handle_without_db_pool_raises_error(
+    async def test_handle_without_initialization_raises_error(
         self,
+        container: ModelONEXContainer,
         memory_id: UUID,
     ) -> None:
-        """Test that handle() raises RuntimeError when db_pool is not configured.
+        """Test that handle() raises RuntimeError when handler not initialized.
 
-        Given: Handler without db_pool
+        Given: Handler created but not initialized
         When: Calling handle()
         Then: RuntimeError is raised with appropriate message
         """
-        handler = HandlerMemoryExpire()
+        handler = HandlerMemoryExpire(container)
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
             expected_revision=1,
         )
 
-        with pytest.raises(RuntimeError, match="Database pool not configured"):
+        with pytest.raises(RuntimeError, match="Handler not initialized"):
             await handler.handle(command)
 
     @pytest.mark.asyncio
-    async def test_handle_without_db_pool_raises_error_with_custom_params(
+    async def test_handle_without_initialization_raises_error_with_custom_params(
         self,
+        container: ModelONEXContainer,
         memory_id: UUID,
         fixed_now: datetime,
     ) -> None:
         """Test that handle() raises RuntimeError regardless of command parameters.
 
-        Given: Handler without db_pool and command with custom parameters
+        Given: Handler not initialized and command with custom parameters
         When: Calling handle()
         Then: RuntimeError is raised
         """
-        handler = HandlerMemoryExpire()
+        handler = HandlerMemoryExpire(container)
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
             expected_revision=5,
             expired_at=fixed_now,
         )
 
-        with pytest.raises(RuntimeError, match="Database pool not configured"):
+        with pytest.raises(RuntimeError, match="Handler not initialized"):
             await handler.handle(command)
 
     @pytest.mark.asyncio
-    async def test_handle_without_db_pool_raises_error_for_various_revisions(
+    async def test_handle_without_initialization_raises_error_for_various_revisions(
         self,
+        container: ModelONEXContainer,
         memory_id: UUID,
     ) -> None:
         """Test that handle() raises RuntimeError for any expected_revision.
 
-        Given: Handler without db_pool and various revision values
+        Given: Handler not initialized and various revision values
         When: Calling handle()
         Then: RuntimeError is raised for all cases
         """
-        handler = HandlerMemoryExpire()
+        handler = HandlerMemoryExpire(container)
         test_cases = [0, 1, 5, 100, 999]
 
         for expected_revision in test_cases:
@@ -213,7 +252,7 @@ class TestNoDatabasePool:
                 expected_revision=expected_revision,
             )
 
-            with pytest.raises(RuntimeError, match="Database pool not configured"):
+            with pytest.raises(RuntimeError, match="Handler not initialized"):
                 await handler.handle(command)
 
 
@@ -488,28 +527,29 @@ class TestCurrentStateModel:
 
 
 # =============================================================================
-# Retry Logic Tests (No Database Pool)
+# Retry Logic Tests (Not Initialized)
 # =============================================================================
 
 
 class TestRetryLogic:
-    """Tests for handle_with_retry() behavior when db_pool is not configured."""
+    """Tests for handle_with_retry() behavior when handler not initialized."""
 
     @pytest.mark.asyncio
-    async def test_handle_with_retry_without_db_pool_raises_error(
+    async def test_handle_with_retry_without_initialization_raises_error(
         self,
+        container: ModelONEXContainer,
         memory_id: UUID,
         fixed_now: datetime,
     ) -> None:
-        """Test handle_with_retry raises RuntimeError when db_pool is not configured.
+        """Test handle_with_retry raises RuntimeError when handler not initialized.
 
-        Given: Handler without db_pool
+        Given: Handler not initialized
         When: Calling handle_with_retry
         Then: RuntimeError is raised
         """
-        handler = HandlerMemoryExpire()
+        handler = HandlerMemoryExpire(container)
 
-        with pytest.raises(RuntimeError, match="Database pool not configured"):
+        with pytest.raises(RuntimeError, match="Handler not initialized"):
             await handler.handle_with_retry(
                 memory_id=memory_id,
                 initial_revision=1,
@@ -518,19 +558,20 @@ class TestRetryLogic:
             )
 
     @pytest.mark.asyncio
-    async def test_handle_with_retry_without_db_pool_raises_error_with_params(
+    async def test_handle_with_retry_without_initialization_raises_error_with_params(
         self,
+        container: ModelONEXContainer,
         memory_id: UUID,
     ) -> None:
         """Test handle_with_retry raises RuntimeError regardless of parameters.
 
-        Given: Handler without db_pool and specific parameters
+        Given: Handler not initialized and specific parameters
         When: Calling handle_with_retry
         Then: RuntimeError is raised
         """
-        handler = HandlerMemoryExpire()
+        handler = HandlerMemoryExpire(container)
 
-        with pytest.raises(RuntimeError, match="Database pool not configured"):
+        with pytest.raises(RuntimeError, match="Handler not initialized"):
             await handler.handle_with_retry(
                 memory_id=memory_id,
                 initial_revision=10,
@@ -683,3 +724,108 @@ class TestSQLPatternDocumentation:
         assert EnumLifecycleState.EXPIRED not in valid_states
         assert EnumLifecycleState.ARCHIVED not in valid_states
         assert EnumLifecycleState.DELETED not in valid_states
+
+
+# =============================================================================
+# Health Check Tests
+# =============================================================================
+
+
+class TestHealthCheck:
+    """Tests for health_check() method."""
+
+    @pytest.mark.asyncio
+    async def test_health_check_before_initialization(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test health_check returns not initialized status.
+
+        Given: Handler not initialized
+        When: Calling health_check()
+        Then: Returns typed health model indicating not initialized
+        """
+        handler = HandlerMemoryExpire(container)
+        health = await handler.health_check()
+
+        assert health.initialized is False
+        assert health.db_pool_available is False
+        assert health.circuit_breaker_state == "not_configured"
+        assert health.max_retries == 3  # Default value
+
+    @pytest.mark.asyncio
+    async def test_health_check_after_initialization(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test health_check returns healthy status after initialization.
+
+        Given: Handler initialized with mock pool
+        When: Calling health_check()
+        Then: Returns typed health model indicating initialized
+        """
+        handler = HandlerMemoryExpire(container)
+        mock_pool = object()  # type: ignore[assignment]
+        await handler.initialize(db_pool=mock_pool, max_retries=5)  # type: ignore[arg-type]
+
+        health = await handler.health_check()
+
+        assert health.initialized is True
+        assert health.db_pool_available is True
+        assert health.circuit_breaker_state == "closed"
+        assert health.max_retries == 5
+
+
+# =============================================================================
+# Describe Tests
+# =============================================================================
+
+
+class TestDescribe:
+    """Tests for describe() method."""
+
+    @pytest.mark.asyncio
+    async def test_describe_returns_metadata(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test describe returns handler metadata.
+
+        Given: Handler instance
+        When: Calling describe()
+        Then: Returns typed metadata model with handler information
+        """
+        handler = HandlerMemoryExpire(container)
+        metadata = await handler.describe()
+
+        assert metadata.name == "HandlerMemoryExpire"
+        assert metadata.description  # Non-empty description
+        assert metadata.version == "1.0.0"
+        assert "memory_expiration" in metadata.capabilities
+        assert "optimistic_locking" in metadata.capabilities
+        assert metadata.target_state == "expired"
+        assert "active" in metadata.valid_from_states
+
+    @pytest.mark.asyncio
+    async def test_describe_reflects_initialization_state(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test describe reflects initialization state.
+
+        Given: Handler before and after initialization
+        When: Calling describe()
+        Then: initialized field reflects actual state
+        """
+        handler = HandlerMemoryExpire(container)
+
+        # Before initialization
+        metadata_before = await handler.describe()
+        assert metadata_before.initialized is False
+
+        # After initialization
+        mock_pool = object()  # type: ignore[assignment]
+        await handler.initialize(db_pool=mock_pool)  # type: ignore[arg-type]
+
+        metadata_after = await handler.describe()
+        assert metadata_after.initialized is True

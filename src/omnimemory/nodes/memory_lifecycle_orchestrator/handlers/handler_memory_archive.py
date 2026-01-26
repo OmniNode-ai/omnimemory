@@ -39,12 +39,18 @@ Example::
     from pathlib import Path
     from uuid import UUID
 
+    from omnibase_core.container import ModelONEXContainer
+
+    # Create handler with container
+    container = ModelONEXContainer()
+    handler = HandlerMemoryArchive(container)
+
     # Option 1: Use OMNIMEMORY_ARCHIVE_PATH environment variable (recommended)
     # export OMNIMEMORY_ARCHIVE_PATH=/var/omnimemory/archives
-    handler = HandlerMemoryArchive(db_pool=pool)
+    await handler.initialize(db_pool=pool)
 
     # Option 2: Explicit path (useful for testing)
-    handler = HandlerMemoryArchive(
+    await handler.initialize(
         db_pool=pool,
         archive_base_path=Path("/custom/archive/path"),
     )
@@ -89,6 +95,7 @@ from omnimemory.utils.concurrency import CircuitBreaker
 if TYPE_CHECKING:
     from asyncpg import Pool
     from asyncpg.exceptions import InterfaceError, InternalClientError, PostgresError
+    from omnibase_core.container import ModelONEXContainer
 else:
     try:
         from asyncpg.exceptions import (
@@ -109,6 +116,8 @@ __all__ = [
     "HandlerMemoryArchive",
     "ModelArchiveMemoryCommand",
     "ModelArchiveRecord",
+    "ModelMemoryArchiveHealth",
+    "ModelMemoryArchiveMetadata",
     "ModelMemoryArchiveResult",
     "ProtocolOrphanedArchiveTracker",
 ]
@@ -357,6 +366,126 @@ class ModelMemoryRow(BaseModel):  # omnimemory-model-exempt: handler internal
     metadata: ModelGenericMetadata | None = None
 
 
+class ModelCircuitBreakerConfigInfo(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Circuit breaker configuration info for handler metadata.
+
+    Attributes:
+        failure_threshold: Number of failures before opening circuit.
+        recovery_timeout: Seconds to wait before attempting recovery.
+        success_threshold: Successes needed to close circuit.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    failure_threshold: int = Field(
+        ...,
+        description="Number of failures before opening circuit",
+    )
+    recovery_timeout: float = Field(
+        ...,
+        description="Seconds to wait before attempting recovery",
+    )
+    success_threshold: int = Field(
+        ...,
+        description="Successes needed to close circuit",
+    )
+
+
+class ModelMemoryArchiveHealth(BaseModel):  # omnimemory-model-exempt: handler health
+    """Health status for the Memory Archive Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its dependencies.
+
+    Attributes:
+        initialized: Whether the handler has been initialized.
+        db_pool_available: Whether a database connection pool is configured.
+        archive_base_path: The configured archive base path.
+        orphan_tracker_configured: Whether an orphan tracker is configured.
+        circuit_breaker_state: Current state of the database circuit breaker.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    db_pool_available: bool = Field(
+        ...,
+        description="Whether a database connection pool is configured",
+    )
+    archive_base_path: str | None = Field(
+        default=None,
+        description="The configured archive base path",
+    )
+    orphan_tracker_configured: bool = Field(
+        ...,
+        description="Whether an orphan tracker is configured for handling orphaned archives",
+    )
+    circuit_breaker_state: str = Field(
+        ...,
+        description="Current state of the database circuit breaker (closed, open, half_open, not_configured)",
+    )
+
+
+class ModelMemoryArchiveMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing memory archive handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's purpose, capabilities, archive format, and configuration.
+
+    Attributes:
+        name: Handler class name.
+        description: Brief description of handler purpose.
+        capabilities: List of supported capabilities.
+        archive_format: Description of the archive file format.
+        compression_level: Configured gzip compression level.
+        query_timeout_seconds: Database query timeout in seconds.
+        circuit_breaker_config: Circuit breaker configuration.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    description: str = Field(
+        ...,
+        description="Brief description of handler purpose",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported capabilities",
+    )
+    archive_format: str = Field(
+        ...,
+        description="Description of the archive file format",
+    )
+    compression_level: int = Field(
+        ...,
+        ge=1,
+        le=9,
+        description="Configured gzip compression level (1-9)",
+    )
+    query_timeout_seconds: float = Field(
+        ...,
+        description="Database query timeout in seconds",
+    )
+    circuit_breaker_config: ModelCircuitBreakerConfigInfo = Field(
+        ...,
+        description="Circuit breaker configuration",
+    )
+
+
 class HandlerMemoryArchive:
     """Handler for archiving memories to cold storage.
 
@@ -423,14 +552,38 @@ class HandlerMemoryArchive:
     _CB_RECOVERY_TIMEOUT: float = 60.0
     _CB_SUCCESS_THRESHOLD: int = 2
 
-    def __init__(
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize the archive handler with a dependency container.
+
+        Args:
+            container: ONEX dependency injection container for service resolution.
+                The container follows the ONEX DI pattern where handlers receive
+                all dependencies through the container rather than as constructor
+                parameters.
+
+        Note:
+            After construction, call initialize() to set up runtime dependencies
+            (db_pool, archive_base_path, orphan_tracker). The handler will raise
+            RuntimeError if handle() is called before initialization.
+        """
+        self._container = container
+        self._db_pool: Pool | None = None
+        self._archive_base_path: Path | None = None
+        self._orphan_tracker: ProtocolOrphanedArchiveTracker | None = None
+        self._db_circuit_breaker: CircuitBreaker | None = None
+        self._initialized = False
+
+    async def initialize(
         self,
         db_pool: Pool | None = None,
         archive_base_path: Path | None = None,
         orphan_tracker: ProtocolOrphanedArchiveTracker | None = None,
-        db_circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
-        """Initialize the archive handler.
+        """Initialize runtime dependencies for the handler.
+
+        This method must be called after construction and before handle() to
+        set up the handler's runtime dependencies. This pattern separates
+        construction (container injection) from initialization (runtime setup).
 
         Args:
             db_pool: PostgreSQL connection pool for database operations.
@@ -443,15 +596,12 @@ class HandlerMemoryArchive:
                 If provided, will be called when an archive file is written
                 but the database state update fails. This enables monitoring
                 and cleanup of orphaned files.
-            db_circuit_breaker: Optional circuit breaker for database operations.
-                If not provided, a default circuit breaker is created.
-                Protects against cascading failures when database is unhealthy.
         """
         self._db_pool = db_pool
         self._orphan_tracker = orphan_tracker
 
         # Initialize circuit breaker for DB operations
-        self._db_circuit_breaker = db_circuit_breaker or CircuitBreaker(
+        self._db_circuit_breaker = CircuitBreaker(
             failure_threshold=self._CB_FAILURE_THRESHOLD,
             recovery_timeout=self._CB_RECOVERY_TIMEOUT,
             success_threshold=self._CB_SUCCESS_THRESHOLD,
@@ -476,9 +626,101 @@ class HandlerMemoryArchive:
                     extra={"archive_path": str(self._archive_base_path)},
                 )
 
+        self._initialized = True
+
+    async def shutdown(self) -> None:
+        """Shutdown the handler and release resources.
+
+        Resets initialization state and clears internal references.
+        Safe to call multiple times (idempotent).
+        After shutdown, initialize() must be called again to use the handler.
+
+        Note:
+            This method does NOT close the database pool as it is an
+            external resource whose lifecycle is not owned by this handler.
+        """
+        if self._initialized:
+            # Clear internal state (pools are external, don't close)
+            self._db_pool = None
+            self._archive_base_path = None
+            self._orphan_tracker = None
+            self._db_circuit_breaker = None
+            self._initialized = False
+            logger.info("HandlerMemoryArchive shutdown complete")
+
+    async def health_check(self) -> ModelMemoryArchiveHealth:
+        """Check the health status of the handler.
+
+        Returns:
+            ModelMemoryArchiveHealth with detailed status information:
+            - initialized: Whether the handler has been initialized
+            - db_pool_available: Whether a database pool is configured
+            - archive_base_path: The configured archive base path
+            - orphan_tracker_configured: Whether an orphan tracker is configured
+            - circuit_breaker_state: Current state of the DB circuit breaker
+        """
+        circuit_state = "not_configured"
+        if self._db_circuit_breaker is not None:
+            circuit_state = self._db_circuit_breaker.state.value
+
+        return ModelMemoryArchiveHealth(
+            initialized=self._initialized,
+            db_pool_available=self._db_pool is not None,
+            archive_base_path=str(self._archive_base_path)
+            if self._archive_base_path
+            else None,
+            orphan_tracker_configured=self._orphan_tracker is not None,
+            circuit_breaker_state=circuit_state,
+        )
+
+    async def describe(self) -> ModelMemoryArchiveMetadata:
+        """Return metadata and capabilities of this handler.
+
+        Provides introspection information about the handler, including
+        its purpose, supported operations, and configuration.
+
+        Returns:
+            ModelMemoryArchiveMetadata with handler information including
+            name, description, capabilities, and archive configuration.
+        """
+        return ModelMemoryArchiveMetadata(
+            name="HandlerMemoryArchive",
+            description=(
+                "Archives EXPIRED memories to cold storage with gzip compression "
+                "and atomic writes. Uses optimistic locking for concurrency safety."
+            ),
+            capabilities=[
+                "archive_expired_memory",
+                "atomic_file_write",
+                "optimistic_locking",
+                "orphan_tracking",
+            ],
+            archive_format="JSONL with gzip compression (.jsonl.gz)",
+            compression_level=self._ARCHIVE_COMPRESSION_LEVEL,
+            query_timeout_seconds=self._QUERY_TIMEOUT_SECONDS,
+            circuit_breaker_config=ModelCircuitBreakerConfigInfo(
+                failure_threshold=self._CB_FAILURE_THRESHOLD,
+                recovery_timeout=self._CB_RECOVERY_TIMEOUT,
+                success_threshold=self._CB_SUCCESS_THRESHOLD,
+            ),
+        )
+
     @property
-    def archive_base_path(self) -> Path:
-        """Get the base path for archives."""
+    def initialized(self) -> bool:
+        """Check if the handler has been initialized.
+
+        Returns:
+            True if initialize() has been called successfully.
+        """
+        return self._initialized
+
+    @property
+    def archive_base_path(self) -> Path | None:
+        """Get the base path for archives.
+
+        Returns:
+            The configured archive base path, or None if not yet initialized.
+        """
         return self._archive_base_path
 
     async def handle(
@@ -497,9 +739,23 @@ class HandlerMemoryArchive:
             Result indicating success, conflict, or failure with details.
 
         Raises:
-            RuntimeError: If database pool is not configured.
+            RuntimeError: If handler is not initialized or database pool is not configured.
         """
+        # Require handler to be initialized
+        if not self._initialized:
+            raise RuntimeError(
+                "Handler not initialized. Call initialize() before handle()."
+            )
+
         now = datetime.now(timezone.utc)
+
+        # Explicit guard for circuit breaker (guaranteed set after initialize())
+        # Note: Using explicit guard instead of assert because assertions can be
+        # disabled in production with -O flag, making this a critical path check.
+        if self._db_circuit_breaker is None:
+            raise RuntimeError(
+                "Circuit breaker not initialized. This indicates a bug in initialize()."
+            )
 
         # Check circuit breaker before any DB operations
         if not self._db_circuit_breaker.should_allow_request():
@@ -534,6 +790,40 @@ class HandlerMemoryArchive:
                 memory_id=command.memory_id,
                 success=False,
                 error_message=str(e),
+            )
+        except PostgresError as e:
+            # Handle asyncpg database errors (query errors, constraint violations, etc.)
+            self._db_circuit_breaker.record_failure()
+            logger.error(
+                "Database error reading memory",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                error_message=f"Database error reading memory: {e}",
+            )
+        except (InterfaceError, InternalClientError) as e:
+            # Handle asyncpg client-side errors not covered by PostgresError:
+            # - InterfaceError: Pool closing, connection already acquired, etc.
+            # - InternalClientError: Protocol errors, schema cache issues, etc.
+            self._db_circuit_breaker.record_failure()
+            logger.error(
+                "Client error reading memory",
+                extra={
+                    "memory_id": str(command.memory_id),
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            return ModelMemoryArchiveResult(
+                memory_id=command.memory_id,
+                success=False,
+                error_message=f"Client error reading memory: {e}",
             )
         except TimeoutError as e:
             self._db_circuit_breaker.record_timeout()
@@ -592,6 +882,25 @@ class HandlerMemoryArchive:
             command.memory_id,
             now,
         )
+
+        # Step 5b: Validate archive path to prevent directory traversal attacks
+        # Custom paths must be within the allowed archive base directory
+        if command.archive_path is not None:
+            validation_error = self._validate_archive_path(command.archive_path)
+            if validation_error is not None:
+                logger.warning(
+                    "Rejected archive path outside allowed directory",
+                    extra={
+                        "memory_id": str(command.memory_id),
+                        "requested_path": str(command.archive_path),
+                        "archive_base_path": str(self._archive_base_path),
+                    },
+                )
+                return ModelMemoryArchiveResult(
+                    memory_id=command.memory_id,
+                    success=False,
+                    error_message=validation_error,
+                )
 
         # Step 6: Write atomically
         try:
@@ -786,6 +1095,15 @@ class HandlerMemoryArchive:
             ... )
             Path("/var/omnimemory/archives/2026/01/25/abc12345-....jsonl.gz")
         """
+        # Explicit guard for archive base path (guaranteed set after initialize())
+        # Note: Using explicit guard instead of assert because assertions can be
+        # disabled in production with -O flag, making this a critical path check.
+        if self._archive_base_path is None:
+            raise RuntimeError(
+                "Archive base path not initialized. "
+                "This indicates a bug in initialize()."
+            )
+
         return (
             self._archive_base_path
             / str(archived_at.year)
@@ -793,6 +1111,56 @@ class HandlerMemoryArchive:
             / f"{archived_at.day:02d}"
             / f"{memory_id}.jsonl.gz"
         )
+
+    def _validate_archive_path(self, archive_path: Path) -> str | None:
+        """Validate that an archive path is within the allowed base directory.
+
+        Prevents directory traversal attacks (e.g., ../../../etc/passwd) by
+        ensuring the resolved path is under the configured archive base path.
+
+        Security Note:
+            This method uses Path.resolve() to normalize the path and eliminate
+            any '..' components, symlinks, or other path manipulation attempts.
+            The resolved path must start with the resolved base path.
+
+        Args:
+            archive_path: The path to validate (may be user-provided).
+
+        Returns:
+            None if the path is valid, or an error message string if invalid.
+        """
+        # Explicit guard for archive base path
+        if self._archive_base_path is None:
+            return (
+                "Archive base path not initialized. "
+                "Call initialize() before validating paths."
+            )
+
+        # Resolve both paths to eliminate '..' components and symlinks
+        try:
+            # Resolve the base path (should already exist or will be created)
+            resolved_base = self._archive_base_path.resolve()
+
+            # For the archive path, we need to handle the case where parent
+            # directories don't exist yet. We resolve what we can.
+            # Note: resolve() on a non-existent path returns the normalized
+            # absolute path without following symlinks for non-existent parts.
+            resolved_archive = archive_path.resolve()
+
+            # Check if the resolved archive path is under the resolved base path
+            # Using is_relative_to() for clean path containment check (Python 3.9+)
+            if not resolved_archive.is_relative_to(resolved_base):
+                return (
+                    f"Archive path '{archive_path}' is outside allowed directory. "
+                    f"Path must be under '{self._archive_base_path}'."
+                )
+
+            return None  # Path is valid
+
+        except (OSError, ValueError) as e:
+            # OSError: Path resolution failed (e.g., permission denied on symlink)
+            # ValueError: Path operations failed (e.g., invalid path characters)
+            return f"Failed to validate archive path: {e}"
 
     def _serialize_for_archive_sync(self, record: ModelArchiveRecord) -> bytes:
         """Serialize record to compressed JSONL bytes (synchronous).

@@ -2,7 +2,7 @@
 Foundation Tests for OmniMemory ONEX Architecture
 
 This module tests the foundational components of the OmniMemory system
-to ensure ONEX compliance and proper implementation of the ModelOnexContainer
+to ensure ONEX compliance and proper implementation of the ModelONEXContainer
 patterns, protocols, and error handling.
 """
 
@@ -12,6 +12,10 @@ from pathlib import Path
 
 import pytest
 import yaml
+from omnibase_core.container import ModelONEXContainer
+from omnibase_core.models.core.model_base_error import ModelBaseError
+from omnibase_core.models.core.model_base_result import ModelBaseResult
+from omnibase_core.models.results.model_simple_metadata import ModelGenericMetadata
 
 from omnimemory import (  # Protocols; Data models; Error handling
     AccessLevel,
@@ -23,12 +27,8 @@ from omnimemory import (  # Protocols; Data models; Error handling
     MemoryStoreResponse,
     ProtocolMemoryStorage,
     ProtocolOmniMemoryError,
-    ProtocolSystemError,
     ProtocolValidationError,
 )
-
-# Use compat modules until omnibase_core components are available
-from omnimemory.compat import ModelOnexContainer, NodeResult
 
 
 class MockMemoryStorageNode:
@@ -60,7 +60,7 @@ class MockMemoryStorageNode:
     async def store_memory(
         self,
         request: MemoryStoreRequest,
-    ) -> NodeResult[MemoryStoreResponse]:
+    ) -> ModelBaseResult:
         """Mock memory storage operation."""
         try:
             # Simulate storage operation
@@ -78,20 +78,29 @@ class MockMemoryStorageNode:
                 storage_size_bytes=len(request.memory.content),
             )
 
-            return NodeResult.success(
-                value=response,
-                provenance=["mock_storage.store_memory"],
-                trust_score=1.0,
-                metadata={"service": "mock_storage"},
+            return ModelBaseResult(
+                success=True,
+                exit_code=0,
+                errors=[],
+                metadata=ModelGenericMetadata(
+                    custom_fields={
+                        "response": response.model_dump(),
+                        "service": "mock_storage",
+                    }
+                ),
             )
 
         except Exception as e:
-            return NodeResult.failure(
-                error=ProtocolSystemError(
-                    message=f"Mock storage failed: {e!s}",
-                    system_component="mock_storage",
-                ),
-                provenance=["mock_storage.store_memory.failed"],
+            return ModelBaseResult(
+                success=False,
+                exit_code=1,
+                errors=[
+                    ModelBaseError(
+                        message=f"Mock storage failed: {e!s}",
+                        code="STORAGE_ERROR",
+                        details="mock_storage.store_memory.failed",
+                    )
+                ],
             )
 
 
@@ -99,9 +108,9 @@ class TestFoundationArchitecture:
     """Test suite for ONEX foundation architecture."""
 
     @pytest.fixture
-    def container(self) -> ModelOnexContainer:
+    def container(self) -> ModelONEXContainer:
         """Create a test container instance."""
-        return ModelOnexContainer()
+        return ModelONEXContainer()
 
     @pytest.fixture
     def sample_memory_record(self) -> MemoryRecord:
@@ -115,25 +124,26 @@ class TestFoundationArchitecture:
             tags=["test", "validation", "onex"],
         )
 
-    def test_container_initialization(self, container: ModelOnexContainer) -> None:
+    def test_container_initialization(self, container: ModelONEXContainer) -> None:
         """Test that the ONEX container initializes properly."""
         assert container is not None
-        assert hasattr(container, "register_singleton")
-        assert hasattr(container, "register_transient")
-        assert hasattr(container, "resolve")
+        # omnibase_core container uses service registry pattern
+        assert hasattr(container, "get_service")
+        assert hasattr(container, "get_service_optional")
+        assert hasattr(container, "service_registry")
 
-    def test_container_node_registration_resolution(
-        self, container: ModelOnexContainer
-    ) -> None:
-        """Test ONEX node registration and resolution functionality."""
-        # Register mock storage node
-        container.register_singleton(ProtocolMemoryStorage, MockMemoryStorageNode)
+    def test_container_service_registry(self, container: ModelONEXContainer) -> None:
+        """Test ONEX container service registry access."""
+        # omnibase_core uses service registry pattern
+        # Test that service registry is accessible
+        assert container.service_registry is not None
 
-        # Resolve node
-        storage_node = container.resolve(ProtocolMemoryStorage)
-
-        assert storage_node is not None
-        assert isinstance(storage_node, MockMemoryStorageNode)
+        # Test get_service_optional returns None for unregistered services
+        result = container.get_service_optional(
+            ProtocolMemoryStorage  # type: ignore[type-abstract]
+        )
+        # Unregistered service should return None (not raise)
+        assert result is None
 
     def test_memory_record_validation(self, sample_memory_record: MemoryRecord) -> None:
         """Test memory record creation and validation."""
@@ -179,7 +189,10 @@ class TestFoundationArchitecture:
 
         assert error.omnimemory_error_code == EnumOmniMemoryErrorCode.INVALID_INPUT
         assert error.message == "Test error message"
-        assert error.context["test_key"] == "test_value"
+        # ModelOnexError stores context dict under "additional_context.context" path
+        assert (
+            error.context["additional_context"]["context"]["test_key"] == "test_value"
+        )
         assert error.is_recoverable() is False  # Validation errors are not recoverable
 
         # Test ProtocolValidationError
@@ -189,8 +202,15 @@ class TestFoundationArchitecture:
             field_value="invalid_value",
         )
 
-        assert validation_error.context["field_name"] == "test_field"
-        assert validation_error.context["field_value"] == "invalid_value"
+        # Context is stored under additional_context.context by ModelOnexError
+        assert (
+            validation_error.context["additional_context"]["context"]["field_name"]
+            == "test_field"
+        )
+        assert (
+            validation_error.context["additional_context"]["context"]["field_value"]
+            == "invalid_value"
+        )
         assert "Review and correct" in validation_error.recovery_hint
 
     def test_error_categorization(self) -> None:
@@ -211,36 +231,55 @@ class TestFoundationArchitecture:
         assert storage_category.recoverable is True
         assert storage_category.default_retry_count > 0
 
-    def test_node_result_success_failure_composition(self) -> None:
-        """Test monadic patterns and NodeResult composition."""
-        # Test successful NodeResult
-        success_result = NodeResult.success(
-            value="test_value",
-            provenance=["test.operation"],
-            trust_score=1.0,
+    def test_model_base_result_success_failure(self) -> None:
+        """Test ModelBaseResult success and failure patterns."""
+        # Test successful ModelBaseResult
+        success_result = ModelBaseResult(
+            success=True,
+            exit_code=0,
+            errors=[],
+            metadata=ModelGenericMetadata(
+                custom_fields={
+                    "value": "test_value",
+                    "provenance": ["test.operation"],
+                    "trust_score": 1.0,
+                }
+            ),
         )
 
-        assert success_result.is_success is True
-        assert success_result.is_failure is False
-        assert success_result.value == "test_value"
-        assert "test.operation" in success_result.provenance
-        assert success_result.trust_score == 1.0
+        assert success_result.success is True
+        assert success_result.exit_code == 0
+        assert len(success_result.errors) == 0
+        assert success_result.metadata is not None
+        assert success_result.metadata.custom_fields["value"] == "test_value"
+        assert "test.operation" in success_result.metadata.custom_fields["provenance"]
+        assert success_result.metadata.custom_fields["trust_score"] == 1.0
 
-        # Test failure NodeResult
-        error = ProtocolSystemError(
-            message="Test failure",
-            system_component="test_component",
+        # Test failure ModelBaseResult
+        failure_result = ModelBaseResult(
+            success=False,
+            exit_code=1,
+            errors=[
+                ModelBaseError(
+                    message="Test failure",
+                    code="SYSTEM_ERROR",
+                    details="test_component",
+                )
+            ],
+            metadata=ModelGenericMetadata(
+                custom_fields={"provenance": ["test.operation.failed"]}
+            ),
         )
 
-        failure_result = NodeResult.failure(
-            error=error,
-            provenance=["test.operation.failed"],
+        assert failure_result.success is False
+        assert failure_result.exit_code == 1
+        assert len(failure_result.errors) == 1
+        assert failure_result.errors[0].message == "Test failure"
+        assert failure_result.metadata is not None
+        assert (
+            "test.operation.failed"
+            in failure_result.metadata.custom_fields["provenance"]
         )
-
-        assert failure_result.is_success is False
-        assert failure_result.is_failure is True
-        assert failure_result.error is not None
-        assert "test.operation.failed" in failure_result.provenance
 
     def test_contract_compliance(self) -> None:
         """Test that the implementation follows contract specifications.
@@ -271,15 +310,16 @@ class TestFoundationArchitecture:
         assert "reducer" in architecture["nodes"]
         assert "orchestrator" in architecture["nodes"]
 
+    @pytest.mark.asyncio
     async def test_memory_operation_e2e(
-        self, container: ModelOnexContainer, sample_memory_record: MemoryRecord
+        self, container: ModelONEXContainer, sample_memory_record: MemoryRecord
     ) -> None:
         """Test end-to-end memory operation using ONEX nodes."""
-        # Register mock storage node
-        container.register_singleton(ProtocolMemoryStorage, MockMemoryStorageNode)
+        # Verify container is available (omnibase_core pattern doesn't use register/resolve)
+        assert container is not None
 
-        # Resolve storage node
-        storage_node = container.resolve(ProtocolMemoryStorage)
+        # Directly instantiate mock storage node for testing
+        storage_node = MockMemoryStorageNode()
 
         # Create store request
         store_request = MemoryStoreRequest(
@@ -291,12 +331,14 @@ class TestFoundationArchitecture:
         # Perform store operation
         store_result = await storage_node.store_memory(store_request)
 
-        assert store_result.is_success
-        response = store_result.value
-        assert response.memory_id == sample_memory_record.memory_id
-        assert response.storage_location == "/mock/storage/location"
-        assert response.indexing_status == "completed"
-        assert response.embedding_generated is True
+        assert store_result.success
+        assert store_result.metadata is not None
+        response_data = store_result.metadata.custom_fields["response"]
+        # model_dump() may return UUID objects, so convert both to string for comparison
+        assert str(response_data["memory_id"]) == str(sample_memory_record.memory_id)
+        assert response_data["storage_location"] == "/mock/storage/location"
+        assert response_data["indexing_status"] == "completed"
+        assert response_data["embedding_generated"] is True
 
 
 class TestMockMemoryStorageNode:

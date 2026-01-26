@@ -4,7 +4,7 @@ Data Models for OmniMemory ONEX Architecture
 This module contains all Pydantic data models used throughout the OmniMemory system,
 following ONEX contract-driven development patterns with strong typing and validation.
 
-All models support monadic patterns with NodeResult composition and provide
+All models support result patterns with ModelBaseResult composition and provide
 comprehensive validation, serialization, and observability features.
 """
 

@@ -37,12 +37,20 @@ Related:
 
 Example::
 
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
         HandlerMemoryExpire,
         ModelExpireMemoryCommand,
     )
 
-    handler = HandlerMemoryExpire(db_pool=pool)
+    # Create handler with container (dependency injection)
+    container = ModelONEXContainer()
+    handler = HandlerMemoryExpire(container)
+
+    # Initialize with database pool and configuration
+    await handler.initialize(db_pool=pool, max_retries=3)
+
+    # Execute expiration
     result = await handler.handle(
         ModelExpireMemoryCommand(
             memory_id=uuid4(),
@@ -87,9 +95,14 @@ else:
         InterfaceError = Exception  # type: ignore[misc,assignment]
         InternalClientError = Exception  # type: ignore[misc,assignment]
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums import EnumLifecycleState
+
+if TYPE_CHECKING:
+    from omnibase_core.container import ModelONEXContainer
 from omnimemory.utils.concurrency import (
     CircuitBreaker,
     CircuitBreakerOpenError,
@@ -109,6 +122,8 @@ _CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
 __all__ = [
     "HandlerMemoryExpire",
     "ModelExpireMemoryCommand",
+    "ModelMemoryExpireHealth",
+    "ModelMemoryExpireMetadata",
     "ModelMemoryExpireResult",
     "ModelMemoryCurrentState",
     "CircuitBreakerOpenError",
@@ -252,6 +267,91 @@ class ModelMemoryCurrentState(BaseModel):  # omnimemory-model-exempt: handler st
     )
 
 
+class ModelMemoryExpireHealth(BaseModel):  # omnimemory-model-exempt: handler health
+    """Health status for the Memory Expire Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its database connectivity.
+
+    Attributes:
+        initialized: Whether the handler has been initialized.
+        circuit_breaker_state: Current state of the circuit breaker.
+        db_pool_available: Whether the database connection pool is configured.
+        max_retries: Configured maximum retry attempts.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    circuit_breaker_state: str = Field(
+        ...,
+        description="Current state of the circuit breaker (closed, open, half_open, not_configured)",
+    )
+    db_pool_available: bool = Field(
+        ...,
+        description="Whether the database connection pool is configured",
+    )
+    max_retries: int = Field(
+        ...,
+        ge=1,
+        description="Configured maximum retry attempts",
+    )
+
+
+class ModelMemoryExpireMetadata(BaseModel):  # omnimemory-model-exempt: handler metadata
+    """Metadata describing memory expire handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's purpose, capabilities, and state transition rules.
+
+    Attributes:
+        name: Handler class name.
+        description: Brief description of handler purpose.
+        version: Handler version string.
+        capabilities: List of supported capabilities.
+        valid_from_states: States from which expiration can transition.
+        target_state: The state memories transition to after expiration.
+        initialized: Whether the handler has been initialized.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    description: str = Field(
+        ...,
+        description="Brief description of handler purpose",
+    )
+    version: str = Field(
+        ...,
+        description="Handler version string",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported capabilities",
+    )
+    valid_from_states: list[str] = Field(
+        ...,
+        description="States from which expiration can transition",
+    )
+    target_state: str = Field(
+        ...,
+        description="The state memories transition to after expiration",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+
+
 # =============================================================================
 # Handler
 # =============================================================================
@@ -302,19 +402,37 @@ class HandlerMemoryExpire:
     # handle_with_retry() to keep retrying on already-expired memories.
     _VALID_FROM_STATES = frozenset({EnumLifecycleState.ACTIVE})
 
-    def __init__(
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize the expiration handler with container.
+
+        Args:
+            container: ONEX dependency injection container for service resolution.
+                The handler uses the container for accessing shared infrastructure
+                services and configuration.
+
+        Note:
+            The handler is not fully operational until initialize() is called.
+            Use the initialized property to check initialization status.
+        """
+        self._container = container
+        self._db_pool: Pool | None = None
+        self._max_retries: int = 3
+        self._circuit_breaker: CircuitBreaker | None = None
+        self._initialized: bool = False
+
+    async def initialize(
         self,
-        db_pool: Pool | None = None,
+        db_pool: Pool,
         max_retries: int = 3,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
-        """Initialize the expiration handler.
+        """Initialize handler resources.
+
+        Must be called before using handle() or handle_with_retry().
 
         Args:
-            db_pool: Database connection pool. Required for database operations.
-                If None, calling handle() or _read_current_state() will raise
-                RuntimeError. The handler requires a database pool for all
-                operations - there is no in-memory fallback mode.
+            db_pool: Database connection pool for database operations.
+                Required for all database operations.
             max_retries: Maximum retry attempts for handle_with_retry().
                 Defaults to 3, which balances retry opportunity against
                 excessive contention scenarios.
@@ -336,6 +454,85 @@ class HandlerMemoryExpire:
             recovery_timeout=_CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
             success_threshold=_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
         )
+        self._initialized = True
+        logger.info("HandlerMemoryExpire initialized successfully")
+
+    @property
+    def initialized(self) -> bool:
+        """Check if the handler has been initialized.
+
+        Returns:
+            True if initialize() has been called successfully.
+        """
+        return self._initialized
+
+    async def shutdown(self) -> None:
+        """Shutdown the handler and release resources.
+
+        Resets initialization state and clears internal references.
+        Safe to call multiple times (idempotent).
+        After shutdown, initialize() must be called again to use the handler.
+
+        Note:
+            This method does NOT close the database pool as it is an
+            external resource whose lifecycle is not owned by this handler.
+        """
+        if self._initialized:
+            # Clear internal state (pools are external, don't close)
+            self._db_pool = None
+            self._circuit_breaker = None
+            self._initialized = False
+            logger.info("HandlerMemoryExpire shutdown complete")
+
+    async def health_check(self) -> ModelMemoryExpireHealth:
+        """Check handler health status.
+
+        Returns:
+            ModelMemoryExpireHealth with detailed status information:
+            - initialized: Whether initialize() has been called
+            - circuit_breaker_state: Current circuit breaker state
+            - db_pool_available: Whether database pool is configured
+            - max_retries: Configured retry limit
+        """
+        cb_state = (
+            self._circuit_breaker.state.value
+            if self._circuit_breaker
+            else "not_configured"
+        )
+
+        return ModelMemoryExpireHealth(
+            initialized=self._initialized,
+            circuit_breaker_state=cb_state,
+            db_pool_available=self._db_pool is not None,
+            max_retries=self._max_retries,
+        )
+
+    async def describe(self) -> ModelMemoryExpireMetadata:
+        """Return handler metadata and capabilities.
+
+        Provides information about the handler for introspection
+        and service discovery.
+
+        Returns:
+            ModelMemoryExpireMetadata with handler information including
+            name, description, capabilities, and state transition rules.
+        """
+        return ModelMemoryExpireMetadata(
+            name="HandlerMemoryExpire",
+            description=(
+                "Handles memory expiration with optimistic locking. "
+                "Performs ACTIVE -> EXPIRED state transitions."
+            ),
+            version="1.0.0",
+            capabilities=[
+                "memory_expiration",
+                "optimistic_locking",
+                "retry_with_backoff",
+            ],
+            valid_from_states=[s.value for s in self._VALID_FROM_STATES],
+            target_state=EnumLifecycleState.EXPIRED.value,
+            initialized=self._initialized,
+        )
 
     @property
     def max_retries(self) -> int:
@@ -349,6 +546,7 @@ class HandlerMemoryExpire:
         Exposed for monitoring and testing purposes. The circuit breaker
         tracks database failures and opens to prevent cascading failures.
         """
+        assert self._circuit_breaker is not None
         return self._circuit_breaker
 
     @property
@@ -360,6 +558,7 @@ class HandlerMemoryExpire:
             CircuitBreakerState.OPEN: Failing fast, DB assumed unavailable
             CircuitBreakerState.HALF_OPEN: Testing if DB has recovered
         """
+        assert self._circuit_breaker is not None
         return self._circuit_breaker.state
 
     async def handle(
@@ -391,12 +590,21 @@ class HandlerMemoryExpire:
             command.reason,
         )
 
-        # Require database pool for all operations
+        # Require handler to be initialized
+        if not self._initialized:
+            raise RuntimeError(
+                "Handler not initialized. Call initialize() before handle()."
+            )
+
+        # Require database pool for all operations (should always be true after init)
         if self._db_pool is None:
             raise RuntimeError(
                 "Database pool not configured. "
                 "Initialize handler with db_pool parameter."
             )
+
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._circuit_breaker is not None
 
         # Check circuit breaker before attempting database operation
         if not self._circuit_breaker.should_allow_request():
@@ -713,18 +921,27 @@ class HandlerMemoryExpire:
             ModelMemoryCurrentState if found, None if not found.
 
         Raises:
-            RuntimeError: If database pool is not configured.
+            RuntimeError: If handler is not initialized or database pool is not configured.
             PostgresError: If a database error occurs during the query.
             InterfaceError: If a client-side asyncpg error occurs.
             InternalClientError: If a protocol-level asyncpg error occurs.
             TimeoutError: If the database query exceeds the timeout.
         """
-        # Require database pool for all operations
+        # Require handler to be initialized
+        if not self._initialized:
+            raise RuntimeError(
+                "Handler not initialized. Call initialize() before _read_current_state()."
+            )
+
+        # Require database pool for all operations (should always be true after init)
         if self._db_pool is None:
             raise RuntimeError(
                 "Database pool not configured. "
                 "Initialize handler with db_pool parameter."
             )
+
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._circuit_breaker is not None
 
         # Check circuit breaker before attempting database operation
         if not self._circuit_breaker.should_allow_request():

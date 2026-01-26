@@ -17,9 +17,9 @@ Example::
         NodeSimilarityCompute,
         ModelSimilarityComputeRequest,
     )
-    from omnimemory.compat import ModelOnexContainer
+    from omnibase_core.container import ModelONEXContainer
 
-    container = ModelOnexContainer()
+    container = ModelONEXContainer()
     node = NodeSimilarityCompute(container)
 
     request = ModelSimilarityComputeRequest(
@@ -38,13 +38,88 @@ from __future__ import annotations
 
 from typing import assert_never
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from ..base import BaseComputeNode, ContainerType
-from .handlers import HandlerSimilarityCompute, ModelHandlerSimilarityComputeConfig
+from .handlers import (
+    HandlerSimilarityCompute,
+    ModelHandlerSimilarityComputeConfig,
+    ModelSimilarityComputeHealth,
+    ModelSimilarityComputeMetadata,
+)
 from .models import ModelSimilarityComputeRequest, ModelSimilarityComputeResponse
 
 __all__ = [
+    "ModelNodeSimilarityComputeHealth",
+    "ModelNodeSimilarityComputeMetadata",
     "NodeSimilarityCompute",
 ]
+
+
+class ModelNodeSimilarityComputeHealth(  # omnimemory-model-exempt: handler health
+    BaseModel
+):
+    """Health status for the Similarity Compute Node.
+
+    Returned by the node's health_check() method to provide detailed health
+    information including the node's status and the underlying handler's health.
+
+    Attributes:
+        healthy: Whether the node is healthy.
+        node: Node identifier string.
+        handler: Detailed health status of the underlying handler.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    healthy: bool = Field(
+        ...,
+        description="Whether the node is healthy",
+    )
+    node: str = Field(
+        ...,
+        description="Node identifier string",
+    )
+    handler: ModelSimilarityComputeHealth = Field(
+        ...,
+        description="Detailed health status of the underlying handler",
+    )
+
+
+class ModelNodeSimilarityComputeMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing similarity compute node capabilities and configuration.
+
+    Returned by the node's describe() method to provide introspection information
+    about the node's type, capabilities, and underlying handler details.
+
+    Attributes:
+        node_type: ONEX node type (COMPUTE for this node).
+        node_name: Node identifier string.
+        handler: Detailed metadata of the underlying handler.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    node_type: str = Field(
+        ...,
+        description="ONEX node type (COMPUTE for this node)",
+    )
+    node_name: str = Field(
+        ...,
+        description="Node identifier string",
+    )
+    handler: ModelSimilarityComputeMetadata = Field(
+        ...,
+        description="Detailed metadata of the underlying handler",
+    )
 
 
 class NodeSimilarityCompute(BaseComputeNode):
@@ -63,13 +138,14 @@ class NodeSimilarityCompute(BaseComputeNode):
         - Node is a thin wrapper (minimal logic)
         - All business logic is in the handler
         - Error handling converts exceptions to error responses
+        - Handler follows container-driven pattern
 
     Attributes:
         container: The ONEX container for dependency injection.
 
     Example::
 
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         node = NodeSimilarityCompute(container)
 
         # Cosine distance
@@ -101,8 +177,47 @@ class NodeSimilarityCompute(BaseComputeNode):
             container: ONEX container for dependency injection.
         """
         super().__init__(container)
-        self._handler = HandlerSimilarityCompute(
-            config=ModelHandlerSimilarityComputeConfig()
+        # Handler follows container-driven pattern
+        # Config is provided via initialize() or uses defaults
+        self._handler = HandlerSimilarityCompute(container)
+        self._handler_initialized = False
+
+    async def initialize(
+        self,
+        config: ModelHandlerSimilarityComputeConfig | None = None,
+    ) -> None:
+        """Initialize the node and its handler.
+
+        Args:
+            config: Optional handler configuration.
+        """
+        await self._handler.initialize(config)
+        self._handler_initialized = True
+
+    async def health_check(self) -> ModelNodeSimilarityComputeHealth:
+        """Return health status of the node and handler.
+
+        Returns:
+            ModelNodeSimilarityComputeHealth with node and handler status.
+        """
+        handler_health = await self._handler.health_check()
+        return ModelNodeSimilarityComputeHealth(
+            healthy=handler_health.healthy,
+            node="similarity_compute",
+            handler=handler_health,
+        )
+
+    async def describe(self) -> ModelNodeSimilarityComputeMetadata:
+        """Return node metadata and capabilities.
+
+        Returns:
+            ModelNodeSimilarityComputeMetadata describing the node's capabilities.
+        """
+        handler_desc = await self._handler.describe()
+        return ModelNodeSimilarityComputeMetadata(
+            node_type="COMPUTE",
+            node_name="similarity_compute",
+            handler=handler_desc,
         )
 
     def execute(

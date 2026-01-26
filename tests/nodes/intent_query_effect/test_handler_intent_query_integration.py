@@ -81,6 +81,7 @@ _SKIP_REASON = "Memgraph not available"
 try:
     from neo4j import AsyncGraphDatabase
     from neo4j.exceptions import ServiceUnavailable
+    from omnibase_core.container import ModelONEXContainer
 
     from omnimemory.handlers.adapters import AdapterIntentGraph
     from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
@@ -187,13 +188,32 @@ async def initialized_adapter(
 
 
 @pytest.fixture
+def container() -> ModelONEXContainer:
+    """Create a container for handler tests."""
+    return ModelONEXContainer()
+
+
+@pytest.fixture
 async def initialized_handler(
-    initialized_adapter: AdapterIntentGraph,
+    memgraph_available: bool,
+    container: ModelONEXContainer,
     handler_config: ModelHandlerIntentQueryConfig,
+    adapter_config: ModelAdapterIntentGraphConfig,
 ) -> AsyncGenerator[HandlerIntentQuery, None]:
-    """Create and initialize handler for tests."""
-    handler = HandlerIntentQuery(handler_config)
-    await handler.initialize(initialized_adapter)
+    """Create and initialize handler for tests.
+
+    The handler now owns the adapter lifecycle (container-driven pattern).
+    """
+    if not memgraph_available:
+        pytest.skip("Memgraph is not available")
+
+    handler = HandlerIntentQuery(container)
+    await handler.initialize(
+        connection_uri=get_memgraph_uri(),
+        auth=get_memgraph_auth(),
+        config=handler_config,
+        adapter_config=adapter_config,
+    )
 
     yield handler
 
@@ -703,12 +723,15 @@ class TestHandlerIntentQueryUnit:
     async def test_handler_not_initialized_returns_error(self) -> None:
         """Test execute before initialize returns error."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
         from omnimemory.nodes.intent_query_effect.models import (
             ModelIntentQueryRequestedEvent,
         )
 
-        handler = HandlerIntentQuery()
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
         request = ModelIntentQueryRequestedEvent.create_distribution_query(
             time_range_hours=1,
         )
@@ -718,70 +741,96 @@ class TestHandlerIntentQueryUnit:
         assert response.status == "error"
         assert "not initialized" in (response.error_message or "").lower()
 
-    def test_handler_config_defaults(self) -> None:
-        """Test handler uses default config when none provided."""
+    def test_handler_config_none_before_initialize(self) -> None:
+        """Test handler config is None before initialization."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
-        handler = HandlerIntentQuery()
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
 
-        assert handler.config.timeout_seconds == 10.0
-        assert handler.config.default_time_range_hours == 24
-        assert handler.config.default_limit == 100
+        # Config is None before initialize
+        assert handler.config is None
 
-    def test_handler_config_custom(self) -> None:
-        """Test handler accepts custom config."""
-        pytest.importorskip("omnimemory.nodes.intent_query_effect.models")
+    def test_handler_has_container(self) -> None:
+        """Test handler has container reference."""
+        pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
-        from omnimemory.nodes.intent_query_effect.models import (
-            ModelHandlerIntentQueryConfig,
-        )
 
-        config = ModelHandlerIntentQueryConfig(
-            timeout_seconds=30.0,
-            default_time_range_hours=48,
-            default_limit=50,
-        )
-        handler = HandlerIntentQuery(config)
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
 
-        assert handler.config.timeout_seconds == 30.0
-        assert handler.config.default_time_range_hours == 48
-        assert handler.config.default_limit == 50
+        assert handler.container is container
 
     def test_handler_not_initialized_by_default(self) -> None:
         """Test handler is not initialized by default."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
-        handler = HandlerIntentQuery()
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
 
         assert not handler.is_initialized
-
-    @pytest.mark.asyncio
-    async def test_handler_initialize_requires_adapter(self) -> None:
-        """Test initialize requires valid adapter."""
-        pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
-
-        handler = HandlerIntentQuery()
-
-        # Should not raise, but sets adapter
-        # We can't call initialize with None, so we test the state
-        assert handler.is_initialized is False
 
     @pytest.mark.asyncio
     async def test_handler_shutdown_idempotent(self) -> None:
         """Test shutdown can be called multiple times safely."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
-        handler = HandlerIntentQuery()
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
 
         # Should not raise
         await handler.shutdown()
         await handler.shutdown()
 
         assert not handler.is_initialized
+
+    @pytest.mark.asyncio
+    async def test_handler_describe_metadata(self) -> None:
+        """Test describe returns handler metadata."""
+        pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
+        from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
+
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
+
+        metadata = await handler.describe()
+
+        assert metadata.name == "HandlerIntentQuery"
+        assert metadata.node_type == "EFFECT"
+        assert "distribution" in metadata.supported_query_types
+        assert "session" in metadata.supported_query_types
+        assert "recent" in metadata.supported_query_types
+        assert metadata.initialized is False
+
+    @pytest.mark.asyncio
+    async def test_handler_health_check_not_initialized(self) -> None:
+        """Test health_check returns unhealthy when not initialized."""
+        pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
+
+        from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
+
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
+
+        health = await handler.health_check()
+
+        assert health.healthy is False
+        assert health.initialized is False
+        assert "not initialized" in (health.error_message or "").lower()
 
 
 # Remove integration markers for unit tests

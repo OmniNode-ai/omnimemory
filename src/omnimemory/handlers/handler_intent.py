@@ -111,7 +111,7 @@ logger = logging.getLogger(__name__)
 HANDLER_ID_INTENT: str = "intent-handler"
 
 
-class ModelHandlerIntentMetadata(  # omnimemory-model-exempt: handler-local metadata
+class ModelHandlerIntentMetadata(  # omnimemory-model-exempt: handler metadata
     BaseModel
 ):
     """Metadata describing the intent handler capabilities.

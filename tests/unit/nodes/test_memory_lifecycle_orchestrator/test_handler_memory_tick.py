@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
 from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
 from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
@@ -43,6 +44,16 @@ from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_tick
 # =============================================================================
 # Test Fixtures
 # =============================================================================
+
+
+@pytest.fixture
+def container() -> ModelONEXContainer:
+    """Provide an ONEX container for handler initialization.
+
+    Returns:
+        A ModelONEXContainer instance for dependency injection.
+    """
+    return ModelONEXContainer()
 
 
 @pytest.fixture
@@ -244,61 +255,169 @@ class MockProjectionReader:
 class TestHandlerMemoryTickInitialization:
     """Tests for HandlerMemoryTick initialization."""
 
-    def test_handler_creates_without_projection_reader(self) -> None:
-        """Test handler can be created without projection reader.
+    def test_handler_creates_with_container(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test handler can be created with container.
 
-        Given: No projection reader provided
+        Given: An ONEX container
         When: Creating HandlerMemoryTick
-        Then: Handler is created successfully in stub mode
+        Then: Handler is created successfully but not initialized
         """
-        handler = HandlerMemoryTick()
+        handler = HandlerMemoryTick(container)
         assert handler is not None
         assert handler._projection_reader is None
+        assert handler.initialized is False
 
-    def test_handler_creates_with_projection_reader(self) -> None:
-        """Test handler can be created with projection reader.
+    @pytest.mark.asyncio
+    async def test_handler_initializes_without_projection_reader(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test handler can be initialized without projection reader.
+
+        Given: No projection reader provided
+        When: Initializing HandlerMemoryTick
+        Then: Handler is initialized in stub mode
+        """
+        handler = HandlerMemoryTick(container)
+        await handler.initialize()
+
+        assert handler.initialized is True
+        assert handler._projection_reader is None
+
+    @pytest.mark.asyncio
+    async def test_handler_initializes_with_projection_reader(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test handler can be initialized with projection reader.
 
         Given: A mock projection reader
-        When: Creating HandlerMemoryTick
-        Then: Handler is created with the reader attached
+        When: Initializing HandlerMemoryTick
+        Then: Handler is initialized with the reader attached
         """
         reader = MockProjectionReader()
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
+
+        assert handler.initialized is True
         assert handler._projection_reader is reader
 
-    def test_handler_creates_with_custom_batch_size(self) -> None:
-        """Test handler can be created with custom batch size.
+    @pytest.mark.asyncio
+    async def test_handler_initializes_with_custom_batch_size(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test handler can be initialized with custom batch size.
 
         Given: A custom batch_size value
-        When: Creating HandlerMemoryTick
+        When: Initializing HandlerMemoryTick
         Then: Handler uses the custom batch size
         """
-        handler = HandlerMemoryTick(batch_size=50)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(batch_size=50)
+
         assert handler._batch_size == 50
 
-    def test_handler_default_batch_size(self) -> None:
+    @pytest.mark.asyncio
+    async def test_handler_default_batch_size(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
         """Test handler uses default batch size of 100.
 
         Given: No batch_size provided
-        When: Creating HandlerMemoryTick
+        When: Initializing HandlerMemoryTick
         Then: Handler uses default batch size of 100
         """
-        handler = HandlerMemoryTick()
+        handler = HandlerMemoryTick(container)
+        await handler.initialize()
+
         assert handler._batch_size == 100
 
-    def test_handler_properties(self) -> None:
+    def test_handler_properties(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
         """Test handler exposes correct properties.
 
         Given: A HandlerMemoryTick instance
         When: Accessing handler properties
         Then: Properties return expected values
         """
-        handler = HandlerMemoryTick()
+        handler = HandlerMemoryTick(container)
 
         assert handler.handler_id == "handler-memory-tick"
         assert handler.category == EnumMessageCategory.EVENT
         assert handler.message_types == {"ModelRuntimeTick"}
         assert handler.node_kind == EnumNodeKind.ORCHESTRATOR
+
+    @pytest.mark.asyncio
+    async def test_health_check_before_initialization(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test health_check returns correct status before initialization.
+
+        Given: A handler that has not been initialized
+        When: Calling health_check
+        Then: Returns typed health model with initialized=False and no circuit breaker state
+        """
+        handler = HandlerMemoryTick(container)
+
+        health = await handler.health_check()
+
+        assert health.initialized is False
+        assert health.circuit_breaker_state is None
+        assert health.projection_reader_available is False
+        assert health.batch_size == 100
+
+    @pytest.mark.asyncio
+    async def test_health_check_after_initialization(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test health_check returns correct status after initialization.
+
+        Given: A handler that has been initialized
+        When: Calling health_check
+        Then: Returns typed health model with initialized=True and circuit breaker state
+        """
+        reader = MockProjectionReader()
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader, batch_size=50)
+
+        health = await handler.health_check()
+
+        assert health.initialized is True
+        assert health.circuit_breaker_state == "closed"
+        assert health.projection_reader_available is True
+        assert health.batch_size == 50
+
+    @pytest.mark.asyncio
+    async def test_describe_returns_handler_metadata(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test describe returns handler metadata.
+
+        Given: A HandlerMemoryTick instance
+        When: Calling describe
+        Then: Returns typed metadata model with comprehensive handler information
+        """
+        handler = HandlerMemoryTick(container)
+        await handler.initialize()
+
+        metadata = await handler.describe()
+
+        assert metadata.name == "HandlerMemoryTick"
+        assert metadata.description  # Non-empty description
+        assert "memory_expiration" in metadata.capabilities
+        assert "archive_initiation" in metadata.capabilities
+        assert metadata.initialized is True
+        assert "ModelRuntimeTick" in metadata.message_types
 
 
 # =============================================================================
@@ -312,6 +431,7 @@ class TestNoCandidates:
     @pytest.mark.asyncio
     async def test_tick_with_no_projection_reader(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
     ) -> None:
         """Test tick returns empty result when no projection reader.
@@ -320,7 +440,8 @@ class TestNoCandidates:
         When: Processing a runtime tick
         Then: Result contains zero events and success metrics
         """
-        handler = HandlerMemoryTick()
+        handler = HandlerMemoryTick(container)
+        await handler.initialize()
 
         output = await handler.handle(tick_envelope)
 
@@ -332,6 +453,7 @@ class TestNoCandidates:
     @pytest.mark.asyncio
     async def test_tick_with_empty_projection(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
     ) -> None:
         """Test tick returns empty result when projection has no candidates.
@@ -344,7 +466,8 @@ class TestNoCandidates:
             expired_candidates=[],
             archive_candidates=[],
         )
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -355,6 +478,7 @@ class TestNoCandidates:
     @pytest.mark.asyncio
     async def test_projection_reader_called_correctly(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
         correlation_id: UUID,
@@ -366,7 +490,8 @@ class TestNoCandidates:
         Then: Projection reader methods are called with correct args
         """
         reader = MockProjectionReader()
-        handler = HandlerMemoryTick(projection_reader=reader, batch_size=50)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader, batch_size=50)
 
         await handler.handle(tick_envelope)
 
@@ -397,6 +522,7 @@ class TestExpirationDetection:
     @pytest.mark.asyncio
     async def test_finds_expired_memory(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -412,7 +538,8 @@ class TestExpirationDetection:
             lifecycle_revision=3,
         )
         reader = MockProjectionReader(expired_candidates=[expired_memory])
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -427,6 +554,7 @@ class TestExpirationDetection:
     @pytest.mark.asyncio
     async def test_finds_multiple_expired_memories(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -444,7 +572,8 @@ class TestExpirationDetection:
             for i in range(1, 4)
         ]
         reader = MockProjectionReader(expired_candidates=expired_memories)
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -455,6 +584,7 @@ class TestExpirationDetection:
     @pytest.mark.asyncio
     async def test_skips_memory_not_needing_expiration(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -471,7 +601,8 @@ class TestExpirationDetection:
             expiration_emitted_at=fixed_now - timedelta(minutes=30),
         )
         reader = MockProjectionReader(expired_candidates=[already_emitted])
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -481,6 +612,7 @@ class TestExpirationDetection:
     @pytest.mark.asyncio
     async def test_expiration_event_contains_correct_causation_id(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         tick_id: UUID,
         fixed_now: datetime,
@@ -496,7 +628,8 @@ class TestExpirationDetection:
             expires_at=fixed_now - timedelta(hours=1),
         )
         reader = MockProjectionReader(expired_candidates=[expired_memory])
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -517,6 +650,7 @@ class TestArchiveDetection:
     @pytest.mark.asyncio
     async def test_finds_archive_candidate(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -532,7 +666,8 @@ class TestArchiveDetection:
             lifecycle_revision=5,
         )
         reader = MockProjectionReader(archive_candidates=[archive_candidate])
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -547,6 +682,7 @@ class TestArchiveDetection:
     @pytest.mark.asyncio
     async def test_finds_multiple_archive_candidates(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -564,7 +700,8 @@ class TestArchiveDetection:
             for i in range(1, 4)
         ]
         reader = MockProjectionReader(archive_candidates=archive_candidates)
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -575,6 +712,7 @@ class TestArchiveDetection:
     @pytest.mark.asyncio
     async def test_skips_already_initiated_archive(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -590,7 +728,8 @@ class TestArchiveDetection:
             archive_initiated_at=fixed_now - timedelta(hours=1),
         )
         reader = MockProjectionReader(archive_candidates=[already_initiated])
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -600,6 +739,7 @@ class TestArchiveDetection:
     @pytest.mark.asyncio
     async def test_skips_already_archived_memory(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -615,7 +755,8 @@ class TestArchiveDetection:
             archived_at=fixed_now - timedelta(hours=1),
         )
         reader = MockProjectionReader(archive_candidates=[already_archived])
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -633,6 +774,7 @@ class TestCombinedScenarios:
     @pytest.mark.asyncio
     async def test_finds_both_expired_and_archive_candidates(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -654,7 +796,8 @@ class TestCombinedScenarios:
             expired_candidates=[expired_memory],
             archive_candidates=[archive_candidate],
         )
-        handler = HandlerMemoryTick(projection_reader=reader)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader)
 
         output = await handler.handle(tick_envelope)
 
@@ -679,6 +822,7 @@ class TestBatchLimiting:
     @pytest.mark.asyncio
     async def test_respects_batch_size_for_expirations(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         fixed_now: datetime,
     ) -> None:
@@ -697,7 +841,8 @@ class TestBatchLimiting:
             for i in range(1, 11)
         ]
         reader = MockProjectionReader(expired_candidates=expired_memories)
-        handler = HandlerMemoryTick(projection_reader=reader, batch_size=5)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader, batch_size=5)
 
         output = await handler.handle(tick_envelope)
 
@@ -708,6 +853,7 @@ class TestBatchLimiting:
     @pytest.mark.asyncio
     async def test_batch_size_passed_to_reader(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
     ) -> None:
         """Test batch_size is passed to projection reader.
@@ -717,7 +863,8 @@ class TestBatchLimiting:
         Then: Projection reader receives the batch_size as limit
         """
         reader = MockProjectionReader()
-        handler = HandlerMemoryTick(projection_reader=reader, batch_size=25)
+        handler = HandlerMemoryTick(container)
+        await handler.initialize(projection_reader=reader, batch_size=25)
 
         await handler.handle(tick_envelope)
 
@@ -737,6 +884,7 @@ class TestHandlerOutput:
     @pytest.mark.asyncio
     async def test_output_structure(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
         correlation_id: UUID,
     ) -> None:
@@ -746,7 +894,8 @@ class TestHandlerOutput:
         When: Tick processing completes
         Then: Output has correct structure and metadata
         """
-        handler = HandlerMemoryTick()
+        handler = HandlerMemoryTick(container)
+        await handler.initialize()
 
         output = await handler.handle(tick_envelope)
 
@@ -759,6 +908,7 @@ class TestHandlerOutput:
     @pytest.mark.asyncio
     async def test_output_metrics_present(
         self,
+        container: ModelONEXContainer,
         tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
     ) -> None:
         """Test handler output includes required metrics.
@@ -767,7 +917,8 @@ class TestHandlerOutput:
         When: Tick processing completes
         Then: Output metrics include all expected keys
         """
-        handler = HandlerMemoryTick()
+        handler = HandlerMemoryTick(container)
+        await handler.initialize()
 
         output = await handler.handle(tick_envelope)
 

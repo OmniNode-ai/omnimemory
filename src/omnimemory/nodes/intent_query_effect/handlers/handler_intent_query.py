@@ -6,17 +6,28 @@ Processes intent query requests (distribution, session, recent, health_check)
 and returns responses via the event bus. Part of the event-driven architecture
 where OmniDash queries intent data without direct database access.
 
+This handler follows the container-driven pattern where the handler owns
+the adapter lifecycle and manages all database connection setup internally.
+
 Example::
 
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
-    from omnimemory.handlers.adapters import AdapterIntentGraph
 
-    handler = HandlerIntentQuery()
-    await handler.initialize(adapter)
+    container = ModelONEXContainer()
+    handler = HandlerIntentQuery(container)
+    await handler.initialize(
+        connection_uri="bolt://localhost:7687",
+        auth=("user", "password"),
+    )
     response = await handler.execute(request_event)
+    await handler.shutdown()
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1504.
+
+.. versionchanged:: 0.2.0
+    Refactored to container-driven pattern for OMN-1577.
 """
 
 from __future__ import annotations
@@ -24,8 +35,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel, ConfigDict, Field
+
+from omnimemory.handlers.adapters import AdapterIntentGraph
+from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
 from omnimemory.nodes.intent_query_effect.models import (
     ModelHandlerIntentQueryConfig,
     ModelIntentQueryRequestedEvent,
@@ -34,14 +50,141 @@ from omnimemory.nodes.intent_query_effect.models import (
 from omnimemory.nodes.intent_query_effect.utils import map_intent_records
 
 if TYPE_CHECKING:
-    from omnimemory.handlers.adapters import AdapterIntentGraph
+    from omnibase_core.container import ModelONEXContainer
 
 logger = logging.getLogger(__name__)
 
 # Contract SLA: max response time in milliseconds
 _CONTRACT_MAX_RESPONSE_TIME_MS = 100.0
 
-__all__ = ["HandlerIntentQuery"]
+__all__ = ["HandlerIntentQuery", "ModelIntentQueryHealth", "ModelIntentQueryMetadata"]
+
+
+class ModelIntentQueryConfigInfo(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Configuration info for intent query handler metadata.
+
+    Attributes:
+        timeout_seconds: Query timeout in seconds.
+        default_time_range_hours: Default time range for queries.
+        default_limit: Default result limit.
+        default_min_confidence: Default minimum confidence threshold.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    timeout_seconds: float = Field(
+        ...,
+        description="Query timeout in seconds",
+    )
+    default_time_range_hours: int = Field(
+        ...,
+        description="Default time range for queries in hours",
+    )
+    default_limit: int = Field(
+        ...,
+        description="Default result limit",
+    )
+    default_min_confidence: float = Field(
+        ...,
+        description="Default minimum confidence threshold",
+    )
+
+
+class ModelIntentQueryHealth(  # omnimemory-model-exempt: handler health
+    BaseModel
+):
+    """Health status for the Intent Query Handler.
+
+    Returned by health_check() to provide detailed health information
+    about the handler and its owned adapter.
+
+    Attributes:
+        healthy: Overall health status.
+        initialized: Whether the handler has been initialized.
+        adapter_healthy: Adapter health status.
+        error_message: Error details if unhealthy.
+        session_count: Number of sessions in the graph database.
+        intent_count: Number of intents in the graph database.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    healthy: bool = Field(
+        ...,
+        description="Overall health status",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether the handler has been initialized",
+    )
+    adapter_healthy: bool | None = Field(
+        default=None,
+        description="Adapter health status",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Error details if unhealthy",
+    )
+    session_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of sessions in the graph database",
+    )
+    intent_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of intents in the graph database",
+    )
+
+
+class ModelIntentQueryMetadata(  # omnimemory-model-exempt: handler metadata
+    BaseModel
+):
+    """Metadata describing intent query handler capabilities and configuration.
+
+    Returned by describe() method to provide introspection information
+    about the handler's capabilities, supported query types, and configuration.
+
+    Attributes:
+        name: Handler class name.
+        node_type: ONEX node type identifier.
+        capabilities: List of supported operations.
+        supported_query_types: List of supported query type values.
+        initialized: Whether handler is ready.
+        config: Current configuration (None if not initialized).
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(
+        ...,
+        description="Handler class name",
+    )
+    node_type: str = Field(
+        ...,
+        description="ONEX node type identifier",
+    )
+    capabilities: list[str] = Field(
+        ...,
+        description="List of supported operations",
+    )
+    supported_query_types: list[str] = Field(
+        ...,
+        description="List of supported query type values",
+    )
+    initialized: bool = Field(
+        ...,
+        description="Whether handler is ready",
+    )
+    config: ModelIntentQueryConfigInfo | None = Field(
+        default=None,
+        description="Current configuration (None if not initialized)",
+    )
 
 
 class HandlerIntentQuery:
@@ -50,9 +193,10 @@ class HandlerIntentQuery:
     Routes intent query requests to the appropriate adapter method and
     constructs response events with proper correlation tracking.
 
-    This handler is designed for use in event-driven architectures where
-    clients (e.g., dashboards) request intent data via Kafka events rather
-    than direct database queries.
+    This handler follows the container-driven pattern:
+    - Constructor takes ModelONEXContainer for dependency injection
+    - Handler owns and manages the adapter lifecycle
+    - initialize() creates and configures the adapter internally
 
     Supported query types:
         - distribution: Get intent counts grouped by category
@@ -61,25 +205,25 @@ class HandlerIntentQuery:
         - health_check: Check handler health and readiness status
 
     Attributes:
+        container: The ONEX dependency injection container.
         config: Handler configuration controlling timeouts and defaults.
         is_initialized: Whether the handler has been initialized.
 
     Example::
 
+        import os
+        from omnibase_core.container import ModelONEXContainer
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
-        from omnimemory.handlers.adapters import (
-            AdapterIntentGraph,
-            ModelAdapterIntentGraphConfig,
+
+        # Create handler with container
+        container = ModelONEXContainer()
+        handler = HandlerIntentQuery(container)
+
+        # Initialize (creates and owns adapter internally)
+        await handler.initialize(
+            connection_uri=os.getenv("MEMGRAPH_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("MEMGRAPH_USER", ""), os.getenv("MEMGRAPH_PASSWORD", "")),
         )
-
-        # Create and initialize adapter
-        adapter_config = ModelAdapterIntentGraphConfig()
-        adapter = AdapterIntentGraph(adapter_config)
-        await adapter.initialize(connection_uri="bolt://localhost:7687")
-
-        # Create and initialize handler
-        handler = HandlerIntentQuery()
-        await handler.initialize(adapter)
 
         # Execute a query
         request = ModelIntentQueryRequestedEvent(
@@ -90,23 +234,33 @@ class HandlerIntentQuery:
         if response.status == "success":
             print(f"Distribution: {response.distribution}")
 
+        # Shutdown releases all resources including adapter
         await handler.shutdown()
+
+    .. versionchanged:: 0.2.0
+        Refactored to container-driven pattern for OMN-1577.
     """
 
-    def __init__(self, config: ModelHandlerIntentQueryConfig | None = None) -> None:
-        """Initialize the handler.
+    def __init__(self, container: ModelONEXContainer) -> None:
+        """Initialize the handler with a dependency injection container.
 
         Args:
-            config: Optional configuration. Uses defaults if not provided.
+            container: The ONEX container for dependency injection.
         """
-        self._config = config or ModelHandlerIntentQueryConfig()
+        self._container = container
+        self._config: ModelHandlerIntentQueryConfig | None = None
         self._adapter: AdapterIntentGraph | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
     @property
-    def config(self) -> ModelHandlerIntentQueryConfig:
-        """Get handler configuration."""
+    def container(self) -> ModelONEXContainer:
+        """Get the dependency injection container."""
+        return self._container
+
+    @property
+    def config(self) -> ModelHandlerIntentQueryConfig | None:
+        """Get handler configuration (None if not initialized)."""
         return self._config
 
     @property
@@ -114,13 +268,35 @@ class HandlerIntentQuery:
         """Check if handler is initialized."""
         return self._initialized
 
-    async def initialize(self, adapter: AdapterIntentGraph) -> None:
-        """Initialize with adapter dependency.
+    async def initialize(
+        self,
+        connection_uri: str,
+        auth: tuple[str, str] | None = None,
+        *,
+        config: ModelHandlerIntentQueryConfig | None = None,
+        adapter_config: ModelAdapterIntentGraphConfig | None = None,
+        options: Mapping[str, object] | None = None,
+    ) -> None:
+        """Initialize the handler and create owned adapter.
+
+        This method creates and owns the adapter lifecycle internally.
+        The adapter is created, initialized, and managed by this handler.
 
         Thread-safe initialization using asyncio.Lock.
 
         Args:
-            adapter: The intent graph adapter for database operations.
+            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            auth: Optional (username, password) tuple for authentication.
+            config: Optional handler configuration. Uses defaults if not provided.
+            adapter_config: Optional adapter configuration. Uses defaults if not provided.
+            options: Additional connection options passed to the adapter.
+
+        Raises:
+            RuntimeError: If initialization fails or times out.
+            ValueError: If connection_uri is malformed.
+
+        .. versionchanged:: 0.2.0
+            Changed to create and own adapter internally (OMN-1577).
         """
         if self._initialized:
             return
@@ -129,9 +305,107 @@ class HandlerIntentQuery:
             if self._initialized:
                 return
 
-            self._adapter = adapter
+            # Set handler config
+            self._config = config or ModelHandlerIntentQueryConfig()
+
+            # Create and initialize adapter (handler owns lifecycle)
+            effective_adapter_config = adapter_config or ModelAdapterIntentGraphConfig(
+                timeout_seconds=self._config.timeout_seconds,
+            )
+            self._adapter = AdapterIntentGraph(
+                config=effective_adapter_config,
+                container=self._container,
+            )
+            await self._adapter.initialize(
+                connection_uri=connection_uri,
+                auth=auth,
+                options=options,
+            )
+
             self._initialized = True
-            logger.info("HandlerIntentQuery initialized")
+            logger.info("HandlerIntentQuery initialized with owned adapter")
+
+    async def health_check(self) -> ModelIntentQueryHealth:
+        """Check the health status of this handler.
+
+        Returns health information about the handler and its owned adapter.
+
+        Returns:
+            ModelIntentQueryHealth with detailed status information:
+                - healthy: Overall health status
+                - initialized: Whether handler is initialized
+                - adapter_healthy: Adapter health status
+                - error_message: Error details if unhealthy
+                - session_count: Number of sessions in graph database
+                - intent_count: Number of intents in graph database
+        """
+        if not self._initialized:
+            return ModelIntentQueryHealth(
+                healthy=False,
+                initialized=False,
+                adapter_healthy=None,
+                error_message="Handler not initialized",
+            )
+
+        if self._adapter is None:
+            return ModelIntentQueryHealth(
+                healthy=False,
+                initialized=True,
+                adapter_healthy=None,
+                error_message="Adapter is None despite initialization",
+            )
+
+        try:
+            adapter_health = await self._adapter.health_check()
+            return ModelIntentQueryHealth(
+                healthy=adapter_health.is_healthy,
+                initialized=True,
+                adapter_healthy=adapter_health.is_healthy,
+                error_message=adapter_health.error_message,
+                session_count=adapter_health.session_count,
+                intent_count=adapter_health.intent_count,
+            )
+        except Exception as e:
+            logger.warning("Health check failed: %s", e)
+            return ModelIntentQueryHealth(
+                healthy=False,
+                initialized=True,
+                adapter_healthy=None,
+                error_message=f"Health check failed: {e}",
+            )
+
+    async def describe(self) -> ModelIntentQueryMetadata:
+        """Return handler metadata and capabilities.
+
+        Provides introspection information about this handler including
+        supported operations, configuration, and status.
+
+        Returns:
+            ModelIntentQueryMetadata with handler information including
+            name, node_type, capabilities, supported query types, and configuration.
+        """
+        config_info: ModelIntentQueryConfigInfo | None = None
+        if self._config is not None:
+            config_info = ModelIntentQueryConfigInfo(
+                timeout_seconds=self._config.timeout_seconds,
+                default_time_range_hours=self._config.default_time_range_hours,
+                default_limit=self._config.default_limit,
+                default_min_confidence=self._config.default_min_confidence,
+            )
+
+        return ModelIntentQueryMetadata(
+            name="HandlerIntentQuery",
+            node_type="EFFECT",
+            capabilities=[
+                "intent_distribution_query",
+                "intent_session_query",
+                "intent_recent_query",
+                "event_driven_response",
+            ],
+            supported_query_types=["distribution", "session", "recent"],
+            initialized=self._initialized,
+            config=config_info,
+        )
 
     async def execute(
         self,
@@ -148,7 +422,7 @@ class HandlerIntentQuery:
         Returns:
             Response event with query results or error details.
         """
-        if not self._initialized or self._adapter is None:
+        if not self._initialized or self._adapter is None or self._config is None:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type=request.query_type,
@@ -157,9 +431,10 @@ class HandlerIntentQuery:
             )
 
         start = time.monotonic()
+        config = self._config  # Local reference for type narrowing
 
         try:
-            async with asyncio.timeout(self._config.timeout_seconds):
+            async with asyncio.timeout(config.timeout_seconds):
                 match request.query_type:
                     case "distribution":
                         return await self._handle_distribution(request, start)
@@ -180,7 +455,7 @@ class HandlerIntentQuery:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type=request.query_type,
-                error_message=f"Handler timeout after {self._config.timeout_seconds}s",
+                error_message=f"Handler timeout after {config.timeout_seconds}s",
                 correlation_id=request.correlation_id,
             )
         except Exception as e:
@@ -405,12 +680,24 @@ class HandlerIntentQuery:
         )
 
     async def shutdown(self) -> None:
-        """Shutdown the handler and release resources.
+        """Shutdown the handler and release all resources.
 
-        Safe to call multiple times. Does not shutdown the adapter
-        (caller is responsible for adapter lifecycle).
+        This method properly closes the owned adapter and releases all
+        associated resources. Safe to call multiple times.
+
+        .. versionchanged:: 0.2.0
+            Handler now owns adapter lifecycle and shuts it down (OMN-1577).
         """
         if self._initialized:
-            self._adapter = None
+            # Shutdown owned adapter
+            if self._adapter is not None:
+                try:
+                    await self._adapter.shutdown()
+                except Exception as e:
+                    logger.warning("Error shutting down adapter: %s", e)
+                finally:
+                    self._adapter = None
+
+            self._config = None
             self._initialized = False
-            logger.info("HandlerIntentQuery shutdown")
+            logger.info("HandlerIntentQuery shutdown complete")

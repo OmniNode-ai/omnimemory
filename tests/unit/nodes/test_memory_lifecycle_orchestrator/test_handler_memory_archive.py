@@ -31,6 +31,7 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 from omnibase_core.models.infrastructure.model_value import ModelValue
 from omnibase_core.models.metadata.model_generic_metadata import ModelGenericMetadata
 from pydantic import ValidationError
@@ -83,19 +84,35 @@ def archive_base_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def handler(archive_base_path: Path) -> HandlerMemoryArchive:
-    """Create handler without database pool for testing.
+def container() -> ModelONEXContainer:
+    """Provide an ONEX container for dependency injection.
+
+    Returns:
+        ModelONEXContainer instance.
+    """
+    return ModelONEXContainer()
+
+
+@pytest.fixture
+async def handler(
+    container: ModelONEXContainer,
+    archive_base_path: Path,
+) -> HandlerMemoryArchive:
+    """Create an initialized handler without database pool for testing.
 
     Args:
+        container: ONEX dependency injection container.
         archive_base_path: Base path for archive storage.
 
     Returns:
-        HandlerMemoryArchive instance for testing.
+        Initialized HandlerMemoryArchive instance for testing.
     """
-    return HandlerMemoryArchive(
+    handler = HandlerMemoryArchive(container)
+    await handler.initialize(
         db_pool=None,
         archive_base_path=archive_base_path,
     )
+    return handler
 
 
 @pytest.fixture
@@ -153,95 +170,223 @@ def sample_archive_record(
 class TestHandlerMemoryArchiveInitialization:
     """Tests for HandlerMemoryArchive initialization."""
 
-    def test_handler_creates_without_db_pool(
+    def test_handler_creates_with_container(
         self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test handler can be created with only container.
+
+        Given: ModelONEXContainer
+        When: Creating HandlerMemoryArchive
+        Then: Handler is created successfully but not initialized
+        """
+        handler = HandlerMemoryArchive(container)
+        assert handler is not None
+        assert handler._db_pool is None
+        assert handler.initialized is False
+
+    @pytest.mark.asyncio
+    async def test_handler_initializes_without_db_pool(
+        self,
+        container: ModelONEXContainer,
         archive_base_path: Path,
     ) -> None:
-        """Test handler can be created without database pool.
+        """Test handler can be initialized without database pool.
 
-        Given: No db_pool provided
-        When: Creating HandlerMemoryArchive
-        Then: Handler is created successfully
+        Given: No db_pool provided to initialize
+        When: Calling initialize()
+        Then: Handler is initialized successfully
         """
-        handler = HandlerMemoryArchive(
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
             db_pool=None,
             archive_base_path=archive_base_path,
         )
-        assert handler is not None
+        assert handler.initialized is True
         assert handler._db_pool is None
 
-    def test_handler_default_archive_path(
-        self, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.asyncio
+    async def test_handler_default_archive_path(
+        self,
+        container: ModelONEXContainer,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test handler uses temp directory-based default path.
 
         Given: No archive_base_path provided and no env var set
-        When: Creating HandlerMemoryArchive
+        When: Calling initialize() without archive_base_path
         Then: Handler uses temp directory-based path
         """
         # Ensure env var is not set
         monkeypatch.delenv("OMNIMEMORY_ARCHIVE_PATH", raising=False)
 
-        handler = HandlerMemoryArchive()
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(db_pool=None)
         expected_path = Path(tempfile.gettempdir()) / "omnimemory" / "archives"
         assert handler.archive_base_path == expected_path
 
-    def test_handler_archive_path_from_env_var(
-        self, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.asyncio
+    async def test_handler_archive_path_from_env_var(
+        self,
+        container: ModelONEXContainer,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test handler reads archive path from environment variable.
 
         Given: OMNIMEMORY_ARCHIVE_PATH environment variable is set
-        When: Creating HandlerMemoryArchive without explicit path
+        When: Calling initialize() without explicit path
         Then: Handler uses path from environment variable
         """
         env_path = "/custom/env/archive/path"
         monkeypatch.setenv("OMNIMEMORY_ARCHIVE_PATH", env_path)
 
-        handler = HandlerMemoryArchive()
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(db_pool=None)
         assert handler.archive_base_path == Path(env_path)
 
-    def test_handler_explicit_path_overrides_env_var(
+    @pytest.mark.asyncio
+    async def test_handler_explicit_path_overrides_env_var(
         self,
+        container: ModelONEXContainer,
         monkeypatch: pytest.MonkeyPatch,
         archive_base_path: Path,
     ) -> None:
         """Test explicit path parameter overrides environment variable.
 
         Given: Both env var and explicit path provided
-        When: Creating HandlerMemoryArchive
+        When: Calling initialize()
         Then: Explicit path takes precedence over env var
         """
         monkeypatch.setenv("OMNIMEMORY_ARCHIVE_PATH", "/ignored/env/path")
 
-        handler = HandlerMemoryArchive(archive_base_path=archive_base_path)
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+        )
         assert handler.archive_base_path == archive_base_path
 
-    def test_handler_custom_archive_path(
+    @pytest.mark.asyncio
+    async def test_handler_custom_archive_path(
         self,
+        container: ModelONEXContainer,
         archive_base_path: Path,
     ) -> None:
         """Test handler uses custom archive path.
 
         Given: Custom archive_base_path
-        When: Creating HandlerMemoryArchive
+        When: Calling initialize()
         Then: Handler uses the custom path
         """
-        handler = HandlerMemoryArchive(archive_base_path=archive_base_path)
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+        )
         assert handler.archive_base_path == archive_base_path
 
-    def test_archive_base_path_property(
+    @pytest.mark.asyncio
+    async def test_archive_base_path_property(
         self,
+        container: ModelONEXContainer,
         archive_base_path: Path,
     ) -> None:
         """Test archive_base_path property returns correct path.
 
-        Given: Handler with custom archive path
+        Given: Handler initialized with custom archive path
         When: Accessing archive_base_path property
         Then: Returns the configured path
         """
-        handler = HandlerMemoryArchive(archive_base_path=archive_base_path)
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+        )
         assert handler.archive_base_path == archive_base_path
+
+    def test_archive_base_path_none_before_init(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test archive_base_path is None before initialization.
+
+        Given: Handler created but not initialized
+        When: Accessing archive_base_path property
+        Then: Returns None
+        """
+        handler = HandlerMemoryArchive(container)
+        assert handler.archive_base_path is None
+
+    @pytest.mark.asyncio
+    async def test_initialized_property(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+    ) -> None:
+        """Test initialized property reflects initialization state.
+
+        Given: Handler in various states
+        When: Checking initialized property
+        Then: Returns correct boolean value
+        """
+        handler = HandlerMemoryArchive(container)
+        assert handler.initialized is False
+
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+        )
+        assert handler.initialized is True
+
+    @pytest.mark.asyncio
+    async def test_health_check(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+    ) -> None:
+        """Test health_check returns status information.
+
+        Given: Initialized handler
+        When: Calling health_check()
+        Then: Returns typed health model with status information
+        """
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+        )
+
+        health = await handler.health_check()
+
+        assert health.initialized is True
+        assert health.db_pool_available is False
+        assert health.archive_base_path == str(archive_base_path)
+        assert health.circuit_breaker_state is not None
+
+    @pytest.mark.asyncio
+    async def test_describe(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+    ) -> None:
+        """Test describe returns handler metadata.
+
+        Given: Initialized handler
+        When: Calling describe()
+        Then: Returns typed metadata model with handler information
+        """
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+        )
+
+        metadata = await handler.describe()
+
+        assert metadata.name == "HandlerMemoryArchive"
+        assert metadata.description  # Non-empty description
+        assert metadata.capabilities
+        assert "archive_expired_memory" in metadata.capabilities
 
 
 # =============================================================================
@@ -978,18 +1123,37 @@ class TestHandlerErrorHandling:
     """Tests for handler error handling behavior."""
 
     @pytest.mark.asyncio
+    async def test_handle_without_initialization_raises_error(
+        self,
+        container: ModelONEXContainer,
+        archive_command: ModelArchiveMemoryCommand,
+    ) -> None:
+        """Test handler raises RuntimeError when not initialized.
+
+        Given: Handler not initialized
+        When: Calling handle()
+        Then: RuntimeError is raised
+        """
+        handler = HandlerMemoryArchive(container)
+
+        with pytest.raises(RuntimeError, match="Handler not initialized"):
+            await handler.handle(archive_command)
+
+    @pytest.mark.asyncio
     async def test_handle_without_db_pool_raises_error(
         self,
+        container: ModelONEXContainer,
         archive_base_path: Path,
         archive_command: ModelArchiveMemoryCommand,
     ) -> None:
         """Test handler raises RuntimeError without db_pool.
 
-        Given: Handler without db_pool configured
+        Given: Handler initialized without db_pool
         When: Calling handle()
-        Then: RuntimeError is raised
+        Then: RuntimeError is raised when trying to read memory
         """
-        handler = HandlerMemoryArchive(
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
             db_pool=None,
             archive_base_path=archive_base_path,
         )
@@ -1118,3 +1282,218 @@ class TestEdgeCases:
         path = handler._get_archive_path(memory_id, future_date)
 
         assert "2099/12/31" in str(path)
+
+
+# =============================================================================
+# Path Validation Security Tests
+# =============================================================================
+
+
+class TestPathValidationSecurity:
+    """Tests for archive path validation and directory traversal prevention.
+
+    These tests verify that custom archive paths are validated to prevent
+    directory traversal attacks and arbitrary file writes outside the
+    configured archive base directory.
+
+    Security Note:
+        These tests are critical for ensuring the handler rejects malicious
+        paths that could be used to overwrite system files or access
+        sensitive directories.
+    """
+
+    def test_validate_path_within_base_directory(
+        self,
+        handler: HandlerMemoryArchive,
+        archive_base_path: Path,
+    ) -> None:
+        """Test valid path within base directory is accepted.
+
+        Given: Path under the archive base directory
+        When: Validating the path
+        Then: Validation returns None (success)
+        """
+        valid_path = archive_base_path / "2026" / "01" / "25" / "test.jsonl.gz"
+        error = handler._validate_archive_path(valid_path)
+
+        assert error is None
+
+    def test_validate_path_rejects_parent_traversal(
+        self,
+        handler: HandlerMemoryArchive,
+        archive_base_path: Path,
+    ) -> None:
+        """Test path with .. traversal is rejected.
+
+        Given: Path with .. components escaping base directory
+        When: Validating the path
+        Then: Validation returns error message
+        """
+        # Attempt to escape via .. traversal
+        malicious_path = archive_base_path / ".." / ".." / "etc" / "passwd"
+        error = handler._validate_archive_path(malicious_path)
+
+        assert error is not None
+        assert "outside allowed directory" in error
+
+    def test_validate_path_rejects_absolute_outside_base(
+        self,
+        handler: HandlerMemoryArchive,
+        tmp_path: Path,
+    ) -> None:
+        """Test absolute path outside base directory is rejected.
+
+        Given: Absolute path not under archive base
+        When: Validating the path
+        Then: Validation returns error message
+        """
+        # Use a different tmp directory that's outside our archive base
+        different_temp = tmp_path.parent / "other_location"
+        different_temp.mkdir(exist_ok=True)
+        malicious_path = different_temp / "malicious" / "archive.jsonl.gz"
+        error = handler._validate_archive_path(malicious_path)
+
+        assert error is not None
+        assert "outside allowed directory" in error
+
+    def test_validate_path_allows_nested_subdirectories(
+        self,
+        handler: HandlerMemoryArchive,
+        archive_base_path: Path,
+    ) -> None:
+        """Test deeply nested path within base is accepted.
+
+        Given: Path with many nested subdirectories under base
+        When: Validating the path
+        Then: Validation returns None (success)
+        """
+        nested_path = (
+            archive_base_path / "a" / "b" / "c" / "d" / "e" / "f" / "archive.jsonl.gz"
+        )
+        error = handler._validate_archive_path(nested_path)
+
+        assert error is None
+
+    def test_validate_path_rejects_sibling_directory(
+        self,
+        handler: HandlerMemoryArchive,
+        tmp_path: Path,
+    ) -> None:
+        """Test path in sibling directory is rejected.
+
+        Given: Path in a sibling directory of the archive base
+        When: Validating the path
+        Then: Validation returns error message
+        """
+        # Create a sibling directory to the archive base
+        sibling_dir = tmp_path / "sibling"
+        sibling_dir.mkdir()
+
+        malicious_path = sibling_dir / "stolen.jsonl.gz"
+        error = handler._validate_archive_path(malicious_path)
+
+        assert error is not None
+        assert "outside allowed directory" in error
+
+    def test_validate_path_handles_relative_paths(
+        self,
+        handler: HandlerMemoryArchive,
+        archive_base_path: Path,
+    ) -> None:
+        """Test relative path is resolved and validated correctly.
+
+        Given: Relative path components under base directory
+        When: Validating the path
+        Then: Path is resolved and validated correctly
+        """
+        # Path with . components (current directory references)
+        relative_path = archive_base_path / "2026" / "." / "01" / "test.jsonl.gz"
+        error = handler._validate_archive_path(relative_path)
+
+        assert error is None
+
+    def test_validate_path_error_on_uninitialized_handler(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test validation fails gracefully when handler not initialized.
+
+        Given: Handler not initialized (no archive base path)
+        When: Validating a path
+        Then: Returns error message about missing initialization
+        """
+        handler = HandlerMemoryArchive(container)
+        # Note: Not calling initialize()
+
+        test_path = Path("/some/path.jsonl.gz")
+        error = handler._validate_archive_path(test_path)
+
+        assert error is not None
+        assert "not initialized" in error
+
+
+# =============================================================================
+# Explicit Guard Tests (No Assert Statements)
+# =============================================================================
+
+
+class TestExplicitGuards:
+    """Tests for explicit guard patterns replacing assert statements.
+
+    These tests verify that the handler uses explicit if/raise guards
+    instead of assert statements for critical path validation. Assert
+    statements can be disabled with python -O flag, making them unsuitable
+    for security-critical checks.
+    """
+
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_guard_raises_on_bug(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test circuit breaker guard raises RuntimeError if not set.
+
+        Given: Handler with _db_circuit_breaker artificially set to None
+        When: Calling handle() after initialization
+        Then: RuntimeError is raised indicating a bug
+
+        Note: This tests the guard pattern, not normal operation. In normal
+        operation, initialize() always sets the circuit breaker.
+        """
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize()
+
+        # Artificially corrupt internal state to test guard
+        handler._db_circuit_breaker = None
+        handler._initialized = True
+
+        command = ModelArchiveMemoryCommand(
+            memory_id=UUID("12345678-abcd-1234-abcd-567812345678"),
+            expected_revision=1,
+        )
+
+        with pytest.raises(RuntimeError, match="Circuit breaker not initialized"):
+            await handler.handle(command)
+
+    def test_archive_base_path_guard_raises_on_bug(
+        self,
+        container: ModelONEXContainer,
+    ) -> None:
+        """Test archive base path guard raises RuntimeError if not set.
+
+        Given: Handler with _archive_base_path artificially set to None
+        When: Calling _get_archive_path()
+        Then: RuntimeError is raised indicating a bug
+
+        Note: This tests the guard pattern, not normal operation.
+        """
+        handler = HandlerMemoryArchive(container)
+        # Don't initialize, manually set initialized flag
+        handler._initialized = True
+        handler._archive_base_path = None
+
+        memory_id = UUID("12345678-abcd-1234-abcd-567812345678")
+        now = datetime(2026, 1, 25, tzinfo=timezone.utc)
+
+        with pytest.raises(RuntimeError, match="Archive base path not initialized"):
+            handler._get_archive_path(memory_id, now)

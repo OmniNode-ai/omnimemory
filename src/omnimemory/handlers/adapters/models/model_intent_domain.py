@@ -59,7 +59,7 @@ __all__ = [
 ]
 
 
-class ModelIntentClassificationOutput(  # omnimemory-model-exempt: adapter-internal
+class ModelIntentClassificationOutput(  # omnimemory-model-exempt: adapter internal
     BaseModel
 ):
     """Input model for intent classification data to be stored.
@@ -125,7 +125,7 @@ class ModelIntentClassificationOutput(  # omnimemory-model-exempt: adapter-inter
     )
 
 
-class ModelIntentStorageResult(BaseModel):  # omnimemory-model-exempt: adapter-internal
+class ModelIntentStorageResult(BaseModel):  # omnimemory-model-exempt: adapter internal
     """Result of an intent storage operation.
 
     Returned by AdapterIntentGraph.store_intent() to indicate the outcome
@@ -176,7 +176,7 @@ class ModelIntentStorageResult(BaseModel):  # omnimemory-model-exempt: adapter-i
     )
 
 
-class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter-internal
+class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
     """A single intent record returned from query operations.
 
     Represents an intent classification that was previously stored in the
@@ -231,7 +231,7 @@ class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter-internal
     )
 
 
-class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter-internal
+class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter internal
     """Result of an intent query operation.
 
     Returned by AdapterIntentGraph.get_session_intents() to provide the
@@ -279,7 +279,7 @@ class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter-int
     )
 
 
-class ModelIntentDistributionResult(  # omnimemory-model-exempt: adapter-internal
+class ModelIntentDistributionResult(  # omnimemory-model-exempt: adapter internal
     BaseModel
 ):
     """Result of an intent distribution query.

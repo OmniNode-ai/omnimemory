@@ -10,31 +10,46 @@ OmniMemory includes a compatibility layer (`src/omnimemory/compat/`) that provid
 
 ## Current Stub Implementations
 
-### 1. NodeResult (Monadic Pattern)
+### 1. NodeResult (Monadic Pattern) - MIGRATED
 
-**File**: `src/omnimemory/compat/node_result.py`
+**File**: `src/omnimemory/compat/node_result.py` (deprecated)
 
 **Purpose**: Provides the monadic result pattern for node operations, enabling clean error handling without exceptions.
 
-**Upstream Target**: `omnibase_core.core.monadic.model_node_result.NodeResult`
+**Status**: **MIGRATED** - Now using `omnibase_core.models.core.model_base_result.ModelBaseResult`
 
-**Status**: Local stub - awaiting upstream availability
+**Migration Notes**:
+- All protocol return types changed from `NodeResult[T]` to `ModelBaseResult`
+- `result.is_success` changed to `result.success`
+- Success/failure creation now uses direct construction instead of class methods
+- Result values stored in `metadata.custom_fields` instead of direct `.value` access
 
-**Usage**:
+**New Usage**:
 ```python
-from omnimemory.compat import NodeResult
+from omnibase_core.models.core.model_base_result import ModelBaseResult
+from omnibase_core.models.core.model_base_error import ModelBaseError
+from omnibase_core.models.results.model_simple_metadata import ModelGenericMetadata
 
 # Create success result
-result = NodeResult.success(data={"key": "value"})
+result = ModelBaseResult(
+    success=True,
+    exit_code=0,
+    errors=[],
+    metadata=ModelGenericMetadata(custom_fields={"data": {"key": "value"}})
+)
 
 # Create failure result
-result = NodeResult.failure(error="Operation failed", code="ERR_001")
+result = ModelBaseResult(
+    success=False,
+    exit_code=1,
+    errors=[ModelBaseError(message="Operation failed", code="ERR_001")]
+)
 
-# Pattern matching
-if result.is_success:
-    process(result.data)
+# Check result
+if result.success:
+    process(result.metadata.custom_fields["data"])
 else:
-    handle_error(result.error)
+    handle_error(result.errors)
 ```
 
 ---
@@ -90,9 +105,11 @@ db = container.resolve("db_handler")
 ### Phase 1: Monitoring (Current)
 
 Monitor `omnibase_core` releases for availability of:
-- `omnibase_core.core.monadic.model_node_result`
-- `omnibase_core.core.errors.core_errors`
-- `omnibase_core.core.model_onex_container`
+- `omnibase_core.core.errors.core_errors` (OnexError, BaseOnexError)
+- `omnibase_core.core.model_onex_container` (ModelOnexContainer)
+
+**Already migrated** (no longer monitoring):
+- ~~`omnibase_core.core.monadic.model_node_result`~~ - Migrated to `ModelBaseResult` (see Section 1)
 
 ### Phase 2: Migration
 
@@ -103,9 +120,11 @@ When upstream components become available:
    # Before (using stub)
    from omnimemory.compat import NodeResult
 
-   # After (using upstream)
-   from omnibase_core.core.monadic.model_node_result import NodeResult
+   # After (using upstream ModelBaseResult)
+   from omnibase_core.models.core.model_base_result import ModelBaseResult
    ```
+
+   **Note**: NodeResult has been migrated to ModelBaseResult (see section 1 above).
 
 2. **Run Test Suite**:
    ```bash

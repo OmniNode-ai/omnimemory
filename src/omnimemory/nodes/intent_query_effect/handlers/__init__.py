@@ -9,22 +9,29 @@ Handlers:
 
 Example::
 
+    import os
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
-    from omnimemory.handlers.adapters import AdapterIntentGraph
 
-    # Initialize adapter
-    adapter = AdapterIntentGraph(config)
-    await adapter.initialize(connection_uri="bolt://localhost:7687")
-
-    # Initialize handler
-    handler = HandlerIntentQuery()
-    await handler.initialize(adapter)
+    # Create handler with container (handler owns adapter lifecycle)
+    container = ModelONEXContainer()
+    handler = HandlerIntentQuery(container)
+    await handler.initialize(
+        connection_uri=os.getenv("MEMGRAPH_URI", "bolt://localhost:7687"),
+        auth=(os.getenv("MEMGRAPH_USER", ""), os.getenv("MEMGRAPH_PASSWORD", "")),
+    )
 
     # Execute query
     response = await handler.execute(request_event)
 
+    # Shutdown releases all resources
+    await handler.shutdown()
+
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1504.
+
+.. versionchanged:: 0.2.0
+    Refactored to container-driven pattern for OMN-1577.
 """
 
 from omnimemory.nodes.intent_query_effect.handlers.handler_intent_query import (

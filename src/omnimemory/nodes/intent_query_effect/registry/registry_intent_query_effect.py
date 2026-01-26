@@ -19,14 +19,20 @@ Related:
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1504.
+
+.. versionchanged:: 0.2.0
+    Refactored to container-driven pattern for OMN-1577.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from omnimemory.handlers.adapters import AdapterIntentGraph
+    from omnibase_core.container import ModelONEXContainer
+
+    from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
     from omnimemory.nodes.intent_query_effect.models import (
         ModelHandlerIntentQueryConfig,
@@ -39,90 +45,113 @@ class RegistryIntentQueryEffect:
     """Infrastructure registry for intent_query_effect node.
 
     Provides factory methods for creating handler instances with
-    proper dependency injection.
+    proper dependency injection using the container-driven pattern.
 
     This registry follows the ONEX infrastructure registry pattern:
-        - Factory methods for handler creation with adapter injection
-        - Adapter requirements documentation for validation
+        - Factory methods for handler creation with container injection
+        - Container-based dependency management
         - Node type classification for routing decisions
         - Capability listing for service discovery
 
     Example:
-        >>> from omnimemory.handlers.adapters import (
-        ...     AdapterIntentGraph,
-        ...     ModelAdapterIntentGraphConfig,
-        ... )
+        >>> from omnibase_core.container import ModelONEXContainer
         >>> from omnimemory.nodes.intent_query_effect.registry import (
         ...     RegistryIntentQueryEffect,
         ... )
         >>>
-        >>> # Create and initialize adapter
-        >>> adapter_config = ModelAdapterIntentGraphConfig()
-        >>> adapter = AdapterIntentGraph(adapter_config)
-        >>> await adapter.initialize(connection_uri="bolt://localhost:7687")
-        >>>
-        >>> # Create handler via registry
-        >>> handler = await RegistryIntentQueryEffect.create_and_initialize(adapter)
+        >>> # Create handler via registry with container
+        >>> container = ModelONEXContainer()
+        >>> handler = await RegistryIntentQueryEffect.create_and_initialize(
+        ...     container=container,
+        ...     connection_uri="bolt://localhost:7687",
+        ... )
 
     .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+        Refactored to container-driven pattern for OMN-1577.
     """
 
     @staticmethod
     def create_handler(
-        config: ModelHandlerIntentQueryConfig | None = None,
+        container: ModelONEXContainer,
     ) -> HandlerIntentQuery:
-        """Create a HandlerIntentQuery with configuration.
+        """Create a HandlerIntentQuery with container.
 
         Factory method that creates a HandlerIntentQuery instance
-        with optional configuration. The handler must be initialized
-        separately with an adapter before use.
+        with the provided container. The handler must be initialized
+        separately before use.
 
         Args:
-            config: Optional handler configuration. Uses defaults if not provided.
+            container: ONEX container for dependency injection.
 
         Returns:
-            Configured HandlerIntentQuery instance (not yet initialized).
+            HandlerIntentQuery instance (not yet initialized).
 
         Example:
-            >>> handler = RegistryIntentQueryEffect.create_handler()
-            >>> await handler.initialize(adapter)
+            >>> container = ModelONEXContainer()
+            >>> handler = RegistryIntentQueryEffect.create_handler(container)
+            >>> await handler.initialize(connection_uri="bolt://localhost:7687")
 
         .. versionadded:: 0.1.0
+
+        .. versionchanged:: 0.2.0
+            Changed to accept container instead of config (OMN-1577).
         """
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
-        return HandlerIntentQuery(config=config)
+        return HandlerIntentQuery(container=container)
 
     @staticmethod
     async def create_and_initialize(
-        adapter: AdapterIntentGraph,
+        container: ModelONEXContainer,
+        connection_uri: str,
+        auth: tuple[str, str] | None = None,
+        *,
         config: ModelHandlerIntentQueryConfig | None = None,
+        adapter_config: ModelAdapterIntentGraphConfig | None = None,
+        options: Mapping[str, object] | None = None,
     ) -> HandlerIntentQuery:
         """Create and initialize a HandlerIntentQuery.
 
         Convenience method that creates and initializes in one call.
+        The handler owns and manages the adapter lifecycle internally.
 
         Args:
-            adapter: Initialized AdapterIntentGraph instance for database
-                operations. Must be initialized before passing.
+            container: ONEX container for dependency injection.
+            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            auth: Optional (username, password) tuple for authentication.
             config: Optional handler configuration. Uses defaults if not provided.
+            adapter_config: Optional adapter configuration. Uses defaults if not provided.
+            options: Additional connection options passed to the adapter.
 
         Returns:
             Initialized HandlerIntentQuery ready to execute queries.
 
         Example:
+            >>> container = ModelONEXContainer()
             >>> handler = await RegistryIntentQueryEffect.create_and_initialize(
-            ...     adapter=adapter,
+            ...     container=container,
+            ...     connection_uri="bolt://localhost:7687",
             ...     config=ModelHandlerIntentQueryConfig(timeout_seconds=30.0),
             ... )
             >>> response = await handler.execute(request)
 
         .. versionadded:: 0.1.0
+
+        .. versionchanged:: 0.2.0
+            Changed to container-driven pattern with handler-owned adapter (OMN-1577).
         """
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
-        handler = HandlerIntentQuery(config=config)
-        await handler.initialize(adapter)
+        handler = HandlerIntentQuery(container=container)
+        await handler.initialize(
+            connection_uri=connection_uri,
+            auth=auth,
+            config=config,
+            adapter_config=adapter_config,
+            options=options,
+        )
         return handler
 
     @staticmethod

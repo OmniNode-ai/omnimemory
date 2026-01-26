@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 __all__ = ["ModelIntentGraphHealth"]
 
 
-class ModelIntentGraphHealth(  # omnimemory-model-exempt: adapter-internal health
+class ModelIntentGraphHealth(  # omnimemory-model-exempt: adapter health
     BaseModel
 ):
     """Health status information for the intent graph adapter.

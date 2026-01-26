@@ -121,19 +121,22 @@ async def subscription_handler(
     Yields:
         Initialized HandlerSubscription instance.
     """
+    from omnibase_core.container import ModelONEXContainer
+
     if not services_available:
         pytest.skip("Required services (PostgreSQL, Valkey) not available")
 
+    container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
         kafka_bootstrap_servers=get_test_kafka_bootstrap_servers(),
     )
-    handler = HandlerSubscription(config)
+    handler = HandlerSubscription(container)
 
     try:
-        await handler.initialize()
+        await handler.initialize(config)
     except RuntimeError as e:
         pytest.skip(f"Failed to initialize handler: {e}")
 
@@ -159,26 +162,6 @@ def handler_config(
         valkey_port=test_valkey_port,
         kafka_bootstrap_servers=get_test_kafka_bootstrap_servers(),
     )
-
-
-@pytest.fixture
-def unique_agent_id() -> str:
-    """Generate a unique agent ID for test isolation.
-
-    Returns:
-        Unique agent identifier.
-    """
-    return f"test_agent_{uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def unique_topic() -> str:
-    """Generate a unique topic for test isolation.
-
-    Returns:
-        Unique topic in memory.<entity>.<event> format.
-    """
-    return f"memory.test_{uuid4().hex[:8]}.created"
 
 
 @pytest.fixture
@@ -578,6 +561,8 @@ class TestSurviveRestart:
         services_available: bool,
     ) -> None:
         """Subscriptions survive handler shutdown and restart."""
+        from omnibase_core.container import ModelONEXContainer
+
         if not services_available:
             pytest.skip("Required services not available")
 
@@ -585,9 +570,10 @@ class TestSurviveRestart:
         topic = f"memory.test_{uuid4().hex[:8]}.created"
 
         # Create handler and subscription
-        handler1 = HandlerSubscription(handler_config)
+        container1 = ModelONEXContainer()
+        handler1 = HandlerSubscription(container1)
         try:
-            await handler1.initialize()
+            await handler1.initialize(handler_config)
         except RuntimeError as e:
             pytest.skip(f"Failed to initialize handler: {e}")
 
@@ -595,9 +581,10 @@ class TestSurviveRestart:
         await handler1.shutdown()
 
         # Create new handler instance and verify subscription exists
-        handler2 = HandlerSubscription(handler_config)
+        container2 = ModelONEXContainer()
+        handler2 = HandlerSubscription(container2)
         try:
-            await handler2.initialize()
+            await handler2.initialize(handler_config)
         except RuntimeError as e:
             pytest.skip(f"Failed to initialize handler: {e}")
 
@@ -618,6 +605,8 @@ class TestSurviveRestart:
         services_available: bool,
     ) -> None:
         """Deleted subscriptions remain deleted after restart."""
+        from omnibase_core.container import ModelONEXContainer
+
         if not services_available:
             pytest.skip("Required services not available")
 
@@ -625,9 +614,10 @@ class TestSurviveRestart:
         topic = f"memory.test_{uuid4().hex[:8]}.created"
 
         # Create, subscribe, then unsubscribe
-        handler1 = HandlerSubscription(handler_config)
+        container1 = ModelONEXContainer()
+        handler1 = HandlerSubscription(container1)
         try:
-            await handler1.initialize()
+            await handler1.initialize(handler_config)
         except RuntimeError as e:
             pytest.skip(f"Failed to initialize handler: {e}")
 
@@ -636,9 +626,10 @@ class TestSurviveRestart:
         await handler1.shutdown()
 
         # Verify subscription stays deleted
-        handler2 = HandlerSubscription(handler_config)
+        container2 = ModelONEXContainer()
+        handler2 = HandlerSubscription(container2)
         try:
-            await handler2.initialize()
+            await handler2.initialize(handler_config)
         except RuntimeError as e:
             pytest.skip(f"Failed to initialize handler: {e}")
 
@@ -677,7 +668,10 @@ class TestHealthCheck:
         handler_config: ModelHandlerSubscriptionConfig,
     ) -> None:
         """Health check before initialize returns uninitialized status."""
-        handler = HandlerSubscription(handler_config)
+        from omnibase_core.container import ModelONEXContainer
+
+        container = ModelONEXContainer()
+        handler = HandlerSubscription(container)
 
         health = await handler.health_check()
 
@@ -813,7 +807,10 @@ class TestInitialization:
         handler_config: ModelHandlerSubscriptionConfig,
     ) -> None:
         """Operations before initialize raise RuntimeError."""
-        handler = HandlerSubscription(handler_config)
+        from omnibase_core.container import ModelONEXContainer
+
+        container = ModelONEXContainer()
+        handler = HandlerSubscription(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
             await handler.subscribe(
@@ -828,13 +825,16 @@ class TestInitialization:
         services_available: bool,
     ) -> None:
         """Multiple initialize calls are safe (idempotent)."""
+        from omnibase_core.container import ModelONEXContainer
+
         if not services_available:
             pytest.skip("Required services not available")
 
-        handler = HandlerSubscription(handler_config)
+        container = ModelONEXContainer()
+        handler = HandlerSubscription(container)
         try:
-            await handler.initialize()
-            await handler.initialize()  # Should not raise
+            await handler.initialize(handler_config)
+            await handler.initialize(handler_config)  # Should not raise
             assert handler.is_initialized is True
         except RuntimeError as e:
             pytest.skip(f"Failed to initialize handler: {e}")
@@ -848,12 +848,15 @@ class TestInitialization:
         services_available: bool,
     ) -> None:
         """Multiple shutdown calls are safe (idempotent)."""
+        from omnibase_core.container import ModelONEXContainer
+
         if not services_available:
             pytest.skip("Required services not available")
 
-        handler = HandlerSubscription(handler_config)
+        container = ModelONEXContainer()
+        handler = HandlerSubscription(container)
         try:
-            await handler.initialize()
+            await handler.initialize(handler_config)
         except RuntimeError as e:
             pytest.skip(f"Failed to initialize handler: {e}")
 
