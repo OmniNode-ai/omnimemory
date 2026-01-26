@@ -25,6 +25,8 @@ Usage::
     Temporary workaround for OMN-1588.
 """
 
+# TODO(OMN-1588): Remove this entire module when omnibase_core adds native handler_routing support
+
 from omnimemory.models.contracts.model_contract_compute_extended import (
     ModelContractComputeExtended,
 )
