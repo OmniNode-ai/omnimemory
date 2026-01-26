@@ -91,33 +91,14 @@ actions:
 # === HANDLER ROUTING ===
 # Routes operations to the appropriate handler implementation.
 # P1A: FileSystem adapter is the sole handler for all operations.
+# All operations (store, retrieve, update, delete, list) route to the same handler,
+# so default_handler is sufficient - no per-operation handlers needed.
 handler_routing:
   routing_strategy: "operation_match"
   execution_mode: "sequential"
   default_handler:
     name: "HandlerFileSystemAdapter"
     module: "omnimemory.nodes.memory_storage_effect.adapters"
-  handlers:
-    - operation: "store"
-      handler:
-        name: "HandlerFileSystemAdapter"
-        module: "omnimemory.nodes.memory_storage_effect.adapters"
-    - operation: "retrieve"
-      handler:
-        name: "HandlerFileSystemAdapter"
-        module: "omnimemory.nodes.memory_storage_effect.adapters"
-    - operation: "update"
-      handler:
-        name: "HandlerFileSystemAdapter"
-        module: "omnimemory.nodes.memory_storage_effect.adapters"
-    - operation: "delete"
-      handler:
-        name: "HandlerFileSystemAdapter"
-        module: "omnimemory.nodes.memory_storage_effect.adapters"
-    - operation: "list"
-      handler:
-        name: "HandlerFileSystemAdapter"
-        module: "omnimemory.nodes.memory_storage_effect.adapters"
 
 # === DEPENDENCIES ===
 # P1A: FileSystem backend is primary, other backends deferred to Phase 2
