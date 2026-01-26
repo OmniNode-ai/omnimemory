@@ -416,6 +416,7 @@ class TestGetSessionOperation:
             status="not_found",
             intents=[],
             total_count=0,
+            error_message="Session not found",
         )
 
         request = ModelIntentStorageRequest(
@@ -608,8 +609,7 @@ class TestErrorHandling:
         request = ModelIntentStorageRequest(
             operation="get_distribution",  # Valid operation for construction
         )
-        # Manually set invalid operation to test handler's internal routing
-        # Using object.__setattr__ to bypass frozen/validation
+        # Bypass Pydantic validation to test handler's internal operation routing
         object.__setattr__(request, "operation", "invalid_op")
 
         # Act
