@@ -175,25 +175,7 @@ handler_routing:
         module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
       description: "Archives EXPIRED memories to cold storage with gzip compression"
 
-  # Restore command handler - ARCHIVED -> ACTIVE state transition (planned)
-  # TODO(OMN-1453): Implement HandlerRestoreMemory
-  # - event_model:
-  #     name: "ModelRestoreMemoryCommand"
-  #   event_pattern: "memory.cmd.restore-memory.v1"
-  #   handler:
-  #     name: "HandlerRestoreMemory"
-  #     module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
-  #   description: "Restores ARCHIVED memories back to ACTIVE state"
-
-  # Memory accessed event handler - TTL extension tracking (planned)
-  # TODO(OMN-1453): Implement HandlerMemoryAccessed
-  # - event_model:
-  #     name: "ModelMemoryAccessedEvent"
-  #   event_pattern: "memory.evt.memory-accessed.v1"
-  #   handler:
-  #     name: "HandlerMemoryAccessed"
-  #     module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
-  #   description: "Tracks memory access patterns for TTL extension decisions"
+  # Future handlers (OMN-1453): restore, memory-accessed
 
 # Orchestration configuration - use defaults
 load_balancing_enabled: true

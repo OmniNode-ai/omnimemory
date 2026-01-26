@@ -20,6 +20,29 @@ Note:
 
     It is re-exported here for import convenience.
 
+Import Direction (CRITICAL):
+    This module creates a one-way import dependency:
+
+    ``omnimemory.handlers`` --> imports from --> ``omnimemory.nodes.*/handlers/``
+
+    **Why this exists**: Re-exporting node handlers here provides a convenient single
+    import location for consumers (``from omnimemory.handlers import HandlerSemanticCompute``).
+
+    **Circular Import Warning**: Node handler modules (anything under ``nodes/*/handlers/``)
+    MUST NOT import from ``omnimemory.handlers``. Doing so would create a circular import:
+
+        - ``omnimemory.handlers.__init__`` imports ``omnimemory.nodes.X.handlers``
+        - ``omnimemory.nodes.X.handlers`` imports ``omnimemory.handlers`` (CIRCULAR!)
+
+    If a node handler needs types or utilities from the handlers package, import directly
+    from the specific submodule instead:
+
+        # WRONG (causes circular import)
+        from omnimemory.handlers import HandlerIntent
+
+        # CORRECT (direct import from specific module)
+        from omnimemory.handlers.handler_intent import HandlerIntent
+
 Example::
 
     from omnimemory.handlers import (

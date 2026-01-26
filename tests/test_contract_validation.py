@@ -235,3 +235,146 @@ class TestContractHandlerMapping:
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
     def test_node_integration_with_storage_backend(self, node_name: str) -> None:
         """Verify node interaction with actual storage backends."""
+
+
+# Filter for orchestrator nodes only
+ORCHESTRATOR_NODES: list[str] = [
+    node for node in CORE_8_NODES if "orchestrator" in node
+]
+
+
+class TestOrchestratorEventValidation:
+    """Test orchestrator-specific event field validation.
+
+    Orchestrator contracts define consumed_events and published_events fields
+    that are stripped during standard Pydantic validation (due to format mismatch
+    with ModelEventDescriptor/ModelEventSubscription). This test class validates
+    that these event fields have the correct structure.
+
+    Event Field Schemas:
+        consumed_events: List of dicts with required keys:
+            - event_pattern: str (event pattern string)
+            - handler_function: str (handler method name)
+
+        published_events: List of dicts with required keys:
+            - event_pattern: str (event pattern string)
+            Optional: description, etc.
+    """
+
+    @pytest.mark.parametrize("node_name", ORCHESTRATOR_NODES)
+    def test_consumed_events_structure(self, node_name: str) -> None:
+        """Verify consumed_events entries have required keys.
+
+        Each consumed_events entry must have:
+        - event_pattern: The event pattern to subscribe to
+        - handler_function: The handler method name to invoke
+        """
+        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        if not contract_path.exists():
+            pytest.skip(f"File not yet implemented: {contract_path}")
+
+        with open(contract_path, encoding="utf-8") as f:
+            data: MappingResultDict = yaml.safe_load(f)
+
+        consumed_events = data.get("consumed_events")
+
+        # consumed_events is required for orchestrators
+        assert (
+            consumed_events is not None
+        ), f"Orchestrator {node_name} missing consumed_events field"
+        assert isinstance(
+            consumed_events, list
+        ), f"consumed_events must be a list: {node_name}"
+
+        # Validate each entry has required keys
+        for idx, event in enumerate(consumed_events):
+            assert isinstance(
+                event, dict
+            ), f"consumed_events[{idx}] must be a dict: {node_name}"
+            assert (
+                "event_pattern" in event
+            ), f"consumed_events[{idx}] missing 'event_pattern': {node_name}"
+            assert (
+                "handler_function" in event
+            ), f"consumed_events[{idx}] missing 'handler_function': {node_name}"
+            # Validate types
+            assert isinstance(
+                event["event_pattern"], str
+            ), f"consumed_events[{idx}].event_pattern must be str: {node_name}"
+            assert isinstance(
+                event["handler_function"], str
+            ), f"consumed_events[{idx}].handler_function must be str: {node_name}"
+            # Validate non-empty
+            assert event[
+                "event_pattern"
+            ], f"consumed_events[{idx}].event_pattern cannot be empty: {node_name}"
+            assert event[
+                "handler_function"
+            ], f"consumed_events[{idx}].handler_function cannot be empty: {node_name}"
+
+    @pytest.mark.parametrize("node_name", ORCHESTRATOR_NODES)
+    def test_published_events_structure(self, node_name: str) -> None:
+        """Verify published_events entries have required keys.
+
+        Each published_events entry must have:
+        - event_pattern: The event pattern that will be published
+
+        published_events can be an empty list if the orchestrator
+        publishes events dynamically or documents them elsewhere.
+        """
+        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        if not contract_path.exists():
+            pytest.skip(f"File not yet implemented: {contract_path}")
+
+        with open(contract_path, encoding="utf-8") as f:
+            data: MappingResultDict = yaml.safe_load(f)
+
+        published_events = data.get("published_events")
+
+        # published_events is required but can be empty
+        assert (
+            published_events is not None
+        ), f"Orchestrator {node_name} missing published_events field"
+        assert isinstance(
+            published_events, list
+        ), f"published_events must be a list: {node_name}"
+
+        # Validate each entry has required keys (if non-empty)
+        for idx, event in enumerate(published_events):
+            assert isinstance(
+                event, dict
+            ), f"published_events[{idx}] must be a dict: {node_name}"
+            assert (
+                "event_pattern" in event
+            ), f"published_events[{idx}] missing 'event_pattern': {node_name}"
+            # Validate types
+            assert isinstance(
+                event["event_pattern"], str
+            ), f"published_events[{idx}].event_pattern must be str: {node_name}"
+            # Validate non-empty
+            assert event[
+                "event_pattern"
+            ], f"published_events[{idx}].event_pattern cannot be empty: {node_name}"
+
+    @pytest.mark.parametrize("node_name", ORCHESTRATOR_NODES)
+    def test_consumed_events_handler_naming_convention(self, node_name: str) -> None:
+        """Verify handler_function follows naming convention.
+
+        Handler functions should follow the pattern 'handle_<action>'
+        to maintain consistency across orchestrators.
+        """
+        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        if not contract_path.exists():
+            pytest.skip(f"File not yet implemented: {contract_path}")
+
+        with open(contract_path, encoding="utf-8") as f:
+            data: MappingResultDict = yaml.safe_load(f)
+
+        consumed_events = data.get("consumed_events", [])
+
+        for idx, event in enumerate(consumed_events):
+            handler = event.get("handler_function", "")
+            assert handler.startswith("handle_"), (
+                f"consumed_events[{idx}].handler_function should start with 'handle_': "
+                f"got '{handler}' in {node_name}"
+            )
