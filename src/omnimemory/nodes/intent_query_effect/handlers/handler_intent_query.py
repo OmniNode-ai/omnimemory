@@ -2,9 +2,9 @@
 # Copyright (c) 2025 OmniNode Team
 """Handler for intent query operations via Kafka events.
 
-Processes intent query requests (distribution, session, recent) and returns
-responses via the event bus. Part of the event-driven architecture where
-OmniDash queries intent data without direct database access.
+Processes intent query requests (distribution, session, recent, health_check)
+and returns responses via the event bus. Part of the event-driven architecture
+where OmniDash queries intent data without direct database access.
 
 Example::
 
@@ -58,6 +58,7 @@ class HandlerIntentQuery:
         - distribution: Get intent counts grouped by category
         - session: Get intents for a specific session
         - recent: Get recent intents across all sessions
+        - health_check: Check handler health and readiness status
 
     Attributes:
         config: Handler configuration controlling timeouts and defaults.
@@ -166,6 +167,8 @@ class HandlerIntentQuery:
                         return await self._handle_session(request, start)
                     case "recent":
                         return await self._handle_recent(request, start)
+                    case "health_check":
+                        return await self._handle_health_check(request, start)
                     case _:
                         return ModelIntentQueryResponseEvent.from_error(
                             query_id=request.query_id,
@@ -371,6 +374,31 @@ class HandlerIntentQuery:
             query_id=request.query_id,
             intents=payloads,
             time_range_hours=request.time_range_hours,
+            execution_time_ms=execution_time_ms,
+            correlation_id=request.correlation_id,
+        )
+
+    async def _handle_health_check(
+        self,
+        request: ModelIntentQueryRequestedEvent,
+        start: float,
+    ) -> ModelIntentQueryResponseEvent:
+        """Handle health check query - verify handler is initialized and ready.
+
+        Args:
+            request: The query request event.
+            start: Start time for execution timing.
+
+        Returns:
+            Response event with health status.
+        """
+        execution_time_ms = (time.monotonic() - start) * 1000
+
+        # Handler is initialized if we reached here (checked in execute())
+        return ModelIntentQueryResponseEvent(
+            query_id=request.query_id,
+            query_type="health_check",
+            status="success",
             execution_time_ms=execution_time_ms,
             correlation_id=request.correlation_id,
         )

@@ -131,7 +131,8 @@ validation_rules:
     user_context: "str, max_length=10000, PII-validated before processing"
 
 # === HANDLER ROUTING (Declarative Dispatch) ===
-# Maps operations to handler classes for ONEX-compliant routing
+# Maps operations to handler classes for ONEX-compliant routing.
+# routing_key values MUST match validation_rules.constraint_definitions.operation Literal values.
 handler_routing:
   version:
     major: 1
@@ -139,23 +140,18 @@ handler_routing:
     patch: 0
   routing_strategy: operation_match
   handlers:
-    # Store a classified intent linked to a session
-    - routing_key: "store_intent"
+    # Store operation: persist a classified intent linked to a session
+    - routing_key: "store"
       handler_key: "HandlerIntentStorageAdapter"
       priority: 0
       output_events: []
-    # Retrieve intents for a specific session
-    - routing_key: "get_session_intents"
+    # Get session operation: retrieve intents for a specific session
+    - routing_key: "get_session"
       handler_key: "HandlerIntentStorageAdapter"
       priority: 0
       output_events: []
-    # Get aggregate intent category distribution
-    - routing_key: "get_intent_distribution"
-      handler_key: "HandlerIntentStorageAdapter"
-      priority: 0
-      output_events: []
-    # Check node health status
-    - routing_key: "health_check"
+    # Get distribution operation: aggregate intent category distribution
+    - routing_key: "get_distribution"
       handler_key: "HandlerIntentStorageAdapter"
       priority: 0
       output_events: []

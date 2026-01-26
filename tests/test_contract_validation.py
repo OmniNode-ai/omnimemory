@@ -132,8 +132,10 @@ class TestContractValidation:
                 ModelContractOrchestratorExtended(**orchestrator_data)
             else:
                 pytest.fail(f"Unknown node_type: {node_type}")
-        except ImportError:
-            pytest.skip("omnibase_core not installed")
+        except ModuleNotFoundError as e:
+            if e.name and e.name.startswith("omnibase_core"):
+                pytest.skip("omnibase_core not installed")
+            raise
 
 
 class TestContractRuntimeLoad:

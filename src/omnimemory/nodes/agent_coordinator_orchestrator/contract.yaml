@@ -106,7 +106,7 @@ handler_routing:
     - routing_key: "notify"
       handler_key: "HandlerSubscription.notify"
       priority: 0
-      output_events: []
+      output_events: ["omnimemory.memory.notification.v1"]
   default_handler: null
 
 # =============================================================================
