@@ -31,6 +31,8 @@ Example::
 
 from omnimemory.nodes.similarity_compute.handlers.handler_similarity_compute import (
     HandlerSimilarityCompute,
+    ModelSimilarityComputeHealth,
+    ModelSimilarityComputeMetadata,
 )
 from omnimemory.nodes.similarity_compute.models import (
     ModelHandlerSimilarityComputeConfig,
@@ -39,4 +41,6 @@ from omnimemory.nodes.similarity_compute.models import (
 __all__ = [
     "HandlerSimilarityCompute",
     "ModelHandlerSimilarityComputeConfig",
+    "ModelSimilarityComputeHealth",
+    "ModelSimilarityComputeMetadata",
 ]

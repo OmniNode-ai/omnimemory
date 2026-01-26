@@ -105,10 +105,6 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from omnimemory.enums.enum_subscription_status import EnumSubscriptionStatus
-
-if TYPE_CHECKING:
-    from omnibase_core.container import ModelONEXContainer
-
 from omnimemory.handlers.adapters.adapter_valkey import (
     AdapterValkey,
     AdapterValkeyConfig,
@@ -118,6 +114,9 @@ from omnimemory.models.subscription import (
     ModelSubscription,
 )
 from omnimemory.models.subscription.constants import TOPIC_PATTERN
+
+if TYPE_CHECKING:
+    from omnibase_core.container import ModelONEXContainer
 
 # Optional omnibase_infra imports for handler reuse
 _OMNIBASE_INFRA_AVAILABLE = False
