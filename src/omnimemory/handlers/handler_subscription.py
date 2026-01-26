@@ -114,23 +114,63 @@ from omnimemory.models.subscription import (
 from omnimemory.models.subscription.constants import TOPIC_PATTERN
 
 # Optional omnibase_infra imports for handler reuse
-_OMNIBASE_INFRA_AVAILABLE = False
-_OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
+# Note: Using lowercase names since these are reassigned (not true constants)
+_omnibase_infra_available = False
+_omnibase_infra_import_error: str | None = None
 
 try:
-    from omnibase_infra.event_bus.event_bus_kafka import EventBusKafka
-    from omnibase_infra.handlers.handler_db import HandlerDb
+    from omnibase_infra.event_bus.event_bus_kafka import (
+        EventBusKafka,  # type: ignore[reportAssignmentType]
+    )
+    from omnibase_infra.handlers.handler_db import (
+        HandlerDb,  # type: ignore[reportAssignmentType]
+    )
 
-    _OMNIBASE_INFRA_AVAILABLE = True
+    _omnibase_infra_available = True
 except ImportError as e:
-    _OMNIBASE_INFRA_IMPORT_ERROR = str(e)
+    _omnibase_infra_import_error = str(e)
 
-    # Provide stubs for type checking
+    # Provide stubs for type checking with method signatures
+    # These stubs allow pyright to understand the interface even when
+    # omnibase_infra is not installed
+    from typing import Any
+
     class HandlerDb:  # type: ignore[no-redef]
         """Stub for HandlerDb when omnibase_infra is not installed."""
 
+        async def initialize(self, config: dict[str, Any]) -> None:
+            """Initialize the database handler."""
+            raise NotImplementedError("omnibase_infra is not installed")
+
+        async def shutdown(self) -> None:
+            """Shutdown the database handler."""
+            raise NotImplementedError("omnibase_infra is not installed")
+
+        async def execute(self, envelope: dict[str, Any]) -> Any:
+            """Execute a database operation."""
+            raise NotImplementedError("omnibase_infra is not installed")
+
     class EventBusKafka:  # type: ignore[no-redef]
         """Stub for EventBusKafka when omnibase_infra is not installed."""
+
+        async def initialize(self, config: dict[str, Any]) -> None:
+            """Initialize the Kafka event bus."""
+            raise NotImplementedError("omnibase_infra is not installed")
+
+        async def shutdown(self) -> None:
+            """Shutdown the Kafka event bus."""
+            raise NotImplementedError("omnibase_infra is not installed")
+
+        async def execute(self, envelope: dict[str, Any]) -> Any:
+            """Execute a Kafka operation."""
+            raise NotImplementedError("omnibase_infra is not installed")
+
+        async def health_check(self) -> Any:
+            """Check the health of the Kafka connection.
+
+            Returns Any because the real class may return dict, bool, or Pydantic model.
+            """
+            raise NotImplementedError("omnibase_infra is not installed")
 
 
 logger = logging.getLogger(__name__)
@@ -436,11 +476,11 @@ class HandlerSubscription:
         Raises:
             ImportError: If omnibase_infra is not installed.
         """
-        if not _OMNIBASE_INFRA_AVAILABLE:
+        if not _omnibase_infra_available:
             raise ImportError(
                 f"omnibase_infra is required for HandlerSubscription. "
                 f"Install it with: poetry install --with dev. "
-                f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
+                f"Original error: {_omnibase_infra_import_error}"
             )
 
         self._config = config

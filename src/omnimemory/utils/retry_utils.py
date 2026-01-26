@@ -138,10 +138,14 @@ async def retry_with_backoff(
             attempts.append(attempt_info)
 
             # Execute operation
+            # Note: We use cast() because pyright cannot narrow the return type
+            # based on asyncio.iscoroutinefunction() check. The runtime behavior
+            # is correct - sync functions return T directly, async functions
+            # return Coroutine[Any, Any, T] which we await to get T.
             if asyncio.iscoroutinefunction(operation):
                 result: T = await operation(*args, **kwargs)
             else:
-                result = operation(*args, **kwargs)
+                result = cast(T, operation(*args, **kwargs))
 
             # Success - log if there were retries
             if attempt > 1:

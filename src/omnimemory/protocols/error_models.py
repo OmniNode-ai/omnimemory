@@ -20,16 +20,11 @@ FieldValueType = (
     str | int | float | bool | bytes | list[object] | dict[str, object] | None
 )
 
-# Use local compatibility stub until omnibase_core provides OnexError
-try:
-    from omnibase_core.core.errors.core_errors import (
-        OnexError as BaseOnexError,
-    )
-except (ImportError, ModuleNotFoundError):
-    from ..compat.onex_error import OnexError as BaseOnexError
-
+# Use local compatibility stub - provides consistent interface
+# regardless of omnibase_core availability
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..compat.onex_error import OnexError as BaseOnexError
 from ..models.foundation import ModelMetadata
 
 
@@ -48,10 +43,8 @@ def _normalize_context_to_dict(
         return dict(
             context.to_dict()
         )  # to_dict() returns dict[str, str], copy for safety
-    if isinstance(context, dict):
-        return dict(context)  # Shallow copy for mutability
-    # Fallback for any other object with dict-like behavior
-    return dict(context)
+    # context is dict[str, object] at this point
+    return dict(context)  # Shallow copy for mutability
 
 
 # === ERROR CODES ===
@@ -203,7 +196,7 @@ def get_error_category(
     error_code: EnumOmniMemoryErrorCode,
 ) -> ModelErrorCategoryInfo | None:
     """Get error category information for an error code."""
-    for category_name, category_info in ERROR_CATEGORIES.items():
+    for _category_name, category_info in ERROR_CATEGORIES.items():
         if error_code.value.startswith(category_info.prefix):
             return category_info
     return None
@@ -229,7 +222,6 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         cause: BaseException | None = None,
         recovery_hint: str | None = None,
         retry_after: int | None = None,
-        **kwargs: object,
     ) -> None:
         """
         Initialize OmniMemory error.
@@ -242,7 +234,6 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
             cause: Underlying exception that caused this error
             recovery_hint: Suggestion for error recovery
             retry_after: Suggested retry delay in seconds
-            **kwargs: Additional keyword arguments passed to BaseOnexError
         """
         # Get error category information
         category_info = get_error_category(error_code)
@@ -272,7 +263,6 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
             message=message,
             context=enhanced_context,
             correlation_id=correlation_id,
-            **kwargs,
         )
 
         # Store additional OmniMemory-specific information

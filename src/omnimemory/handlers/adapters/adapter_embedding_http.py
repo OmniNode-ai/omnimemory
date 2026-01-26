@@ -45,6 +45,7 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from omnibase_core.container import ModelONEXContainer
 from omnibase_infra.errors import (
     InfraConnectionError,
     InfraTimeoutError,
@@ -66,6 +67,8 @@ from omnimemory.models.config import (
 if TYPE_CHECKING:
     from types import TracebackType
     from uuid import UUID
+
+    from omnibase_core.models.dispatch import ModelHandlerOutput
 
 
 logger = logging.getLogger(__name__)
@@ -188,7 +191,9 @@ class EmbeddingHttpClient:
             if self._initialized:
                 return
 
-            self._handler = HandlerHttpRest()
+            # Create a minimal ONEX container for the handler
+            container = ModelONEXContainer()
+            self._handler = HandlerHttpRest(container)
             # Assert for type narrowing: pyright doesn't narrow instance attributes
             # after assignment due to potential concurrent modification
             assert self._handler is not None
@@ -368,7 +373,7 @@ class EmbeddingHttpClient:
 
     def _parse_response(
         self,
-        result: object,
+        result: ModelHandlerOutput[dict[str, object]],
         correlation_id: UUID,
         skip_dimension_validation: bool = False,
     ) -> list[float]:
@@ -386,13 +391,6 @@ class EmbeddingHttpClient:
             EmbeddingClientError: If response format is invalid.
         """
         # Extract the result payload
-        if not hasattr(result, "result"):
-            raise EmbeddingClientError(
-                f"Invalid response structure: missing 'result' attribute "
-                f"(correlation_id={correlation_id})",
-                correlation_id,
-            )
-
         result_dict = result.result
         if not isinstance(result_dict, dict):
             raise EmbeddingClientError(

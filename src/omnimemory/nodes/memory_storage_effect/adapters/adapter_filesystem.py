@@ -45,16 +45,21 @@ from pydantic import ValidationError
 
 # omnibase_infra is a dev dependency - make imports conditional
 # to allow test collection and provide clear error messages
-_OMNIBASE_INFRA_AVAILABLE = False
-_OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
+# Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
+_omnibase_infra_available: bool = False
+_omnibase_infra_import_error: str | None = None
 
 try:
-    from omnibase_infra.errors.error_infra import InfraConnectionError
-    from omnibase_infra.handlers.handler_filesystem import HandlerFileSystem
+    from omnibase_infra.errors.error_infra import (
+        InfraConnectionError,  # pyright: ignore[reportAssignmentType]
+    )
+    from omnibase_infra.handlers.handler_filesystem import (
+        HandlerFileSystem,  # pyright: ignore[reportAssignmentType]
+    )
 
-    _OMNIBASE_INFRA_AVAILABLE = True
+    _omnibase_infra_available = True
 except ImportError as e:
-    _OMNIBASE_INFRA_IMPORT_ERROR = str(e)
+    _omnibase_infra_import_error = str(e)
 
     # Provide stub types for type checking and to allow module to load
     class InfraConnectionError(Exception):  # type: ignore[no-redef]
@@ -67,8 +72,20 @@ except ImportError as e:
             raise ImportError(
                 f"omnibase_infra is required for HandlerFileSystemAdapter. "
                 f"Install it with: poetry install --with dev. "
-                f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
+                f"Original error: {_omnibase_infra_import_error}"
             )
+
+        async def initialize(self, config: dict[str, object]) -> None:
+            """Stub for initialize method."""
+            raise ImportError("omnibase_infra is required")
+
+        async def execute(self, envelope: dict[str, object]) -> object:
+            """Stub for execute method."""
+            raise ImportError("omnibase_infra is required")
+
+        async def shutdown(self) -> None:
+            """Stub for shutdown method."""
+            raise ImportError("omnibase_infra is required")
 
 
 from omnimemory.models.adapters import ModelFileSystemAdapterConfig

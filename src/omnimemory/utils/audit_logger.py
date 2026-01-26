@@ -84,9 +84,10 @@ class AuditLogger:
                     "message": record.getMessage(),
                 }
 
-                # Add audit event data if present
-                if hasattr(record, "audit_event"):
-                    log_data["audit_event"] = record.audit_event
+                # Add audit event data if present (use getattr for dynamic attribute)
+                audit_event = getattr(record, "audit_event", None)
+                if audit_event is not None:
+                    log_data["audit_event"] = audit_event
 
                 return json.dumps(log_data)
 
@@ -371,7 +372,7 @@ def _cleanup_audit_logger() -> None:
     and file handles are released.
     """
     instance = _AuditLoggerState.get_instance()
-    if instance is not None and instance.logger is not None:
+    if instance is not None:
         for handler in instance.logger.handlers[:]:
             try:
                 handler.flush()

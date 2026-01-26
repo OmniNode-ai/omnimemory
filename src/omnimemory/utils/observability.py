@@ -395,11 +395,11 @@ def create_validated_log_entry(
 
 
 # Optional psutil import for memory tracking - gracefully degrade if unavailable
-_PSUTIL_AVAILABLE = False
+_psutil_available = False
 try:
     import psutil  # type: ignore[import-untyped]
 
-    _PSUTIL_AVAILABLE = True
+    _psutil_available = True
 except ImportError:
     psutil = None
 from .error_sanitizer import SanitizationLevel
@@ -418,7 +418,7 @@ def validate_correlation_id(correlation_id: str) -> bool:
     Returns:
         bool: True if valid, False otherwise
     """
-    if not correlation_id or not isinstance(correlation_id, str):
+    if not correlation_id:
         return False
 
     # Allow UUIDs (with or without hyphens) and alphanumeric strings up to 64 chars
@@ -1452,7 +1452,7 @@ class ObservabilityManager:
         start_memory: float | None = None
         if trace_performance:
             # Only track memory if psutil is available
-            if _PSUTIL_AVAILABLE and psutil is not None:
+            if _psutil_available and psutil is not None:
                 try:
                     process = psutil.Process()
                     start_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -1551,7 +1551,7 @@ class ObservabilityManager:
 
                     if metrics_final.memory_usage_start is not None:
                         # Only track memory delta if psutil is available
-                        if _PSUTIL_AVAILABLE and psutil is not None:
+                        if _psutil_available and psutil is not None:
                             try:
                                 process = psutil.Process()
                                 end_memory = (
@@ -1864,15 +1864,9 @@ class HandlerObservabilityWrapper:
                                 Default is False for backwards compatibility.
 
         Raises:
-            ValueError: If handler_name is not a valid string or doesn't match
+            ValueError: If handler_name is empty or doesn't match
                        the required pattern.
         """
-        # Validate handler_name is a non-empty string
-        if not isinstance(handler_name, str):
-            raise ValueError(
-                f"handler_name must be a string, got {type(handler_name).__name__}"
-            )
-
         if not handler_name:
             raise ValueError("handler_name must be a non-empty string")
 

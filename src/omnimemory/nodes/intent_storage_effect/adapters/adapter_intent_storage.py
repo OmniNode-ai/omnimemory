@@ -65,15 +65,18 @@ if TYPE_CHECKING:
     from omnimemory.handlers.adapters import AdapterIntentGraph
 
 # Runtime conditional import
-_ADAPTER_AVAILABLE = False
-_ADAPTER_IMPORT_ERROR: str | None = None
+# Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
+_adapter_available: bool = False
+_adapter_import_error: str | None = None
 
 try:
-    from omnimemory.handlers.adapters import AdapterIntentGraph
+    from omnimemory.handlers.adapters import (
+        AdapterIntentGraph,  # pyright: ignore[reportAssignmentType]
+    )
 
-    _ADAPTER_AVAILABLE = True
+    _adapter_available = True
 except ImportError as e:
-    _ADAPTER_IMPORT_ERROR = str(e)
+    _adapter_import_error = str(e)
 
     class AdapterIntentGraph:  # type: ignore[no-redef]
         """Stub for AdapterIntentGraph when dependencies not installed."""
@@ -82,8 +85,47 @@ except ImportError as e:
             raise ImportError(
                 f"AdapterIntentGraph dependencies not available. "
                 f"Ensure omnibase_infra is installed. "
-                f"Original error: {_ADAPTER_IMPORT_ERROR}"
+                f"Original error: {_adapter_import_error}"
             )
+
+        async def initialize(
+            self,
+            connection_uri: str,
+            auth: tuple[str, str] | None = None,
+            options: object | None = None,
+        ) -> None:
+            """Stub for initialize method."""
+            raise ImportError("AdapterIntentGraph dependencies not available")
+
+        async def shutdown(self) -> None:
+            """Stub for shutdown method."""
+            raise ImportError("AdapterIntentGraph dependencies not available")
+
+        async def store_intent(
+            self,
+            session_id: str,
+            intent_data: object,
+            correlation_id: object,
+            user_context: str | None = None,
+        ) -> object:
+            """Stub for store_intent method."""
+            raise ImportError("AdapterIntentGraph dependencies not available")
+
+        async def get_session_intents(
+            self,
+            session_id: str,
+            min_confidence: float | None = None,
+            limit: int | None = None,
+        ) -> object:
+            """Stub for get_session_intents method."""
+            raise ImportError("AdapterIntentGraph dependencies not available")
+
+        async def get_intent_distribution(
+            self,
+            time_range_hours: int | None = None,
+        ) -> object:
+            """Stub for get_intent_distribution method."""
+            raise ImportError("AdapterIntentGraph dependencies not available")
 
 
 logger = logging.getLogger(__name__)
@@ -161,9 +203,9 @@ class HandlerIntentStorageAdapter:
         if self._initialized:
             return
 
-        if not _ADAPTER_AVAILABLE:
+        if not _adapter_available:
             raise ImportError(
-                f"AdapterIntentGraph dependencies not available: {_ADAPTER_IMPORT_ERROR}"
+                f"AdapterIntentGraph dependencies not available: {_adapter_import_error}"
             )
 
         self._adapter = AdapterIntentGraph(self._config)

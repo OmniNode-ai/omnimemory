@@ -69,15 +69,16 @@ else:
     RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
     PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
 
-_REDIS_AVAILABLE = False
-_REDIS_IMPORT_ERROR: str | None = None
+# Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
+_redis_available: bool = False
+_redis_import_error: str | None = None
 
 try:
     import redis.asyncio as aioredis
 
-    _REDIS_AVAILABLE = True
+    _redis_available = True
 except ImportError as e:
-    _REDIS_IMPORT_ERROR = str(e)
+    _redis_import_error = str(e)
     aioredis = None  # type: ignore[assignment]
 
 
@@ -413,11 +414,11 @@ class AdapterValkey:
         Raises:
             ImportError: If redis-py is not installed.
         """
-        if not _REDIS_AVAILABLE:
+        if not _redis_available:
             raise ImportError(
                 f"redis-py is required for AdapterValkey. "
                 f"Install it with: poetry add redis. "
-                f"Original error: {_REDIS_IMPORT_ERROR}"
+                f"Original error: {_redis_import_error}"
             )
 
         self._config = config
@@ -516,7 +517,7 @@ class AdapterValkey:
                     password = self._config.password.get_secret_value()
 
                 # aioredis is guaranteed to be available here because
-                # __init__ raises ImportError if _REDIS_AVAILABLE is False
+                # __init__ raises ImportError if _redis_available is False
                 assert aioredis is not None, "aioredis module not available"
 
                 self._client = aioredis.Redis(
@@ -798,7 +799,8 @@ class AdapterValkey:
         result = await self._ensure_awaited(client.hget(self._prefixed_key(key), field))
         if result is None:
             return None
-        return str(result) if not isinstance(result, str) else result
+        # Always convert to str - handles both str and bytes from redis
+        return str(result)
 
     async def hgetall(self, key: str) -> dict[str, str]:
         """Get all fields and values of a hash.

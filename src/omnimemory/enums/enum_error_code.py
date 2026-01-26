@@ -10,11 +10,11 @@ from __future__ import annotations
 import re
 
 try:
-    from omnibase_core.core.errors.core_errors import (
+    from omnibase_core.core.errors.core_errors import (  # pyright: ignore[reportMissingImports]
         OnexErrorCode,
     )
 
-    _BASE_CLASS = OnexErrorCode
+    _base_class = OnexErrorCode
 except ImportError:
     # Fallback for development environments without omnibase_core
     from enum import Enum
@@ -42,10 +42,10 @@ except ImportError:
             """Get the appropriate CLI exit code for this error."""
             return 1  # Default to error exit code
 
-    _BASE_CLASS = OnexErrorCode
+    _base_class = OnexErrorCode
 
 
-class EnumOmniMemoryErrorCode(_BASE_CLASS):  # type: ignore[valid-type,misc]
+class EnumOmniMemoryErrorCode(_base_class):  # type: ignore[valid-type,misc]
     """Memory-specific error codes for the ONEX memory system."""
 
     # Memory operation errors (specific to omnimemory only)

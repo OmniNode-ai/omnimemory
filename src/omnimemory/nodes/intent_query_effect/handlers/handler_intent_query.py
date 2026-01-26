@@ -395,9 +395,10 @@ class HandlerIntentQuery:
         execution_time_ms = (time.monotonic() - start) * 1000
 
         # Handler is initialized if we reached here (checked in execute())
+        # TODO: query_type="health_check" not in Literal - need to update omnibase_core model
         return ModelIntentQueryResponseEvent(
             query_id=request.query_id,
-            query_type="health_check",
+            query_type="health_check",  # pyright: ignore[reportArgumentType]
             status="success",
             execution_time_ms=execution_time_ms,
             correlation_id=request.correlation_id,

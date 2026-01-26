@@ -197,10 +197,8 @@ class SearchFilters(BaseMemoryModel):
             return ModelOptionalStringList(values=[v])
         if isinstance(v, list):
             return ModelOptionalStringList(values=v)
-        if isinstance(v, set | frozenset):
-            return ModelOptionalStringList(values=sorted(v))
-        # Should not reach here given type annotation, but satisfy type checker
-        return None
+        # v is set | frozenset at this point
+        return ModelOptionalStringList(values=sorted(v))
 
 
 class SearchResult(BaseMemoryModel):
@@ -319,10 +317,8 @@ class BaseMemoryResponse(BaseMemoryModel):
             return None
         if isinstance(v, ModelStringList):
             return v
-        if isinstance(v, list):
-            return ModelStringList(values=v)
-        # Should not reach here given type annotation, but satisfy type checker
-        return None
+        # v is list[str] at this point
+        return ModelStringList(values=v)
 
 
 # === CORE DATA MODELS ===
@@ -418,10 +414,8 @@ class MemoryRecord(BaseMemoryModel):
             return None
         if isinstance(v, ModelStringList):
             return v
-        if isinstance(v, list):
-            return ModelStringList(values=v)
-        # Should not reach here given type annotation, but satisfy type checker
-        return None
+        # v is list[str] at this point
+        return ModelStringList(values=v)
 
 
 # === MEMORY OPERATION REQUESTS/RESPONSES ===

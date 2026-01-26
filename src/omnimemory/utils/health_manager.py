@@ -21,12 +21,12 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
 # Optional psutil import for resource metrics - gracefully degrade if unavailable
-_PSUTIL_AVAILABLE = False
+_psutil_available = False
 psutil = None
 try:
     import psutil  # type: ignore[import-untyped,no-redef]
 
-    _PSUTIL_AVAILABLE = True
+    _psutil_available = True
 except ImportError:
     pass
 
@@ -127,11 +127,11 @@ def _get_package_version() -> ModelSemVer:
     Returns:
         ModelSemVer: Package version as strongly-typed semver model.
     """
+    from importlib.metadata import PackageNotFoundError, version
+
     fallback_version = ModelSemVer(major=0, minor=1, patch=0)
     try:
         # Try to get version from package metadata
-        from importlib.metadata import PackageNotFoundError, version
-
         version_str = version("omnimemory")
         return ModelSemVer.parse(version_str)
     except PackageNotFoundError:
@@ -407,20 +407,9 @@ class HealthCheckManager:
                             error=sanitized_error,
                             error_type=type(result).__name__,
                         )
-                    elif isinstance(result, HealthCheckResult):
-                        health_results.append(result)
                     else:
-                        # Should not happen, but handle gracefully
-                        config = self._configs[dependency_name]
-                        err_msg = f"Unexpected type: {type(result).__name__}"
-                        health_results.append(
-                            HealthCheckResult(
-                                config=config,
-                                status=HealthStatus.UNHEALTHY,
-                                latency_ms=0.0,
-                                error_message=err_msg,
-                            )
-                        )
+                        # Result is HealthCheckResult (the expected return type)
+                        health_results.append(cast(HealthCheckResult, result))
 
                 logger.info(
                     "health_check_all_completed",
@@ -448,7 +437,7 @@ class HealthCheckManager:
         Returns default metrics if psutil is unavailable or any error occurs.
         """
         # Check if psutil is available
-        if not _PSUTIL_AVAILABLE or psutil is None:
+        if not _psutil_available or psutil is None:
             logger.debug(
                 "resource_metrics_unavailable",
                 reason="psutil_not_installed",
@@ -811,12 +800,17 @@ async def create_pinecone_health_check(
 
         # Attempt to import Pinecone client - try async first, then sync
         pinecone_async_available = False
+        PineconeAsyncio = None
         try:
-            from pinecone import PineconeAsyncio
+            # PineconeAsyncio may not exist in all SDK versions
+            from pinecone import (
+                PineconeAsyncio as _PineconeAsyncio,  # pyright: ignore[reportAttributeAccessIssue]
+            )
 
+            PineconeAsyncio = _PineconeAsyncio
             pinecone_async_available = True
         except ImportError:
-            PineconeAsyncio = None
+            pass
 
         try:
             from pinecone import Pinecone
@@ -830,12 +824,18 @@ async def create_pinecone_health_check(
 
         # Perform actual health check by calling Pinecone API
         start_time = time.time()
+        index_count = 0
         try:
             if pinecone_async_available and PineconeAsyncio is not None:
                 # Use native async client for non-blocking I/O
                 pc_async = PineconeAsyncio(api_key=api_key)
                 try:
                     indexes = await pc_async.list_indexes()
+                    # Get index count - handle different SDK versions
+                    if hasattr(indexes, "names"):
+                        index_count = len(indexes.names())
+                    elif hasattr(indexes, "__len__"):
+                        index_count = len(indexes)
                 finally:
                     # Cleanup async client resources
                     if hasattr(pc_async, "close"):
@@ -846,17 +846,17 @@ async def create_pinecone_health_check(
                 loop = asyncio.get_running_loop()
                 pc = Pinecone(api_key=api_key)
 
-                def _sync_list_indexes() -> list[str]:
+                def _sync_list_indexes() -> int:
                     result = pc.list_indexes()
-                    return result.names() if result else []
+                    if result and hasattr(result, "names"):
+                        return len(result.names())
+                    elif result and hasattr(result, "__len__"):
+                        return len(result)
+                    return 0
 
-                index_names = await loop.run_in_executor(None, _sync_list_indexes)
-                # Create a simple namespace object to match async behavior
-                indexes = type("IndexList", (), {"names": lambda: index_names})()
+                index_count = await loop.run_in_executor(None, _sync_list_indexes)
 
             latency_ms = (time.time() - start_time) * 1000
-
-            index_count = len(indexes.names()) if indexes else 0
             return HealthCheckResult(
                 config=config,
                 status=HealthStatus.HEALTHY,
@@ -1017,11 +1017,12 @@ class HealthManager:
             result = await asyncio.wait_for(check_func(), timeout=self.default_timeout)
             response_time = time.time() - start_time
 
-            # Record success on circuit breaker
+            # Record success on circuit breaker (if it has record_success method)
             if name in self.circuit_breakers:
                 cb = self.circuit_breakers[name]
-                if hasattr(cb, "record_success"):
-                    cb.record_success()
+                record_success_fn = getattr(cb, "record_success", None)
+                if callable(record_success_fn):
+                    record_success_fn()
 
             # Convert result to HealthCheckDetails
             if isinstance(result, HealthCheckDetails):
@@ -1074,11 +1075,12 @@ class HealthManager:
         except Exception as e:
             response_time = time.time() - start_time
 
-            # Record failure on circuit breaker
+            # Record failure on circuit breaker (if it has record_failure method)
             if name in self.circuit_breakers:
                 cb = self.circuit_breakers[name]
-                if hasattr(cb, "record_failure"):
-                    cb.record_failure()
+                record_failure_fn = getattr(cb, "record_failure", None)
+                if callable(record_failure_fn):
+                    record_failure_fn()
 
             return ResourceHealthCheck(
                 status=HealthStatus.UNHEALTHY,
