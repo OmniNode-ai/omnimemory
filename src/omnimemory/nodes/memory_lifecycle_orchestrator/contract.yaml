@@ -134,48 +134,34 @@ published_events: []
 # The routing strategy determines how incoming messages are matched to handlers.
 #
 # Routing Strategies:
-#   - event_type_match: Match by event model class name
-#   - event_pattern_match: Match by event pattern string
-#
-# Execution Modes:
-#   - sequential: Handlers execute one at a time, in order
-#   - parallel: Independent handlers may execute concurrently
+#   - payload_type_match: Match by event model class name
+#   - operation_match: Match by operation field in message
+#   - topic_pattern: Match by glob pattern against topic
 # =============================================================================
 handler_routing:
-  routing_strategy: "event_type_match"
-  execution_mode: "sequential"
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  routing_strategy: payload_type_match
   handlers:
     # RuntimeTick handler - evaluates memory TTL expiration and archive candidates
-    - operation: "tick"
-      event_model:
-        name: "ModelRuntimeTick"
-      event_pattern: "onex.internal.runtime-tick.v1"
-      handler:
-        name: "HandlerMemoryTick"
-        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
-      description: "Evaluates memory TTL expirations and initiates archival for expired memories"
-
+    - routing_key: "tick"
+      handler_key: "HandlerMemoryTick"
+      priority: 0
+      output_events: []
     # Expire command handler - ACTIVE -> EXPIRED state transition
-    - operation: "expire"
-      event_model:
-        name: "ModelExpireMemoryCommand"
-      event_pattern: "memory.cmd.expire-memory.v1"
-      handler:
-        name: "HandlerMemoryExpire"
-        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
-      description: "Performs ACTIVE -> EXPIRED state transition with optimistic locking"
-
+    - routing_key: "expire"
+      handler_key: "HandlerMemoryExpire"
+      priority: 0
+      output_events: []
     # Archive command handler - EXPIRED -> ARCHIVED state transition
-    - operation: "archive"
-      event_model:
-        name: "ModelArchiveMemoryCommand"
-      event_pattern: "memory.cmd.archive-memory.v1"
-      handler:
-        name: "HandlerMemoryArchive"
-        module: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers"
-      description: "Archives EXPIRED memories to cold storage with gzip compression"
-
+    - routing_key: "archive"
+      handler_key: "HandlerMemoryArchive"
+      priority: 0
+      output_events: []
   # Future handlers (OMN-1453): restore, memory-accessed
+  default_handler: null
 
 # Orchestration configuration - use defaults
 load_balancing_enabled: true

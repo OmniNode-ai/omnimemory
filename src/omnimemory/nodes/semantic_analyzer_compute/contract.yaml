@@ -73,27 +73,28 @@ validation_rules:
 # Declarative handler dispatch configuration following ONEX patterns.
 # The node delegates to handlers based on operation type.
 handler_routing:
-  routing_strategy: "operation_match"
-  execution_mode: "sequential"
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  routing_strategy: operation_match
   handlers:
-    - operation: "embed"
-      handler:
-        name: "HandlerSemanticCompute"
-        module: "omnimemory.nodes.semantic_analyzer_compute.handlers"
-        method: "embed"
-      description: "Generate embedding vector for content"
-    - operation: "extract_entities"
-      handler:
-        name: "HandlerSemanticCompute"
-        module: "omnimemory.nodes.semantic_analyzer_compute.handlers"
-        method: "extract_entities"
-      description: "Extract named entities from content"
-    - operation: "analyze"
-      handler:
-        name: "HandlerSemanticCompute"
-        module: "omnimemory.nodes.semantic_analyzer_compute.handlers"
-        method: "analyze"
-      description: "Full semantic analysis (embedding + entities + topics)"
+    # Generate embedding vector for content
+    - routing_key: "embed"
+      handler_key: "HandlerSemanticCompute.embed"
+      priority: 0
+      output_events: []
+    # Extract named entities from content
+    - routing_key: "extract_entities"
+      handler_key: "HandlerSemanticCompute.extract_entities"
+      priority: 0
+      output_events: []
+    # Full semantic analysis (embedding + entities + topics)
+    - routing_key: "analyze"
+      handler_key: "HandlerSemanticCompute.analyze"
+      priority: 0
+      output_events: []
+  default_handler: null
 
 # === TAGS ===
 tags:
