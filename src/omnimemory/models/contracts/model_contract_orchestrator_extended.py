@@ -40,6 +40,6 @@ class ModelContractOrchestratorExtended(ModelContractOrchestrator):
 
     model_config = ConfigDict(
         extra="ignore",  # Allow additional ONEX extension fields
-        use_enum_values=True,  # Orchestrator uses this
+        use_enum_values=False,
         validate_assignment=True,
     )

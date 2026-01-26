@@ -43,7 +43,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "ModelIntentRecordPayload",
@@ -164,6 +164,20 @@ class ModelIntentQueryRequestedEvent(BaseModel):
         default=None,
         description="Name of the requesting service/component",
     )
+
+    @model_validator(mode="after")
+    def validate_session_ref_required(self) -> ModelIntentQueryRequestedEvent:
+        """Validate session_ref is provided for session queries.
+
+        Raises:
+            ValueError: If query_type is "session" but session_ref is not provided.
+
+        Returns:
+            The validated model instance.
+        """
+        if self.query_type == "session" and not self.session_ref:
+            raise ValueError("session_ref is required when query_type is 'session'")
+        return self
 
     @classmethod
     def create_distribution_query(

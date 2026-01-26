@@ -347,22 +347,26 @@ class TestHandlerIntentQueryIntegration:
         self,
         initialized_handler: HandlerIntentQuery,
     ) -> None:
-        """Test session query without session_ref returns error."""
+        """Test session query without session_ref raises ValidationError.
+
+        Note: Validation now happens at the model level via model_validator,
+        so creating a request without session_ref raises immediately.
+        """
+        from pydantic import ValidationError
+
         from omnimemory.nodes.intent_query_effect.models import (
             ModelIntentQueryRequestedEvent,
         )
 
-        # Manually create request without session_ref
-        request = ModelIntentQueryRequestedEvent(
-            query_type="session",
-            session_ref=None,  # Missing!
-            requester_name="test",
-        )
+        # Model-level validation prevents creation without session_ref
+        with pytest.raises(ValidationError) as exc_info:
+            ModelIntentQueryRequestedEvent(
+                query_type="session",
+                session_ref=None,  # Missing!
+                requester_name="test",
+            )
 
-        response = await initialized_handler.execute(request)
-
-        assert response.status == "error"
-        assert "session_ref" in (response.error_message or "").lower()
+        assert "session_ref is required" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_correlation_id_preserved(

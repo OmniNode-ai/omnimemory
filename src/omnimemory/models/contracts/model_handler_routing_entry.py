@@ -22,10 +22,9 @@ class ModelHandlerRoutingEntry(BaseModel):
     """Single handler routing entry mapping event to handler.
 
     This follows the omnibase_infra contract.yaml format for handler routing.
-    Supports both full format and shorthand formats for event_model.
 
     Attributes:
-        event_model: Event model specification (name + module) or just name string.
+        event_model: Event model specification (name + module).
         handler: Handler specification (name + module).
         operation: Operation name for operation-based routing.
         action: Action name for action-based routing.
@@ -35,9 +34,9 @@ class ModelHandlerRoutingEntry(BaseModel):
 
     model_config = ConfigDict(extra="allow", frozen=True)
 
-    event_model: ModelEventModel | str | None = Field(
+    event_model: ModelEventModel | None = Field(
         default=None,
-        description="Event model specification for event-based routing (string or dict)",
+        description="Event model specification for event-based routing",
     )
     handler: ModelHandlerSpec = Field(
         ...,

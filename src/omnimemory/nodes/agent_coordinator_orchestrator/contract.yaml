@@ -93,7 +93,6 @@ handler_routing:
       handler:
         name: "HandlerSubscription"
         module: "omnimemory.handlers"
-        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
         method: "subscribe"
       description: "Register an agent's subscription to a memory topic"
 
@@ -103,7 +102,6 @@ handler_routing:
       handler:
         name: "HandlerSubscription"
         module: "omnimemory.handlers"
-        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
         method: "unsubscribe"
       description: "Remove an agent's subscription from a memory topic"
 
@@ -113,7 +111,6 @@ handler_routing:
       handler:
         name: "HandlerSubscription"
         module: "omnimemory.handlers"
-        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
         method: "list_subscriptions"
       description: "List all subscriptions for a given agent"
 
@@ -123,7 +120,6 @@ handler_routing:
       handler:
         name: "HandlerSubscription"
         module: "omnimemory.handlers"
-        class_path: "omnimemory.handlers.handler_subscription.HandlerSubscription"
         method: "notify"
       description: "Publish notification event to Kafka for subscriber consumption"
 
