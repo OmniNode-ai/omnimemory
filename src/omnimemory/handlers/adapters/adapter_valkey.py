@@ -63,8 +63,8 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
     from redis.asyncio.client import Pipeline
 
-    RedisClientType: TypeAlias = AsyncRedis  # noqa: UP040
-    PipelineType: TypeAlias = Pipeline  # noqa: UP040
+    RedisClientType: TypeAlias = AsyncRedis  # noqa: UP040 - can't use type keyword in conditional
+    PipelineType: TypeAlias = Pipeline  # noqa: UP040 - can't use type keyword in conditional
 else:
     RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
     PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
@@ -530,7 +530,9 @@ class AdapterValkey:
                     decode_responses=self._config.decode_responses,  # pyright: ignore[reportArgumentType]
                     max_connections=self._config.max_connections,
                 )
-                assert self._client is not None  # Narrow type for pyright
+                # Assert for type narrowing: pyright doesn't narrow instance
+                # attributes after assignment due to potential concurrent modification
+                assert self._client is not None
 
                 # Test connection with PING
                 await self._client.ping()

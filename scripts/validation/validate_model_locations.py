@@ -109,10 +109,7 @@ def is_path_allowed(filepath: Path) -> bool:
                     return True
 
     # Check dynamic node models pattern
-    if NODE_MODELS_PATTERN.search(filepath_str):
-        return True
-
-    return False
+    return bool(NODE_MODELS_PATTERN.search(filepath_str))
 
 
 class PydanticModelVisitor(ast.NodeVisitor):
@@ -150,10 +147,7 @@ class PydanticModelVisitor(ast.NodeVisitor):
             return True
 
         # Pattern 2: Attribute access (typing.TYPE_CHECKING or any_module.TYPE_CHECKING)
-        if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
-            return True
-
-        return False
+        return isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definitions to find Pydantic models."""
@@ -167,13 +161,20 @@ class PydanticModelVisitor(ast.NodeVisitor):
                 break
 
         if is_pydantic_model:
-            # Check for exemption annotation on the class definition line
-            line_idx = node.lineno - 1  # 0-indexed
-            if line_idx < len(self.source_lines):
+            # Check for exemption annotation on class definition lines
+            # For multi-line class definitions, check from lineno to the line with ":"
+            is_exempt = False
+            start_line = node.lineno - 1  # 0-indexed
+            # Scan from class start to the line ending with ":" (class signature end)
+            for line_idx in range(start_line, min(start_line + 10, len(self.source_lines))):
                 line = self.source_lines[line_idx]
-                is_exempt = bool(EXEMPTION_PATTERN.search(line))
-            else:
-                is_exempt = False
+                if EXEMPTION_PATTERN.search(line):
+                    is_exempt = True
+                    break
+                # Stop AFTER checking the line that ends the class signature
+                # (the signature always ends with ":")
+                if line.rstrip().endswith(":"):
+                    break
 
             self.models.append((node.name, node.lineno, is_exempt))
 
