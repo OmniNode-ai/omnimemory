@@ -73,7 +73,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
-from cachetools import LRUCache  # type: ignore[import-untyped]
+from cachetools import LRUCache
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
@@ -700,7 +700,7 @@ class HandlerSemanticCompute:
 
         if self._embedding_cache is not None:
             cache_size = len(self._embedding_cache)
-            cache_max_size = self._embedding_cache.maxsize
+            cache_max_size = int(self._embedding_cache.maxsize)
 
         return ModelSemanticComputeHealth(
             initialized=self._initialized,
@@ -960,7 +960,7 @@ class HandlerSemanticCompute:
         # Check cache
         cache_key = self._compute_cache_key(content, model)
         if self._config.enable_caching and cache_key in self._embedding_cache:
-            return self._embedding_cache[cache_key]  # type: ignore[no-any-return]
+            return list(self._embedding_cache[cache_key])
 
         # Generate embedding via provider with retry logic for transient failures
         timeout = self._config.policy_config.timeout_seconds
