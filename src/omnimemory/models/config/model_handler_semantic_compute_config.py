@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnimemory.models.config.model_semantic_compute_policy_config import (
     ModelSemanticComputePolicyConfig,
 )
+from omnimemory.models.foundation.model_semver import ModelSemVer
 
 
 class ModelHandlerSemanticComputeConfig(BaseModel):
@@ -42,9 +43,8 @@ class ModelHandlerSemanticComputeConfig(BaseModel):
         description="Name identifier for this handler instance",
     )
 
-    handler_version: str = Field(
-        default="1.0.0",
-        pattern=r"^\d+\.\d+\.\d+$",
+    handler_version: ModelSemVer = Field(
+        default_factory=lambda: ModelSemVer.parse("1.0.0"),
         description="Semantic version of the handler",
     )
 
