@@ -770,12 +770,12 @@ class TestHandlerIntentQueryUnit:
 
         metadata = await handler.describe()
 
-        assert metadata["name"] == "HandlerIntentQuery"
-        assert metadata["node_type"] == "EFFECT"
-        assert "distribution" in metadata["supported_query_types"]
-        assert "session" in metadata["supported_query_types"]
-        assert "recent" in metadata["supported_query_types"]
-        assert metadata["initialized"] is False
+        assert metadata.name == "HandlerIntentQuery"
+        assert metadata.node_type == "EFFECT"
+        assert "distribution" in metadata.supported_query_types
+        assert "session" in metadata.supported_query_types
+        assert "recent" in metadata.supported_query_types
+        assert metadata.initialized is False
 
     @pytest.mark.asyncio
     async def test_handler_health_check_not_initialized(self) -> None:
@@ -789,9 +789,9 @@ class TestHandlerIntentQueryUnit:
 
         health = await handler.health_check()
 
-        assert health["healthy"] is False
-        assert health["initialized"] is False
-        assert "not initialized" in (health.get("error_message") or "").lower()
+        assert health.healthy is False
+        assert health.initialized is False
+        assert "not initialized" in (health.error_message or "").lower()
 
 
 # Remove integration markers for unit tests

@@ -127,9 +127,9 @@ class NodeSimilarityCompute(BaseComputeNode):
         """
         handler_health = await self._handler.health_check()
         return {
-            "healthy": handler_health.get("healthy", False),
+            "healthy": handler_health.healthy,
             "node": "similarity_compute",
-            "handler": handler_health,
+            "handler": handler_health.model_dump(),
         }
 
     async def describe(self) -> dict[str, object]:
@@ -142,7 +142,7 @@ class NodeSimilarityCompute(BaseComputeNode):
         return {
             "node_type": "COMPUTE",
             "node_name": "similarity_compute",
-            "handler": handler_desc,
+            "handler": handler_desc.model_dump(),
         }
 
     def execute(

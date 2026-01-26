@@ -50,8 +50,11 @@ Performance:
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import TYPE_CHECKING, Literal
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -240,6 +243,19 @@ class HandlerSimilarityCompute:
             initialized=self._initialized,
             supported_metrics=["cosine", "euclidean"],
         )
+
+    async def shutdown(self) -> None:
+        """Clean up handler resources.
+
+        Safe to call multiple times. After shutdown, initialize() must be
+        called again to use the handler.
+
+        .. versionadded:: 0.2.0
+            Added for container-driven pattern consistency (OMN-1577).
+        """
+        self._config = None
+        self._initialized = False
+        logger.debug("HandlerSimilarityCompute shutdown complete")
 
     def _ensure_initialized(self) -> None:
         """Ensure the handler is initialized before operations.

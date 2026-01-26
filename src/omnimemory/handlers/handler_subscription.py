@@ -518,12 +518,18 @@ class HandlerSubscription:
         return "subscription"
 
     @property
-    def config(self) -> ModelHandlerSubscriptionConfig | None:
+    def config(self) -> ModelHandlerSubscriptionConfig:
         """Get the handler configuration.
 
-        Returns:
-            The handler configuration, or None if not yet initialized.
+        Raises:
+            RuntimeError: If handler is not initialized.
         """
+        if not self._initialized:
+            raise RuntimeError(
+                "HandlerSubscription is not initialized. "
+                "Call initialize() before accessing config."
+            )
+        assert self._config is not None  # For type checker
         return self._config
 
     @property
