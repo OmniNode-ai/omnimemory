@@ -8,13 +8,13 @@ for Kafka event transmission.
 
 The key difference between models:
     - ModelIntentRecord.session_ref is optional (from graph queries)
-    - ModelIntentRecordPayload.session_ref is required (for event transmission)
+    - IntentRecordPayload.session_ref is required (for event transmission)
     - Field name: created_at_utc (internal) -> created_at (payload)
 
 Example::
 
     from omnimemory.handlers.adapters.models import ModelIntentRecord
-    from omnimemory.nodes.intent_query_effect.models import map_to_intent_payload
+    from omnimemory.nodes.intent_query_effect.utils import map_to_intent_payload
 
     record = ModelIntentRecord(
         intent_id=uuid4(),
@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from omnimemory.nodes.intent_query_effect.models import ModelIntentRecordPayload
+from omnibase_core.models.events import IntentRecordPayload
 
 if TYPE_CHECKING:
     from omnimemory.handlers.adapters.models import ModelIntentRecord
@@ -44,8 +44,8 @@ if TYPE_CHECKING:
 __all__ = ["map_intent_records", "map_to_intent_payload"]
 
 
-def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload:
-    """Convert a ModelIntentRecord to ModelIntentRecordPayload.
+def map_to_intent_payload(record: ModelIntentRecord) -> IntentRecordPayload:
+    """Convert a ModelIntentRecord to IntentRecordPayload.
 
     Maps from the omnimemory internal model to the core event payload model
     for transmission in Kafka events.
@@ -54,7 +54,7 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
         record: The internal intent record from AdapterIntentGraph.
 
     Returns:
-        ModelIntentRecordPayload suitable for event transmission.
+        IntentRecordPayload suitable for event transmission.
 
     Raises:
         ValueError: If session_ref is None (required for payload).
@@ -62,14 +62,14 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     Note:
         The field name differs between models:
             - ModelIntentRecord uses ``created_at_utc``
-            - ModelIntentRecordPayload uses ``created_at``
+            - IntentRecordPayload uses ``created_at``
     """
     if record.session_ref is None:
         raise ValueError(
             f"Cannot map intent {record.intent_id} to payload: session_ref is required"
         )
 
-    return ModelIntentRecordPayload(
+    return IntentRecordPayload(
         intent_id=record.intent_id,
         session_ref=record.session_ref,
         intent_category=record.intent_category,
@@ -81,8 +81,8 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
 
 def map_intent_records(
     records: list[ModelIntentRecord],
-) -> list[ModelIntentRecordPayload]:
-    """Convert a list of ModelIntentRecord to ModelIntentRecordPayload.
+) -> list[IntentRecordPayload]:
+    """Convert a list of ModelIntentRecord to IntentRecordPayload.
 
     Convenience function for bulk conversion of intent records.
 
