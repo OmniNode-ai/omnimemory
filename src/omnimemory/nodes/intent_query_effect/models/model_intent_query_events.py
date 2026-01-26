@@ -7,7 +7,7 @@ events used in the event-driven architecture. These models are used for
 Kafka event transmission between OmniDash and OmniMemory.
 
 Models:
-    ModelModelIntentRecordPayload: Payload model for intent records in events.
+    ModelIntentRecordPayload: Payload model for intent records in events.
     ModelIntentQueryRequestedEvent: Request event for intent queries.
     ModelIntentQueryResponseEvent: Response event with query results.
 
