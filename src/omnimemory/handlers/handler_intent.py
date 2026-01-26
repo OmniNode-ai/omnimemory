@@ -6,11 +6,23 @@ Wraps AdapterIntentGraph following the omnibase_infra container-driven pattern.
 Unlike event-driven handlers, this handler provides synchronous direct method
 calls for API layer integration.
 
+Protocol Compliance:
+    Implements :class:`~omnimemory.protocols.ProtocolHandlerIntent` protocol
+    for contract-driven development and type-safe dependency injection.
+
+Resilience:
+    Includes circuit breaker pattern for fault tolerance. The circuit breaker
+    protects against cascading failures when the graph database is unavailable
+    or experiencing issues. Configuration via initialize() options:
+    - circuit_breaker_threshold: Failures before opening (default: 5)
+    - circuit_breaker_reset_timeout: Seconds before half-open (default: 60.0)
+
 Architecture:
     - Container-driven initialization (receives ModelONEXContainer)
     - Handler owns adapter lifecycle (creates on init, closes on shutdown)
     - Delegates all operations to AdapterIntentGraph
     - Uses structured logging with correlation IDs
+    - Circuit breaker wraps all adapter operations
 
 Operations:
     - store_intent(): Store an intent classification linked to a session
@@ -53,6 +65,9 @@ Example::
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1536.
+
+.. versionchanged:: 0.2.0
+    Added ProtocolHandlerIntent compliance and circuit breaker resilience.
 """
 
 from __future__ import annotations
@@ -75,11 +90,17 @@ from omnimemory.handlers.adapters.models import (
     ModelIntentQueryResult,
     ModelIntentStorageResult,
 )
+from omnimemory.utils.concurrency import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    CircuitBreakerState,
+)
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
 
 __all__ = [
+    "CircuitBreakerOpenError",
     "HandlerIntent",
     "ModelHandlerIntentMetadata",
 ]
@@ -90,9 +111,9 @@ logger = logging.getLogger(__name__)
 HANDLER_ID_INTENT: str = "intent-handler"
 
 
-class ModelHandlerIntentMetadata(
+class ModelHandlerIntentMetadata(  # omnimemory-model-exempt: handler-local metadata
     BaseModel
-):  # omnimemory-model-exempt: handler-local metadata
+):
     """Metadata describing the intent handler capabilities.
 
     Returned by HandlerIntent.describe() to provide information about
@@ -131,6 +152,8 @@ class ModelHandlerIntentMetadata(
 class HandlerIntent:
     """Direct protocol handler for intent storage and query operations.
 
+    Implements: :class:`~omnimemory.protocols.ProtocolHandlerIntent`
+
     Wraps AdapterIntentGraph following the omnibase_infra container-driven pattern.
     Unlike HandlerIntentQuery (event-driven), this handler provides synchronous
     direct method calls for API layer integration.
@@ -140,11 +163,23 @@ class HandlerIntent:
     - Closes adapter during shutdown()
 
     Protocol Compliance:
-        Implements standard handler interface:
+        Implements :class:`~omnimemory.protocols.ProtocolHandlerIntent` protocol:
         - handler_type property returning "intent"
         - is_initialized property for state checking
         - initialize(), shutdown() lifecycle methods
+        - store_intent(), query_session(), query_distribution() operations
         - health_check(), describe() introspection methods
+
+    Circuit Breaker:
+        All adapter operations are protected by a circuit breaker pattern to
+        prevent cascading failures. The circuit breaker:
+        - Opens after consecutive failures (configurable threshold)
+        - Automatically attempts recovery after reset timeout
+        - Raises CircuitBreakerOpenError when open (fail-fast behavior)
+
+        Configuration via initialize() options:
+        - circuit_breaker_threshold: Failures before opening (default: 5)
+        - circuit_breaker_reset_timeout: Seconds before half-open (default: 60.0)
 
     Thread Safety:
         Uses asyncio.Lock for initialization to prevent race conditions
@@ -154,6 +189,9 @@ class HandlerIntent:
         All business operation methods return error status in response
         models rather than raising exceptions. This allows API layers
         to handle errors gracefully without try/except blocks.
+
+        Exception: CircuitBreakerOpenError is raised when the circuit is
+        open to provide immediate feedback that the service is unavailable.
 
     Attributes:
         handler_type: Returns "intent" as handler type identifier.
@@ -193,6 +231,8 @@ class HandlerIntent:
             The container is stored for interface compliance with the standard
             ONEX handler pattern and to enable future DI-based service resolution.
             The adapter is NOT created here; it is created during initialize().
+            The circuit breaker is also created during initialize() with
+            configuration from the options parameter.
         """
         self._container = container
         self._adapter: AdapterIntentGraph | None = None
@@ -200,6 +240,8 @@ class HandlerIntent:
         self._initialized: bool = False
         self._init_lock = asyncio.Lock()
         self._connection_uri: str = ""
+        # Circuit breaker for adapter operations (initialized in initialize())
+        self._circuit_breaker: CircuitBreaker | None = None
 
     @property
     def handler_type(self) -> str:
@@ -299,6 +341,38 @@ class HandlerIntent:
 
                 auto_indexes_raw = opts.get("auto_create_indexes", True)
                 auto_create_indexes = bool(auto_indexes_raw)
+
+                # Circuit breaker configuration
+                cb_threshold_raw = opts.get("circuit_breaker_threshold", 5)
+                circuit_breaker_threshold = (
+                    int(cb_threshold_raw)
+                    if isinstance(cb_threshold_raw, int | float | str)
+                    else 5
+                )
+
+                cb_reset_raw = opts.get("circuit_breaker_reset_timeout", 60.0)
+                circuit_breaker_reset_timeout = (
+                    float(cb_reset_raw)
+                    if isinstance(cb_reset_raw, int | float | str)
+                    else 60.0
+                )
+
+                # Create circuit breaker for adapter protection
+                self._circuit_breaker = CircuitBreaker(
+                    failure_threshold=circuit_breaker_threshold,
+                    recovery_timeout=circuit_breaker_reset_timeout,
+                    success_threshold=1,  # Close after 1 success in half-open
+                )
+
+                logger.debug(
+                    "Circuit breaker configured",
+                    extra={
+                        "handler": HANDLER_ID_INTENT,
+                        "correlation_id": str(init_correlation_id),
+                        "failure_threshold": circuit_breaker_threshold,
+                        "recovery_timeout": circuit_breaker_reset_timeout,
+                    },
+                )
 
                 self._adapter_config = ModelAdapterIntentGraphConfig(
                     timeout_seconds=timeout_seconds,
@@ -418,6 +492,7 @@ class HandlerIntent:
 
             self._initialized = False
             self._adapter_config = None
+            self._circuit_breaker = None
 
             logger.info(
                 "%s shutdown complete",
@@ -428,20 +503,24 @@ class HandlerIntent:
                 },
             )
 
-    def _ensure_initialized(self) -> AdapterIntentGraph:
-        """Ensure handler is initialized and return adapter.
+    def _ensure_initialized(self) -> tuple[AdapterIntentGraph, CircuitBreaker]:
+        """Ensure handler is initialized and return adapter with circuit breaker.
 
         Returns:
-            The initialized AdapterIntentGraph.
+            Tuple of (AdapterIntentGraph, CircuitBreaker) for protected operations.
 
         Raises:
             RuntimeError: If handler is not initialized.
         """
-        if not self._initialized or self._adapter is None:
+        if (
+            not self._initialized
+            or self._adapter is None
+            or self._circuit_breaker is None
+        ):
             raise RuntimeError(
                 "HandlerIntent not initialized. Call initialize() first."
             )
-        return self._adapter
+        return self._adapter, self._circuit_breaker
 
     # =========================================================================
     # Core Operations
@@ -470,12 +549,17 @@ class HandlerIntent:
             On success, includes the intent_id and whether a new
             intent was created vs merged.
 
+        Raises:
+            CircuitBreakerOpenError: If the circuit breaker is open.
+
         Note:
             This method never raises on business errors - it returns
-            an error status in the result model instead.
+            an error status in the result model instead. However,
+            CircuitBreakerOpenError is raised for immediate fail-fast
+            behavior when the service is unavailable.
         """
         try:
-            adapter = self._ensure_initialized()
+            adapter, circuit_breaker = self._ensure_initialized()
         except RuntimeError as e:
             logger.error(
                 "store_intent called on uninitialized handler",
@@ -491,6 +575,21 @@ class HandlerIntent:
                 error_message=str(e),
             )
 
+        # Check circuit breaker before attempting operation
+        if not circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker is open, failing fast",
+                extra={
+                    "handler": HANDLER_ID_INTENT,
+                    "correlation_id": str(correlation_id),
+                    "session_id": session_id,
+                    "circuit_state": circuit_breaker.state.value,
+                },
+            )
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker is {circuit_breaker.state.value}"
+            )
+
         logger.debug(
             "Storing intent for session %s",
             session_id,
@@ -502,12 +601,34 @@ class HandlerIntent:
             },
         )
 
-        return await adapter.store_intent(
-            session_id=session_id,
-            intent_data=intent_data,
-            correlation_id=correlation_id,
-            user_context=user_context,
-        )
+        try:
+            result = await adapter.store_intent(
+                session_id=session_id,
+                intent_data=intent_data,
+                correlation_id=correlation_id,
+                user_context=user_context,
+            )
+            # Record success if operation completed without exception
+            if result.status == "success":
+                circuit_breaker.record_success()
+            else:
+                # Business errors (e.g., validation) are not circuit breaker failures
+                pass
+            return result
+        except Exception as e:
+            circuit_breaker.record_failure()
+            logger.error(
+                "store_intent failed, recorded circuit breaker failure",
+                extra={
+                    "handler": HANDLER_ID_INTENT,
+                    "correlation_id": str(correlation_id),
+                    "session_id": session_id,
+                    "error": str(e),
+                    "circuit_state": circuit_breaker.state.value,
+                    "failure_count": circuit_breaker.failure_count,
+                },
+            )
+            raise
 
     async def query_session(
         self,
@@ -530,14 +651,19 @@ class HandlerIntent:
         Returns:
             ModelIntentQueryResult with the list of intents or error status.
 
+        Raises:
+            CircuitBreakerOpenError: If the circuit breaker is open.
+
         Note:
             This method never raises on business errors - it returns
-            an error status in the result model instead.
+            an error status in the result model instead. However,
+            CircuitBreakerOpenError is raised for immediate fail-fast
+            behavior when the service is unavailable.
         """
         query_correlation_id = uuid4()
 
         try:
-            adapter = self._ensure_initialized()
+            adapter, circuit_breaker = self._ensure_initialized()
         except RuntimeError as e:
             logger.error(
                 "query_session called on uninitialized handler",
@@ -552,6 +678,21 @@ class HandlerIntent:
                 error_message=str(e),
             )
 
+        # Check circuit breaker before attempting operation
+        if not circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker is open, failing fast",
+                extra={
+                    "handler": HANDLER_ID_INTENT,
+                    "correlation_id": str(query_correlation_id),
+                    "session_id": session_id,
+                    "circuit_state": circuit_breaker.state.value,
+                },
+            )
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker is {circuit_breaker.state.value}"
+            )
+
         logger.debug(
             "Querying intents for session %s",
             session_id,
@@ -564,11 +705,30 @@ class HandlerIntent:
             },
         )
 
-        return await adapter.get_session_intents(
-            session_id=session_id,
-            min_confidence=min_confidence,
-            limit=limit,
-        )
+        try:
+            result = await adapter.get_session_intents(
+                session_id=session_id,
+                min_confidence=min_confidence,
+                limit=limit,
+            )
+            # Record success if operation completed without exception
+            if result.status == "success":
+                circuit_breaker.record_success()
+            return result
+        except Exception as e:
+            circuit_breaker.record_failure()
+            logger.error(
+                "query_session failed, recorded circuit breaker failure",
+                extra={
+                    "handler": HANDLER_ID_INTENT,
+                    "correlation_id": str(query_correlation_id),
+                    "session_id": session_id,
+                    "error": str(e),
+                    "circuit_state": circuit_breaker.state.value,
+                    "failure_count": circuit_breaker.failure_count,
+                },
+            )
+            raise
 
     async def query_distribution(
         self,
@@ -586,14 +746,19 @@ class HandlerIntent:
         Returns:
             ModelIntentDistributionResult with distribution data or error status.
 
+        Raises:
+            CircuitBreakerOpenError: If the circuit breaker is open.
+
         Note:
             This method never raises on business errors - it returns
-            an error status in the result model instead.
+            an error status in the result model instead. However,
+            CircuitBreakerOpenError is raised for immediate fail-fast
+            behavior when the service is unavailable.
         """
         query_correlation_id = uuid4()
 
         try:
-            adapter = self._ensure_initialized()
+            adapter, circuit_breaker = self._ensure_initialized()
         except RuntimeError as e:
             logger.error(
                 "query_distribution called on uninitialized handler",
@@ -609,6 +774,21 @@ class HandlerIntent:
                 error_message=str(e),
             )
 
+        # Check circuit breaker before attempting operation
+        if not circuit_breaker.should_allow_request():
+            logger.warning(
+                "Circuit breaker is open, failing fast",
+                extra={
+                    "handler": HANDLER_ID_INTENT,
+                    "correlation_id": str(query_correlation_id),
+                    "time_range_hours": time_range_hours,
+                    "circuit_state": circuit_breaker.state.value,
+                },
+            )
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker is {circuit_breaker.state.value}"
+            )
+
         logger.debug(
             "Querying intent distribution for last %d hours",
             time_range_hours,
@@ -619,9 +799,28 @@ class HandlerIntent:
             },
         )
 
-        return await adapter.get_intent_distribution(
-            time_range_hours=time_range_hours,
-        )
+        try:
+            result = await adapter.get_intent_distribution(
+                time_range_hours=time_range_hours,
+            )
+            # Record success if operation completed without exception
+            if result.status == "success":
+                circuit_breaker.record_success()
+            return result
+        except Exception as e:
+            circuit_breaker.record_failure()
+            logger.error(
+                "query_distribution failed, recorded circuit breaker failure",
+                extra={
+                    "handler": HANDLER_ID_INTENT,
+                    "correlation_id": str(query_correlation_id),
+                    "time_range_hours": time_range_hours,
+                    "error": str(e),
+                    "circuit_state": circuit_breaker.state.value,
+                    "failure_count": circuit_breaker.failure_count,
+                },
+            )
+            raise
 
     # =========================================================================
     # Introspection
@@ -631,12 +830,13 @@ class HandlerIntent:
         """Check if the handler and adapter are healthy.
 
         Delegates to AdapterIntentGraph.health_check() to verify
-        connectivity and gather graph statistics.
+        connectivity and gather graph statistics. Also includes
+        circuit breaker status in the response.
 
         Returns:
-            ModelIntentGraphHealth with detailed health status.
-            This method never raises - errors are captured in the
-            result model.
+            ModelIntentGraphHealth with detailed health status including
+            circuit breaker state. This method never raises - errors are
+            captured in the result model.
         """
         timestamp = datetime.now(UTC)
 
@@ -649,19 +849,52 @@ class HandlerIntent:
                 last_check_timestamp=timestamp,
             )
 
+        # Include circuit breaker status in health check
+        circuit_breaker_info = ""
+        if self._circuit_breaker is not None:
+            cb = self._circuit_breaker
+            circuit_breaker_info = (
+                f"circuit_breaker={cb.state.value}, "
+                f"failures={cb.failure_count}/{cb.failure_threshold}"
+            )
+            # If circuit breaker is open, mark as degraded but not unhealthy
+            if cb.state == CircuitBreakerState.OPEN:
+                return ModelIntentGraphHealth(
+                    is_healthy=False,
+                    initialized=True,
+                    handler_healthy=True,  # Handler itself is healthy
+                    error_message=f"Circuit breaker is open ({circuit_breaker_info})",
+                    last_check_timestamp=timestamp,
+                )
+
         try:
-            return await self._adapter.health_check()
+            health = await self._adapter.health_check()
+            # Append circuit breaker info to any existing error message
+            if circuit_breaker_info and health.error_message:
+                health = ModelIntentGraphHealth(
+                    is_healthy=health.is_healthy,
+                    initialized=health.initialized,
+                    handler_healthy=health.handler_healthy,
+                    error_message=f"{health.error_message} ({circuit_breaker_info})",
+                    last_check_timestamp=health.last_check_timestamp,
+                    session_count=health.session_count,
+                    intent_count=health.intent_count,
+                )
+            return health
         except Exception as e:
             logger.warning(
                 "Health check failed: %s",
                 e,
                 extra={"handler": HANDLER_ID_INTENT},
             )
+            error_msg = f"Health check failed: {e}"
+            if circuit_breaker_info:
+                error_msg = f"{error_msg} ({circuit_breaker_info})"
             return ModelIntentGraphHealth(
                 is_healthy=False,
                 initialized=True,
                 handler_healthy=None,
-                error_message=f"Health check failed: {e}",
+                error_message=error_msg,
                 last_check_timestamp=timestamp,
             )
 

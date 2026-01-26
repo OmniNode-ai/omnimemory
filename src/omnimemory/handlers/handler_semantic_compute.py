@@ -97,7 +97,9 @@ _T = TypeVar("_T")
 # =============================================================================
 
 
-class ModelHandlerSemanticComputeConfig(BaseModel):
+class ModelHandlerSemanticComputeConfig(  # omnimemory-model-exempt: handler-local config
+    BaseModel
+):
     """Configuration for the semantic compute handler.
 
     This model configures the handler's behavior and wraps the policy config.
