@@ -49,6 +49,7 @@ try:
         ModelIntentRecord,
         ModelIntentStorageResult,
     )
+    from omnimemory.models.utils import ModelPIIDetectionResult, ModelPIIMatch, PIIType
     from omnimemory.nodes.intent_storage_effect import (
         HandlerIntentStorageAdapter,
         ModelIntentStorageRequest,
@@ -292,6 +293,82 @@ class TestStoreOperation:
         # Assert
         call_kwargs = mock_adapter.store_intent.call_args.kwargs
         assert call_kwargs["user_context"] == user_context
+
+    async def test_store_redacts_pii_from_user_context(
+        self,
+        handler_with_mock: HandlerIntentStorageAdapter,
+        mock_adapter: MagicMock,
+        sample_intent_data: ModelIntentClassificationOutput,
+    ) -> None:
+        """Verify PII is redacted from user_context before storage.
+
+        When user_context contains PII (e.g., email addresses), the handler
+        should detect and redact the PII before passing to the adapter for
+        storage. This ensures sensitive data is not persisted.
+
+        Note: This test uses model_construct() to bypass the model's own PII
+        validation, allowing us to test the handler's PII detection as a
+        second line of defense. In production, the model validation would
+        reject PII-containing requests before reaching the handler.
+        """
+        # Arrange - setup PII detector mock to indicate PII was found
+        original_context = "User email is test@example.com"
+        sanitized_context = "User email is ***@***.***"
+
+        pii_detection_result = ModelPIIDetectionResult(
+            has_pii=True,
+            matches=[
+                ModelPIIMatch(
+                    pii_type=PIIType.EMAIL,
+                    value="test@example.com",
+                    start_index=14,
+                    end_index=30,
+                    confidence=0.95,
+                    masked_value="***@***.***",
+                )
+            ],
+            sanitized_content=sanitized_context,
+            pii_types_detected={PIIType.EMAIL},
+            scan_duration_ms=1.5,
+        )
+
+        handler_with_mock._pii_detector.detect_pii = MagicMock(
+            return_value=pii_detection_result
+        )
+
+        mock_adapter.store_intent.return_value = ModelIntentStorageResult(
+            status="success",
+            intent_id=TEST_INTENT_ID,
+            session_id=TEST_SESSION_ID,
+            created=True,
+            execution_time_ms=5.0,
+        )
+
+        # Use model_construct to bypass model-level PII validation
+        # This tests the handler's PII detection as a second line of defense
+        request = ModelIntentStorageRequest.model_construct(
+            operation="store",
+            session_id=TEST_SESSION_ID,
+            intent_data=sample_intent_data,
+            user_context=original_context,
+            correlation_id=None,
+            min_confidence=0.0,
+            limit=100,
+            time_range_hours=24,
+        )
+
+        # Act
+        await handler_with_mock.execute(request)
+
+        # Assert - PII detector was called with the original content
+        handler_with_mock._pii_detector.detect_pii.assert_called_once_with(
+            original_context, sensitivity_level="medium"
+        )
+
+        # Assert - sanitized content was passed to adapter, not original
+        call_kwargs = mock_adapter.store_intent.call_args.kwargs
+        assert call_kwargs["user_context"] == sanitized_context
+        assert call_kwargs["user_context"] != original_context
 
     async def test_store_handles_adapter_error(
         self,
@@ -592,8 +669,9 @@ class TestErrorHandling:
         handler_with_mock: HandlerIntentStorageAdapter,
     ) -> None:
         """Verify error response for unknown operation type."""
-        # Arrange - use model_construct to bypass Pydantic validation
-        # This tests handler's internal operation routing with an invalid operation
+        # NOTE: Using model_construct() intentionally bypasses Pydantic validation
+        # to test handler's internal routing logic with an invalid operation value
+        # that would normally be rejected at model instantiation.
         request = ModelIntentStorageRequest.model_construct(
             operation="invalid_op",
             session_id=None,
@@ -658,6 +736,81 @@ class TestErrorHandling:
         # Assert - handler adds its own timing
         assert response.execution_time_ms > 0
 
+    async def test_store_without_session_id_returns_error(
+        self,
+        handler_with_mock: HandlerIntentStorageAdapter,
+        sample_intent_data: ModelIntentClassificationOutput,
+    ) -> None:
+        """Verify error response when session_id is missing for store operation."""
+        # Arrange - use model_construct to bypass Pydantic validation for testing
+        request = ModelIntentStorageRequest.model_construct(
+            operation="store",
+            session_id=None,
+            intent_data=sample_intent_data,
+        )
+
+        # Act
+        response = await handler_with_mock.execute(request)
+
+        # Assert
+        assert response.status == "error"
+        assert "session_id" in (response.error_message or "").lower()
+
+    async def test_store_without_intent_data_returns_error(
+        self,
+        handler_with_mock: HandlerIntentStorageAdapter,
+    ) -> None:
+        """Verify error response when intent_data is missing for store operation."""
+        # Arrange - use model_construct to bypass Pydantic validation for testing
+        request = ModelIntentStorageRequest.model_construct(
+            operation="store",
+            session_id=TEST_SESSION_ID,
+            intent_data=None,
+        )
+
+        # Act
+        response = await handler_with_mock.execute(request)
+
+        # Assert
+        assert response.status == "error"
+        assert "intent_data" in (response.error_message or "").lower()
+
+    async def test_circuit_breaker_open_returns_error(
+        self,
+        handler_with_mock: HandlerIntentStorageAdapter,
+        mock_adapter: MagicMock,
+        sample_intent_data: ModelIntentClassificationOutput,
+    ) -> None:
+        """Verify error response when circuit breaker is open.
+
+        The handler wraps adapter calls with a circuit breaker that opens
+        after 5 consecutive failures (default threshold). When open, requests
+        fail fast with a "temporarily unavailable" error instead of attempting
+        the underlying operation.
+        """
+        # Arrange - configure mock to always fail
+        mock_adapter.store_intent.side_effect = RuntimeError("DB connection lost")
+
+        request = ModelIntentStorageRequest(
+            operation="store",
+            session_id=TEST_SESSION_ID,
+            intent_data=sample_intent_data,
+        )
+
+        # Trigger enough failures to open circuit breaker (default threshold is 5)
+        for _ in range(5):
+            response = await handler_with_mock.execute(request)
+            # Verify failures are being recorded (not circuit breaker errors yet)
+            assert response.status == "error"
+            assert "RuntimeError" in (response.error_message or "")
+
+        # Act - next call should get circuit breaker open error
+        response = await handler_with_mock.execute(request)
+
+        # Assert - circuit breaker is now open
+        assert response.status == "error"
+        assert "temporarily unavailable" in (response.error_message or "").lower()
+
 
 # =============================================================================
 # Unit Tests (Explicit markers override module-level)
@@ -690,3 +843,26 @@ class TestHandlerIntentStorageAdapterUnit:
 
         assert handler._config.timeout_seconds == 60.0
         assert handler._config.max_intents_per_session == 500
+
+    async def test_shutdown_clears_state(self) -> None:
+        """Verify shutdown properly clears adapter state."""
+        if not _DEPENDENCIES_AVAILABLE:
+            pytest.skip(_SKIP_REASON)
+
+        # Create and manually initialize handler with mock
+        config = ModelAdapterIntentGraphConfig()
+        handler = HandlerIntentStorageAdapter(config=config)
+
+        # Inject mock adapter to simulate initialized state
+        mock_adapter = MagicMock()
+        mock_adapter.shutdown = AsyncMock()
+        handler._adapter = mock_adapter
+        handler._initialized = True
+
+        # Act
+        await handler.shutdown()
+
+        # Assert
+        mock_adapter.shutdown.assert_called_once()
+        assert handler._adapter is None
+        assert handler._initialized is False
