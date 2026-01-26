@@ -408,8 +408,8 @@ class HealthCheckManager:
                             error_type=type(result).__name__,
                         )
                     else:
-                        # Result is HealthCheckResult (the expected return type)
-                        health_results.append(cast(HealthCheckResult, result))
+                        # Result is HealthCheckResult (type narrowed by isinstance check)
+                        health_results.append(result)
 
                 logger.info(
                     "health_check_all_completed",

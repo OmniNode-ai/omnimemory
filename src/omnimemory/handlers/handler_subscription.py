@@ -120,10 +120,10 @@ _omnibase_infra_import_error: str | None = None
 
 try:
     from omnibase_infra.event_bus.event_bus_kafka import (
-        EventBusKafka,  # type: ignore[reportAssignmentType]
+        EventBusKafka,  # pyright: ignore[reportAssignmentType]
     )
     from omnibase_infra.handlers.handler_db import (
-        HandlerDb,  # type: ignore[reportAssignmentType]
+        HandlerDb,  # pyright: ignore[reportAssignmentType]
     )
 
     _omnibase_infra_available = True

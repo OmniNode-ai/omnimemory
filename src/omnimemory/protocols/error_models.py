@@ -205,7 +205,7 @@ def get_error_category(
 # === BASE EXCEPTION CLASSES ===
 
 
-class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
+class ProtocolOmniMemoryError(BaseOnexError):  # pyright: ignore[reportGeneralTypeIssues]
     """
     Base exception class for all OmniMemory errors.
 
@@ -219,7 +219,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         message: str,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
         recovery_hint: str | None = None,
         retry_after: int | None = None,
     ) -> None:
@@ -270,7 +270,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         self.category_info = category_info
         self.recovery_hint = recovery_hint
         self.retry_after = retry_after
-        self.cause: BaseException | None = cause
+        self.cause = cause
 
         # Chain the underlying cause if provided
         if cause:
@@ -324,7 +324,7 @@ class ProtocolValidationError(ProtocolOmniMemoryError):
         validation_rule: str | None = None,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
     ) -> None:
         # Determine specific validation error code
         error_code = EnumOmniMemoryErrorCode.INVALID_INPUT
@@ -368,7 +368,7 @@ class ProtocolStorageError(ProtocolOmniMemoryError):
         operation: str | None = None,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
     ) -> None:
         # Determine specific storage error code
         error_code = EnumOmniMemoryErrorCode.STORAGE_UNAVAILABLE
@@ -417,7 +417,7 @@ class ProtocolRetrievalError(ProtocolOmniMemoryError):
         query: str | None = None,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
     ) -> None:
         # Determine specific retrieval error code
         error_code = EnumOmniMemoryErrorCode.SEARCH_FAILED
@@ -467,7 +467,7 @@ class ProtocolProcessingError(ProtocolOmniMemoryError):
         model_name: str | None = None,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
     ) -> None:
         # Determine specific processing error code
         error_code = EnumOmniMemoryErrorCode.PROCESSING_FAILED
@@ -517,7 +517,7 @@ class ProtocolCoordinationError(ProtocolOmniMemoryError):
         agent_ids: list[UUID] | None = None,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
     ) -> None:
         # Determine specific coordination error code
         error_code = EnumOmniMemoryErrorCode.WORKFLOW_FAILED
@@ -566,7 +566,7 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
         system_component: str | None = None,
         context: ModelMetadata | dict[str, object] | None = None,
         correlation_id: UUID | None = None,
-        cause: BaseException | None = None,
+        cause: Exception | None = None,
     ) -> None:
         # Determine specific system error code
         error_code = EnumOmniMemoryErrorCode.INTERNAL_ERROR
@@ -608,7 +608,7 @@ class ProtocolSystemError(ProtocolOmniMemoryError):
 
 
 def wrap_exception(
-    exception: BaseException,
+    exception: Exception,
     error_code: EnumOmniMemoryErrorCode,
     message: str | None = None,
     context: ModelMetadata | dict[str, object] | None = None,
@@ -645,7 +645,7 @@ def wrap_exception(
 
 def chain_errors(
     primary_error: ProtocolOmniMemoryError,
-    secondary_error: BaseException,
+    secondary_error: Exception,
 ) -> ProtocolOmniMemoryError:
     """
     Chain a secondary error to a primary ProtocolOmniMemoryError.
@@ -662,9 +662,9 @@ def chain_errors(
         primary_error.__cause__ = secondary_error
     else:
         # If there's already a cause, chain it
-        current: BaseException = primary_error.cause
+        current: Exception = primary_error.cause
         while hasattr(current, "__cause__") and current.__cause__ is not None:
-            current = current.__cause__
+            current = current.__cause__  # type: ignore[assignment]
         current.__cause__ = secondary_error
 
     return primary_error

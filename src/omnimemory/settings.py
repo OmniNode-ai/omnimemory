@@ -405,7 +405,7 @@ class MemoryServiceSettings(BaseSettings):
         # Filesystem is always required
         # BaseSettings loads required fields from environment variables
         # pyright doesn't understand pydantic-settings env var loading
-        filesystem_settings = FilesystemSettings()  # type: ignore[call-arg]
+        filesystem_settings = FilesystemSettings()  # pyright: ignore[reportCallIssue]
         filesystem_config = filesystem_settings.to_config()
 
         # Load optional backends based on enablement flags
@@ -415,7 +415,7 @@ class MemoryServiceSettings(BaseSettings):
         if self.postgres_enabled:
             # BaseSettings loads required fields from environment variables
             # pyright doesn't understand pydantic-settings env var loading
-            postgres_settings = PostgresSettings()  # type: ignore[call-arg]
+            postgres_settings = PostgresSettings()  # pyright: ignore[reportCallIssue]
             postgres_config = postgres_settings.to_config()
 
         if self.qdrant_enabled:
