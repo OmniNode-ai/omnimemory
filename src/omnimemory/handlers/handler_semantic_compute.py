@@ -589,6 +589,7 @@ class HandlerSemanticCompute:
         self._policy: HandlerSemanticComputePolicy | None = None
         self._embedding_cache: LRUCache[str, list[float]] | None = None
         self._initialized = False
+        self._init_lock = asyncio.Lock()
 
     async def initialize(
         self,
@@ -615,53 +616,62 @@ class HandlerSemanticCompute:
             RuntimeError: If embedding_provider is not provided and not
                 registered in container (embedding provider is required).
         """
-        # Import here to avoid circular imports at module level
-        from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
+        # Fast path: already initialized (avoid lock acquisition)
+        if self._initialized:
+            return
 
-        # Resolve config
-        self._config = config or ModelHandlerSemanticComputeConfig()
+        async with self._init_lock:
+            # Double-check after acquiring lock
+            if self._initialized:
+                return
 
-        # Resolve embedding provider (required)
-        if embedding_provider is not None:
-            self._embedding_provider = embedding_provider
-        else:
-            resolved = self._container.get_service_optional(
-                ProtocolEmbeddingProvider  # type: ignore[type-abstract]
-            )
-            if resolved is not None:
-                self._embedding_provider = resolved
+            # Import here to avoid circular imports at module level
+            from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
+
+            # Resolve config
+            self._config = config or ModelHandlerSemanticComputeConfig()
+
+            # Resolve embedding provider (required)
+            if embedding_provider is not None:
+                self._embedding_provider = embedding_provider
             else:
-                raise RuntimeError(
-                    "HandlerSemanticCompute requires an embedding provider. "
-                    "Either pass embedding_provider to initialize() or register "
-                    "ProtocolEmbeddingProvider in the container."
+                resolved = self._container.get_service_optional(
+                    ProtocolEmbeddingProvider  # type: ignore[type-abstract]
+                )
+                if resolved is not None:
+                    self._embedding_provider = resolved
+                else:
+                    raise RuntimeError(
+                        "HandlerSemanticCompute requires an embedding provider. "
+                        "Either pass embedding_provider to initialize() or register "
+                        "ProtocolEmbeddingProvider in the container."
+                    )
+
+            # Resolve LLM provider (optional)
+            if llm_provider is not None:
+                self._llm_provider = llm_provider
+            else:
+                self._llm_provider = self._container.get_service_optional(
+                    ProtocolLLMProvider  # type: ignore[type-abstract]
                 )
 
-        # Resolve LLM provider (optional)
-        if llm_provider is not None:
-            self._llm_provider = llm_provider
-        else:
-            self._llm_provider = self._container.get_service_optional(
-                ProtocolLLMProvider  # type: ignore[type-abstract]
+            # Set up policy and cache
+            self._policy = HandlerSemanticComputePolicy(self._config.policy_config)
+
+            # Guard against max_cache_size=0: cachetools LRUCache requires maxsize > 0
+            # If caching is disabled (max_cache_size=0), use minimum size but caching
+            # will be bypassed by enable_caching=False or the cache will just evict quickly
+            effective_cache_size = max(self._config.max_cache_size, _MIN_CACHE_SIZE)
+            self._embedding_cache = LRUCache(maxsize=effective_cache_size)
+
+            self._initialized = True
+            logger.debug(
+                "HandlerSemanticCompute initialized: embedding_provider=%s, llm_provider=%s",
+                self._embedding_provider.provider_name
+                if self._embedding_provider
+                else None,
+                self._llm_provider.provider_name if self._llm_provider else None,
             )
-
-        # Set up policy and cache
-        self._policy = HandlerSemanticComputePolicy(self._config.policy_config)
-
-        # Guard against max_cache_size=0: cachetools LRUCache requires maxsize > 0
-        # If caching is disabled (max_cache_size=0), use minimum size but caching
-        # will be bypassed by enable_caching=False or the cache will just evict quickly
-        effective_cache_size = max(self._config.max_cache_size, _MIN_CACHE_SIZE)
-        self._embedding_cache = LRUCache(maxsize=effective_cache_size)
-
-        self._initialized = True
-        logger.debug(
-            "HandlerSemanticCompute initialized: embedding_provider=%s, llm_provider=%s",
-            self._embedding_provider.provider_name
-            if self._embedding_provider
-            else None,
-            self._llm_provider.provider_name if self._llm_provider else None,
-        )
 
     async def health_check(self) -> ModelSemanticComputeHealth:
         """Check handler health and return status.

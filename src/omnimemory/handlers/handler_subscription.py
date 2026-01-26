@@ -142,10 +142,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "HandlerSubscription",
-    "ModelHandlerMetadata",
     "ModelHandlerSubscriptionConfig",
     "ModelPaginatedSubscriptions",
     "ModelSubscriptionHealth",
+    "ModelSubscriptionMetadata",
     "ModelSubscriptionMetrics",
 ]
 
@@ -413,7 +413,7 @@ class ModelPaginatedSubscriptions(  # omnimemory-model-exempt: handler result
     )
 
 
-class ModelHandlerMetadata(  # omnimemory-model-exempt: handler metadata
+class ModelSubscriptionMetadata(  # omnimemory-model-exempt: handler metadata
     BaseModel
 ):
     """Metadata describing handler capabilities and configuration.
@@ -1834,14 +1834,14 @@ class HandlerSubscription:
             metrics=await self.get_metrics(),
         )
 
-    async def describe(self) -> ModelHandlerMetadata:
+    async def describe(self) -> ModelSubscriptionMetadata:
         """Return handler metadata and capabilities.
 
         Provides introspection information about the handler's type,
         supported operations, and configuration.
 
         Returns:
-            ModelHandlerMetadata with handler information.
+            ModelSubscriptionMetadata with handler information.
 
         Note:
             This method is async per ONEX protocol specification.
@@ -1859,7 +1859,7 @@ class HandlerSubscription:
             "postgresql_persistence",
         ]
 
-        return ModelHandlerMetadata(
+        return ModelSubscriptionMetadata(
             handler_type=self.handler_type,
             capabilities=capabilities,
             supports_transactions=False,  # Operations are not transactional across services

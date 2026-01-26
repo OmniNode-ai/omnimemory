@@ -466,6 +466,24 @@ class HandlerMemoryExpire:
         """
         return self._initialized
 
+    async def shutdown(self) -> None:
+        """Shutdown the handler and release resources.
+
+        Resets initialization state and clears internal references.
+        Safe to call multiple times (idempotent).
+        After shutdown, initialize() must be called again to use the handler.
+
+        Note:
+            This method does NOT close the database pool as it is an
+            external resource whose lifecycle is not owned by this handler.
+        """
+        if self._initialized:
+            # Clear internal state (pools are external, don't close)
+            self._db_pool = None
+            self._circuit_breaker = None
+            self._initialized = False
+            logger.info("HandlerMemoryExpire shutdown complete")
+
     async def health_check(self) -> ModelMemoryExpireHealth:
         """Check handler health status.
 

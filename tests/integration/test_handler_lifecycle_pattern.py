@@ -74,8 +74,8 @@ class TestHandlerLifecyclePattern:
 
         assert health.initialized is False
         assert health.handler == "similarity_compute"
-        # Pure compute handler is always "healthy" (no external deps)
-        assert health.healthy is True
+        # Uninitialized handler reports unhealthy (cannot perform computations)
+        assert health.healthy is False
 
     @pytest.mark.asyncio
     async def test_initialize_succeeds(self) -> None:

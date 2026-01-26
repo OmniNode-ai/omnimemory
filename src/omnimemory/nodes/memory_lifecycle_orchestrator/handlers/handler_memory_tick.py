@@ -535,6 +535,24 @@ class HandlerMemoryTick:
         """
         return self._initialized
 
+    async def shutdown(self) -> None:
+        """Shutdown the handler and release resources.
+
+        Resets initialization state and clears internal references.
+        Safe to call multiple times (idempotent).
+        After shutdown, initialize() must be called again to use the handler.
+
+        Note:
+            This method does NOT close the projection reader as it is an
+            external resource whose lifecycle is not owned by this handler.
+        """
+        if self._initialized:
+            # Clear internal state (external resources are not closed)
+            self._projection_reader = None
+            self._circuit_breaker = None
+            self._initialized = False
+            logger.info("HandlerMemoryTick shutdown complete")
+
     async def health_check(self) -> ModelMemoryTickHealth:
         """Check the health status of the handler.
 
