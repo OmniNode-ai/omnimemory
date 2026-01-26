@@ -54,10 +54,10 @@ import logging
 import random
 import time
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
-from cachetools import LRUCache  # type: ignore[import-untyped]
+from cachetools import LRUCache
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
@@ -494,7 +494,7 @@ class HandlerSemanticCompute:
         # Check cache
         cache_key = self._compute_cache_key(content, model)
         if self._config.enable_caching and cache_key in self._embedding_cache:
-            return cast(list[float], self._embedding_cache[cache_key])
+            return self._embedding_cache[cache_key]
 
         # Generate embedding via provider with retry logic for transient failures
         timeout = self._config.policy_config.timeout_seconds
@@ -762,7 +762,7 @@ class HandlerSemanticCompute:
             relevance_score=None,  # Relevance analysis not implemented
             confidence_score=0.9 if embedding else 0.7,
             model_name=self._embedding_provider.model_name,
-model_version=ModelSemVer.parse(self._config.handler_version),
+            model_version=ModelSemVer.parse(self._config.handler_version),
             processing_time_ms=processing_time_ms,
         )
 

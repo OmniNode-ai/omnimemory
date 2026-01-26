@@ -78,7 +78,7 @@ try:
     _REDIS_AVAILABLE = True
 except ImportError as e:
     _REDIS_IMPORT_ERROR = str(e)
-    aioredis = None
+    aioredis = None  # type: ignore[assignment]
 
 
 logger = logging.getLogger(__name__)
@@ -912,7 +912,7 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            await pipe.reset()
+            await pipe.reset()  # type: ignore[no-untyped-call]
 
     # =========================================================================
     # Utility Methods
