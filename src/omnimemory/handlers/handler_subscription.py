@@ -697,7 +697,7 @@ class HandlerSubscription:
             ValueError: If topic format is invalid.
             RuntimeError: If handler is not initialized.
         """
-        valkey, _, _, _ = self._ensure_initialized()
+        valkey, _, _, config = self._ensure_initialized()
 
         # Early topic validation with clear error message for better debugging
         # (ModelSubscription also validates, but this provides subscribe()-specific context)
@@ -754,13 +754,13 @@ class HandlerSubscription:
 
             async with valkey.pipeline() as pipe:
                 pipe.sadd(topic_key, subscription_id)
-                pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                pipe.expire(topic_key, config.cache_ttl_seconds)
                 pipe.sadd(agent_key, subscription_id)
-                pipe.expire(agent_key, self._config.cache_ttl_seconds)
+                pipe.expire(agent_key, config.cache_ttl_seconds)
                 pipe.set_key(
                     sub_key,
                     subscription.model_dump_json(),
-                    ttl=self._config.cache_ttl_seconds,
+                    ttl=config.cache_ttl_seconds,
                 )
         except Exception as e:
             logger.warning(
@@ -869,7 +869,7 @@ class HandlerSubscription:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
         """
-        _, _, kafka_handler, _ = self._ensure_initialized()
+        _, _, kafka_handler, config = self._ensure_initialized()
 
         # Validate that event topic matches the topic argument
         if event.topic != topic:
@@ -889,7 +889,7 @@ class HandlerSubscription:
 
         # Publish event to Kafka
         # Agents consume from this topic via consumer groups keyed by agent_id
-        kafka_topic = self._config.kafka_notification_topic
+        kafka_topic = config.kafka_notification_topic
         envelope = {
             "operation": "kafka.produce",
             "payload": {
@@ -989,16 +989,16 @@ class HandlerSubscription:
             implementing UI pagination, always provide a ``limit`` parameter even if
             you want all results (e.g., ``limit=1000``).
         """
-        valkey, _, _, _ = self._ensure_initialized()
+        valkey, _, _, config = self._ensure_initialized()
 
         # Validate pagination parameters
         if offset < 0:
             raise ValueError(f"offset must be non-negative, got {offset}")
         if limit is not None and limit <= 0:
             raise ValueError(f"limit must be positive when provided, got {limit}")
-        if limit is not None and limit > self._config.pagination_max_limit:
+        if limit is not None and limit > config.pagination_max_limit:
             raise ValueError(
-                f"limit exceeds maximum ({self._config.pagination_max_limit}), got {limit}"
+                f"limit exceeds maximum ({config.pagination_max_limit}), got {limit}"
             )
 
         # For paginated queries, always use database to ensure consistent ordering
@@ -1363,12 +1363,13 @@ class HandlerSubscription:
         async with self._cache_rebuild_lock:
             # Access components directly - this is called during initialize()
             # before _initialized is set, so we can't use _ensure_initialized()
-            if self._valkey is None or self._db_handler is None:
+            if self._valkey is None or self._db_handler is None or self._config is None:
                 raise RuntimeError(
                     "_rebuild_cache_from_db called before components initialized"
                 )
             valkey = self._valkey
             db_handler = self._db_handler
+            config = self._config
 
             logger.info("Rebuilding Valkey cache from PostgreSQL...")
 
@@ -1414,7 +1415,7 @@ class HandlerSubscription:
                         "sql": sql,
                         "parameters": [
                             EnumSubscriptionStatus.ACTIVE.value,
-                            self._config.cache_rebuild_batch_size,
+                            config.cache_rebuild_batch_size,
                             offset,
                         ],
                     },
@@ -1437,7 +1438,7 @@ class HandlerSubscription:
                         pipe.set_key(
                             sub_key,
                             subscription.model_dump_json(),
-                            ttl=self._config.cache_ttl_seconds,
+                            ttl=config.cache_ttl_seconds,
                         )
 
                         # Add to topic->subscribers mapping
@@ -1445,17 +1446,17 @@ class HandlerSubscription:
                             topic=subscription.topic
                         )
                         pipe.sadd(topic_key, subscription.id)
-                        pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                        pipe.expire(topic_key, config.cache_ttl_seconds)
 
                         # Add to agent->subscriptions mapping
                         agent_key = CACHE_KEY_AGENT_SUBSCRIPTIONS.format(
                             agent_id=subscription.agent_id
                         )
                         pipe.sadd(agent_key, subscription.id)
-                        pipe.expire(agent_key, self._config.cache_ttl_seconds)
+                        pipe.expire(agent_key, config.cache_ttl_seconds)
 
                 processed += len(rows)
-                offset += self._config.cache_rebuild_batch_size
+                offset += config.cache_rebuild_batch_size
                 logger.info(
                     "Cache rebuild progress: %d/%d subscriptions",
                     processed,
@@ -1476,7 +1477,7 @@ class HandlerSubscription:
         Returns:
             Set of subscription IDs.
         """
-        valkey, db_handler, _, _ = self._ensure_initialized()
+        valkey, db_handler, _, config = self._ensure_initialized()
 
         # Try cache first (best-effort - DB is authoritative)
         topic_key = CACHE_KEY_TOPIC_SUBSCRIBERS.format(topic=topic)
@@ -1486,7 +1487,7 @@ class HandlerSubscription:
             if subscriber_ids:
                 # Refresh TTL on cache hit to prevent expiry during active usage
                 try:
-                    await valkey.expire(topic_key, self._config.cache_ttl_seconds)
+                    await valkey.expire(topic_key, config.cache_ttl_seconds)
                 except Exception as e:
                     logger.debug(
                         "Failed to refresh cache TTL for topic %s: %s", topic, e
@@ -1527,7 +1528,7 @@ class HandlerSubscription:
             try:
                 async with valkey.pipeline() as pipe:
                     pipe.sadd(topic_key, *subscription_ids)
-                    pipe.expire(topic_key, self._config.cache_ttl_seconds)
+                    pipe.expire(topic_key, config.cache_ttl_seconds)
             except Exception as e:
                 logger.warning(
                     "Failed to rebuild cache for topic %s (DB query succeeded): %s",
@@ -1596,7 +1597,7 @@ class HandlerSubscription:
         Returns:
             List of subscriptions.
         """
-        valkey, db_handler, _, _ = self._ensure_initialized()
+        valkey, db_handler, _, config = self._ensure_initialized()
 
         subscriptions: list[ModelSubscription] = []
         missing_ids: list[str] = list(subscription_ids)
@@ -1636,7 +1637,7 @@ class HandlerSubscription:
                                 sub_key = CACHE_KEY_SUBSCRIPTION.format(
                                     subscription_id=sub.id
                                 )
-                                pipe.expire(sub_key, self._config.cache_ttl_seconds)
+                                pipe.expire(sub_key, config.cache_ttl_seconds)
                     except Exception as e:
                         logger.debug("Failed to refresh cache TTL: %s", e)
 
@@ -1682,7 +1683,7 @@ class HandlerSubscription:
                     await valkey.set_key(
                         sub_key,
                         subscription.model_dump_json(),
-                        ttl=self._config.cache_ttl_seconds,
+                        ttl=config.cache_ttl_seconds,
                     )
                 except Exception as e:
                     logger.warning(

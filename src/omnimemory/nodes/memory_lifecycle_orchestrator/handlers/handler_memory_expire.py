@@ -528,6 +528,7 @@ class HandlerMemoryExpire:
         Exposed for monitoring and testing purposes. The circuit breaker
         tracks database failures and opens to prevent cascading failures.
         """
+        assert self._circuit_breaker is not None
         return self._circuit_breaker
 
     @property
@@ -539,6 +540,7 @@ class HandlerMemoryExpire:
             CircuitBreakerState.OPEN: Failing fast, DB assumed unavailable
             CircuitBreakerState.HALF_OPEN: Testing if DB has recovered
         """
+        assert self._circuit_breaker is not None
         return self._circuit_breaker.state
 
     async def handle(
@@ -582,6 +584,9 @@ class HandlerMemoryExpire:
                 "Database pool not configured. "
                 "Initialize handler with db_pool parameter."
             )
+
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._circuit_breaker is not None
 
         # Check circuit breaker before attempting database operation
         if not self._circuit_breaker.should_allow_request():
@@ -916,6 +921,9 @@ class HandlerMemoryExpire:
                 "Database pool not configured. "
                 "Initialize handler with db_pool parameter."
             )
+
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._circuit_breaker is not None
 
         # Check circuit breaker before attempting database operation
         if not self._circuit_breaker.should_allow_request():

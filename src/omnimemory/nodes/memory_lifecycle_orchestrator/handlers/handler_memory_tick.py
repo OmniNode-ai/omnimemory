@@ -724,6 +724,9 @@ class HandlerMemoryTick:
             )
             return []
 
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._circuit_breaker is not None
+
         # Check circuit breaker before attempting external call
         if not self._circuit_breaker.should_allow_request():
             logger.warning(
@@ -849,6 +852,9 @@ class HandlerMemoryTick:
                 extra={"correlation_id": str(correlation_id)},
             )
             return []
+
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._circuit_breaker is not None
 
         # Check circuit breaker before attempting external call
         if not self._circuit_breaker.should_allow_request():

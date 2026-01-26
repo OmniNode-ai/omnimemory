@@ -724,6 +724,9 @@ class HandlerMemoryArchive:
 
         now = datetime.now(timezone.utc)
 
+        # Type narrowing for circuit breaker (guaranteed set after initialize())
+        assert self._db_circuit_breaker is not None
+
         # Check circuit breaker before any DB operations
         if not self._db_circuit_breaker.should_allow_request():
             logger.warning(
@@ -1009,6 +1012,9 @@ class HandlerMemoryArchive:
             ... )
             Path("/var/omnimemory/archives/2026/01/25/abc12345-....jsonl.gz")
         """
+        # Type narrowing (guaranteed set after initialize())
+        assert self._archive_base_path is not None
+
         return (
             self._archive_base_path
             / str(archived_at.year)

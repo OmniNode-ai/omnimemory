@@ -73,7 +73,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
-from cachetools import LRUCache
+from cachetools import LRUCache  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..enums import EnumEntityExtractionMode, EnumSemanticEntityType
@@ -617,7 +617,7 @@ class HandlerSemanticCompute:
             self._embedding_provider = embedding_provider
         elif self._container.is_registered(ProtocolEmbeddingProvider):
             self._embedding_provider = self._container.resolve(
-                ProtocolEmbeddingProvider
+                ProtocolEmbeddingProvider  # type: ignore[type-abstract]
             )
         else:
             raise RuntimeError(
@@ -630,7 +630,7 @@ class HandlerSemanticCompute:
         if llm_provider is not None:
             self._llm_provider = llm_provider
         elif self._container.is_registered(ProtocolLLMProvider):
-            self._llm_provider = self._container.resolve(ProtocolLLMProvider)
+            self._llm_provider = self._container.resolve(ProtocolLLMProvider)  # type: ignore[type-abstract]
         else:
             self._llm_provider = None
 
@@ -957,7 +957,7 @@ class HandlerSemanticCompute:
         # Check cache
         cache_key = self._compute_cache_key(content, model)
         if self._config.enable_caching and cache_key in self._embedding_cache:
-            return self._embedding_cache[cache_key]
+            return self._embedding_cache[cache_key]  # type: ignore[no-any-return]
 
         # Generate embedding via provider with retry logic for transient failures
         timeout = self._config.policy_config.timeout_seconds

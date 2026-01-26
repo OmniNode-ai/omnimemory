@@ -189,6 +189,7 @@ class EmbeddingHttpClient:
                 return
 
             self._handler = HandlerHttpRest()
+            assert self._handler is not None  # Narrow type for pyright
             await self._handler.initialize(
                 {
                     "timeout_seconds": self._config.timeout_seconds,
