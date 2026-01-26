@@ -110,6 +110,28 @@ src/omnimemory/models/         # 26 Pydantic models, zero Any types
 └── foundation/                # Base architectural models (3 models)
 ```
 
+### Model Exemption Comments
+
+Some Pydantic models are exempt from standard model validation rules (e.g., models directory organization). These use the comment pattern:
+
+```python
+class MyModel(  # omnimemory-model-exempt: <reason>
+    BaseModel
+):
+    """Model exempt from standard location rules."""
+    pass
+```
+
+**Valid exemption reasons:**
+- `handler metadata` - Handler introspection models (returned by `describe()`)
+- `handler health` - Handler health status models (returned by `health_check()`)
+- `handler config` - Handler-specific configuration models
+- `handler internal` - Internal implementation models not part of public API
+- `handler-specific metadata` - Handler-specific metadata models
+- `handler result` - Handler operation result models
+
+These models are defined alongside their handler rather than in `/models/` because they are tightly coupled to the handler implementation and would create unnecessary indirection if separated.
+
 ### ONEX 4-Node Architecture Integration
 
 ```
