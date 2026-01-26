@@ -89,8 +89,7 @@ from omnimemory.utils.concurrency import CircuitBreaker
 if TYPE_CHECKING:
     from asyncpg import Pool
     from asyncpg.exceptions import InterfaceError, InternalClientError, PostgresError
-
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 else:
     try:
         from asyncpg.exceptions import (

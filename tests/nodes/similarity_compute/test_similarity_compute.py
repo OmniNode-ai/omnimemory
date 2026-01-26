@@ -31,8 +31,8 @@ import os
 import time
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 
-from omnimemory.compat import ModelOnexContainer
 from omnimemory.nodes.similarity_compute import (
     HandlerSimilarityCompute,
     ModelHandlerSimilarityComputeConfig,
@@ -57,17 +57,17 @@ def config() -> ModelHandlerSimilarityComputeConfig:
 
 
 @pytest.fixture
-def container() -> ModelOnexContainer:
+def container() -> ModelONEXContainer:
     """Create an ONEX container for node testing.
 
     Returns:
-        ModelOnexContainer instance.
+        ModelONEXContainer instance.
     """
-    return ModelOnexContainer()
+    return ModelONEXContainer()
 
 
 @pytest.fixture
-async def handler(container: ModelOnexContainer) -> HandlerSimilarityCompute:
+async def handler(container: ModelONEXContainer) -> HandlerSimilarityCompute:
     """Create an initialized handler for testing.
 
     Uses the container-driven pattern. The handler must be initialized
@@ -85,7 +85,7 @@ async def handler(container: ModelOnexContainer) -> HandlerSimilarityCompute:
 
 
 @pytest.fixture
-async def node(container: ModelOnexContainer) -> NodeSimilarityCompute:
+async def node(container: ModelONEXContainer) -> NodeSimilarityCompute:
     """Create an initialized node for testing.
 
     Args:
@@ -995,7 +995,7 @@ class TestNodeSimilarityCompute:
     def test_node_container_access(
         self,
         node: NodeSimilarityCompute,
-        container: ModelOnexContainer,
+        container: ModelONEXContainer,
     ) -> None:
         """Node provides access to injected container.
 
@@ -1540,7 +1540,7 @@ class TestHandlerConfig:
         """
         # With larger epsilon, more vectors are considered "zero"
         config = ModelHandlerSimilarityComputeConfig(epsilon=1e-3)
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize(config)
 
@@ -1564,7 +1564,7 @@ class TestFailFastBehavior:
         When: Accessing the config property
         Then: RuntimeError should be raised with descriptive message
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -1577,7 +1577,7 @@ class TestFailFastBehavior:
         When: Calling cosine_distance
         Then: RuntimeError should be raised
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -1590,7 +1590,7 @@ class TestFailFastBehavior:
         When: Calling euclidean_distance
         Then: RuntimeError should be raised
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -1603,7 +1603,7 @@ class TestFailFastBehavior:
         When: Calling compare
         Then: RuntimeError should be raised
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -1617,7 +1617,7 @@ class TestFailFastBehavior:
         When: Calling compute methods
         Then: Methods should succeed without errors
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
 

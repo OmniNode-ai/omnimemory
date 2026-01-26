@@ -81,8 +81,8 @@ _SKIP_REASON = "Memgraph not available"
 try:
     from neo4j import AsyncGraphDatabase
     from neo4j.exceptions import ServiceUnavailable
+    from omnibase_core.container import ModelONEXContainer
 
-    from omnimemory.compat import ModelONEXContainer
     from omnimemory.handlers.adapters import AdapterIntentGraph
     from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
@@ -692,9 +692,9 @@ class TestHandlerIntentQueryUnit:
     async def test_handler_not_initialized_returns_error(self) -> None:
         """Test execute before initialize returns error."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
+        from omnibase_core.container import ModelONEXContainer
         from omnibase_core.models.events import ModelIntentQueryRequestedEvent
 
-        from omnimemory.compat import ModelONEXContainer
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()
@@ -711,7 +711,8 @@ class TestHandlerIntentQueryUnit:
     def test_handler_config_none_before_initialize(self) -> None:
         """Test handler config is None before initialization."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()
@@ -723,7 +724,8 @@ class TestHandlerIntentQueryUnit:
     def test_handler_has_container(self) -> None:
         """Test handler has container reference."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()
@@ -734,7 +736,8 @@ class TestHandlerIntentQueryUnit:
     def test_handler_not_initialized_by_default(self) -> None:
         """Test handler is not initialized by default."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()
@@ -746,7 +749,8 @@ class TestHandlerIntentQueryUnit:
     async def test_handler_shutdown_idempotent(self) -> None:
         """Test shutdown can be called multiple times safely."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()
@@ -762,7 +766,8 @@ class TestHandlerIntentQueryUnit:
     async def test_handler_describe_metadata(self) -> None:
         """Test describe returns handler metadata."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()
@@ -781,7 +786,8 @@ class TestHandlerIntentQueryUnit:
     async def test_handler_health_check_not_initialized(self) -> None:
         """Test health_check returns unhealthy when not initialized."""
         pytest.importorskip("omnimemory.nodes.intent_query_effect.handlers")
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
+
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         container = ModelONEXContainer()

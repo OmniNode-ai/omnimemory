@@ -5,7 +5,7 @@ This module contains all protocol definitions for the OmniMemory system,
 following ONEX 4-node architecture patterns and contract-driven development.
 
 All protocols use typing.Protocol for structural typing and avoid isinstance
-checks, supporting the ModelOnexContainer pattern for dependency injection.
+checks, supporting the ModelONEXContainer pattern for dependency injection.
 """
 
 # Protocol categories: Base, Effect, Compute, Reducer, and Orchestrator node protocols

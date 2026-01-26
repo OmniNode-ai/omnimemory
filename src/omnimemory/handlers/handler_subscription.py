@@ -44,7 +44,7 @@ Known Limitations:
 
 Example::
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.handlers import (
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,
@@ -107,7 +107,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from omnimemory.enums.enum_subscription_status import EnumSubscriptionStatus
 
 if TYPE_CHECKING:
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 from omnimemory.handlers.adapters.adapter_valkey import (
     AdapterValkey,
     AdapterValkeyConfig,

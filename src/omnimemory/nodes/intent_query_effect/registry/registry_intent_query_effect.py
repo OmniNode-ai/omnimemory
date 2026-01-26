@@ -30,7 +30,8 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
+
     from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
     from omnimemory.nodes.intent_query_effect.models import (
@@ -53,7 +54,7 @@ class RegistryIntentQueryEffect:
         - Capability listing for service discovery
 
     Example:
-        >>> from omnimemory.compat import ModelONEXContainer
+        >>> from omnibase_core.container import ModelONEXContainer
         >>> from omnimemory.nodes.intent_query_effect.registry import (
         ...     RegistryIntentQueryEffect,
         ... )

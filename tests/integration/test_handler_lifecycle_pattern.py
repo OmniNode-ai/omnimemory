@@ -29,8 +29,8 @@ Usage:
 from __future__ import annotations
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 
-from omnimemory.compat import ModelOnexContainer
 from omnimemory.nodes.similarity_compute.handlers import (
     HandlerSimilarityCompute,
     ModelHandlerSimilarityComputeConfig,
@@ -53,7 +53,7 @@ class TestHandlerLifecyclePattern:
         When: Creating a handler with the container
         Then: Handler is created successfully with container stored
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         assert handler is not None
@@ -67,7 +67,7 @@ class TestHandlerLifecyclePattern:
         When: Calling health_check()
         Then: Health status shows initialized=False
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         health = await handler.health_check()
@@ -85,7 +85,7 @@ class TestHandlerLifecyclePattern:
         When: Calling initialize()
         Then: Handler is initialized without errors
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         # Should not raise
@@ -103,7 +103,7 @@ class TestHandlerLifecyclePattern:
         When: Calling initialize(config)
         Then: Handler uses the provided configuration
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         custom_config = ModelHandlerSimilarityComputeConfig(epsilon=1e-8)
 
@@ -119,7 +119,7 @@ class TestHandlerLifecyclePattern:
         When: Calling health_check()
         Then: Health status shows initialized=True and healthy=True
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
 
@@ -137,7 +137,7 @@ class TestHandlerLifecyclePattern:
         When: Calling describe()
         Then: Metadata includes handler_type, capabilities, and metrics
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
 
@@ -160,7 +160,7 @@ class TestHandlerLifecyclePattern:
         When: Calling describe()
         Then: Metadata shows initialized=False
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         metadata = await handler.describe()
@@ -177,7 +177,7 @@ class TestHandlerLifecyclePattern:
         When: Calling compute operations
         Then: Operations complete successfully with correct results
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
 
@@ -206,7 +206,7 @@ class TestHandlerLifecyclePattern:
         When: Calling shutdown()
         Then: Handler returns to uninitialized state
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
 
@@ -229,7 +229,7 @@ class TestHandlerLifecyclePattern:
         When: Calling compute operations
         Then: RuntimeError is raised with descriptive message
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
         await handler.shutdown()
@@ -252,7 +252,7 @@ class TestHandlerLifecyclePattern:
         When: Calling compute operations
         Then: RuntimeError is raised with descriptive message
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -272,7 +272,7 @@ class TestHandlerLifecyclePattern:
         When: Accessing the config property
         Then: RuntimeError is raised
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         with pytest.raises(RuntimeError, match="not initialized"):
@@ -286,7 +286,7 @@ class TestHandlerLifecyclePattern:
         When: Calling shutdown() multiple times
         Then: No error is raised and state remains uninitialized
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
         await handler.initialize()
 
@@ -306,7 +306,7 @@ class TestHandlerLifecyclePattern:
         When: Calling initialize() again
         Then: Handler becomes operational again
         """
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         # First lifecycle
@@ -343,7 +343,7 @@ class TestHandlerLifecycleFullCycle:
         container-driven handlers must follow.
         """
         # Phase 1: Creation
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         handler = HandlerSimilarityCompute(container)
 
         # Verify: uninitialized state

@@ -11,7 +11,7 @@ the adapter lifecycle and manages all database connection setup internally.
 
 Example::
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
     container = ModelONEXContainer()
@@ -50,7 +50,7 @@ from omnimemory.nodes.intent_query_effect.models import ModelHandlerIntentQueryC
 from omnimemory.nodes.intent_query_effect.utils import map_intent_records
 
 if TYPE_CHECKING:
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ class HandlerIntentQuery:
 
     Example::
 
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
         from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
         # Create handler with container

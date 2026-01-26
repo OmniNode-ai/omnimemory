@@ -56,10 +56,9 @@ from omnimemory.enums import EnumLifecycleState
 from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerOpenError
 
 if TYPE_CHECKING:
+    from omnibase_core.container import ModelONEXContainer
     from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
-
-    from omnimemory.compat import ModelONEXContainer
 
 logger = logging.getLogger(__name__)
 
@@ -451,7 +450,7 @@ class HandlerMemoryTick:
     Example:
         >>> from datetime import datetime, timezone
         >>> from uuid import uuid4
-        >>> from omnimemory.compat import ModelONEXContainer
+        >>> from omnibase_core.container import ModelONEXContainer
         >>> container = ModelONEXContainer()
         >>> handler = HandlerMemoryTick(container)
         >>> await handler.initialize(projection_reader=reader, batch_size=100)

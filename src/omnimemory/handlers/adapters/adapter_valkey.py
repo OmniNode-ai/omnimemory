@@ -63,8 +63,8 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
     from redis.asyncio.client import Pipeline
 
-    RedisClientType: TypeAlias = AsyncRedis[bytes]  # noqa: UP040
-    PipelineType: TypeAlias = Pipeline[bytes]  # noqa: UP040
+    RedisClientType: TypeAlias = AsyncRedis  # noqa: UP040
+    PipelineType: TypeAlias = Pipeline  # noqa: UP040
 else:
     RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
     PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
@@ -78,7 +78,7 @@ try:
     _REDIS_AVAILABLE = True
 except ImportError as e:
     _REDIS_IMPORT_ERROR = str(e)
-    aioredis = None
+    aioredis = None  # type: ignore[assignment]
 
 
 logger = logging.getLogger(__name__)
@@ -910,7 +910,7 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            await pipe.reset()
+            await pipe.reset()  # type: ignore[no-untyped-call]
 
     # =========================================================================
     # Utility Methods

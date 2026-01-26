@@ -26,7 +26,7 @@ Example::
         HandlerSemanticCompute,
         ModelHandlerSemanticComputeConfig,
     )
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 
     # Container-driven pattern (recommended)
     container = ModelONEXContainer()
@@ -95,7 +95,8 @@ from ..utils.handler_constants import (
 )
 
 if TYPE_CHECKING:
-    from ..compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
+
     from ..protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
 
 logger = logging.getLogger(__name__)
@@ -615,24 +616,26 @@ class HandlerSemanticCompute:
         # Resolve embedding provider (required)
         if embedding_provider is not None:
             self._embedding_provider = embedding_provider
-        elif self._container.is_registered(ProtocolEmbeddingProvider):
-            self._embedding_provider = self._container.resolve(
+        else:
+            resolved = self._container.get_service_optional(
                 ProtocolEmbeddingProvider  # type: ignore[type-abstract]
             )
-        else:
-            raise RuntimeError(
-                "HandlerSemanticCompute requires an embedding provider. "
-                "Either pass embedding_provider to initialize() or register "
-                "ProtocolEmbeddingProvider in the container."
-            )
+            if resolved is not None:
+                self._embedding_provider = resolved
+            else:
+                raise RuntimeError(
+                    "HandlerSemanticCompute requires an embedding provider. "
+                    "Either pass embedding_provider to initialize() or register "
+                    "ProtocolEmbeddingProvider in the container."
+                )
 
         # Resolve LLM provider (optional)
         if llm_provider is not None:
             self._llm_provider = llm_provider
-        elif self._container.is_registered(ProtocolLLMProvider):
-            self._llm_provider = self._container.resolve(ProtocolLLMProvider)  # type: ignore[type-abstract]
         else:
-            self._llm_provider = None
+            self._llm_provider = self._container.get_service_optional(
+                ProtocolLLMProvider  # type: ignore[type-abstract]
+            )
 
         # Set up policy and cache
         self._policy = HandlerSemanticComputePolicy(self._config.policy_config)

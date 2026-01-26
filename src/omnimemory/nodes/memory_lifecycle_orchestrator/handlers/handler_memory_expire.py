@@ -37,7 +37,7 @@ Related:
 
 Example::
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
         HandlerMemoryExpire,
         ModelExpireMemoryCommand,
@@ -102,7 +102,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnimemory.enums import EnumLifecycleState
 
 if TYPE_CHECKING:
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 from omnimemory.utils.concurrency import (
     CircuitBreaker,
     CircuitBreakerOpenError,

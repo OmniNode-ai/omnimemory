@@ -29,9 +29,9 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 from pydantic import ValidationError
 
-from omnimemory.compat import ModelONEXContainer
 from omnimemory.enums import EnumLifecycleState
 from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
     HandlerMemoryExpire,

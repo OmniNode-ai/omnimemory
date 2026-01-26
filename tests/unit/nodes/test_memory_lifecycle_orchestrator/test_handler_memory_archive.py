@@ -31,11 +31,11 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 from omnibase_core.models.infrastructure.model_value import ModelValue
 from omnibase_core.models.metadata.model_generic_metadata import ModelGenericMetadata
 from pydantic import ValidationError
 
-from omnimemory.compat import ModelONEXContainer
 from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
     HandlerMemoryArchive,
     ModelArchiveMemoryCommand,

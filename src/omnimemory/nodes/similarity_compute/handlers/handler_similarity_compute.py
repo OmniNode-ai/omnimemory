@@ -18,7 +18,7 @@ Supported Metrics:
 
 Example::
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.similarity_compute.handlers import (
         HandlerSimilarityCompute,
         ModelHandlerSimilarityComputeConfig,
@@ -61,7 +61,7 @@ from pydantic import BaseModel, ConfigDict, Field
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 
 from omnimemory.models.memory.model_similarity_result import ModelSimilarityResult
 from omnimemory.nodes.similarity_compute.models import (

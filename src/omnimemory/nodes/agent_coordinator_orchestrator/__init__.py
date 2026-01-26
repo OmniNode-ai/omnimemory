@@ -31,7 +31,7 @@ Models::
 
 Handler Integration::
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.handlers import (
         HandlerSubscription,
         ModelHandlerSubscriptionConfig,

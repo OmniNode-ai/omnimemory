@@ -32,8 +32,8 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 
-from omnimemory.compat import ModelONEXContainer
 from omnimemory.enums import EnumEntityExtractionMode, EnumSemanticEntityType
 from omnimemory.handlers import (
     HandlerSemanticCompute,

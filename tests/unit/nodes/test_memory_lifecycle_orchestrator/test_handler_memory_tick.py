@@ -27,12 +27,12 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
+from omnibase_core.container import ModelONEXContainer
 from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
 from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
 from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
 from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
-from omnimemory.compat import ModelONEXContainer
 from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_tick import (
     HandlerMemoryTick,
     ModelMemoryArchiveInitiated,

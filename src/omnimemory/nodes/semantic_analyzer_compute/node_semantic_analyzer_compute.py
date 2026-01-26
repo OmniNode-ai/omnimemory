@@ -17,9 +17,9 @@ Example::
         NodeSemanticAnalyzerCompute,
         ModelSemanticAnalyzerComputeRequest,
     )
-    from omnimemory.compat import ModelOnexContainer
+    from omnibase_core.container import ModelONEXContainer
 
-    container = ModelOnexContainer()
+    container = ModelONEXContainer()
     node = NodeSemanticAnalyzerCompute(
         container=container,
         embedding_provider=my_embedding_provider,
@@ -82,7 +82,7 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
 
     Example::
 
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         node = NodeSemanticAnalyzerCompute(
             container=container,
             embedding_provider=my_provider,

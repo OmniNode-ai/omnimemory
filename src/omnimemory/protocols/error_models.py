@@ -3,7 +3,7 @@ Error Models and Exception Classes for OmniMemory ONEX Architecture
 
 This module defines comprehensive error handling following ONEX standards,
 including structured error codes, exception chaining, and monadic error patterns
-that integrate with NodeResult for consistent error handling across the system.
+that integrate with ModelBaseResult for consistent error handling across the system.
 """
 
 from __future__ import annotations
@@ -20,14 +20,8 @@ FieldValueType = (
     str | int | float | bool | bytes | list[object] | dict[str, object] | None
 )
 
-# Use local compatibility stub until omnibase_core provides OnexError
-try:
-    from omnibase_core.core.errors.core_errors import (
-        OnexError as BaseOnexError,
-    )
-except (ImportError, ModuleNotFoundError):
-    from ..compat.onex_error import OnexError as BaseOnexError
-
+# Import ModelOnexError from omnibase_core
+from omnibase_core.models.errors.model_onex_error import ModelOnexError
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation import ModelMetadata
@@ -212,11 +206,11 @@ def get_error_category(
 # === BASE EXCEPTION CLASSES ===
 
 
-class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
+class ProtocolOmniMemoryError(ModelOnexError):
     """
     Base exception class for all OmniMemory errors.
 
-    Extends ONEX BaseOnexError with OmniMemory-specific functionality
+    Extends ONEX ModelOnexError with OmniMemory-specific functionality
     including error categorization, recovery hints, and monadic integration.
     """
 
@@ -242,7 +236,7 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
             cause: Underlying exception that caused this error
             recovery_hint: Suggestion for error recovery
             retry_after: Suggested retry delay in seconds
-            **kwargs: Additional keyword arguments passed to BaseOnexError
+            **kwargs: Additional keyword arguments passed to ModelOnexError
         """
         # Get error category information
         category_info = get_error_category(error_code)
@@ -266,13 +260,18 @@ class ProtocolOmniMemoryError(BaseOnexError):  # type: ignore[misc]
         if retry_after:
             enhanced_context["retry_after_seconds"] = retry_after
 
-        # Initialize base OnexError
+        # Initialize base ModelOnexError
+        # Merge enhanced_context and kwargs into context dict
+        all_context: dict[str, object] = {**enhanced_context}
+        # Filter kwargs to only include valid context items (exclude None values)
+        for key, value in kwargs.items():
+            if value is not None:
+                all_context[key] = value
         super().__init__(
-            error_code=error_code.value,
             message=message,
-            context=enhanced_context,
+            error_code=error_code.value,
             correlation_id=correlation_id,
-            **kwargs,
+            context=all_context,
         )
 
         # Store additional OmniMemory-specific information

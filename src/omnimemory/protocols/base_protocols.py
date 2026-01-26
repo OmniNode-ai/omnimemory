@@ -8,7 +8,7 @@ This module defines all protocol interfaces following ONEX 4-node architecture:
 - Orchestrator: Workflow, agent, and memory coordination
 
 All protocols use typing.Protocol for structural typing, avoiding isinstance
-checks and supporting ModelOnexContainer dependency injection patterns.
+checks and supporting ModelONEXContainer dependency injection patterns.
 """
 
 from __future__ import annotations
@@ -19,19 +19,11 @@ if TYPE_CHECKING:
     from datetime import datetime
     from uuid import UUID
 
-    # Use local compatibility stub until omnibase_core provides NodeResult
-    try:
-        from omnibase_core.core.monadic.model_node_result import (
-            NodeResult,
-        )
-    except (ImportError, ModuleNotFoundError):
-        from ..compat.node_result import NodeResult
+    from omnibase_core.models.core.model_base_result import ModelBaseResult
 
     from ..models.foundation import (
         ModelConfiguration,
-        ModelHealthResponse,
         ModelMetadata,
-        ModelMetricsResponse,
         ModelOptionalStringList,
         ModelResultCollection,
         ModelStringList,
@@ -39,80 +31,44 @@ if TYPE_CHECKING:
     )
     from .data_models import (  # Requests and responses
         AgentCoordinationRequest,
-        AgentCoordinationResponse,
         AggregationRequest,
-        AggregationResponse,
         BackupRequest,
-        BackupResponse,
         BaseMemoryRequest,
         BaseMemoryResponse,
         BroadcastRequest,
-        BroadcastResponse,
         CompressionRequest,
-        CompressionResponse,
         ConsolidationRequest,
-        ConsolidationResponse,
         ContextMergeRequest,
-        ContextMergeResponse,
         ContextualSearchRequest,
-        ContextualSearchResponse,
         DeduplicationRequest,
-        DeduplicationResponse,
         EmbeddingRequest,
-        EmbeddingResponse,
         InsightExtractionRequest,
-        InsightExtractionResponse,
         IntelligenceProcessRequest,
-        IntelligenceProcessResponse,
         LayoutOptimizationRequest,
-        LayoutOptimizationResponse,
         LifecycleOrchestrationRequest,
-        LifecycleOrchestrationResponse,
         MemoryDeleteRequest,
-        MemoryDeleteResponse,
         MemoryRecord,
         MemoryRetrieveRequest,
-        MemoryRetrieveResponse,
         MemoryStoreRequest,
-        MemoryStoreResponse,
         MigrationCoordinationRequest,
-        MigrationCoordinationResponse,
         ParallelCoordinationRequest,
-        ParallelCoordinationResponse,
         PatternAnalysisRequest,
-        PatternAnalysisResponse,
         PatternLearningRequest,
-        PatternLearningResponse,
         PatternPredictionRequest,
-        PatternPredictionResponse,
         PatternRecognitionRequest,
-        PatternRecognitionResponse,
         PersistenceRequest,
-        PersistenceResponse,
         QuotaManagementRequest,
-        QuotaManagementResponse,
         RestoreRequest,
-        RestoreResponse,
         RetrievalOptimizationRequest,
-        RetrievalOptimizationResponse,
         SemanticAnalysisRequest,
-        SemanticAnalysisResponse,
         SemanticComparisonRequest,
-        SemanticComparisonResponse,
         SemanticSearchRequest,
-        SemanticSearchResponse,
         StateSynchronizationRequest,
-        StateSynchronizationResponse,
         StatisticsRequest,
-        StatisticsResponse,
         SummarizationRequest,
-        SummarizationResponse,
         TemporalSearchRequest,
-        TemporalSearchResponse,
         WorkflowExecutionRequest,
-        WorkflowExecutionResponse,
         WorkflowStateRequest,
-        WorkflowStateResponse,
     )
 
 # === BASE PROTOCOLS ===
@@ -129,12 +85,12 @@ class ProtocolMemoryBase(Protocol):
     async def health_check(
         self,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelHealthResponse]:
+    ) -> ModelBaseResult:
         """
         Check the health status of the memory component.
 
         Returns:
-            NodeResult containing ModelHealthResponse with:
+            ModelBaseResult containing ModelHealthResponse with:
             - status: overall system health (healthy/degraded/unhealthy)
             - latency_ms: response time metrics
             - resource_usage: detailed system resource metrics
@@ -146,12 +102,12 @@ class ProtocolMemoryBase(Protocol):
     async def get_metrics(
         self,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetricsResponse]:
+    ) -> ModelBaseResult:
         """
         Get operational metrics for the memory component.
 
         Returns:
-            NodeResult containing ModelMetricsResponse with:
+            ModelBaseResult containing ModelMetricsResponse with:
             - operation_counts: detailed counts by operation type
             - performance_metrics: latency, throughput, error rates
             - resource_metrics: memory usage, cache statistics, connections
@@ -164,7 +120,7 @@ class ProtocolMemoryBase(Protocol):
         self,
         config: ModelSystemConfiguration,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[bool]:
+    ) -> ModelBaseResult:
         """
         Configure the memory component with new settings.
 
@@ -174,7 +130,7 @@ class ProtocolMemoryBase(Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult indicating configuration success/failure
+            ModelBaseResult indicating configuration success/failure
         """
         ...
 
@@ -190,7 +146,7 @@ class ProtocolMemoryOperations(ProtocolMemoryBase, Protocol):
     async def validate_request(
         self,
         request: BaseMemoryRequest,
-    ) -> NodeResult[bool]:
+    ) -> ModelBaseResult:
         """
         Validate a memory operation request.
 
@@ -198,7 +154,7 @@ class ProtocolMemoryOperations(ProtocolMemoryBase, Protocol):
             request: The request to validate
 
         Returns:
-            NodeResult indicating validation success/failure with error details
+            ModelBaseResult indicating validation success/failure with error details
         """
         ...
 
@@ -208,7 +164,7 @@ class ProtocolMemoryOperations(ProtocolMemoryBase, Protocol):
         request: BaseMemoryRequest,
         response: BaseMemoryResponse,
         correlation_id: UUID,
-    ) -> NodeResult[bool]:
+    ) -> ModelBaseResult:
         """
         Log a completed memory operation for audit and monitoring.
 
@@ -219,7 +175,7 @@ class ProtocolMemoryOperations(ProtocolMemoryBase, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult indicating logging success/failure
+            ModelBaseResult indicating logging success/failure
         """
         ...
 
@@ -238,7 +194,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
     async def store_memory(
         self,
         request: MemoryStoreRequest,
-    ) -> NodeResult[MemoryStoreResponse]:
+    ) -> ModelBaseResult:
         """
         Store a memory record with metadata and provenance.
 
@@ -246,14 +202,14 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
             request: Memory storage request containing the memory record
 
         Returns:
-            NodeResult with MemoryStoreResponse containing storage details
+            ModelBaseResult with MemoryStoreResponse containing storage details
         """
         ...
 
     async def retrieve_memory(
         self,
         request: MemoryRetrieveRequest,
-    ) -> NodeResult[MemoryRetrieveResponse]:
+    ) -> ModelBaseResult:
         """
         Retrieve a memory record by identifier.
 
@@ -261,14 +217,14 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
             request: Memory retrieval request with memory ID
 
         Returns:
-            NodeResult with MemoryRetrieveResponse containing the memory record
+            ModelBaseResult with MemoryRetrieveResponse containing the memory record
         """
         ...
 
     async def delete_memory(
         self,
         request: MemoryDeleteRequest,
-    ) -> NodeResult[MemoryDeleteResponse]:
+    ) -> ModelBaseResult:
         """
         Soft delete a memory record with audit trail.
 
@@ -276,7 +232,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
             request: Memory deletion request with memory ID
 
         Returns:
-            NodeResult with MemoryDeleteResponse indicating success/failure
+            ModelBaseResult with MemoryDeleteResponse indicating success/failure
         """
         ...
 
@@ -285,7 +241,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
         memory_id: UUID,
         updates: ModelMetadata,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[MemoryRecord]:
+    ) -> ModelBaseResult:
         """
         Update an existing memory record.
 
@@ -295,7 +251,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with updated MemoryRecord
+            ModelBaseResult with updated MemoryRecord
         """
         ...
 
@@ -305,7 +261,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
         limit: int = 100,
         offset: int = 0,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[list[MemoryRecord]]:
+    ) -> ModelBaseResult:
         """
         List memory records with optional filtering and pagination.
 
@@ -316,7 +272,7 @@ class ProtocolMemoryStorage(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with list of MemoryRecord objects
+            ModelBaseResult with list of MemoryRecord objects
         """
         ...
 
@@ -332,7 +288,7 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
     async def semantic_search(
         self,
         request: SemanticSearchRequest,
-    ) -> NodeResult[SemanticSearchResponse]:
+    ) -> ModelBaseResult:
         """
         Perform vector-based semantic similarity search.
 
@@ -340,14 +296,14 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
             request: Semantic search request with query and parameters
 
         Returns:
-            NodeResult with SemanticSearchResponse containing matched memories
+            ModelBaseResult with SemanticSearchResponse containing matched memories
         """
         ...
 
     async def temporal_search(
         self,
         request: TemporalSearchRequest,
-    ) -> NodeResult[TemporalSearchResponse]:
+    ) -> ModelBaseResult:
         """
         Perform time-based memory retrieval with decay consideration.
 
@@ -355,14 +311,14 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
             request: Temporal search request with time range and criteria
 
         Returns:
-            NodeResult with TemporalSearchResponse containing time-filtered memories
+            ModelBaseResult with TemporalSearchResponse containing time-filtered memories
         """
         ...
 
     async def contextual_search(
         self,
         request: ContextualSearchRequest,
-    ) -> NodeResult[ContextualSearchResponse]:
+    ) -> ModelBaseResult:
         """
         Perform context-aware memory retrieval using multiple criteria.
 
@@ -370,7 +326,7 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
             request: Contextual search request with context parameters
 
         Returns:
-            NodeResult with ContextualSearchResponse containing context-matched memories
+            ModelBaseResult with ContextualSearchResponse containing context-matched memories
         """
         ...
 
@@ -380,7 +336,7 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
         relationship_types: ModelOptionalStringList | None = None,
         max_depth: int = 2,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[list[MemoryRecord]]:
+    ) -> ModelBaseResult:
         """
         Get memories related to a specific memory record.
 
@@ -391,7 +347,7 @@ class ProtocolMemoryRetrieval(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with list of related MemoryRecord objects
+            ModelBaseResult with list of related MemoryRecord objects
         """
         ...
 
@@ -407,7 +363,7 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
     async def persist_to_storage(
         self,
         request: PersistenceRequest,
-    ) -> NodeResult[PersistenceResponse]:
+    ) -> ModelBaseResult:
         """
         Persist memory data to durable storage.
 
@@ -415,14 +371,14 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
             request: Persistence request with storage preferences
 
         Returns:
-            NodeResult with PersistenceResponse containing storage details
+            ModelBaseResult with PersistenceResponse containing storage details
         """
         ...
 
     async def backup_memory(
         self,
         request: BackupRequest,
-    ) -> NodeResult[BackupResponse]:
+    ) -> ModelBaseResult:
         """
         Create a backup of memory data with versioning.
 
@@ -430,14 +386,14 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
             request: Backup request with backup parameters
 
         Returns:
-            NodeResult with BackupResponse containing backup details
+            ModelBaseResult with BackupResponse containing backup details
         """
         ...
 
     async def restore_memory(
         self,
         request: RestoreRequest,
-    ) -> NodeResult[RestoreResponse]:
+    ) -> ModelBaseResult:
         """
         Restore memory data from a backup.
 
@@ -445,7 +401,7 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
             request: Restore request with backup identifier and options
 
         Returns:
-            NodeResult with RestoreResponse containing restore status
+            ModelBaseResult with RestoreResponse containing restore status
         """
         ...
 
@@ -453,7 +409,7 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
         self,
         memory_ids: list[UUID] | None = None,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Verify the integrity of stored memory data.
 
@@ -462,7 +418,7 @@ class ProtocolMemoryPersistence(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with integrity verification results
+            ModelBaseResult with integrity verification results
         """
         ...
 
@@ -481,7 +437,7 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
     async def process_intelligence(
         self,
         request: IntelligenceProcessRequest,
-    ) -> NodeResult[IntelligenceProcessResponse]:
+    ) -> ModelBaseResult:
         """
         Process raw intelligence data into structured memory.
 
@@ -489,14 +445,14 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
             request: Intelligence processing request with raw data
 
         Returns:
-            NodeResult with IntelligenceProcessResponse containing processed data
+            ModelBaseResult with IntelligenceProcessResponse containing processed data
         """
         ...
 
     async def analyze_patterns(
         self,
         request: PatternAnalysisRequest,
-    ) -> NodeResult[PatternAnalysisResponse]:
+    ) -> ModelBaseResult:
         """
         Analyze patterns in intelligence data.
 
@@ -504,14 +460,14 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
             request: Pattern analysis request with data to analyze
 
         Returns:
-            NodeResult with PatternAnalysisResponse containing discovered patterns
+            ModelBaseResult with PatternAnalysisResponse containing discovered patterns
         """
         ...
 
     async def extract_insights(
         self,
         request: InsightExtractionRequest,
-    ) -> NodeResult[InsightExtractionResponse]:
+    ) -> ModelBaseResult:
         """
         Extract actionable insights from processed intelligence.
 
@@ -519,7 +475,7 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
             request: Insight extraction request with processed data
 
         Returns:
-            NodeResult with InsightExtractionResponse containing extracted insights
+            ModelBaseResult with InsightExtractionResponse containing extracted insights
         """
         ...
 
@@ -528,7 +484,7 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
         memory: MemoryRecord,
         enrichment_types: ModelStringList,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[MemoryRecord]:
+    ) -> ModelBaseResult:
         """
         Enrich a memory record with additional intelligence data.
 
@@ -538,7 +494,7 @@ class ProtocolIntelligenceProcessor(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with enriched MemoryRecord
+            ModelBaseResult with enriched MemoryRecord
         """
         ...
 
@@ -554,7 +510,7 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
     async def analyze_semantics(
         self,
         request: SemanticAnalysisRequest,
-    ) -> NodeResult[SemanticAnalysisResponse]:
+    ) -> ModelBaseResult:
         """
         Analyze semantic content and relationships.
 
@@ -562,14 +518,14 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
             request: Semantic analysis request with content to analyze
 
         Returns:
-            NodeResult with SemanticAnalysisResponse containing analysis results
+            ModelBaseResult with SemanticAnalysisResponse containing analysis results
         """
         ...
 
     async def generate_embeddings(
         self,
         request: EmbeddingRequest,
-    ) -> NodeResult[EmbeddingResponse]:
+    ) -> ModelBaseResult:
         """
         Generate vector embeddings for semantic search.
 
@@ -577,14 +533,14 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
             request: Embedding request with text to embed
 
         Returns:
-            NodeResult with EmbeddingResponse containing vector embeddings
+            ModelBaseResult with EmbeddingResponse containing vector embeddings
         """
         ...
 
     async def compare_semantics(
         self,
         request: SemanticComparisonRequest,
-    ) -> NodeResult[SemanticComparisonResponse]:
+    ) -> ModelBaseResult:
         """
         Compare semantic similarity between content.
 
@@ -592,7 +548,7 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
             request: Semantic comparison request with content to compare
 
         Returns:
-            NodeResult with SemanticComparisonResponse containing similarity scores
+            ModelBaseResult with SemanticComparisonResponse containing similarity scores
         """
         ...
 
@@ -601,7 +557,7 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
         content_items: ModelStringList,
         num_clusters: int | None = None,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Cluster content items by semantic similarity.
 
@@ -611,7 +567,7 @@ class ProtocolSemanticAnalyzer(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with clustering results
+            ModelBaseResult with clustering results
         """
         ...
 
@@ -627,7 +583,7 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
     async def recognize_patterns(
         self,
         request: PatternRecognitionRequest,
-    ) -> NodeResult[PatternRecognitionResponse]:
+    ) -> ModelBaseResult:
         """
         Recognize patterns in memory data.
 
@@ -635,14 +591,14 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
             request: Pattern recognition request with data to analyze
 
         Returns:
-            NodeResult with PatternRecognitionResponse containing recognized patterns
+            ModelBaseResult with PatternRecognitionResponse containing recognized patterns
         """
         ...
 
     async def learn_patterns(
         self,
         request: PatternLearningRequest,
-    ) -> NodeResult[PatternLearningResponse]:
+    ) -> ModelBaseResult:
         """
         Learn new patterns from memory data.
 
@@ -650,14 +606,14 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
             request: Pattern learning request with training data
 
         Returns:
-            NodeResult with PatternLearningResponse containing learning results
+            ModelBaseResult with PatternLearningResponse containing learning results
         """
         ...
 
     async def predict_patterns(
         self,
         request: PatternPredictionRequest,
-    ) -> NodeResult[PatternPredictionResponse]:
+    ) -> ModelBaseResult:
         """
         Predict future patterns based on learned data.
 
@@ -665,7 +621,7 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
             request: Pattern prediction request with context data
 
         Returns:
-            NodeResult with PatternPredictionResponse containing predictions
+            ModelBaseResult with PatternPredictionResponse containing predictions
         """
         ...
 
@@ -674,7 +630,7 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
         patterns: ModelResultCollection,
         validation_data: ModelResultCollection,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Validate discovered patterns against validation data.
 
@@ -684,7 +640,7 @@ class ProtocolPatternRecognition(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with pattern validation results
+            ModelBaseResult with pattern validation results
         """
         ...
 
@@ -703,7 +659,7 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
     async def consolidate_memories(
         self,
         request: ConsolidationRequest,
-    ) -> NodeResult[ConsolidationResponse]:
+    ) -> ModelBaseResult:
         """
         Consolidate similar memories into unified representations.
 
@@ -711,14 +667,14 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
             request: Consolidation request with consolidation criteria
 
         Returns:
-            NodeResult with ConsolidationResponse containing consolidation results
+            ModelBaseResult with ConsolidationResponse containing consolidation results
         """
         ...
 
     async def deduplicate_memories(
         self,
         request: DeduplicationRequest,
-    ) -> NodeResult[DeduplicationResponse]:
+    ) -> ModelBaseResult:
         """
         Remove duplicate memories while preserving provenance.
 
@@ -726,14 +682,14 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
             request: Deduplication request with deduplication parameters
 
         Returns:
-            NodeResult with DeduplicationResponse containing deduplication results
+            ModelBaseResult with DeduplicationResponse containing deduplication results
         """
         ...
 
     async def merge_memory_contexts(
         self,
         request: ContextMergeRequest,
-    ) -> NodeResult[ContextMergeResponse]:
+    ) -> ModelBaseResult:
         """
         Merge related memory contexts.
 
@@ -741,7 +697,7 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
             request: Context merge request with merge criteria
 
         Returns:
-            NodeResult with ContextMergeResponse containing merge results
+            ModelBaseResult with ContextMergeResponse containing merge results
         """
         ...
 
@@ -749,7 +705,7 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
         self,
         memories: list[MemoryRecord],
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelResultCollection]:
+    ) -> ModelBaseResult:
         """
         Detect conflicts between memory records.
 
@@ -758,7 +714,7 @@ class ProtocolMemoryConsolidator(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with list of detected conflicts
+            ModelBaseResult with list of detected conflicts
         """
         ...
 
@@ -774,7 +730,7 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
     async def aggregate_memories(
         self,
         request: AggregationRequest,
-    ) -> NodeResult[AggregationResponse]:
+    ) -> ModelBaseResult:
         """
         Aggregate memories by temporal or semantic criteria.
 
@@ -782,14 +738,14 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
             request: Aggregation request with aggregation parameters
 
         Returns:
-            NodeResult with AggregationResponse containing aggregated data
+            ModelBaseResult with AggregationResponse containing aggregated data
         """
         ...
 
     async def summarize_memory_clusters(
         self,
         request: SummarizationRequest,
-    ) -> NodeResult[SummarizationResponse]:
+    ) -> ModelBaseResult:
         """
         Create summaries of memory clusters.
 
@@ -797,14 +753,14 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
             request: Summarization request with cluster data
 
         Returns:
-            NodeResult with SummarizationResponse containing cluster summaries
+            ModelBaseResult with SummarizationResponse containing cluster summaries
         """
         ...
 
     async def generate_memory_statistics(
         self,
         request: StatisticsRequest,
-    ) -> NodeResult[StatisticsResponse]:
+    ) -> ModelBaseResult:
         """
         Generate statistical analysis of memory usage.
 
@@ -812,7 +768,7 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
             request: Statistics request with analysis parameters
 
         Returns:
-            NodeResult with StatisticsResponse containing usage statistics
+            ModelBaseResult with StatisticsResponse containing usage statistics
         """
         ...
 
@@ -820,7 +776,7 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
         self,
         view_definition: ModelConfiguration,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Create aggregated views of memory data.
 
@@ -829,7 +785,7 @@ class ProtocolMemoryAggregator(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with created view data
+            ModelBaseResult with created view data
         """
         ...
 
@@ -845,7 +801,7 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
     async def optimize_memory_layout(
         self,
         request: LayoutOptimizationRequest,
-    ) -> NodeResult[LayoutOptimizationResponse]:
+    ) -> ModelBaseResult:
         """
         Optimize memory storage layout for performance.
 
@@ -853,14 +809,14 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
             request: Layout optimization request with optimization parameters
 
         Returns:
-            NodeResult with LayoutOptimizationResponse containing optimization results
+            ModelBaseResult with LayoutOptimizationResponse containing optimization results
         """
         ...
 
     async def compress_memories(
         self,
         request: CompressionRequest,
-    ) -> NodeResult[CompressionResponse]:
+    ) -> ModelBaseResult:
         """
         Compress memories while preserving semantic content.
 
@@ -868,14 +824,14 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
             request: Compression request with compression parameters
 
         Returns:
-            NodeResult with CompressionResponse containing compression results
+            ModelBaseResult with CompressionResponse containing compression results
         """
         ...
 
     async def optimize_retrieval_paths(
         self,
         request: RetrievalOptimizationRequest,
-    ) -> NodeResult[RetrievalOptimizationResponse]:
+    ) -> ModelBaseResult:
         """
         Optimize memory retrieval performance.
 
@@ -883,7 +839,7 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
             request: Retrieval optimization request with optimization parameters
 
         Returns:
-            NodeResult with RetrievalOptimizationResponse containing
+            ModelBaseResult with RetrievalOptimizationResponse containing
             optimization results
         """
         ...
@@ -892,7 +848,7 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
         self,
         time_window: datetime,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Analyze memory system performance over a time window.
 
@@ -901,7 +857,7 @@ class ProtocolMemoryOptimizer(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with performance analysis results
+            ModelBaseResult with performance analysis results
         """
         ...
 
@@ -920,7 +876,7 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
     async def execute_memory_workflow(
         self,
         request: WorkflowExecutionRequest,
-    ) -> NodeResult[WorkflowExecutionResponse]:
+    ) -> ModelBaseResult:
         """
         Execute complex memory workflows.
 
@@ -928,14 +884,14 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
             request: Workflow execution request with workflow definition
 
         Returns:
-            NodeResult with WorkflowExecutionResponse containing execution results
+            ModelBaseResult with WorkflowExecutionResponse containing execution results
         """
         ...
 
     async def coordinate_parallel_operations(
         self,
         request: ParallelCoordinationRequest,
-    ) -> NodeResult[ParallelCoordinationResponse]:
+    ) -> ModelBaseResult:
         """
         Coordinate parallel memory operations.
 
@@ -943,14 +899,14 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
             request: Parallel coordination request with operation definitions
 
         Returns:
-            NodeResult with ParallelCoordinationResponse containing coordination results
+            ModelBaseResult with ParallelCoordinationResponse containing coordination results
         """
         ...
 
     async def manage_workflow_state(
         self,
         request: WorkflowStateRequest,
-    ) -> NodeResult[WorkflowStateResponse]:
+    ) -> ModelBaseResult:
         """
         Manage workflow execution state and recovery.
 
@@ -958,7 +914,7 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
             request: Workflow state request with state management operations
 
         Returns:
-            NodeResult with WorkflowStateResponse containing state management results
+            ModelBaseResult with WorkflowStateResponse containing state management results
         """
         ...
 
@@ -966,7 +922,7 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
         self,
         workflow_id: UUID,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Monitor the progress of a running workflow.
 
@@ -975,7 +931,7 @@ class ProtocolWorkflowCoordinator(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with workflow progress information
+            ModelBaseResult with workflow progress information
         """
         ...
 
@@ -991,7 +947,7 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
     async def coordinate_agents(
         self,
         request: AgentCoordinationRequest,
-    ) -> NodeResult[AgentCoordinationResponse]:
+    ) -> ModelBaseResult:
         """
         Coordinate memory operations across multiple agents.
 
@@ -999,14 +955,14 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
             request: Agent coordination request with coordination parameters
 
         Returns:
-            NodeResult with AgentCoordinationResponse containing coordination results
+            ModelBaseResult with AgentCoordinationResponse containing coordination results
         """
         ...
 
     async def broadcast_memory_updates(
         self,
         request: BroadcastRequest,
-    ) -> NodeResult[BroadcastResponse]:
+    ) -> ModelBaseResult:
         """
         Broadcast memory updates to subscribed agents.
 
@@ -1014,14 +970,14 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
             request: Broadcast request with update information
 
         Returns:
-            NodeResult with BroadcastResponse containing broadcast results
+            ModelBaseResult with BroadcastResponse containing broadcast results
         """
         ...
 
     async def synchronize_agent_state(
         self,
         request: StateSynchronizationRequest,
-    ) -> NodeResult[StateSynchronizationResponse]:
+    ) -> ModelBaseResult:
         """
         Synchronize memory state across agents.
 
@@ -1029,7 +985,7 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
             request: State synchronization request with synchronization parameters
 
         Returns:
-            NodeResult with StateSynchronizationResponse containing sync results
+            ModelBaseResult with StateSynchronizationResponse containing sync results
         """
         ...
 
@@ -1038,7 +994,7 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
         agent_id: UUID,
         agent_capabilities: ModelMetadata,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[bool]:
+    ) -> ModelBaseResult:
         """
         Register an agent with the coordination system.
 
@@ -1048,7 +1004,7 @@ class ProtocolAgentCoordinator(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult indicating registration success/failure
+            ModelBaseResult indicating registration success/failure
         """
         ...
 
@@ -1064,7 +1020,7 @@ class ProtocolMemoryOrchestrator(ProtocolMemoryOperations, Protocol):
     async def orchestrate_memory_lifecycle(
         self,
         request: LifecycleOrchestrationRequest,
-    ) -> NodeResult[LifecycleOrchestrationResponse]:
+    ) -> ModelBaseResult:
         """
         Orchestrate complete memory lifecycle management.
 
@@ -1072,14 +1028,14 @@ class ProtocolMemoryOrchestrator(ProtocolMemoryOperations, Protocol):
             request: Lifecycle orchestration request with lifecycle parameters
 
         Returns:
-            NodeResult with LifecycleOrchestrationResponse containing lifecycle results
+            ModelBaseResult with LifecycleOrchestrationResponse containing lifecycle results
         """
         ...
 
     async def manage_memory_quotas(
         self,
         request: QuotaManagementRequest,
-    ) -> NodeResult[QuotaManagementResponse]:
+    ) -> ModelBaseResult:
         """
         Manage memory usage quotas and limits.
 
@@ -1087,14 +1043,14 @@ class ProtocolMemoryOrchestrator(ProtocolMemoryOperations, Protocol):
             request: Quota management request with quota parameters
 
         Returns:
-            NodeResult with QuotaManagementResponse containing quota management results
+            ModelBaseResult with QuotaManagementResponse containing quota management results
         """
         ...
 
     async def coordinate_memory_migrations(
         self,
         request: MigrationCoordinationRequest,
-    ) -> NodeResult[MigrationCoordinationResponse]:
+    ) -> ModelBaseResult:
         """
         Coordinate memory migrations between storage systems.
 
@@ -1102,14 +1058,14 @@ class ProtocolMemoryOrchestrator(ProtocolMemoryOperations, Protocol):
             request: Migration coordination request with migration parameters
 
         Returns:
-            NodeResult with MigrationCoordinationResponse containing migration results
+            ModelBaseResult with MigrationCoordinationResponse containing migration results
         """
         ...
 
     async def get_system_status(
         self,
         correlation_id: UUID | None = None,
-    ) -> NodeResult[ModelMetadata]:
+    ) -> ModelBaseResult:
         """
         Get comprehensive memory system status.
 
@@ -1117,6 +1073,6 @@ class ProtocolMemoryOrchestrator(ProtocolMemoryOperations, Protocol):
             correlation_id: Request correlation ID
 
         Returns:
-            NodeResult with system status information
+            ModelBaseResult with system status information
         """
         ...

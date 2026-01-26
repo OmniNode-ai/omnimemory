@@ -106,9 +106,13 @@ def validate_error_handling() -> dict[str, Any]:
 
     try:
         from omnimemory.protocols.error_models import (  # noqa: F401
-            OmniMemoryError,
-            StorageError,
-            ValidationError,
+            ProtocolOmniMemoryError as OmniMemoryError,
+        )
+        from omnimemory.protocols.error_models import (
+            ProtocolStorageError as StorageError,
+        )
+        from omnimemory.protocols.error_models import (
+            ProtocolValidationError as ValidationError,
         )
 
         # Test error creation and chaining
@@ -142,10 +146,10 @@ def validate_container_creation() -> dict[str, Any]:
     print("🔍 Testing ONEX container creation...")
 
     try:
-        from omnimemory.compat import ModelOnexContainer
+        from omnibase_core.container import ModelONEXContainer
 
         # Test container creation
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
 
         # Verify container has expected ONEX methods
         has_register_singleton = hasattr(container, "register_singleton")
@@ -205,16 +209,20 @@ def validate_base_implementations() -> dict[str, Any]:
 
 
 async def validate_async_patterns() -> dict[str, Any]:
-    """Validate async patterns and NodeResult usage."""
+    """Validate async patterns and ModelBaseResult usage."""
     print("🔍 Testing async patterns...")
 
     try:
-        # Import async components from local compat layer
-        from omnimemory.compat import ModelOnexContainer, NodeResult  # noqa: F401
+        # Import async components from omnibase_core
+        from omnibase_core.container import ModelONEXContainer
+        from omnibase_core.models.core.model_base_result import (  # noqa: F401
+            ModelBaseResult,
+        )
+
         from omnimemory.protocols.data_models import UserContext  # noqa: F401
 
         # Create container and test ONEX patterns
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
 
         # Verify ONEX methods exist
         has_resolve_method = hasattr(container, "resolve")

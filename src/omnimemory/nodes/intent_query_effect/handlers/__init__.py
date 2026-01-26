@@ -9,7 +9,7 @@ Handlers:
 
 Example::
 
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.intent_query_effect.handlers import HandlerIntentQuery
 
     # Create handler with container (handler owns adapter lifecycle)

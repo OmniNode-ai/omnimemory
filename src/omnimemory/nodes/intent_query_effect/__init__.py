@@ -18,7 +18,7 @@ and manages the adapter lifecycle internally.
 Example::
 
     import asyncio
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
     from omnimemory.nodes.intent_query_effect import HandlerIntentQuery
 
     async def main():

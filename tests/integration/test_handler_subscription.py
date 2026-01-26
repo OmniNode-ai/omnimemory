@@ -121,7 +121,7 @@ async def subscription_handler(
     Yields:
         Initialized HandlerSubscription instance.
     """
-    from omnimemory.compat import ModelONEXContainer
+    from omnibase_core.container import ModelONEXContainer
 
     if not services_available:
         pytest.skip("Required services (PostgreSQL, Valkey) not available")
@@ -581,7 +581,7 @@ class TestSurviveRestart:
         services_available: bool,
     ) -> None:
         """Subscriptions survive handler shutdown and restart."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         if not services_available:
             pytest.skip("Required services not available")
@@ -625,7 +625,7 @@ class TestSurviveRestart:
         services_available: bool,
     ) -> None:
         """Deleted subscriptions remain deleted after restart."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         if not services_available:
             pytest.skip("Required services not available")
@@ -688,7 +688,7 @@ class TestHealthCheck:
         handler_config: ModelHandlerSubscriptionConfig,
     ) -> None:
         """Health check before initialize returns uninitialized status."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         container = ModelONEXContainer()
         handler = HandlerSubscription(container)
@@ -827,7 +827,7 @@ class TestInitialization:
         handler_config: ModelHandlerSubscriptionConfig,
     ) -> None:
         """Operations before initialize raise RuntimeError."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         container = ModelONEXContainer()
         handler = HandlerSubscription(container)
@@ -845,7 +845,7 @@ class TestInitialization:
         services_available: bool,
     ) -> None:
         """Multiple initialize calls are safe (idempotent)."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         if not services_available:
             pytest.skip("Required services not available")
@@ -868,7 +868,7 @@ class TestInitialization:
         services_available: bool,
     ) -> None:
         """Multiple shutdown calls are safe (idempotent)."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         if not services_available:
             pytest.skip("Required services not available")

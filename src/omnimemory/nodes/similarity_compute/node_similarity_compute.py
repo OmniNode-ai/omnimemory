@@ -17,9 +17,9 @@ Example::
         NodeSimilarityCompute,
         ModelSimilarityComputeRequest,
     )
-    from omnimemory.compat import ModelOnexContainer
+    from omnibase_core.container import ModelONEXContainer
 
-    container = ModelOnexContainer()
+    container = ModelONEXContainer()
     node = NodeSimilarityCompute(container)
 
     request = ModelSimilarityComputeRequest(
@@ -70,7 +70,7 @@ class NodeSimilarityCompute(BaseComputeNode):
 
     Example::
 
-        container = ModelOnexContainer()
+        container = ModelONEXContainer()
         node = NodeSimilarityCompute(container)
 
         # Cosine distance

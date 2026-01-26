@@ -123,7 +123,7 @@ class NodeAgentCoordinatorOrchestrator:
 
     async def initialize(self) -> None:
         """Initialize the underlying handler."""
-        from omnimemory.compat import ModelONEXContainer
+        from omnibase_core.container import ModelONEXContainer
 
         if self._initialized:
             return
