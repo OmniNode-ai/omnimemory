@@ -65,6 +65,7 @@ from ..models.config import (
     ModelHandlerSemanticComputeConfig,  # noqa: TC001
     ModelSemanticComputePolicyConfig,  # noqa: TC001
 )
+from ..models.foundation import ModelSemVer
 from ..models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
@@ -705,7 +706,7 @@ class HandlerSemanticCompute:
             relevance_score=None,  # Relevance analysis not implemented
             confidence_score=0.9 if embedding else 0.7,
             model_name=self._embedding_provider.model_name,
-            model_version=self._config.handler_version,
+            model_version=ModelSemVer.parse(self._config.handler_version),
             processing_time_ms=processing_time_ms,
         )
 

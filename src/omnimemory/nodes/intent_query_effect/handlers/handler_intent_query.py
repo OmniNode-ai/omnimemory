@@ -26,12 +26,11 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from omnibase_core.models.events import (
+from omnimemory.nodes.intent_query_effect.models import (
+    ModelHandlerIntentQueryConfig,
     ModelIntentQueryRequestedEvent,
     ModelIntentQueryResponseEvent,
 )
-
-from omnimemory.nodes.intent_query_effect.models import ModelHandlerIntentQueryConfig
 from omnimemory.nodes.intent_query_effect.utils import map_intent_records
 
 if TYPE_CHECKING:
