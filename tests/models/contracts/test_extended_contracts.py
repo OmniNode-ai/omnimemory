@@ -45,6 +45,61 @@ from omnimemory.models.contracts import (
 )
 
 
+def create_handler_routing_subcontract(
+    *,
+    routing_key: str,
+    handler_key: str,
+    routing_strategy: str = "payload_type_match",
+    message_category: EnumMessageCategory = EnumMessageCategory.COMMAND,
+    priority: int = 1,
+    version_major: int = 1,
+    default_handler: str | None = None,
+    output_events: list[str] | None = None,
+    additional_handlers: list[ModelHandlerRoutingEntry] | None = None,
+) -> ModelHandlerRoutingSubcontract:
+    """Factory function to create handler routing subcontracts with customizable parameters.
+
+    This eliminates duplication across test class fixtures while allowing each test
+    to specify the exact values needed for its assertions.
+
+    Args:
+        routing_key: Primary handler routing key (e.g., "memory.store")
+        handler_key: Primary handler key (e.g., "storage_handler")
+        routing_strategy: Routing strategy type (default: "payload_type_match")
+        message_category: Message category enum (default: COMMAND)
+        priority: Handler priority (default: 1)
+        version_major: Major version number (default: 1)
+        default_handler: Optional default handler name
+        output_events: Optional list of output event names
+        additional_handlers: Optional list of additional handler entries
+
+    Returns:
+        Configured ModelHandlerRoutingSubcontract instance
+    """
+    # Build handler entry kwargs, only including output_events if provided
+    handler_kwargs: dict[str, object] = {
+        "routing_key": routing_key,
+        "handler_key": handler_key,
+        "message_category": message_category,
+        "priority": priority,
+    }
+    if output_events is not None:
+        handler_kwargs["output_events"] = output_events
+
+    primary_handler = ModelHandlerRoutingEntry(**handler_kwargs)  # type: ignore[arg-type]
+
+    handlers = [primary_handler]
+    if additional_handlers:
+        handlers.extend(additional_handlers)
+
+    return ModelHandlerRoutingSubcontract(
+        version=ModelSemVer(major=version_major, minor=0, patch=0),
+        routing_strategy=routing_strategy,
+        handlers=handlers,
+        default_handler=default_handler,
+    )
+
+
 class TestMixinHandlerRouting:
     """Tests for MixinHandlerRouting mixin class."""
 
@@ -84,18 +139,13 @@ class TestModelContractEffectExtended:
 
     @pytest.fixture
     def handler_routing_subcontract(self) -> ModelHandlerRoutingSubcontract:
-        """Provide a valid handler routing subcontract."""
-        return ModelHandlerRoutingSubcontract(
-            version=ModelSemVer(major=1, minor=0, patch=0),
+        """Provide a valid handler routing subcontract for Effect tests."""
+        return create_handler_routing_subcontract(
+            routing_key="memory.store",
+            handler_key="storage_handler",
             routing_strategy="payload_type_match",
-            handlers=[
-                ModelHandlerRoutingEntry(
-                    routing_key="memory.store",
-                    handler_key="storage_handler",
-                    message_category=EnumMessageCategory.COMMAND,
-                    priority=1,
-                ),
-            ],
+            message_category=EnumMessageCategory.COMMAND,
+            priority=1,
             default_handler="fallback_handler",
         )
 
@@ -165,18 +215,13 @@ class TestModelContractComputeExtended:
 
     @pytest.fixture
     def handler_routing_subcontract(self) -> ModelHandlerRoutingSubcontract:
-        """Provide a valid handler routing subcontract."""
-        return ModelHandlerRoutingSubcontract(
-            version=ModelSemVer(major=1, minor=0, patch=0),
+        """Provide a valid handler routing subcontract for Compute tests."""
+        return create_handler_routing_subcontract(
+            routing_key="compute.similarity",
+            handler_key="similarity_handler",
             routing_strategy="operation_match",
-            handlers=[
-                ModelHandlerRoutingEntry(
-                    routing_key="compute.similarity",
-                    handler_key="similarity_handler",
-                    message_category=EnumMessageCategory.INTENT,
-                    priority=2,
-                ),
-            ],
+            message_category=EnumMessageCategory.INTENT,
+            priority=2,
         )
 
     def test_compute_extended_without_handler_routing(
@@ -228,19 +273,14 @@ class TestModelContractReducerExtended:
 
     @pytest.fixture
     def handler_routing_subcontract(self) -> ModelHandlerRoutingSubcontract:
-        """Provide a valid handler routing subcontract."""
-        return ModelHandlerRoutingSubcontract(
-            version=ModelSemVer(major=1, minor=0, patch=0),
+        """Provide a valid handler routing subcontract for Reducer tests."""
+        return create_handler_routing_subcontract(
+            routing_key="reduce.consolidate",
+            handler_key="consolidation_handler",
             routing_strategy="topic_pattern",
-            handlers=[
-                ModelHandlerRoutingEntry(
-                    routing_key="reduce.consolidate",
-                    handler_key="consolidation_handler",
-                    message_category=EnumMessageCategory.EVENT,
-                    priority=3,
-                    output_events=["memory.consolidated"],
-                ),
-            ],
+            message_category=EnumMessageCategory.EVENT,
+            priority=3,
+            output_events=["memory.consolidated"],
             default_handler="passthrough_handler",
         )
 
@@ -297,17 +337,16 @@ class TestModelContractOrchestratorExtended:
 
     @pytest.fixture
     def handler_routing_subcontract(self) -> ModelHandlerRoutingSubcontract:
-        """Provide a valid handler routing subcontract."""
-        return ModelHandlerRoutingSubcontract(
-            version=ModelSemVer(major=2, minor=0, patch=0),
+        """Provide a valid handler routing subcontract for Orchestrator tests."""
+        return create_handler_routing_subcontract(
+            routing_key="orchestrate.lifecycle",
+            handler_key="lifecycle_handler",
             routing_strategy="payload_type_match",
-            handlers=[
-                ModelHandlerRoutingEntry(
-                    routing_key="orchestrate.lifecycle",
-                    handler_key="lifecycle_handler",
-                    message_category=EnumMessageCategory.COMMAND,
-                    priority=1,
-                ),
+            message_category=EnumMessageCategory.COMMAND,
+            priority=1,
+            version_major=2,
+            default_handler="workflow_default_handler",
+            additional_handlers=[
                 ModelHandlerRoutingEntry(
                     routing_key="orchestrate.archive",
                     handler_key="archive_handler",
@@ -315,7 +354,6 @@ class TestModelContractOrchestratorExtended:
                     priority=2,
                 ),
             ],
-            default_handler="workflow_default_handler",
         )
 
     def test_orchestrator_extended_without_handler_routing(
