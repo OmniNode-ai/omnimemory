@@ -18,7 +18,9 @@ class ModelIntentClassifiedEvent(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    event_type: Literal["IntentClassified"] = "IntentClassified"
+    event_type: Literal["IntentClassified"] = Field(
+        "IntentClassified", description="Event type discriminator for message routing"
+    )
     session_id: str = Field(..., min_length=1, description="Session identifier")
     correlation_id: UUID = Field(..., description="Correlation ID for tracing")
     intent_category: str = Field(

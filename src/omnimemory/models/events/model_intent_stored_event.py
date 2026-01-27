@@ -10,7 +10,9 @@ class ModelIntentStoredEvent(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    event_type: Literal["IntentStored"] = "IntentStored"
+    event_type: Literal["IntentStored"] = Field(
+        "IntentStored", description="Event type discriminator for message routing"
+    )
     intent_id: UUID = Field(..., description="Generated intent identifier")
     session_id: str = Field(..., description="Session that had the intent")
     intent_category: str = Field(..., description="Stored intent category")

@@ -599,7 +599,9 @@ class HandlerIntentEventConsumer:
         elif is_stale:
             status = HealthStatus.DEGRADED
             staleness_display = (
-                f"{staleness_seconds:.0f}s" if staleness_seconds else "never consumed"
+                f"{staleness_seconds:.0f}s"
+                if staleness_seconds is not None
+                else "never consumed"
             )
             error_message = f"No messages consumed: {staleness_display}"
         else:
