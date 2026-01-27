@@ -444,6 +444,13 @@ class HandlerIntentQuery:
                         return await self._handle_recent(request, start)
                     case "health_check":
                         return await self._handle_health_check(request, start)
+                    case _:
+                        return ModelIntentQueryResponseEvent.from_error(
+                            query_id=request.query_id,
+                            query_type=request.query_type,
+                            error_message=f"Unknown query_type: {request.query_type}",
+                            correlation_id=request.correlation_id,
+                        )
         except TimeoutError:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
