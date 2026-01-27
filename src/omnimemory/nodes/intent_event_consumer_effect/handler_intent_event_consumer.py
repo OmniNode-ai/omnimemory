@@ -636,9 +636,39 @@ class HandlerIntentEventConsumer:
     async def stop(self) -> None:
         """Graceful shutdown.
 
-        Unsubscribes from Kafka topic and resets initialization state.
-        Does not shutdown the storage adapter (caller's responsibility).
+        Cancels pending message processing tasks, unsubscribes from Kafka topic,
+        and resets initialization state. Does not shutdown the storage adapter
+        (caller's responsibility).
         """
+        # Cancel pending tasks first to prevent orphaned processing
+        if self._pending_tasks:
+            pending_count = len(self._pending_tasks)
+            logger.debug(
+                "Cancelling pending tasks",
+                extra={
+                    "handler": HANDLER_ID_INTENT_CONSUMER,
+                    "pending_count": pending_count,
+                },
+            )
+            for task in self._pending_tasks:
+                task.cancel()
+            # Wait for cancellation to complete, capturing any exceptions
+            results = await asyncio.gather(*self._pending_tasks, return_exceptions=True)
+            # Log any unexpected errors (CancelledError is expected)
+            for result in results:
+                if isinstance(result, Exception) and not isinstance(
+                    result, asyncio.CancelledError
+                ):
+                    logger.debug(
+                        "Task cancellation resulted in exception",
+                        extra={
+                            "handler": HANDLER_ID_INTENT_CONSUMER,
+                            "error": str(result),
+                            "error_type": type(result).__name__,
+                        },
+                    )
+            self._pending_tasks.clear()
+
         if self._unsubscribe:
             try:
                 self._unsubscribe()

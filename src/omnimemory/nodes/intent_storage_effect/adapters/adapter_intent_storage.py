@@ -119,6 +119,16 @@ class HandlerIntentStorageAdapter:
         # Initialize PII detector for user input sanitization
         self._pii_detector = PIIDetector()
 
+    @property
+    def is_initialized(self) -> bool:
+        """Check if the adapter has been initialized.
+
+        Returns:
+            True if initialize() has been called successfully and
+            shutdown() has not been called, False otherwise.
+        """
+        return self._initialized
+
     async def initialize(
         self,
         connection_uri: str = "bolt://localhost:7687",

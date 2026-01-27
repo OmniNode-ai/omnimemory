@@ -8,12 +8,15 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelIntentClassifiedEvent(BaseModel):
     """Incoming event from omniintelligence intent classifier.
 
+    Note: Uses extra="ignore" to allow forward compatibility - if
+    omniintelligence adds new fields, this consumer won't reject them.
+
     TODO(OMN-future): Consider migrating to omnibase_core.models.events
     once cross-repo event schemas are standardized. This is logically
     an omniintelligence-owned event; omnimemory is a consumer.
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="ignore", strict=True)
 
     event_type: Literal["IntentClassified"] = "IntentClassified"
     session_id: str = Field(..., min_length=1, description="Session identifier")
