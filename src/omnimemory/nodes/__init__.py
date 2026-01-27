@@ -29,6 +29,11 @@ from omnimemory.nodes.base import (
     BaseReducerNode,
     ContainerType,
 )
+from omnimemory.nodes.intent_event_consumer_effect import (
+    HandlerIntentEventConsumer,
+    ModelIntentEventConsumerConfig,
+    ModelIntentEventConsumerHealth,
+)
 
 __all__: list[str] = [
     # Base classes
@@ -41,6 +46,9 @@ __all__: list[str] = [
     # Effect nodes
     "memory_storage_effect",
     "memory_retrieval_effect",
+    "HandlerIntentEventConsumer",
+    "ModelIntentEventConsumerConfig",
+    "ModelIntentEventConsumerHealth",
     # Compute nodes
     "semantic_analyzer_compute",
     "similarity_compute",

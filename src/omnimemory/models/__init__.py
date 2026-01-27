@@ -12,6 +12,7 @@ Models are organized into functional domains following omnibase_core patterns:
 - adapters/: Adapter configuration models
 - config/: Configuration models
 - utils/: Utility models
+- events/: Kafka event models for message processing
 
 This __init__.py maintains compatibility by re-exporting
 all models at the package level following ONEX standards.
@@ -23,6 +24,7 @@ from . import (
     config,
     container,
     core,
+    events,
     foundation,
     intelligence,
     memory,
@@ -37,6 +39,7 @@ __all__ = [
     "config",
     "container",
     "core",
+    "events",
     "foundation",
     "intelligence",
     "memory",

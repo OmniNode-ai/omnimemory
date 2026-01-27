@@ -1,0 +1,41 @@
+---
+# ONEX Contract: intent_event_consumer_effect
+# Consumes intent-classified events from omniintelligence and persists to graph storage
+
+name: intent_event_consumer_effect
+version: {major: 1, minor: 0, patch: 0}
+uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+node_type: EFFECT
+description: |
+  Consumes intent-classified.v1 events from omniintelligence Kafka topic
+  and persists them to Memgraph using HandlerIntentStorageAdapter.
+
+  Consumer group is derived from node identity per ADR:
+  {env}.omnimemory.intent_event_consumer_effect.consume.v1
+
+# === EVENT TYPE CONFIGURATION ===
+# Note: subscribe_topic_suffix and publish_topic_suffix are custom extensions
+# matching the pattern used by intent_query_effect. These are not part of
+# the standard ModelEventTypeSubcontract schema.
+event_type:
+  version: {major: 1, minor: 0, patch: 0}
+  primary_events: ["intent_classified_consumed", "intent_stored", "intent_store_failed"]
+  event_categories: ["intent", "intelligence", "consumer", "effect"]
+  publish_events: true
+  subscribe_events: true
+  event_routing: "intent"
+  invocation_mode: "subscription"
+  # Custom topic fields (extensions to standard subcontract)
+  subscribe_topic_suffix: "onex.evt.omniintelligence.intent-classified.v1"
+  publish_topic_suffix: "onex.evt.omnimemory.intent-stored.v1"
+
+# === HANDLER CONFIGURATION ===
+handler_config:
+  handler_class: "HandlerIntentEventConsumer"
+  handler_module: "omnimemory.nodes.intent_event_consumer_effect.handler_intent_event_consumer"
+
+# === DEPENDENCIES ===
+dependencies:
+  - name: "HandlerIntentStorageAdapter"
+    type: "handler"
+    required: true
