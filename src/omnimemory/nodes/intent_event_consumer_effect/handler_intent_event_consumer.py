@@ -58,13 +58,10 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
+from omnibase_core.models.events import ModelIntentStoredEvent
 from pydantic import ValidationError
 
-from omnimemory.models.events import (
-    ModelIntentClassifiedEvent,
-    ModelIntentStoredEvent,
-    ModelIntentStoreFailedEvent,
-)
+from omnimemory.models.events import ModelIntentClassifiedEvent
 from omnimemory.models.utils.model_health_status import HealthStatus
 from omnimemory.nodes.intent_event_consumer_effect.models import (
     ModelIntentEventConsumerConfig,
@@ -319,16 +316,17 @@ class HandlerIntentEventConsumer:
                 self._messages_consumed += 1
                 self._last_consume_timestamp = datetime.now(timezone.utc)
 
-                # Emit success event
-                stored_event = ModelIntentStoredEvent(
-                    intent_id=result.intent_id,
-                    session_id=event.session_id,
+                # Emit success event using canonical omnibase_core model
+                # Maps session_id → session_ref at the emission boundary
+                stored_event = ModelIntentStoredEvent.create(
+                    session_ref=event.session_id,  # Map at boundary
                     intent_category=event.intent_category,
+                    intent_id=result.intent_id,
                     confidence=event.confidence,
+                    keywords=event.keywords,
                     created=result.created,
+                    execution_time_ms=storage_latency_ms,
                     correlation_id=event.correlation_id,
-                    timestamp=datetime.now(timezone.utc),
-                    storage_latency_ms=storage_latency_ms,
                 )
                 await self._emit_stored_event(stored_event)
 
@@ -413,26 +411,29 @@ class HandlerIntentEventConsumer:
                 },
             )
 
-            # Emit failure event if we have enough context
+            # Emit failure event using canonical omnibase_core model
+            # Uses status="error" pattern instead of separate failed event
             if session_id and intent_category and correlation_id:
-                failed_event = ModelIntentStoreFailedEvent(
-                    session_id=session_id,
+                error_msg = f"{type(e).__name__}: {e} (retries: {retry_count})"
+                failed_event = ModelIntentStoredEvent.from_error(
+                    session_ref=session_id,  # Map at boundary
                     intent_category=intent_category,
+                    error_message=error_msg,
                     correlation_id=correlation_id,
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    timestamp=datetime.now(timezone.utc),
-                    retry_count=retry_count,
                 )
-                await self._emit_failed_event(failed_event)
+                await self._emit_stored_event(failed_event)
 
             await self._route_to_dlq(message, str(e), retry_count=retry_count)
 
     async def _emit_stored_event(self, event: ModelIntentStoredEvent) -> None:
         """Emit intent-stored event to Kafka.
 
+        Uses canonical omnibase_core.ModelIntentStoredEvent which supports
+        both success (status="success") and error (status="error") cases
+        via a single event type.
+
         Args:
-            event: The stored event to emit.
+            event: The stored event to emit (success or error).
         """
         if self._publish_callback is None:
             logger.debug(
@@ -440,6 +441,7 @@ class HandlerIntentEventConsumer:
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "event_type": event.event_type,
+                    "status": event.status,
                 },
             )
             return
@@ -453,50 +455,14 @@ class HandlerIntentEventConsumer:
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "topic": topic,
                     "intent_id": str(event.intent_id),
+                    "session_ref": event.session_ref,
+                    "status": event.status,
                 },
             )
         except Exception as e:
             # Log but don't fail the main operation for publish errors
             logger.warning(
                 "Failed to emit intent-stored event",
-                extra={
-                    "handler": HANDLER_ID_INTENT_CONSUMER,
-                    "topic": topic,
-                    "error": str(e),
-                },
-            )
-
-    async def _emit_failed_event(self, event: ModelIntentStoreFailedEvent) -> None:
-        """Emit intent-store-failed event to Kafka.
-
-        Args:
-            event: The failure event to emit.
-        """
-        if self._publish_callback is None:
-            logger.debug(
-                "No publish callback configured, skipping failure event emission",
-                extra={
-                    "handler": HANDLER_ID_INTENT_CONSUMER,
-                    "event_type": event.event_type,
-                },
-            )
-            return
-
-        topic = f"{self._env_prefix}.{self._config.publish_failed_topic_suffix}"
-        try:
-            self._publish_callback(topic, event.model_dump(mode="json"))
-            logger.debug(
-                "Emitted intent-store-failed event",
-                extra={
-                    "handler": HANDLER_ID_INTENT_CONSUMER,
-                    "topic": topic,
-                    "session_id": event.session_id,
-                },
-            )
-        except Exception as e:
-            # Log but don't fail for publish errors
-            logger.warning(
-                "Failed to emit intent-store-failed event",
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "topic": topic,

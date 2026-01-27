@@ -612,7 +612,13 @@ class TestEventEmission:
 
     @pytest.mark.asyncio
     async def test_stored_event_emitted_on_success(self) -> None:
-        """Successful storage should emit an intent-stored event."""
+        """Successful storage should emit an intent-stored event.
+
+        Uses canonical ModelIntentStoredEvent from omnibase_core which has:
+        - Versioned event_type: "dev.omnimemory.intent.stored.v1"
+        - session_ref field (mapped from session_id at boundary)
+        - status="success" for successful storage
+        """
         intent_id = uuid4()
         storage_response = ModelIntentStorageResponse(
             status="success",
@@ -637,15 +643,23 @@ class TestEventEmission:
         message = create_valid_message()
         await consumer._handle_message(message, retry_count=0)
 
-        # Check stored event was emitted
+        # Check stored event was emitted with canonical event_type
         stored_events = [c for c in publish_calls if "intent-stored" in c[0]]
         assert len(stored_events) == 1
-        assert stored_events[0][1]["event_type"] == "IntentStored"
+        assert stored_events[0][1]["event_type"] == "dev.omnimemory.intent.stored.v1"
         assert stored_events[0][1]["intent_id"] == str(intent_id)
+        assert stored_events[0][1]["status"] == "success"
+        # session_id is mapped to session_ref at boundary
+        assert stored_events[0][1]["session_ref"] == message["session_id"]
 
     @pytest.mark.asyncio
     async def test_failed_event_emitted_on_failure(self) -> None:
-        """Storage failure should emit an intent-store-failed event."""
+        """Storage failure should emit an intent-stored event with status=error.
+
+        Uses canonical ModelIntentStoredEvent from omnibase_core which encodes
+        both success and error via the status field (not separate events).
+        Error details are in error_message field.
+        """
         storage = create_mock_storage_adapter(
             side_effect=RuntimeError("Storage failed")
         )
@@ -668,11 +682,16 @@ class TestEventEmission:
         message = create_valid_message()
         await consumer._handle_message(message, retry_count=0)
 
-        # Check failed event was emitted
-        failed_events = [c for c in publish_calls if "intent-store-failed" in c[0]]
-        assert len(failed_events) == 1
-        assert failed_events[0][1]["event_type"] == "IntentStoreFailed"
-        assert failed_events[0][1]["error_type"] == "RuntimeError"
+        # Check stored event (with error status) was emitted
+        # Uses same topic as success events - status field distinguishes
+        stored_events = [c for c in publish_calls if "intent-stored" in c[0]]
+        assert len(stored_events) == 1
+        assert stored_events[0][1]["event_type"] == "dev.omnimemory.intent.stored.v1"
+        assert stored_events[0][1]["status"] == "error"
+        assert "RuntimeError" in stored_events[0][1]["error_message"]
+        assert "Storage failed" in stored_events[0][1]["error_message"]
+        # session_id is mapped to session_ref at boundary
+        assert stored_events[0][1]["session_ref"] == message["session_id"]
 
 
 # =============================================================================

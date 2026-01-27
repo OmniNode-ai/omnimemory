@@ -15,13 +15,12 @@ description: |
   {env}.omnimemory.intent_event_consumer_effect.consume.v1
 
 # === EVENT TYPE CONFIGURATION ===
-# Note: subscribe_topic_suffix, publish_stored_topic_suffix,
-# publish_failed_topic_suffix, and dlq_topic_suffix are custom extensions
-# matching the pattern used by intent_query_effect. These are not part of
-# the standard ModelEventTypeSubcontract schema.
+# Note: Uses canonical ModelIntentStoredEvent from omnibase_core which
+# encodes both success and error via status field (not separate events).
+# Topic suffixes are custom extensions matching intent_query_effect pattern.
 event_type:
   version: {major: 1, minor: 0, patch: 0}
-  primary_events: ["intent_classified_consumed", "intent_stored", "intent_store_failed"]
+  primary_events: ["intent_classified_consumed", "intent_stored"]
   event_categories: ["intent", "intelligence", "consumer", "effect"]
   publish_events: true
   subscribe_events: true
@@ -30,7 +29,6 @@ event_type:
   # Custom topic fields (extensions to standard subcontract)
   subscribe_topic_suffix: "onex.evt.omniintelligence.intent-classified.v1"
   publish_stored_topic_suffix: "onex.evt.omnimemory.intent-stored.v1"
-  publish_failed_topic_suffix: "onex.evt.omnimemory.intent-store-failed.v1"
   dlq_topic_suffix: "onex.evt.omniintelligence.intent-classified.v1.dlq"
 
 # === HANDLER CONFIGURATION ===

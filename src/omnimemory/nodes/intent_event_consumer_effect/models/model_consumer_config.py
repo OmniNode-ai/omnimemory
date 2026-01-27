@@ -20,11 +20,7 @@ class ModelIntentEventConsumerConfig(BaseModel):
     )
     publish_stored_topic_suffix: str = Field(
         default="onex.evt.omnimemory.intent-stored.v1",
-        description="Topic suffix for successful storage events",
-    )
-    publish_failed_topic_suffix: str = Field(
-        default="onex.evt.omnimemory.intent-store-failed.v1",
-        description="Topic suffix for failed storage events",
+        description="Topic suffix for storage events (success and error use same topic via status field)",
     )
     dlq_topic_suffix: str = Field(
         default="onex.evt.omniintelligence.intent-classified.v1.dlq",
