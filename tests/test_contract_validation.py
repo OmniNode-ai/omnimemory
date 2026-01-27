@@ -380,3 +380,219 @@ class TestOrchestratorEventValidation:
                 f"consumed_events[{idx}].handler_function should start with 'handle_': "
                 f"got '{handler}' in {node_name}"
             )
+
+
+def _discover_nodes_with_contracts() -> list[str]:
+    """Discover all node directories with contract.yaml files.
+
+    Returns:
+        List of node names that have contract.yaml files.
+    """
+    nodes = []
+    if NODES_DIR.exists():
+        for node_dir in NODES_DIR.iterdir():
+            if node_dir.is_dir() and (node_dir / "contract.yaml").exists():
+                nodes.append(node_dir.name)
+    return sorted(nodes)
+
+
+# All nodes with contracts - discovered dynamically
+ALL_NODES_WITH_CONTRACTS: list[str] = _discover_nodes_with_contracts()
+
+
+class TestHandlerRoutingKeyAlignment:
+    """Test handler_routing.handlers routing_keys align with validation_rules.
+
+    Validates that routing_key values in handler_routing match the operation
+    Literal types defined in validation_rules.constraint_definitions. This
+    ensures the contract is internally consistent and prevents runtime
+    routing failures.
+
+    Alignment Rules:
+        1. routing_keys should match operation/query_type Literal values
+        2. Exact match OR predictable transformation (e.g., query_{type})
+        3. 'health_check' is a valid meta-operation routing_key
+        4. Empty handlers list is valid when default_handler is set
+    """
+
+    # Known meta-operations that are valid but not in constraint Literals
+    META_OPERATIONS: frozenset[str] = frozenset({"health_check"})
+
+    # Known prefix transformations: {constraint_field: prefix}
+    KNOWN_PREFIXES: dict[str, str] = {
+        "query_type": "query_",
+    }
+
+    @staticmethod
+    def _extract_literal_values(constraint_def: str) -> set[str]:
+        """Extract values from a Literal type definition string.
+
+        Args:
+            constraint_def: String like "Literal['store', 'get_session']"
+
+        Returns:
+            Set of extracted values, e.g., {'store', 'get_session'}
+        """
+        import re
+
+        # Match Literal['value1', 'value2', ...] or Literal["value1", "value2", ...]
+        match = re.search(r"Literal\[([^\]]+)\]", constraint_def)
+        if not match:
+            return set()
+
+        literal_content = match.group(1)
+        # Extract quoted strings (single or double quotes)
+        values = re.findall(r"['\"]([^'\"]+)['\"]", literal_content)
+        return set(values)
+
+    @pytest.mark.parametrize("node_name", ALL_NODES_WITH_CONTRACTS)
+    def test_routing_keys_align_with_constraints(self, node_name: str) -> None:
+        """Verify routing_keys in handler_routing match constraint definitions.
+
+        For nodes using operation_match routing strategy, routing_key values
+        should correspond to the operation/query_type Literal values defined
+        in validation_rules.constraint_definitions.
+        """
+        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        if not contract_path.exists():
+            pytest.skip(f"File not yet implemented: {contract_path}")
+
+        with open(contract_path, encoding="utf-8") as f:
+            data: MappingResultDict = yaml.safe_load(f)
+
+        # Skip if no handler_routing defined
+        handler_routing = data.get("handler_routing")
+        if not handler_routing:
+            pytest.skip(f"No handler_routing defined: {node_name}")
+
+        # Skip if not using operation_match strategy
+        routing_strategy = handler_routing.get("routing_strategy", "")
+        if routing_strategy != "operation_match":
+            pytest.skip(f"Not using operation_match strategy: {node_name}")
+
+        # Get handlers list - empty is valid when default_handler is set
+        handlers = handler_routing.get("handlers", [])
+        if not handlers:
+            default_handler = handler_routing.get("default_handler")
+            if default_handler:
+                # Valid: all operations route to default_handler
+                return
+            pytest.skip(f"No handlers and no default_handler: {node_name}")
+
+        # Extract routing_keys from handlers
+        routing_keys: set[str] = {
+            h.get("routing_key", "") for h in handlers if h.get("routing_key")
+        }
+
+        # Get constraint definitions
+        validation_rules = data.get("validation_rules", {})
+        constraint_defs = validation_rules.get("constraint_definitions", {})
+
+        # Find the operation field (operation, query_type, etc.)
+        operation_field: str | None = None
+        operation_literals: set[str] = set()
+
+        for field_name in ("operation", "query_type", "action"):
+            if field_name in constraint_defs:
+                operation_field = field_name
+                literal_values = self._extract_literal_values(
+                    str(constraint_defs[field_name])
+                )
+                if literal_values:
+                    operation_literals = literal_values
+                    break
+
+        if not operation_field or not operation_literals:
+            # No operation Literal found - can't validate alignment
+            pytest.skip(f"No operation Literal in constraint_definitions: {node_name}")
+
+        # Determine expected routing_keys based on constraint values
+        expected_routing_keys: set[str] = set()
+
+        # Check for known prefix transformation
+        prefix = self.KNOWN_PREFIXES.get(operation_field, "")
+        if prefix:
+            # Apply prefix transformation (e.g., query_type "distribution" -> "query_distribution")
+            expected_routing_keys = {f"{prefix}{v}" for v in operation_literals}
+        else:
+            # Exact match expected
+            expected_routing_keys = operation_literals.copy()
+
+        # Add meta-operations
+        expected_routing_keys.update(self.META_OPERATIONS)
+
+        # Validate: all routing_keys should be in expected set
+        unexpected_keys = routing_keys - expected_routing_keys
+        assert not unexpected_keys, (
+            f"Unexpected routing_keys in {node_name}: {unexpected_keys}\n"
+            f"Expected keys (based on {operation_field} Literal + meta-ops): {expected_routing_keys}\n"
+            f"Actual routing_keys: {routing_keys}"
+        )
+
+        # Warn (but don't fail) if routing_keys don't cover all expected operations
+        # Some nodes may intentionally not implement all operations
+        missing_keys = expected_routing_keys - routing_keys - self.META_OPERATIONS
+        if missing_keys:
+            # This is informational - some operations may use default_handler
+            pass  # Could add pytest.warns() here if desired
+
+    @pytest.mark.parametrize("node_name", ALL_NODES_WITH_CONTRACTS)
+    def test_routing_keys_are_unique(self, node_name: str) -> None:
+        """Verify routing_keys in handler_routing are unique.
+
+        Duplicate routing_keys would cause ambiguous routing behavior.
+        """
+        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        if not contract_path.exists():
+            pytest.skip(f"File not yet implemented: {contract_path}")
+
+        with open(contract_path, encoding="utf-8") as f:
+            data: MappingResultDict = yaml.safe_load(f)
+
+        handler_routing = data.get("handler_routing")
+        if not handler_routing:
+            pytest.skip(f"No handler_routing defined: {node_name}")
+
+        handlers = handler_routing.get("handlers", [])
+        if not handlers:
+            pytest.skip(f"No handlers defined: {node_name}")
+
+        routing_keys = [h.get("routing_key", "") for h in handlers]
+        unique_keys = set(routing_keys)
+
+        assert len(routing_keys) == len(unique_keys), (
+            f"Duplicate routing_keys found in {node_name}: "
+            f"{[k for k in routing_keys if routing_keys.count(k) > 1]}"
+        )
+
+    @pytest.mark.parametrize("node_name", ALL_NODES_WITH_CONTRACTS)
+    def test_handler_routing_has_version(self, node_name: str) -> None:
+        """Verify handler_routing includes version field.
+
+        The version field enables contract evolution and compatibility checks.
+        """
+        contract_path: Path = NODES_DIR / node_name / "contract.yaml"
+        if not contract_path.exists():
+            pytest.skip(f"File not yet implemented: {contract_path}")
+
+        with open(contract_path, encoding="utf-8") as f:
+            data: MappingResultDict = yaml.safe_load(f)
+
+        handler_routing = data.get("handler_routing")
+        if not handler_routing:
+            pytest.skip(f"No handler_routing defined: {node_name}")
+
+        version = handler_routing.get("version")
+        assert version is not None, f"handler_routing missing version: {node_name}"
+        assert isinstance(
+            version, dict
+        ), f"handler_routing.version must be dict: {node_name}"
+        assert (
+            "major" in version
+        ), f"handler_routing.version missing 'major': {node_name}"
+        assert (
+            "minor" in version
+        ), f"handler_routing.version missing 'minor': {node_name}"
+        assert (
+            "patch" in version
+        ), f"handler_routing.version missing 'patch': {node_name}"
