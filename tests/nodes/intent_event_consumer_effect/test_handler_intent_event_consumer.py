@@ -16,7 +16,6 @@ All tests use mocked dependencies (no real Kafka/Memgraph).
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -34,13 +33,18 @@ from omnimemory.nodes.intent_storage_effect.models.model_intent_storage_response
 )
 from omnimemory.utils.concurrency import CircuitBreakerState
 
+# Type aliases for Kafka message handling (avoiding Any per zero-Any policy)
+type MessagePayload = dict[str, object]
+type PublishCall = tuple[str, MessagePayload]
+type SubscriptionEntry = tuple[str, object]
+
 
 def create_valid_message(
     session_id: str = "test-session",
     intent_category: str = "debugging",
     confidence: float = 0.85,
     correlation_id: UUID | None = None,
-) -> dict[str, Any]:
+) -> MessagePayload:
     """Create a valid intent-classified event message for testing.
 
     The model has strict=True, so we need to provide properly typed values
@@ -92,15 +96,15 @@ def create_mock_storage_adapter(
     return mock
 
 
-def create_mock_subscribe() -> tuple[MagicMock, list[tuple[str, Any]]]:
+def create_mock_subscribe() -> tuple[MagicMock, list[SubscriptionEntry]]:
     """Create a mock subscribe callback.
 
     Returns:
         Tuple of (subscribe function, list to capture subscriptions).
     """
-    subscriptions: list[tuple[str, Any]] = []
+    subscriptions: list[SubscriptionEntry] = []
 
-    def subscribe(topic: str, handler: Any) -> MagicMock:
+    def subscribe(topic: str, handler: object) -> MagicMock:
         subscriptions.append((topic, handler))
         return MagicMock()  # unsubscribe function
 
@@ -199,9 +203,9 @@ class TestMessageProcessing:
         """Invalid message format should route to DLQ without retry."""
         storage = create_mock_storage_adapter()
         config = ModelIntentEventConsumerConfig(retry_max_attempts=3)
-        publish_calls: list[tuple[str, dict[str, Any]]] = []
+        publish_calls: list[PublishCall] = []
 
-        def mock_publish(topic: str, msg: dict[str, Any]) -> None:
+        def mock_publish(topic: str, msg: MessagePayload) -> None:
             publish_calls.append((topic, msg))
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -213,7 +217,10 @@ class TestMessageProcessing:
         )
 
         # Invalid message - missing required fields
-        invalid_message = {"event_type": "IntentClassified", "session_id": ""}
+        invalid_message: MessagePayload = {
+            "event_type": "IntentClassified",
+            "session_id": "",
+        }
 
         await consumer._handle_message(invalid_message, retry_count=0)
 
@@ -236,9 +243,9 @@ class TestMessageProcessing:
             retry_max_attempts=2,
             retry_backoff_base_seconds=0.1,  # Minimum allowed value
         )
-        publish_calls: list[tuple[str, dict[str, Any]]] = []
+        publish_calls: list[PublishCall] = []
 
-        def mock_publish(topic: str, msg: dict[str, Any]) -> None:
+        def mock_publish(topic: str, msg: MessagePayload) -> None:
             publish_calls.append((topic, msg))
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -286,9 +293,9 @@ class TestUUIDValidation:
         config = ModelIntentEventConsumerConfig(
             retry_max_attempts=0,  # No retries - fail immediately
         )
-        publish_calls: list[tuple[str, dict[str, Any]]] = []
+        publish_calls: list[PublishCall] = []
 
-        def mock_publish(topic: str, msg: dict[str, Any]) -> None:
+        def mock_publish(topic: str, msg: MessagePayload) -> None:
             publish_calls.append((topic, msg))
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -309,7 +316,7 @@ class TestUUIDValidation:
         # Check that the error message mentions the storage adapter bug
         dlq_calls = [c for c in publish_calls if "dlq" in c[0]]
         assert len(dlq_calls) == 1
-        assert "intent_id is None" in dlq_calls[0][1]["failure_reason"]
+        assert "intent_id is None" in str(dlq_calls[0][1]["failure_reason"])
 
 
 # =============================================================================
@@ -330,7 +337,7 @@ class TestRetryLogic:
         sleep_durations: list[float] = []
 
         async def failing_execute(
-            *args: Any, **kwargs: Any
+            *args: object, **kwargs: object
         ) -> ModelIntentStorageResponse:
             nonlocal call_count
             call_count += 1
@@ -383,7 +390,7 @@ class TestRetryLogic:
         await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
 
         # Invalid message
-        invalid_message = {"garbage": "data"}
+        invalid_message: MessagePayload = {"garbage": "data"}
         await consumer._handle_message(invalid_message, retry_count=0)
 
         # Storage should never be called
@@ -458,9 +465,9 @@ class TestCircuitBreaker:
             circuit_breaker_failure_threshold=2,
             retry_max_attempts=0,
         )
-        publish_calls: list[tuple[str, dict[str, Any]]] = []
+        publish_calls: list[PublishCall] = []
 
-        def mock_publish(topic: str, msg: dict[str, Any]) -> None:
+        def mock_publish(topic: str, msg: MessagePayload) -> None:
             publish_calls.append((topic, msg))
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -484,7 +491,7 @@ class TestCircuitBreaker:
         assert consumer._messages_dlq == 1
         dlq_calls = [c for c in publish_calls if "dlq" in c[0]]
         assert len(dlq_calls) == 1
-        assert "Circuit breaker open" in dlq_calls[0][1]["failure_reason"]
+        assert "Circuit breaker open" in str(dlq_calls[0][1]["failure_reason"])
 
 
 # =============================================================================
@@ -627,9 +634,9 @@ class TestEventEmission:
         )
         storage = create_mock_storage_adapter(response=storage_response)
         config = ModelIntentEventConsumerConfig()
-        publish_calls: list[tuple[str, dict[str, Any]]] = []
+        publish_calls: list[PublishCall] = []
 
-        def mock_publish(topic: str, msg: dict[str, Any]) -> None:
+        def mock_publish(topic: str, msg: MessagePayload) -> None:
             publish_calls.append((topic, msg))
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -666,9 +673,9 @@ class TestEventEmission:
         config = ModelIntentEventConsumerConfig(
             retry_max_attempts=0,
         )
-        publish_calls: list[tuple[str, dict[str, Any]]] = []
+        publish_calls: list[PublishCall] = []
 
-        def mock_publish(topic: str, msg: dict[str, Any]) -> None:
+        def mock_publish(topic: str, msg: MessagePayload) -> None:
             publish_calls.append((topic, msg))
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -688,8 +695,8 @@ class TestEventEmission:
         assert len(stored_events) == 1
         assert stored_events[0][1]["event_type"] == "dev.omnimemory.intent.stored.v1"
         assert stored_events[0][1]["status"] == "error"
-        assert "RuntimeError" in stored_events[0][1]["error_message"]
-        assert "Storage failed" in stored_events[0][1]["error_message"]
+        assert "RuntimeError" in str(stored_events[0][1]["error_message"])
+        assert "Storage failed" in str(stored_events[0][1]["error_message"])
         # session_id is mapped to session_ref at boundary
         assert stored_events[0][1]["session_ref"] == message["session_id"]
 
@@ -709,7 +716,7 @@ class TestStopCleanup:
         config = ModelIntentEventConsumerConfig()
         unsubscribe_mock = MagicMock()
 
-        def mock_subscribe(topic: str, handler: Any) -> MagicMock:
+        def mock_subscribe(topic: str, handler: object) -> MagicMock:
             return unsubscribe_mock
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)

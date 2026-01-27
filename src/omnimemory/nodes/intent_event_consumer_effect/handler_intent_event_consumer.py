@@ -55,7 +55,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from omnibase_core.models.events import ModelIntentStoredEvent
@@ -141,11 +141,11 @@ class HandlerIntentEventConsumer:
         self._unsubscribe: Callable[[], None] | None = None
 
         # Kafka publish callback (set during initialize)
-        self._publish_callback: Callable[[str, dict[str, Any]], None] | None = None
+        self._publish_callback: Callable[[str, dict[str, object]], None] | None = None
         self._env_prefix: str = "dev"
 
         # Track pending tasks to prevent garbage collection (RUF006)
-        self._pending_tasks: set[asyncio.Task[Any]] = set()
+        self._pending_tasks: set[asyncio.Task[None]] = set()
 
         logger.info(
             "HandlerIntentEventConsumer initialized",
@@ -172,9 +172,11 @@ class HandlerIntentEventConsumer:
 
     async def initialize(
         self,
-        subscribe_callback: Callable[[str, Callable[[Any], None]], Callable[[], None]],
+        subscribe_callback: Callable[
+            [str, Callable[[dict[str, object]], None]], Callable[[], None]
+        ],
         env_prefix: str = "dev",
-        publish_callback: Callable[[str, dict[str, Any]], None] | None = None,
+        publish_callback: Callable[[str, dict[str, object]], None] | None = None,
     ) -> None:
         """Initialize Kafka subscription.
 
@@ -209,7 +211,7 @@ class HandlerIntentEventConsumer:
             },
         )
 
-    def _handle_message_sync(self, message: dict[str, Any]) -> None:
+    def _handle_message_sync(self, message: dict[str, object]) -> None:
         """Synchronous message handler wrapper for Kafka callback.
 
         Kafka callbacks are typically synchronous, so this wraps the
@@ -249,7 +251,7 @@ class HandlerIntentEventConsumer:
             task.add_done_callback(self._pending_tasks.discard)
 
     async def _handle_message(
-        self, message: dict[str, Any], *, retry_count: int = 0
+        self, message: dict[str, object], *, retry_count: int = 0
     ) -> None:
         """Process a single Kafka message with retry support.
 
@@ -291,6 +293,9 @@ class HandlerIntentEventConsumer:
                         "circuit_state": self._circuit_breaker.state.value,
                         "failure_count": self._circuit_breaker.failure_count,
                     },
+                )
+                self._messages_failed += (
+                    1  # Count circuit-open as failed for accurate metrics
                 )
                 await self._route_to_dlq(message, "Circuit breaker open")
                 return
@@ -471,7 +476,7 @@ class HandlerIntentEventConsumer:
             )
 
     async def _route_to_dlq(
-        self, message: dict[str, Any], reason: str, *, retry_count: int = 0
+        self, message: dict[str, object], reason: str, *, retry_count: int = 0
     ) -> None:
         """Route failed message to dead letter queue.
 
