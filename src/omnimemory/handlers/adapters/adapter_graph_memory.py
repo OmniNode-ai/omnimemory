@@ -53,6 +53,8 @@ from collections.abc import Mapping
 from urllib.parse import urlparse
 
 from omnibase_core.container import ModelONEXContainer  # noqa: TC002 - used at runtime
+from omnibase_infra.errors import InfraConnectionError
+from omnibase_infra.handlers.handler_graph import HandlerGraph
 
 from omnimemory.models.adapters import (
     ModelConnectionsResult,
@@ -63,62 +65,6 @@ from omnimemory.models.adapters import (
     ModelRelatedMemoryResult,
     PropertyValue,
 )
-
-# omnibase_infra is a dev dependency - make imports conditional
-# Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
-# Note: pyright sees imports as redefinitions due to stub classes in except block
-_omnibase_infra_available: bool = False
-_omnibase_infra_import_error: str | None = None
-
-try:
-    from omnibase_infra.errors import (
-        InfraConnectionError,  # pyright: ignore[reportAssignmentType]
-    )
-    from omnibase_infra.handlers.handler_graph import (
-        HandlerGraph,  # pyright: ignore[reportAssignmentType]
-    )
-
-    _omnibase_infra_available = True
-except ImportError as e:
-    _omnibase_infra_import_error = str(e)
-
-    # Provide stub types for type checking and to allow module to load
-    class InfraConnectionError(Exception):  # type: ignore[no-redef]
-        """Stub for InfraConnectionError when omnibase_infra is not installed."""
-
-    class HandlerGraph:  # type: ignore[no-redef]
-        """Stub for HandlerGraph when omnibase_infra is not installed."""
-
-        def __init__(self, container: object) -> None:
-            raise ImportError(
-                f"omnibase_infra is required for AdapterGraphMemory. "
-                f"Install it with: poetry install --with dev. "
-                f"Original error: {_omnibase_infra_import_error}"
-            )
-
-        async def initialize(
-            self,
-            connection_uri: str,
-            auth: tuple[str, str] | None = None,
-            options: dict[str, object] | None = None,
-        ) -> None:
-            """Stub for initialize method."""
-            raise ImportError("omnibase_infra is required")
-
-        async def execute_query(
-            self, query: str, parameters: dict[str, object]
-        ) -> object:
-            """Stub for execute_query method."""
-            raise ImportError("omnibase_infra is required")
-
-        async def health_check(self) -> object:
-            """Stub for health_check method."""
-            raise ImportError("omnibase_infra is required")
-
-        async def shutdown(self) -> None:
-            """Stub for shutdown method."""
-            raise ImportError("omnibase_infra is required")
-
 
 logger = logging.getLogger(__name__)
 

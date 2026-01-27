@@ -60,6 +60,7 @@ from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from omnibase_core.types.type_json import JsonType
+from omnibase_infra.handlers.handler_graph import HandlerGraph
 
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
@@ -73,29 +74,6 @@ from omnimemory.handlers.adapters.models import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
-    from omnibase_infra.handlers.handler_graph import HandlerGraph
-
-# Runtime conditional import - omnibase_infra is a dev dependency
-_OMNIBASE_INFRA_AVAILABLE: bool = False
-_OMNIBASE_INFRA_IMPORT_ERROR: str | None = None
-
-if not TYPE_CHECKING:
-    try:
-        from omnibase_infra.handlers.handler_graph import HandlerGraph
-
-        _OMNIBASE_INFRA_AVAILABLE = True
-    except ImportError as e:
-        _OMNIBASE_INFRA_IMPORT_ERROR = str(e)
-
-        class HandlerGraph:  # type: ignore[no-redef]
-            """Stub for HandlerGraph when omnibase_infra is not installed."""
-
-            def __init__(self, container: object) -> None:
-                raise ImportError(
-                    f"omnibase_infra is required for AdapterIntentGraph. "
-                    f"Install it with: poetry install --with dev. "
-                    f"Original error: {_OMNIBASE_INFRA_IMPORT_ERROR}"
-                )
 
 
 __all__ = ["AdapterIntentGraph", "IntentCypherTemplates"]
@@ -428,12 +406,6 @@ class AdapterIntentGraph:
                             self._container = ModelONEXContainer()
 
                         # Create and initialize handler
-                        if not _OMNIBASE_INFRA_AVAILABLE:
-                            raise RuntimeError(
-                                "HandlerGraph not available. "
-                                "Install omnibase_infra to use graph features."
-                            )
-
                         self._handler = HandlerGraph(self._container)
                         # Assert for type narrowing: pyright doesn't narrow instance
                         # attributes after assignment due to potential concurrent modification
