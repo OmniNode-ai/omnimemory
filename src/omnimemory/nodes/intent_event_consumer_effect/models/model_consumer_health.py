@@ -8,9 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnimemory.models.utils.model_health_status import HealthStatus
 
 
-class ModelIntentEventConsumerHealth(  # omnimemory-model-exempt: handler health
-    BaseModel
-):
+# omnimemory-model-exempt: handler health
+class ModelIntentEventConsumerHealth(BaseModel):
     """Health status for the intent event consumer.
 
     Avoids "always returns OK" anti-pattern by tracking:

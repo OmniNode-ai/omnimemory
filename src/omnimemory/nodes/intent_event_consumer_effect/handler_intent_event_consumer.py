@@ -218,13 +218,31 @@ class HandlerIntentEventConsumer:
         Kafka callbacks are typically synchronous, so this wraps the
         async handler. In production, use an event loop runner.
 
+        Threading Model:
+            This method handles two scenarios:
+
+            1. **No running event loop** (e.g., called from a synchronous Kafka
+               consumer thread): Creates a new event loop via ``asyncio.run()``.
+               Note: In high-throughput scenarios, consider using a dedicated
+               event loop thread to avoid per-message loop creation overhead.
+
+            2. **Existing event loop** (e.g., called from an async context or
+               when the consumer is integrated with an async Kafka client):
+               Schedules the handler as a task in the existing loop.
+
+            For production deployments, prefer using an async Kafka client
+            (e.g., aiokafka) that provides native async message handling,
+            avoiding the need for this synchronous wrapper.
+
         Args:
             message: Raw Kafka message payload.
         """
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No running loop, create one for this callback
+            # No running loop, create one for this callback.
+            # Note: In high-throughput scenarios, this creates a new loop per
+            # message. Consider using a dedicated event loop thread instead.
             asyncio.run(self._handle_message(message, retry_count=0))
         else:
             # Schedule in existing loop
@@ -329,6 +347,9 @@ class HandlerIntentEventConsumer:
                 raise RuntimeError(error_msg)
 
         except ValidationError as e:
+            # Validation errors are NOT retried - they indicate malformed messages
+            # that will never succeed regardless of retry attempts. Route directly
+            # to DLQ for manual inspection.
             logger.error(
                 "Invalid event payload",
                 extra={

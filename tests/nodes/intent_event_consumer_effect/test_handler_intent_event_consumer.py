@@ -15,7 +15,6 @@ All tests use mocked dependencies (no real Kafka/Memgraph).
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -323,22 +322,30 @@ class TestRetryLogic:
 
     @pytest.mark.asyncio
     async def test_retry_on_storage_failure(self) -> None:
-        """Storage failures should trigger exponential backoff retries."""
-        call_times: list[float] = []
-        original_time = asyncio.get_event_loop().time()
+        """Storage failures should trigger exponential backoff retries.
+
+        Uses mocked asyncio.sleep for deterministic testing without timing flakiness.
+        """
+        call_count = 0
+        sleep_durations: list[float] = []
 
         async def failing_execute(
             *args: Any, **kwargs: Any
         ) -> ModelIntentStorageResponse:
-            call_times.append(asyncio.get_event_loop().time() - original_time)
+            nonlocal call_count
+            call_count += 1
             raise RuntimeError("Storage failed")
+
+        async def mock_sleep(duration: float) -> None:
+            """Capture sleep durations without actually sleeping."""
+            sleep_durations.append(duration)
 
         storage = MagicMock()
         storage.execute = failing_execute
 
         config = ModelIntentEventConsumerConfig(
             retry_max_attempts=2,
-            retry_backoff_base_seconds=0.1,  # Minimum allowed (100ms base)
+            retry_backoff_base_seconds=1.0,  # Use 1.0s base for clear math
         )
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
@@ -346,20 +353,22 @@ class TestRetryLogic:
         await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
 
         message = create_valid_message()
-        await consumer._handle_message(message, retry_count=0)
+
+        # Patch asyncio.sleep to make test deterministic
+        import unittest.mock
+
+        with unittest.mock.patch("asyncio.sleep", mock_sleep):
+            await consumer._handle_message(message, retry_count=0)
 
         # Should have 3 calls: initial + 2 retries
-        assert len(call_times) == 3
+        assert call_count == 3
 
-        # Verify exponential backoff timing (approximately)
-        # First retry after ~100ms (0.1s * 2^0)
-        # Second retry after ~200ms more (0.1s * 2^1)
-        if len(call_times) >= 3:
-            first_gap = call_times[1] - call_times[0]
-            second_gap = call_times[2] - call_times[1]
-            # Allow some tolerance for test timing
-            assert first_gap >= 0.08  # ~100ms
-            assert second_gap >= 0.15  # ~200ms
+        # Verify exponential backoff durations (deterministic)
+        # First retry: 1.0 * 2^0 = 1.0s
+        # Second retry: 1.0 * 2^1 = 2.0s
+        assert len(sleep_durations) == 2
+        assert sleep_durations[0] == 1.0  # First backoff: base * 2^0
+        assert sleep_durations[1] == 2.0  # Second backoff: base * 2^1
 
     @pytest.mark.asyncio
     async def test_no_retry_on_validation_error(self) -> None:

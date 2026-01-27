@@ -3,9 +3,8 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ModelIntentEventConsumerConfig(  # omnimemory-model-exempt: handler config
-    BaseModel
-):
+# omnimemory-model-exempt: handler config
+class ModelIntentEventConsumerConfig(BaseModel):
     """Configuration for intent event consumer.
 
     Note: consumer_group is NOT configured here. It is derived from
