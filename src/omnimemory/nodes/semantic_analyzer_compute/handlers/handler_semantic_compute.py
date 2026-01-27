@@ -74,7 +74,7 @@ from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
 from cachetools import LRUCache
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from omnimemory.enums import EnumEntityExtractionMode, EnumSemanticEntityType
 from omnimemory.models.config import (
@@ -121,8 +121,6 @@ _MIN_CACHE_SIZE: int = 1
 # =============================================================================
 # Handler Metadata Models (handler-specific, not ONEX domain models)
 # =============================================================================
-
-from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelSemanticComputeCapabilities(  # omnimemory-model-exempt: handler metadata
