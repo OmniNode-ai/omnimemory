@@ -297,6 +297,17 @@ class HandlerIntentEventConsumer:
                 self._messages_failed += (
                     1  # Count circuit-open as failed for accurate metrics
                 )
+
+                # Emit failure event for observability (matches storage-error path)
+                if session_id and intent_category and correlation_id:
+                    failed_event = ModelIntentStoredEvent.from_error(
+                        session_ref=session_id,  # Map at boundary
+                        intent_category=intent_category,
+                        error_message="Circuit breaker open",
+                        correlation_id=correlation_id,
+                    )
+                    await self._emit_stored_event(failed_event)
+
                 await self._route_to_dlq(message, "Circuit breaker open")
                 return
 
