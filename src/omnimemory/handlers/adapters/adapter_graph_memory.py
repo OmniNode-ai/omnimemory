@@ -66,6 +66,7 @@ from omnimemory.models.adapters import (
 
 # omnibase_infra is a dev dependency - make imports conditional
 # Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
+# Note: pyright sees imports as redefinitions due to stub classes in except block
 _omnibase_infra_available: bool = False
 _omnibase_infra_import_error: str | None = None
 

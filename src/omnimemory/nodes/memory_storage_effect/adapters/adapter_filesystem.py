@@ -46,6 +46,7 @@ from pydantic import ValidationError
 # omnibase_infra is a dev dependency - make imports conditional
 # to allow test collection and provide clear error messages
 # Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
+# Note: pyright sees imports as redefinitions due to stub classes in except block
 _omnibase_infra_available: bool = False
 _omnibase_infra_import_error: str | None = None
 

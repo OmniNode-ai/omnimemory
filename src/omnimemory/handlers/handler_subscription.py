@@ -120,6 +120,7 @@ if TYPE_CHECKING:
 
 # Optional omnibase_infra imports for handler reuse
 # Note: Using lowercase names since these are reassigned (not true constants)
+# Note: pyright sees imports as redefinitions due to stub classes in except block
 _omnibase_infra_available = False
 _omnibase_infra_import_error: str | None = None
 

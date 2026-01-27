@@ -66,6 +66,7 @@ if TYPE_CHECKING:
 
 # Runtime conditional import
 # Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
+# Note: pyright sees imports as redefinitions due to stub classes in except block
 _adapter_available: bool = False
 _adapter_import_error: str | None = None
 
