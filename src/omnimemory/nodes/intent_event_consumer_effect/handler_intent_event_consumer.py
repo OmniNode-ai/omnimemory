@@ -657,11 +657,25 @@ class HandlerIntentEventConsumer:
     async def stop(self) -> None:
         """Graceful shutdown.
 
-        Cancels pending message processing tasks, unsubscribes from Kafka topic,
+        Unsubscribes from Kafka topic, cancels pending message processing tasks,
         and resets initialization state. Does not shutdown the storage adapter
         (caller's responsibility).
         """
-        # Cancel pending tasks first to prevent orphaned processing
+        # Unsubscribe FIRST to prevent new messages during shutdown
+        if self._unsubscribe:
+            try:
+                self._unsubscribe()
+            except Exception as e:
+                logger.warning(
+                    "Error during Kafka unsubscribe",
+                    extra={
+                        "handler": HANDLER_ID_INTENT_CONSUMER,
+                        "error": str(e),
+                    },
+                )
+            self._unsubscribe = None
+
+        # THEN cancel pending tasks
         if self._pending_tasks:
             pending_count = len(self._pending_tasks)
             logger.debug(
@@ -689,19 +703,6 @@ class HandlerIntentEventConsumer:
                         },
                     )
             self._pending_tasks.clear()
-
-        if self._unsubscribe:
-            try:
-                self._unsubscribe()
-            except Exception as e:
-                logger.warning(
-                    "Error during Kafka unsubscribe",
-                    extra={
-                        "handler": HANDLER_ID_INTENT_CONSUMER,
-                        "error": str(e),
-                    },
-                )
-            self._unsubscribe = None
 
         self._initialized = False
         self._publish_callback = None
