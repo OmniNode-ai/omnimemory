@@ -138,12 +138,11 @@ except ImportError as e:
     # Provide stubs for type checking with method signatures
     # These stubs allow pyright to understand the interface even when
     # omnibase_infra is not installed
-    from typing import Any
 
     class HandlerDb:  # type: ignore[no-redef]
         """Stub for HandlerDb when omnibase_infra is not installed."""
 
-        async def initialize(self, config: dict[str, Any]) -> None:
+        async def initialize(self, config: dict[str, object]) -> None:
             """Initialize the database handler."""
             raise NotImplementedError("omnibase_infra is not installed")
 
@@ -151,14 +150,14 @@ except ImportError as e:
             """Shutdown the database handler."""
             raise NotImplementedError("omnibase_infra is not installed")
 
-        async def execute(self, envelope: dict[str, Any]) -> Any:
+        async def execute(self, envelope: dict[str, object]) -> object:
             """Execute a database operation."""
             raise NotImplementedError("omnibase_infra is not installed")
 
     class EventBusKafka:  # type: ignore[no-redef]
         """Stub for EventBusKafka when omnibase_infra is not installed."""
 
-        async def initialize(self, config: dict[str, Any]) -> None:
+        async def initialize(self, config: dict[str, object]) -> None:
             """Initialize the Kafka event bus."""
             raise NotImplementedError("omnibase_infra is not installed")
 
@@ -166,14 +165,14 @@ except ImportError as e:
             """Shutdown the Kafka event bus."""
             raise NotImplementedError("omnibase_infra is not installed")
 
-        async def execute(self, envelope: dict[str, Any]) -> Any:
+        async def execute(self, envelope: dict[str, object]) -> object:
             """Execute a Kafka operation."""
             raise NotImplementedError("omnibase_infra is not installed")
 
-        async def health_check(self) -> Any:
+        async def health_check(self) -> object:
             """Check the health of the Kafka connection.
 
-            Returns Any because the real class may return dict, bool, or Pydantic model.
+            Returns object because the real class may return dict, bool, or Pydantic model.
             """
             raise NotImplementedError("omnibase_infra is not installed")
 
