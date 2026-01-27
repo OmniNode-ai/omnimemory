@@ -4,7 +4,7 @@
 
 name: intent_event_consumer_effect
 version: {major: 1, minor: 0, patch: 0}
-uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+uuid: "6fc349b1-34f0-4760-b547-6e8bebf0c9c0"
 node_type: EFFECT
 description: |
   Consumes intent-classified.v1 events from omniintelligence Kafka topic

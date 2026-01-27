@@ -56,7 +56,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from pydantic import ValidationError
 
@@ -221,25 +221,29 @@ class HandlerIntentEventConsumer:
         Args:
             message: Raw Kafka message payload.
         """
-        import asyncio
-
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             # No running loop, create one for this callback
-            asyncio.run(self._handle_message(message))
+            asyncio.run(self._handle_message(message, retry_count=0))
         else:
             # Schedule in existing loop
-            task = loop.create_task(self._handle_message(message))
+            task = loop.create_task(self._handle_message(message, retry_count=0))
             # Store reference to prevent garbage collection
             self._pending_tasks.add(task)
             task.add_done_callback(self._pending_tasks.discard)
 
-    async def _handle_message(self, message: dict[str, Any]) -> None:
-        """Process a single Kafka message.
+    async def _handle_message(
+        self, message: dict[str, Any], *, retry_count: int = 0
+    ) -> None:
+        """Process a single Kafka message with retry support.
+
+        On storage failures (not validation errors), retries with exponential
+        backoff up to retry_max_attempts times before routing to DLQ.
 
         Args:
             message: Raw Kafka message payload.
+            retry_count: Current retry attempt (0 = first attempt).
         """
         correlation_id: UUID | None = None
         session_id: str | None = None
@@ -287,13 +291,19 @@ class HandlerIntentEventConsumer:
             ).total_seconds() * 1000
 
             if result.status == "success":
+                # Validate intent_id is present for successful store
+                if result.intent_id is None:
+                    raise RuntimeError(
+                        "Storage returned success but intent_id is None - storage adapter bug"
+                    )
+
                 self._circuit_breaker.record_success()
                 self._messages_consumed += 1
                 self._last_consume_timestamp = datetime.now(timezone.utc)
 
                 # Emit success event
                 stored_event = ModelIntentStoredEvent(
-                    intent_id=result.intent_id or uuid4(),
+                    intent_id=result.intent_id,
                     session_id=event.session_id,
                     intent_category=event.intent_category,
                     confidence=event.confidence,
@@ -332,15 +342,51 @@ class HandlerIntentEventConsumer:
 
         except Exception as e:
             self._circuit_breaker.record_failure()
+
+            # Check if retries are available (storage failures only)
+            max_attempts = self._config.retry_max_attempts
+            if retry_count < max_attempts:
+                # Calculate exponential backoff: base * 2^attempt
+                backoff_seconds = self._config.retry_backoff_base_seconds * (
+                    2**retry_count
+                )
+                next_retry = retry_count + 1
+
+                logger.warning(
+                    "Storage failure, scheduling retry",
+                    extra={
+                        "handler": HANDLER_ID_INTENT_CONSUMER,
+                        "correlation_id": str(correlation_id)
+                        if correlation_id
+                        else None,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "retry_count": retry_count,
+                        "next_retry": next_retry,
+                        "max_attempts": max_attempts,
+                        "backoff_seconds": backoff_seconds,
+                    },
+                )
+
+                # Wait with exponential backoff
+                await asyncio.sleep(backoff_seconds)
+
+                # Recursive retry with incremented count
+                await self._handle_message(message, retry_count=next_retry)
+                return
+
+            # No retries left - route to DLQ
             self._messages_failed += 1
 
             logger.error(
-                "Failed to process event",
+                "Failed to process event after retries exhausted",
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "correlation_id": str(correlation_id) if correlation_id else None,
                     "error": str(e),
                     "error_type": type(e).__name__,
+                    "retry_count": retry_count,
+                    "max_attempts": max_attempts,
                     "circuit_state": self._circuit_breaker.state.value,
                     "failure_count": self._circuit_breaker.failure_count,
                 },
@@ -355,10 +401,11 @@ class HandlerIntentEventConsumer:
                     error_type=type(e).__name__,
                     error_message=str(e),
                     timestamp=datetime.now(timezone.utc),
+                    retry_count=retry_count,
                 )
                 await self._emit_failed_event(failed_event)
 
-            await self._route_to_dlq(message, str(e))
+            await self._route_to_dlq(message, str(e), retry_count=retry_count)
 
     async def _emit_stored_event(self, event: ModelIntentStoredEvent) -> None:
         """Emit intent-stored event to Kafka.
@@ -436,12 +483,15 @@ class HandlerIntentEventConsumer:
                 },
             )
 
-    async def _route_to_dlq(self, message: dict[str, Any], reason: str) -> None:
+    async def _route_to_dlq(
+        self, message: dict[str, Any], reason: str, *, retry_count: int = 0
+    ) -> None:
         """Route failed message to dead letter queue.
 
         Args:
             message: The original message.
             reason: Why the message failed.
+            retry_count: Number of retry attempts made before DLQ routing.
         """
         self._messages_dlq += 1
 
@@ -451,6 +501,7 @@ class HandlerIntentEventConsumer:
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "reason": reason,
+                    "retry_count": retry_count,
                     "dlq_topic": self._config.dlq_topic_suffix,
                 },
             )
@@ -460,6 +511,7 @@ class HandlerIntentEventConsumer:
         dlq_message = {
             "original_message": message,
             "failure_reason": reason,
+            "retry_count": retry_count,
             "failed_at": datetime.now(timezone.utc).isoformat(),
             "handler": HANDLER_ID_INTENT_CONSUMER,
         }
@@ -471,6 +523,7 @@ class HandlerIntentEventConsumer:
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "reason": reason,
+                    "retry_count": retry_count,
                     "dlq_topic": topic,
                 },
             )

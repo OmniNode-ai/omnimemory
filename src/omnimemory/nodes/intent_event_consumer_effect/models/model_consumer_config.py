@@ -51,8 +51,14 @@ class ModelIntentEventConsumerConfig(  # omnimemory-model-exempt: handler config
         description="Seconds without consumption before marked stale",
     )
 
-    # Processing configuration
-    enable_auto_commit: bool = Field(
-        default=False,
-        description="Whether to auto-commit offsets (False = manual commit after storage)",
+    # Retry configuration
+    retry_max_attempts: int = Field(
+        default=3,
+        ge=0,
+        description="Max retries before DLQ (0 = no retries)",
+    )
+    retry_backoff_base_seconds: float = Field(
+        default=1.0,
+        ge=0.1,
+        description="Base backoff seconds (exponential: base * 2^attempt)",
     )
