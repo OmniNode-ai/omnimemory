@@ -41,13 +41,17 @@ _DEPENDENCIES_AVAILABLE = False
 _SKIP_REASON = "Required dependencies not installed"
 
 try:
-    from omnimemory.handlers.adapters.models import (
-        ModelAdapterIntentGraphConfig,
+    from omnibase_core.enums.intelligence import EnumIntentCategory
+    from omnibase_core.models.intelligence import (
         ModelIntentClassificationOutput,
-        ModelIntentDistributionResult,
         ModelIntentQueryResult,
         ModelIntentRecord,
         ModelIntentStorageResult,
+    )
+
+    from omnimemory.handlers.adapters.models import (
+        ModelAdapterIntentGraphConfig,
+        ModelIntentDistributionResult,
     )
     from omnimemory.models.utils import ModelPIIDetectionResult, ModelPIIMatch, PIIType
     from omnimemory.nodes.intent_storage_effect import (
@@ -134,11 +138,10 @@ def handler_with_mock(
 def sample_intent_data() -> ModelIntentClassificationOutput:
     """Create sample intent classification data for testing."""
     return ModelIntentClassificationOutput(
-        intent_category="debugging",
+        success=True,
+        intent_category=EnumIntentCategory.DEBUGGING,
         confidence=0.92,
         keywords=["error", "traceback", "fix"],
-        raw_text="Help me debug this error",
-        metadata={"model_version": "1.0"},
     )
 
 
@@ -147,11 +150,11 @@ def sample_intent_record() -> ModelIntentRecord:
     """Create a sample intent record as returned by adapter queries."""
     return ModelIntentRecord(
         intent_id=TEST_INTENT_ID,
-        session_ref=TEST_SESSION_ID,
-        intent_category="debugging",
+        session_id=TEST_SESSION_ID,
+        intent_category=EnumIntentCategory.DEBUGGING,
         confidence=0.92,
         keywords=["error", "traceback"],
-        created_at_utc=TEST_CREATED_AT,
+        created_at=TEST_CREATED_AT,
         correlation_id=TEST_CORRELATION_ID,
     )
 
@@ -173,11 +176,9 @@ class TestStoreOperation:
         """Verify store_intent() is called with correct arguments."""
         # Arrange
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID,
-            session_id=TEST_SESSION_ID,
             created=True,
-            execution_time_ms=5.0,
         )
 
         request = ModelIntentStorageRequest(
@@ -195,8 +196,7 @@ class TestStoreOperation:
         call_kwargs = mock_adapter.store_intent.call_args.kwargs
         assert call_kwargs["session_id"] == TEST_SESSION_ID
         assert call_kwargs["intent_data"] == sample_intent_data
-        assert call_kwargs["correlation_id"] == TEST_CORRELATION_ID
-        assert call_kwargs["user_context"] == ""
+        assert call_kwargs["correlation_id"] == str(TEST_CORRELATION_ID)
 
     async def test_store_returns_correct_response_model(
         self,
@@ -207,11 +207,9 @@ class TestStoreOperation:
         """Verify store operation returns correctly populated response."""
         # Arrange
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID,
-            session_id=TEST_SESSION_ID,
             created=True,
-            execution_time_ms=5.0,
         )
 
         request = ModelIntentStorageRequest(
@@ -241,11 +239,9 @@ class TestStoreOperation:
         """Verify correlation_id is auto-generated when not provided."""
         # Arrange
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID,
-            session_id=TEST_SESSION_ID,
             created=True,
-            execution_time_ms=5.0,
         )
 
         request = ModelIntentStorageRequest(
@@ -262,9 +258,10 @@ class TestStoreOperation:
         mock_adapter.store_intent.assert_called_once()
         call_kwargs = mock_adapter.store_intent.call_args.kwargs
         generated_correlation_id = call_kwargs["correlation_id"]
-        assert isinstance(generated_correlation_id, UUID)
+        # correlation_id is now a string UUID
+        assert isinstance(generated_correlation_id, str)
         # Verify it's a valid UUID (not the test constant)
-        assert generated_correlation_id != TEST_CORRELATION_ID
+        assert generated_correlation_id != str(TEST_CORRELATION_ID)
 
     async def test_store_propagates_user_context(
         self,
@@ -272,14 +269,16 @@ class TestStoreOperation:
         mock_adapter: MagicMock,
         sample_intent_data: ModelIntentClassificationOutput,
     ) -> None:
-        """Verify user_context is passed through to adapter."""
+        """Verify user_context field is accepted (but no longer passed to adapter).
+
+        Note: user_context is no longer passed to the adapter in omnibase-core 0.13.1.
+        This test verifies the request is still accepted with user_context.
+        """
         # Arrange
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID,
-            session_id=TEST_SESSION_ID,
             created=True,
-            execution_time_ms=5.0,
         )
 
         user_context = "User is working on a Python web app"
@@ -291,11 +290,13 @@ class TestStoreOperation:
         )
 
         # Act
-        await handler_with_mock.execute(request)
+        response = await handler_with_mock.execute(request)
 
-        # Assert
+        # Assert - request still works, adapter called without user_context
+        assert response.status == "success"
+        mock_adapter.store_intent.assert_called_once()
         call_kwargs = mock_adapter.store_intent.call_args.kwargs
-        assert call_kwargs["user_context"] == user_context
+        assert "user_context" not in call_kwargs  # No longer passed
 
     async def test_store_redacts_pii_from_user_context(
         self,
@@ -303,16 +304,14 @@ class TestStoreOperation:
         mock_adapter: MagicMock,
         sample_intent_data: ModelIntentClassificationOutput,
     ) -> None:
-        """Verify PII is redacted from user_context before storage.
+        """Verify PII detection still runs on user_context.
 
-        When user_context contains PII (e.g., email addresses), the handler
-        should detect and redact the PII before passing to the adapter for
-        storage. This ensures sensitive data is not persisted.
+        Note: user_context is no longer passed to the adapter in omnibase-core 0.13.1,
+        but PII detection still runs and logs warnings for audit purposes.
 
-        Note: This test uses model_construct() to bypass the model's own PII
+        This test uses model_construct() to bypass the model's own PII
         validation, allowing us to test the handler's PII detection as a
-        second line of defense. In production, the model validation would
-        reject PII-containing requests before reaching the handler.
+        second line of defense.
         """
         # Arrange - setup PII detector mock to indicate PII was found
         original_context = "User email is test@example.com"
@@ -340,11 +339,9 @@ class TestStoreOperation:
         )
 
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID,
-            session_id=TEST_SESSION_ID,
             created=True,
-            execution_time_ms=5.0,
         )
 
         # Use model_construct to bypass model-level PII validation
@@ -369,10 +366,10 @@ class TestStoreOperation:
             original_context, sensitivity_level=ANY
         )
 
-        # Assert - sanitized content was passed to adapter, not original
+        # Assert - adapter was called (user_context no longer passed)
+        mock_adapter.store_intent.assert_called_once()
         call_kwargs = mock_adapter.store_intent.call_args.kwargs
-        assert call_kwargs["user_context"] == sanitized_context
-        assert call_kwargs["user_context"] != original_context
+        assert "user_context" not in call_kwargs
 
     async def test_store_handles_adapter_error(
         self,
@@ -383,8 +380,7 @@ class TestStoreOperation:
         """Verify error response when adapter returns error status."""
         # Arrange
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="error",
-            session_id=TEST_SESSION_ID,
+            success=False,
             error_message="Database connection failed",
         )
 
@@ -419,10 +415,8 @@ class TestGetSessionOperation:
         """Verify get_session_intents() is called with correct arguments."""
         # Arrange
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="success",
+            success=True,
             intents=[sample_intent_record],
-            total_count=1,
-            execution_time_ms=3.0,
         )
 
         request = ModelIntentStorageRequest(
@@ -451,10 +445,8 @@ class TestGetSessionOperation:
         """Verify get_session returns correctly populated response."""
         # Arrange
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="success",
+            success=True,
             intents=[sample_intent_record],
-            total_count=1,
-            execution_time_ms=3.0,
         )
 
         request = ModelIntentStorageRequest(
@@ -484,12 +476,10 @@ class TestGetSessionOperation:
         handler_with_mock: HandlerIntentStorageAdapter,
         mock_adapter: MagicMock,
     ) -> None:
-        """Verify not_found status is correctly propagated."""
-        # Arrange
+        """Verify error status when adapter returns failure."""
+        # Arrange - in new model, not_found is represented as success=False with error
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="not_found",
-            intents=[],
-            total_count=0,
+            success=False,
             error_message="Session not found",
         )
 
@@ -502,7 +492,7 @@ class TestGetSessionOperation:
         response = await handler_with_mock.execute(request)
 
         # Assert
-        assert response.status == "not_found"
+        assert response.status == "error"
         assert "not found" in (response.error_message or "").lower()
 
     async def test_get_session_handles_no_results(
@@ -510,12 +500,11 @@ class TestGetSessionOperation:
         handler_with_mock: HandlerIntentStorageAdapter,
         mock_adapter: MagicMock,
     ) -> None:
-        """Verify no_results status is correctly propagated."""
-        # Arrange
+        """Verify no_results status when adapter returns empty list."""
+        # Arrange - in new model, no_results is success=True with empty intents
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="no_results",
+            success=True,
             intents=[],
-            total_count=0,
         )
 
         request = ModelIntentStorageRequest(
@@ -743,11 +732,9 @@ class TestErrorHandling:
         """Verify execution_time_ms is always populated in response."""
         # Arrange
         mock_adapter.store_intent.return_value = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID,
-            session_id=TEST_SESSION_ID,
             created=True,
-            execution_time_ms=0.0,  # Adapter returns 0
         )
 
         request = ModelIntentStorageRequest(

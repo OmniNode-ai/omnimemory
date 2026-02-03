@@ -59,7 +59,7 @@ class TestMapEventToStorageRequest:
             event_type="IntentClassified",
             session_id="session_789",
             correlation_id=correlation_id,
-            intent_category="feature_request",
+            intent_category="code_generation",  # Valid EnumIntentCategory value
             confidence=0.77,
             keywords=["add", "feature"],
             timestamp=datetime.now(timezone.utc),
@@ -71,7 +71,8 @@ class TestMapEventToStorageRequest:
         assert result.session_id == event.session_id
         assert result.correlation_id == event.correlation_id
         assert result.intent_data is not None
-        assert result.intent_data.intent_category == event.intent_category
+        # intent_category is now an enum, compare with .value
+        assert result.intent_data.intent_category.value == event.intent_category
         assert result.intent_data.confidence == event.confidence
         assert result.intent_data.keywords == event.keywords
 

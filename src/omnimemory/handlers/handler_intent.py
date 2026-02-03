@@ -77,18 +77,20 @@ import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from uuid import UUID, uuid4
+from uuid import uuid4
 
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput,
+    ModelIntentQueryResult,
+    ModelIntentStorageResult,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.handlers.adapters.adapter_intent_graph import AdapterIntentGraph
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
-    ModelIntentClassificationOutput,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
-    ModelIntentQueryResult,
-    ModelIntentStorageResult,
 )
 from omnimemory.utils.concurrency import (
     CircuitBreaker,
@@ -530,8 +532,7 @@ class HandlerIntent:
         self,
         session_id: str,
         intent_data: ModelIntentClassificationOutput,
-        correlation_id: UUID,
-        user_context: str = "",
+        correlation_id: str,
     ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
@@ -565,13 +566,12 @@ class HandlerIntent:
                 "store_intent called on uninitialized handler",
                 extra={
                     "handler": HANDLER_ID_INTENT,
-                    "correlation_id": str(correlation_id),
+                    "correlation_id": correlation_id,
                     "session_id": session_id,
                 },
             )
             return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
+                success=False,
                 error_message=str(e),
             )
 
@@ -581,7 +581,7 @@ class HandlerIntent:
                 "Circuit breaker is open, failing fast",
                 extra={
                     "handler": HANDLER_ID_INTENT,
-                    "correlation_id": str(correlation_id),
+                    "correlation_id": correlation_id,
                     "session_id": session_id,
                     "circuit_state": circuit_breaker.state.value,
                 },
@@ -595,9 +595,11 @@ class HandlerIntent:
             session_id,
             extra={
                 "handler": HANDLER_ID_INTENT,
-                "correlation_id": str(correlation_id),
+                "correlation_id": correlation_id,
                 "session_id": session_id,
-                "intent_category": intent_data.intent_category,
+                "intent_category": intent_data.intent_category.value
+                if hasattr(intent_data.intent_category, "value")
+                else intent_data.intent_category,
             },
         )
 
@@ -606,11 +608,10 @@ class HandlerIntent:
                 session_id=session_id,
                 intent_data=intent_data,
                 correlation_id=correlation_id,
-                user_context=user_context,
             )
             # Record success if operation completed without exception
             # Business errors (e.g., validation) are not circuit breaker failures
-            if result.status == "success":
+            if result.success:
                 circuit_breaker.record_success()
             return result
         except Exception as e:
@@ -619,7 +620,7 @@ class HandlerIntent:
                 "store_intent failed, recorded circuit breaker failure",
                 extra={
                     "handler": HANDLER_ID_INTENT,
-                    "correlation_id": str(correlation_id),
+                    "correlation_id": correlation_id,
                     "session_id": session_id,
                     "error": str(e),
                     "circuit_state": circuit_breaker.state.value,
@@ -672,7 +673,7 @@ class HandlerIntent:
                 },
             )
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=str(e),
             )
 
@@ -706,11 +707,11 @@ class HandlerIntent:
         try:
             result = await adapter.get_session_intents(
                 session_id=session_id,
-                min_confidence=min_confidence,
+                min_confidence=min_confidence if min_confidence is not None else 0.0,
                 limit=limit,
             )
             # Record success if operation completed without exception
-            if result.status == "success":
+            if result.success:
                 circuit_breaker.record_success()
             return result
         except Exception as e:
@@ -866,19 +867,17 @@ class HandlerIntent:
                 )
 
         try:
-            health = await self._adapter.health_check()
-            # Append circuit breaker info to any existing error message
-            if circuit_breaker_info and health.error_message:
-                health = ModelIntentGraphHealth(
-                    is_healthy=health.is_healthy,
-                    initialized=health.initialized,
-                    handler_healthy=health.handler_healthy,
-                    error_message=f"{health.error_message} ({circuit_breaker_info})",
-                    last_check_timestamp=health.last_check_timestamp,
-                    session_count=health.session_count,
-                    intent_count=health.intent_count,
-                )
-            return health
+            adapter_healthy = await self._adapter.health_check()
+            error_msg = None if adapter_healthy else "Adapter health check failed"
+            if circuit_breaker_info and not adapter_healthy:
+                error_msg = f"{error_msg} ({circuit_breaker_info})"
+            return ModelIntentGraphHealth(
+                is_healthy=adapter_healthy,
+                initialized=True,
+                handler_healthy=adapter_healthy,
+                error_message=error_msg,
+                last_check_timestamp=timestamp,
+            )
         except Exception as e:
             logger.warning(
                 "Health check failed: %s",

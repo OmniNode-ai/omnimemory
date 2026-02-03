@@ -12,13 +12,13 @@ import logging
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 # Runtime import required for Pydantic model validation
 # (TYPE_CHECKING imports are not available at runtime for field type resolution)
-from omnimemory.handlers.adapters.models import (
-    ModelIntentClassificationOutput,  # noqa: TC001
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput,  # noqa: TC002
 )
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from omnimemory.utils.pii_detector import PIIDetector
 
 __all__ = ["ModelIntentStorageRequest"]

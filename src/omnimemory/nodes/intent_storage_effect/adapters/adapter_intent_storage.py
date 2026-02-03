@@ -298,23 +298,23 @@ class HandlerIntentStorageAdapter:
                 )
 
         # Generate correlation_id if not provided
-        correlation_id = request.correlation_id or uuid4()
+        correlation_id = (
+            str(request.correlation_id) if request.correlation_id else str(uuid4())
+        )
 
-        # Call the adapter with sanitized context
+        # Call the adapter (user_context removed in omnibase-core 0.13.1)
         result = await self._adapter.store_intent(
             session_id=request.session_id,
             intent_data=request.intent_data,
             correlation_id=correlation_id,
-            user_context=sanitized_context,
         )
 
-        if result.status == "success":
+        if result.success:
             return ModelIntentStorageResponse(
                 status="success",
                 intent_id=result.intent_id,
                 session_id=request.session_id,
                 created=result.created,
-                execution_time_ms=result.execution_time_ms,
             )
         else:
             return ModelIntentStorageResponse(
@@ -350,15 +350,25 @@ class HandlerIntentStorageAdapter:
             limit=request.limit,
         )
 
-        if result.status == "success":
+        if result.success:
+            if not result.intents:
+                return ModelIntentStorageResponse(
+                    status="no_results",
+                    intents=[],
+                    total_count=0,
+                )
             # Convert to response model format
             intents = [
                 ModelIntentRecordResponse(
                     intent_id=intent.intent_id,
-                    intent_category=intent.intent_category,
+                    intent_category=intent.intent_category.value
+                    if hasattr(intent.intent_category, "value")
+                    else str(intent.intent_category),
                     confidence=intent.confidence,
                     keywords=intent.keywords,
-                    created_at_utc=intent.created_at_utc.isoformat(),
+                    created_at_utc=intent.created_at.isoformat()
+                    if intent.created_at
+                    else "",
                     correlation_id=intent.correlation_id,
                 )
                 for intent in result.intents
@@ -366,19 +376,7 @@ class HandlerIntentStorageAdapter:
             return ModelIntentStorageResponse(
                 status="success",
                 intents=intents,
-                total_count=result.total_count,
-                execution_time_ms=result.execution_time_ms,
-            )
-        elif result.status == "not_found":
-            return ModelIntentStorageResponse(
-                status="not_found",
-                error_message=f"Session not found: {request.session_id}",
-            )
-        elif result.status == "no_results":
-            return ModelIntentStorageResponse(
-                status="no_results",
-                intents=[],
-                total_count=0,
+                total_count=len(intents),
             )
         else:
             return ModelIntentStorageResponse(
