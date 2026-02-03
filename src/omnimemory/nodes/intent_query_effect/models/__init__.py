@@ -5,7 +5,7 @@
 This module exports configuration and event models for the intent query effect node.
 
 Exports:
-    IntentRecordPayload: Payload model for intent records in events.
+    ModelIntentRecordPayload: Payload model for intent records in events.
     ModelHandlerIntentQueryConfig: Handler configuration model.
     ModelIntentQueryRequestedEvent: Request event for intent queries.
     ModelIntentQueryResponseEvent: Response event with query results.
@@ -15,9 +15,9 @@ Exports:
 """
 
 from omnibase_core.models.events import (
-    IntentRecordPayload,
     ModelIntentQueryRequestedEvent,
     ModelIntentQueryResponseEvent,
+    ModelIntentRecordPayload,
 )
 
 from omnimemory.nodes.intent_query_effect.models.model_handler_intent_query_config import (
@@ -25,7 +25,7 @@ from omnimemory.nodes.intent_query_effect.models.model_handler_intent_query_conf
 )
 
 __all__ = [
-    "IntentRecordPayload",
+    "ModelIntentRecordPayload",
     "ModelHandlerIntentQueryConfig",
     "ModelIntentQueryRequestedEvent",
     "ModelIntentQueryResponseEvent",

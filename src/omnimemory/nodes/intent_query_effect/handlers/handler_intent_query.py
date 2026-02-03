@@ -356,14 +356,14 @@ class HandlerIntentQuery:
             )
 
         try:
-            adapter_health = await self._adapter.health_check()
+            adapter_healthy = await self._adapter.health_check()
             return ModelIntentQueryHealth(
-                healthy=adapter_health.is_healthy,
+                healthy=adapter_healthy,
                 initialized=True,
-                adapter_healthy=adapter_health.is_healthy,
-                error_message=adapter_health.error_message,
-                session_count=adapter_health.session_count,
-                intent_count=adapter_health.intent_count,
+                adapter_healthy=adapter_healthy,
+                error_message=None
+                if adapter_healthy
+                else "Adapter health check failed",
             )
         except Exception as e:
             logger.warning("Health check failed: %s", e)
@@ -541,7 +541,7 @@ class HandlerIntentQuery:
             session_id=request.session_ref,
             min_confidence=request.min_confidence
             if request.min_confidence > 0
-            else None,
+            else 0.0,
             limit=request.limit,
         )
 
@@ -555,7 +555,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if result.status == "error":
+        if not result.success:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="session",
@@ -563,19 +563,8 @@ class HandlerIntentQuery:
                 correlation_id=request.correlation_id,
             )
 
-        # Session queries need session_ref populated in records for mapping
-        # Create new instances instead of mutating adapter results
-        intents_with_ref = []
-        for intent in result.intents:
-            if intent.session_ref is None:
-                intents_with_ref.append(
-                    intent.model_copy(update={"session_ref": request.session_ref})
-                )
-            else:
-                intents_with_ref.append(intent)
-
         try:
-            payloads = map_intent_records(intents_with_ref)
+            payloads = map_intent_records(result.intents)
         except ValueError as e:
             logger.warning("Failed to map intent records: %s", e)
             return ModelIntentQueryResponseEvent.from_error(
@@ -626,7 +615,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if result.status == "error":
+        if not result.success:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="recent",

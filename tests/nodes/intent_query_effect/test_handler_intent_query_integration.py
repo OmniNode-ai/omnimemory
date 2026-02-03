@@ -245,18 +245,20 @@ async def test_intents_in_db(
     """
     from uuid import uuid4
 
-    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
+    from omnibase_core.enums.intelligence import EnumIntentCategory
+    from omnibase_core.models.intelligence import ModelIntentClassificationOutput
 
     # Create test intents with varying categories and confidence levels
     test_intents: list[dict[str, Any]] = []
-    test_data = [
-        ("debugging", 0.80, ["error", "traceback"]),
-        ("feature_request", 0.85, ["add", "implement"]),
-        ("documentation", 0.90, ["docs", "explain"]),
+    test_data: list[tuple[EnumIntentCategory, float, list[str]]] = [
+        (EnumIntentCategory.DEBUGGING, 0.80, ["error", "traceback"]),
+        (EnumIntentCategory.CODE_GENERATION, 0.85, ["add", "implement"]),
+        (EnumIntentCategory.DOCUMENTATION, 0.90, ["docs", "explain"]),
     ]
 
     for category, confidence, keywords in test_data:
         intent_data = ModelIntentClassificationOutput(
+            success=True,
             intent_category=category,
             confidence=confidence,
             keywords=keywords,
@@ -266,15 +268,15 @@ async def test_intents_in_db(
         result = await initialized_adapter.store_intent(
             session_id=test_session_id,
             intent_data=intent_data,
-            correlation_id=correlation_id,
+            correlation_id=str(correlation_id),
         )
 
-        if result.status == "success" and result.intent_id is not None:
+        if result.success and result.intent_id is not None:
             test_intents.append(
                 {
                     "intent_id": result.intent_id,
                     "session_id": test_session_id,
-                    "category": category,
+                    "category": category.value,
                     "confidence": confidence,
                     "keywords": keywords,
                     "correlation_id": correlation_id,
