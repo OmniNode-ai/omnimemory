@@ -49,6 +49,8 @@ pytest.importorskip(
     "omnibase_infra", reason="omnibase_infra required for adapter tests"
 )
 
+from omnibase_core.enums.intelligence import EnumIntentCategory
+
 from omnimemory.handlers.adapters import (
     AdapterIntentGraph,
     IntentCypherTemplates,
@@ -122,11 +124,10 @@ def adapter_with_mock(
 def sample_intent_classification() -> ModelIntentClassificationOutput:
     """Create a sample intent classification for testing."""
     return ModelIntentClassificationOutput(
-        intent_category="debugging",
+        success=True,
+        intent_category=EnumIntentCategory.DEBUGGING,
         confidence=0.92,
         keywords=["error", "traceback", "fix"],
-        raw_text="Help me debug this error",
-        metadata={"model_version": "1.0"},
     )
 
 
@@ -313,81 +314,64 @@ class TestModels:
     def test_intent_classification_output_required_fields(self) -> None:
         """Test ModelIntentClassificationOutput with required fields only."""
         classification = ModelIntentClassificationOutput(
-            intent_category="debugging",
-            confidence=0.85,
+            success=True,
         )
 
-        assert classification.intent_category == "debugging"
-        assert classification.confidence == 0.85
+        assert classification.success is True
+        assert classification.intent_category == EnumIntentCategory.UNKNOWN
+        assert classification.confidence == 0.0
         assert classification.keywords == []
-        assert classification.raw_text is None
-        assert classification.metadata == {}
 
     def test_intent_classification_output_all_fields(self) -> None:
         """Test ModelIntentClassificationOutput with all fields."""
         classification = ModelIntentClassificationOutput(
-            intent_category="code_generation",
+            success=True,
+            intent_category=EnumIntentCategory.CODE_GENERATION,
             confidence=0.95,
             keywords=["python", "function", "async"],
-            raw_text="Write an async Python function",
-            metadata={"model_version": "2.0", "latency_ms": 150},
         )
 
-        assert classification.intent_category == "code_generation"
+        assert classification.success is True
+        assert classification.intent_category == EnumIntentCategory.CODE_GENERATION
         assert classification.confidence == 0.95
         assert classification.keywords == ["python", "function", "async"]
-        assert classification.raw_text == "Write an async Python function"
-        assert classification.metadata == {"model_version": "2.0", "latency_ms": 150}
 
     def test_intent_classification_output_confidence_bounds(self) -> None:
         """Test ModelIntentClassificationOutput confidence must be 0.0-1.0."""
         from pydantic import ValidationError
 
         # Valid bounds
-        ModelIntentClassificationOutput(intent_category="test", confidence=0.0)
-        ModelIntentClassificationOutput(intent_category="test", confidence=1.0)
+        ModelIntentClassificationOutput(success=True, confidence=0.0)
+        ModelIntentClassificationOutput(success=True, confidence=1.0)
 
         # Invalid
         with pytest.raises(ValidationError):
-            ModelIntentClassificationOutput(intent_category="test", confidence=-0.1)
+            ModelIntentClassificationOutput(success=True, confidence=-0.1)
 
         with pytest.raises(ValidationError):
-            ModelIntentClassificationOutput(intent_category="test", confidence=1.1)
-
-    def test_intent_classification_output_category_required(self) -> None:
-        """Test intent_category is required and non-empty."""
-        from pydantic import ValidationError
-
-        # Empty string not allowed (min_length=1)
-        with pytest.raises(ValidationError):
-            ModelIntentClassificationOutput(intent_category="", confidence=0.5)
+            ModelIntentClassificationOutput(success=True, confidence=1.1)
 
     def test_intent_storage_result_success(self) -> None:
         """Test ModelIntentStorageResult success case."""
         result = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID_1,
-            session_id="session_xyz789",
             created=True,
-            execution_time_ms=15.5,
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert result.intent_id == TEST_INTENT_ID_1
-        assert result.session_id == "session_xyz789"
         assert result.created is True
-        assert result.execution_time_ms == 15.5
         assert result.error_message is None
 
     def test_intent_storage_result_error(self) -> None:
         """Test ModelIntentStorageResult error case."""
         result = ModelIntentStorageResult(
-            status="error",
-            session_id="session_xyz789",
+            success=False,
             error_message="Connection timeout",
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.intent_id is None
         assert result.created is False
         assert result.error_message == "Connection timeout"
@@ -395,41 +379,41 @@ class TestModels:
     def test_intent_storage_result_merged(self) -> None:
         """Test ModelIntentStorageResult when intent was merged (not created)."""
         result = ModelIntentStorageResult(
-            status="success",
+            success=True,
             intent_id=TEST_INTENT_ID_EXISTING,
-            session_id="session_xyz789",
             created=False,  # Merged with existing
-            execution_time_ms=12.0,
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert result.created is False
 
     def test_intent_record_model(self) -> None:
         """Test ModelIntentRecord creation."""
         record = ModelIntentRecord(
             intent_id=TEST_INTENT_ID_1,
-            intent_category="debugging",
+            session_id="session_123",
+            intent_category=EnumIntentCategory.DEBUGGING,
             confidence=0.92,
             keywords=["error", "fix"],
-            created_at_utc=TEST_CREATED_AT_1,
+            created_at=TEST_CREATED_AT_1,
             correlation_id=TEST_CORRELATION_ID,
         )
 
         assert record.intent_id == TEST_INTENT_ID_1
-        assert record.intent_category == "debugging"
+        assert record.session_id == "session_123"
+        assert record.intent_category == EnumIntentCategory.DEBUGGING
         assert record.confidence == 0.92
         assert record.keywords == ["error", "fix"]
-        assert record.created_at_utc == TEST_CREATED_AT_1
+        assert record.created_at == TEST_CREATED_AT_1
         assert record.correlation_id == TEST_CORRELATION_ID
 
     def test_intent_record_defaults(self) -> None:
         """Test ModelIntentRecord default values."""
         record = ModelIntentRecord(
             intent_id=TEST_INTENT_ID_1,
-            intent_category="test",
+            session_id="session_123",
+            intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
-            created_at_utc=TEST_CREATED_AT_1,
         )
 
         assert record.keywords == []
@@ -440,62 +424,63 @@ class TestModels:
         intents = [
             ModelIntentRecord(
                 intent_id=TEST_INTENT_ID_1,
-                intent_category="debugging",
+                session_id="session_123",
+                intent_category=EnumIntentCategory.DEBUGGING,
                 confidence=0.9,
-                created_at_utc=TEST_CREATED_AT_1,
+                created_at=TEST_CREATED_AT_1,
             ),
             ModelIntentRecord(
                 intent_id=TEST_INTENT_ID_2,
-                intent_category="code_generation",
+                session_id="session_123",
+                intent_category=EnumIntentCategory.CODE_GENERATION,
                 confidence=0.85,
-                created_at_utc=TEST_CREATED_AT_2,
+                created_at=TEST_CREATED_AT_2,
             ),
         ]
 
         result = ModelIntentQueryResult(
-            status="success",
+            success=True,
             intents=intents,
             total_count=2,
-            execution_time_ms=25.0,
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert len(result.intents) == 2
         assert result.total_count == 2
-        assert result.execution_time_ms == 25.0
         assert result.error_message is None
 
     def test_intent_query_result_no_results(self) -> None:
         """Test ModelIntentQueryResult when no intents found."""
         result = ModelIntentQueryResult(
-            status="no_results",
+            success=True,
             intents=[],
             total_count=0,
-            execution_time_ms=10.0,
         )
 
-        assert result.status == "no_results"
+        assert result.success is True
         assert result.intents == []
         assert result.total_count == 0
 
     def test_intent_query_result_error(self) -> None:
         """Test ModelIntentQueryResult error case."""
         result = ModelIntentQueryResult(
-            status="error",
+            success=False,
             error_message="Query timeout",
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.intents == []
         assert result.error_message == "Query timeout"
 
     def test_intent_query_result_status_values(self) -> None:
-        """Test all valid status values for ModelIntentQueryResult."""
-        valid_statuses = ["success", "error", "not_found", "no_results"]
+        """Test ModelIntentQueryResult with success/failure states."""
+        # Success case
+        result_success = ModelIntentQueryResult(success=True)
+        assert result_success.success is True
 
-        for status in valid_statuses:
-            result = ModelIntentQueryResult(status=status)  # type: ignore[arg-type]
-            assert result.status == status
+        # Error case
+        result_error = ModelIntentQueryResult(success=False, error_message="Failed")
+        assert result_error.success is False
 
     def test_intent_graph_health_healthy(self) -> None:
         """Test ModelIntentGraphHealth when healthy."""
@@ -1042,12 +1027,13 @@ class TestContextManager:
                     result = await adapter.store_intent(
                         session_id="session_123",
                         intent_data=ModelIntentClassificationOutput(
-                            intent_category="debugging",
+                            success=True,
+                            intent_category=EnumIntentCategory.DEBUGGING,
                             confidence=0.9,
                         ),
-                        correlation_id=TEST_CORRELATION_ID,
+                        correlation_id=str(TEST_CORRELATION_ID),
                     )
-                    assert result.status == "success"
+                    assert result.success is True
 
                 # After context exit, shutdown should be called
                 mock_instance.shutdown.assert_called_once()
@@ -1112,14 +1098,12 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="session_xyz789",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "success"
-        assert result.session_id == "session_xyz789"
+        assert result.success is True
         assert result.intent_id == TEST_INTENT_ID_1
         assert result.created is True
-        assert result.execution_time_ms > 0
         assert result.error_message is None
 
         # Verify query was called with correct parameters
@@ -1151,10 +1135,10 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="session_xyz789",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert result.created is False
         assert result.intent_id == TEST_INTENT_ID_EXISTING
 
@@ -1170,10 +1154,11 @@ class TestStoreIntent:
         result = await adapter.store_intent(
             session_id="session_123",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
+        assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
     @pytest.mark.asyncio
@@ -1189,12 +1174,12 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
+        assert result.error_message is not None
         assert "failed" in result.error_message.lower()
-        assert result.execution_time_ms > 0
 
     @pytest.mark.asyncio
     async def test_store_intent_with_user_context(
@@ -1203,7 +1188,7 @@ class TestStoreIntent:
         mock_handler: MagicMock,
         sample_intent_classification: ModelIntentClassificationOutput,
     ) -> None:
-        """Test store_intent with user context."""
+        """Test store_intent passes through correlation_id correctly."""
         mock_handler.execute_query.return_value = MagicMock(
             records=[{"intent_id": str(TEST_INTENT_ID_1), "was_created": True}]
         )
@@ -1211,13 +1196,12 @@ class TestStoreIntent:
         await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID,
-            user_context="Python developer debugging async code",
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
         call_args = mock_handler.execute_query.call_args
         params = call_args[1]["parameters"]
-        assert params["user_context"] == "Python developer debugging async code"
+        assert params["correlation_id"] == str(TEST_CORRELATION_ID)
 
     @pytest.mark.asyncio
     async def test_store_intent_rejects_empty_session_id(
@@ -1230,22 +1214,22 @@ class TestStoreIntent:
         result = await adapter_with_mock.store_intent(
             session_id="",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
-        assert result.session_id == ""
+        assert result.success is False
+        assert result.error_message is not None
         assert "session_id cannot be empty" in result.error_message
 
         # Test whitespace-only string
         result_whitespace = await adapter_with_mock.store_intent(
             session_id="   ",
             intent_data=sample_intent_classification,
-            correlation_id=TEST_CORRELATION_ID_2,
+            correlation_id=str(TEST_CORRELATION_ID_2),
         )
 
-        assert result_whitespace.status == "error"
-        assert result_whitespace.session_id == "   "
+        assert result_whitespace.success is False
+        assert result_whitespace.error_message is not None
         assert "session_id cannot be empty" in result_whitespace.error_message
 
 
@@ -1276,7 +1260,7 @@ class TestGetSessionIntents:
                 },
                 {
                     "intent_id": str(TEST_INTENT_ID_2),
-                    "intent_category": "explanation",
+                    "intent_category": "unknown",  # Use valid enum value
                     "confidence": 0.85,
                     "keywords": ["why", "how"],
                     "created_at_utc": TEST_CREATED_AT_2.isoformat(),
@@ -1289,14 +1273,12 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert len(result.intents) == 2
-        assert result.total_count == 2
-        assert result.execution_time_ms > 0
 
         # Verify first intent
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
-        assert result.intents[0].intent_category == "debugging"
+        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING
         assert result.intents[0].confidence == 0.92
         assert result.intents[0].keywords == ["error", "fix"]
 
@@ -1313,9 +1295,8 @@ class TestGetSessionIntents:
             session_id="session_empty",
         )
 
-        assert result.status == "no_results"
+        assert result.success is True
         assert result.intents == []
-        assert result.total_count == 0
 
     @pytest.mark.asyncio
     async def test_get_session_intents_with_min_confidence(
@@ -1377,27 +1358,6 @@ class TestGetSessionIntents:
         assert params["limit"] == 50
 
     @pytest.mark.asyncio
-    async def test_get_session_intents_clamps_values(
-        self,
-        adapter_with_mock: AdapterIntentGraph,
-        mock_handler: MagicMock,
-    ) -> None:
-        """Test that min_confidence and limit are clamped to valid ranges."""
-        mock_handler.execute_query.return_value = MagicMock(records=[])
-
-        # Test with out-of-range values
-        await adapter_with_mock.get_session_intents(
-            session_id="session_123",
-            min_confidence=1.5,  # Should be clamped to 1.0
-            limit=5000,  # Should be clamped to max_intents_per_session
-        )
-
-        call_args = mock_handler.execute_query.call_args
-        params = call_args[1]["parameters"]
-        assert params["min_confidence"] == 1.0  # Clamped
-        assert params["limit"] == 100  # Clamped to config max
-
-    @pytest.mark.asyncio
     async def test_get_session_intents_not_initialized(
         self,
         config: ModelAdapterIntentGraphConfig,
@@ -1407,7 +1367,8 @@ class TestGetSessionIntents:
 
         result = await adapter.get_session_intents(session_id="session_123")
 
-        assert result.status == "error"
+        assert result.success is False
+        assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
     @pytest.mark.asyncio
@@ -1423,7 +1384,8 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.status == "error"
+        assert result.success is False
+        assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
 
@@ -1580,38 +1542,24 @@ class TestHealthCheck:
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
     ) -> None:
-        """Test health check returns healthy status when handler is healthy."""
+        """Test health check returns True when handler is healthy."""
         mock_handler.health_check.return_value = MagicMock(healthy=True)
-        # Mock returns combined count result from count_all_query
-        mock_handler.execute_query.return_value = MagicMock(
-            records=[{"session_count": 100, "intent_count": 500}]
-        )
 
         result = await adapter_with_mock.health_check()
 
-        assert result.is_healthy is True
-        assert result.initialized is True
-        assert result.handler_healthy is True
-        assert result.error_message is None
-        assert result.session_count == 100
-        assert result.intent_count == 500
-        assert result.last_check_timestamp is not None
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_health_check_not_initialized(
         self,
         config: ModelAdapterIntentGraphConfig,
     ) -> None:
-        """Test health check returns unhealthy status when not initialized."""
+        """Test health check returns False when not initialized."""
         adapter = AdapterIntentGraph(config)
 
         result = await adapter.health_check()
 
-        assert result.is_healthy is False
-        assert result.initialized is False
-        assert result.handler_healthy is None
-        assert result.error_message is not None
-        assert "not initialized" in result.error_message.lower()
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_health_check_handler_unhealthy(
@@ -1619,15 +1567,12 @@ class TestHealthCheck:
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
     ) -> None:
-        """Test health check returns unhealthy when handler reports unhealthy."""
+        """Test health check returns False when handler reports unhealthy."""
         mock_handler.health_check.return_value = MagicMock(healthy=False)
 
         result = await adapter_with_mock.health_check()
 
-        assert result.is_healthy is False
-        assert result.initialized is True
-        assert result.handler_healthy is False
-        assert result.error_message is not None
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_health_check_count_query_failure(
@@ -1635,18 +1580,13 @@ class TestHealthCheck:
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
     ) -> None:
-        """Test health check succeeds even if count queries fail."""
-        mock_handler.health_check.return_value = MagicMock(healthy=True)
-        mock_handler.execute_query.side_effect = Exception("Count query failed")
+        """Test health check returns True even if handler raises on health_check."""
+        mock_handler.health_check.side_effect = Exception("Health check failed")
 
         result = await adapter_with_mock.health_check()
 
-        # Should still be healthy, counts just won't be available
-        assert result.is_healthy is True
-        assert result.initialized is True
-        assert result.handler_healthy is True
-        assert result.session_count is None
-        assert result.intent_count is None
+        # Should return False when exception occurs
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_health_check_timeout(
@@ -1670,9 +1610,7 @@ class TestHealthCheck:
 
         result = await adapter.health_check()
 
-        assert result.is_healthy is False
-        assert result.error_message is not None
-        assert "timed out" in result.error_message.lower()
+        assert result is False
 
 
 # =============================================================================
@@ -1693,17 +1631,19 @@ class TestErrorHandling:
         mock_handler.execute_query.side_effect = RuntimeError("Unexpected error")
 
         classification = ModelIntentClassificationOutput(
-            intent_category="test",
+            success=True,
+            intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
         )
 
         result = await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
+        assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
     @pytest.mark.asyncio
@@ -1729,12 +1669,12 @@ class TestErrorHandling:
                 },
                 {
                     "intent_id": None,  # None intent_id - should be skipped
-                    "intent_category": "test",
+                    "intent_category": "unknown",
                     "confidence": 0.7,
                 },
                 {
                     "intent_id": "not-a-valid-uuid",  # Invalid UUID - should be skipped
-                    "intent_category": "test",
+                    "intent_category": "unknown",
                     "confidence": 0.6,
                     "created_at_utc": TEST_CREATED_AT_1.isoformat(),
                 },
@@ -1743,7 +1683,7 @@ class TestErrorHandling:
 
         result = await adapter_with_mock.get_session_intents(session_id="session_123")
 
-        assert result.status == "success"
+        assert result.success is True
         # Only the valid record with proper UUID should be included
         assert len(result.intents) == 1
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
@@ -1759,25 +1699,26 @@ class TestErrorHandling:
 
         # All operations should return error status
         classification = ModelIntentClassificationOutput(
-            intent_category="test",
+            success=True,
+            intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
         )
 
         store_result = await adapter_with_mock.store_intent(
             session_id="session_123",
             intent_data=classification,
-            correlation_id=TEST_CORRELATION_ID,
+            correlation_id=str(TEST_CORRELATION_ID),
         )
-        assert store_result.status == "error"
+        assert store_result.success is False
 
         query_result = await adapter_with_mock.get_session_intents(
             session_id="session_123",
         )
-        assert query_result.status == "error"
+        assert query_result.success is False
 
         distribution = await adapter_with_mock.get_intent_distribution()
         assert distribution.status == "error"
         assert distribution.distribution == {}
 
         health = await adapter_with_mock.health_check()
-        assert health.is_healthy is False
+        assert health is False

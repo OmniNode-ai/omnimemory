@@ -62,6 +62,14 @@ Example::
     Added AdapterValkey for OMN-1393.
 """
 
+# Contract models from omnibase_core (ProtocolIntentGraph conformance)
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput,
+    ModelIntentQueryResult,
+    ModelIntentRecord,
+    ModelIntentStorageResult,
+)
+
 from omnimemory.handlers.adapters.adapter_embedding_http import (
     EmbeddingHttpClient,
     EnumEmbeddingProviderType,
@@ -81,14 +89,12 @@ from omnimemory.handlers.adapters.adapter_valkey import (
     AdapterValkeyConfig,
     ModelValkeyHealth,
 )
+
+# Internal models for adapter-specific functionality
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
-    ModelIntentClassificationOutput,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
-    ModelIntentQueryResult,
-    ModelIntentRecord,
-    ModelIntentStorageResult,
 )
 from omnimemory.models.adapters import (
     ModelConnectionsResult,

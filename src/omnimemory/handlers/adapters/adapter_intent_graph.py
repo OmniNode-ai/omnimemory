@@ -2,14 +2,21 @@
 # Copyright (c) 2025 OmniNode Team
 """Adapter for storing intent classifications in Memgraph.
 
-This adapter provides a domain-specific interface for storing and retrieving
-intent classification results in a graph database. It wraps the generic
-HandlerGraph to provide intent-specific operations:
+This adapter implements ProtocolIntentGraph from omnibase_spi, providing
+a Memgraph-backed implementation for storing and retrieving intent
+classifications.
 
+The storage boundary accepts **classification output** (category, confidence,
+keywords), not raw input. Classification happens upstream; this adapter
+persists the results.
+
+Operations:
 - store_intent(): Store an intent classification linked to a session
 - get_session_intents(): Retrieve intents for a given session
-- get_recent_intents(): Query recent intents across all sessions within a time range
-- get_intent_distribution(): Get aggregate intent statistics
+- health_check(): Check if the graph connection is healthy
+- get_recent_intents(): Query recent intents across all sessions (extension)
+- get_intent_distribution(): Get aggregate intent statistics (extension)
+- get_health_details(): Get detailed health status (extension)
 
 The adapter handles:
 - Session and Intent node creation/merging
@@ -20,31 +27,36 @@ The adapter handles:
 Example::
 
     async def example():
+        from omnibase_core.enums.intelligence import EnumIntentCategory
+
         config = ModelAdapterIntentGraphConfig(timeout_seconds=30.0)
         adapter = AdapterIntentGraph(config)
         await adapter.initialize(
             connection_uri="bolt://localhost:7687",
         )
 
-        # Store an intent
-        from uuid import uuid4
+        # Store an intent (classification already happened upstream)
         classification = ModelIntentClassificationOutput(
-            intent_category="debugging",
+            success=True,
+            intent_category=EnumIntentCategory.DEBUGGING,
             confidence=0.92,
             keywords=["error", "traceback"],
         )
         result = await adapter.store_intent(
             session_id="session_123",
             intent_data=classification,
-            correlation_id=uuid4(),
+            correlation_id="corr-456",
         )
-        if result.status == "success":
+        if result.success:
             print(f"Stored intent: {result.intent_id}")
 
         await adapter.shutdown()
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1457.
+
+.. versionchanged:: 0.2.0
+    Implements ProtocolIntentGraph from omnibase_spi (OMN-1476).
 """
 
 from __future__ import annotations
@@ -59,17 +71,21 @@ from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-from omnibase_core.types.type_json import JsonType
-from omnibase_infra.handlers.handler_graph import HandlerGraph
-
-from omnimemory.handlers.adapters.models import (
-    ModelAdapterIntentGraphConfig,
+from omnibase_core.enums.intelligence import EnumIntentCategory
+from omnibase_core.models.intelligence import (
     ModelIntentClassificationOutput,
-    ModelIntentDistributionResult,
-    ModelIntentGraphHealth,
     ModelIntentQueryResult,
     ModelIntentRecord,
     ModelIntentStorageResult,
+)
+from omnibase_core.types.type_json import JsonType
+from omnibase_infra.handlers.handler_graph import HandlerGraph
+from omnibase_spi.protocols.intelligence import ProtocolIntentGraph
+
+from omnimemory.handlers.adapters.models import (
+    ModelAdapterIntentGraphConfig,
+    ModelIntentDistributionResult,
+    ModelIntentGraphHealth,
 )
 
 if TYPE_CHECKING:
@@ -229,8 +245,12 @@ class IntentCypherTemplates:
         """
 
 
-class AdapterIntentGraph:
+class AdapterIntentGraph(ProtocolIntentGraph):
     """Adapter that wraps HandlerGraph for intent classification storage.
+
+    Implements the ProtocolIntentGraph protocol from omnibase_spi, providing
+    a Memgraph-backed implementation for storing and retrieving intent
+    classifications.
 
     This adapter provides an intent-domain interface on top of the generic
     graph handler, translating intent storage and retrieval operations
@@ -240,12 +260,18 @@ class AdapterIntentGraph:
     - get_session_intents(session_id): Retrieve intents for a session
     - get_recent_intents(time_range, min_confidence): Query recent intents across sessions
     - get_intent_distribution(time_range): Get intent category statistics
+    - health_check(): Check if the graph connection is healthy
 
     The adapter handles:
     - Session node creation with MERGE semantics
     - Intent node creation/update with MERGE semantics
     - Relationship properties for correlation tracking
     - Confidence-based filtering and time-range queries
+
+    Note:
+        The storage boundary accepts **classification output** (category,
+        confidence, keywords), not raw input. Classification happens upstream;
+        this adapter persists the results.
 
     Attributes:
         config: The adapter configuration.
@@ -254,6 +280,8 @@ class AdapterIntentGraph:
     Example::
 
         async def example():
+            from omnibase_core.enums.intelligence import EnumIntentCategory
+
             config = ModelAdapterIntentGraphConfig(
                 timeout_seconds=30.0,
                 max_intents_per_session=100,
@@ -263,16 +291,16 @@ class AdapterIntentGraph:
                 connection_uri="bolt://localhost:7687",
             )
 
-            # Store intent classification
-            from uuid import uuid4
+            # Store intent classification (classification happened upstream)
             result = await adapter.store_intent(
                 session_id="sess_123",
                 intent_data=ModelIntentClassificationOutput(
-                    intent_category="code_generation",
+                    success=True,
+                    intent_category=EnumIntentCategory.CODE_GENERATION,
                     confidence=0.95,
                     keywords=["python", "function"],
                 ),
-                correlation_id=uuid4(),
+                correlation_id="corr-456",
             )
 
             # Query intents for session
@@ -542,11 +570,11 @@ class AdapterIntentGraph:
         self,
         session_id: str,
         intent_data: ModelIntentClassificationOutput,
-        correlation_id: UUID,
-        *,
-        user_context: str = "",
+        correlation_id: str,
     ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
+
+        Implements ProtocolIntentGraph.store_intent.
 
         Uses MERGE semantics to create or update the session and intent
         nodes. If an intent with the same category already exists for
@@ -554,9 +582,10 @@ class AdapterIntentGraph:
 
         Args:
             session_id: Unique identifier for the session.
-            intent_data: The intent classification output to store.
+            intent_data: The classification output to store (category, confidence,
+                keywords). Classification happens upstream; this method persists
+                the result.
             correlation_id: Correlation ID for request tracing.
-            user_context: Optional user context string for the session.
 
         Returns:
             ModelIntentStorageResult indicating success or failure.
@@ -570,8 +599,7 @@ class AdapterIntentGraph:
         # Validate session_id is non-empty
         if not session_id or not session_id.strip():
             return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
+                success=False,
                 error_message="session_id cannot be empty",
             )
 
@@ -579,8 +607,7 @@ class AdapterIntentGraph:
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
+                success=False,
                 error_message=str(e),
             )
 
@@ -596,19 +623,21 @@ class AdapterIntentGraph:
                     rel_type=self._config.relationship_type,
                 )
 
-                # Convert UUID/datetime to strings for database storage
+                # Convert enum/UUID/datetime to strings for database storage
+                # intent_category is an EnumIntentCategory, store its value
+                intent_category_str = intent_data.intent_category.value
                 timestamp_utc_str = timestamp_utc.isoformat()
                 parameters: dict[str, JsonType] = {
                     "session_id": session_id,
                     "started_at_utc": timestamp_utc_str,
-                    "user_context": user_context,
+                    "user_context": "",  # No user_context in protocol
                     "intent_id": str(intent_id),
-                    "intent_category": intent_data.intent_category,
+                    "intent_category": intent_category_str,
                     "confidence": intent_data.confidence,
                     "keywords": cast(list[JsonType], intent_data.keywords),
                     "created_at_utc": timestamp_utc_str,
                     "timestamp_utc": timestamp_utc_str,
-                    "correlation_id": str(correlation_id),
+                    "correlation_id": correlation_id,
                 }
 
                 result = await handler.execute_query(
@@ -647,19 +676,18 @@ class AdapterIntentGraph:
                             )
 
                 logger.info(
-                    "Stored intent for session %s: category=%s, confidence=%.2f, created=%s",
+                    "Stored intent for session %s: category=%s, confidence=%.2f, created=%s (%.2fms)",
                     session_id,
-                    intent_data.intent_category,
+                    intent_category_str,
                     intent_data.confidence,
                     was_created,
+                    execution_time_ms,
                 )
 
                 return ModelIntentStorageResult(
-                    status="success",
+                    success=True,
                     intent_id=returned_intent_id,
-                    session_id=session_id,
                     created=was_created,
-                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
@@ -671,9 +699,7 @@ class AdapterIntentGraph:
                 execution_time_ms,
             )
             return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=f"Operation timed out after {self._config.timeout_seconds}s",
             )
 
@@ -686,19 +712,19 @@ class AdapterIntentGraph:
                 e,
             )
             return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=f"Storage failed: {e}",
             )
 
     async def get_session_intents(
         self,
         session_id: str,
-        min_confidence: float | None = None,
+        min_confidence: float = 0.0,
         limit: int | None = None,
     ) -> ModelIntentQueryResult:
         """Get intents for a session with optional filtering.
+
+        Implements ProtocolIntentGraph.get_session_intents.
 
         Retrieves intent classifications associated with the specified
         session, ordered by creation time (most recent first).
@@ -706,17 +732,11 @@ class AdapterIntentGraph:
         Args:
             session_id: The session identifier to query.
             min_confidence: Minimum confidence threshold (0.0-1.0).
-                Defaults to config.default_confidence_threshold.
             limit: Maximum number of results to return.
                 Defaults to config.max_intents_per_session.
 
         Returns:
             ModelIntentQueryResult with the list of intents or error status.
-            Possible status values:
-            - "success": Query completed with results
-            - "no_results": Session exists but has no intents matching criteria
-            - "not_found": Session not found (reserved for future use)
-            - "error": Query failed
 
         Note:
             This method never raises on business errors - it returns
@@ -726,24 +746,22 @@ class AdapterIntentGraph:
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=str(e),
             )
 
         start_time = time.perf_counter()
 
-        # Apply defaults from config
+        # Apply defaults from config for min_confidence
         effective_min_confidence = (
             min_confidence
-            if min_confidence is not None
+            if min_confidence > 0.0
             else self._config.default_confidence_threshold
         )
+        effective_min_confidence = max(0.0, min(effective_min_confidence, 1.0))
         effective_limit = (
             limit if limit is not None else self._config.max_intents_per_session
         )
-
-        # Clamp values to valid ranges
-        effective_min_confidence = max(0.0, min(effective_min_confidence, 1.0))
         effective_limit = max(
             1, min(effective_limit, self._config.max_intents_per_session)
         )
@@ -771,11 +789,13 @@ class AdapterIntentGraph:
                 execution_time_ms = (end_time - start_time) * 1000
 
                 if not result.records:
+                    logger.debug(
+                        "No intents found for session %s (%.2fms)",
+                        session_id,
+                        execution_time_ms,
+                    )
                     return ModelIntentQueryResult(
-                        status="no_results",
-                        intents=[],
-                        total_count=0,
-                        execution_time_ms=execution_time_ms,
+                        success=True,
                     )
 
                 # Convert records to intent models
@@ -828,7 +848,7 @@ class AdapterIntentGraph:
                     # Parse datetime from ISO string
                     created_at_raw = record.get("created_at_utc", "")
                     try:
-                        created_at_utc = datetime.fromisoformat(str(created_at_raw))
+                        created_at = datetime.fromisoformat(str(created_at_raw))
                     except ValueError:
                         logger.warning(
                             "Skipping intent record with invalid created_at_utc: %s",
@@ -836,22 +856,39 @@ class AdapterIntentGraph:
                         )
                         continue
 
+                    # Convert stored string to EnumIntentCategory
+                    intent_category_str = str(record.get("intent_category", "unknown"))
+                    try:
+                        intent_category = EnumIntentCategory(intent_category_str)
+                    except ValueError:
+                        # If stored category doesn't match enum, use UNKNOWN
+                        logger.warning(
+                            "Unknown intent category '%s', using UNKNOWN",
+                            intent_category_str,
+                        )
+                        intent_category = EnumIntentCategory.UNKNOWN
+
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
-                            intent_category=str(record.get("intent_category", "")),
+                            session_id=session_id,
+                            intent_category=intent_category,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at_utc=created_at_utc,
+                            created_at=created_at,
                             correlation_id=correlation_id,
                         )
                     )
 
+                logger.debug(
+                    "Found %d intents for session %s (%.2fms)",
+                    len(intents),
+                    session_id,
+                    execution_time_ms,
+                )
                 return ModelIntentQueryResult(
-                    status="success",
+                    success=True,
                     intents=intents,
-                    total_count=len(intents),
-                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
@@ -863,8 +900,7 @@ class AdapterIntentGraph:
                 execution_time_ms,
             )
             return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
@@ -877,8 +913,7 @@ class AdapterIntentGraph:
                 e,
             )
             return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=f"Query failed: {e}",
             )
 
@@ -1050,16 +1085,11 @@ class AdapterIntentGraph:
         .. versionadded:: 0.1.0
             Added for OMN-1504 to support querying recent intents across sessions.
         """
-        start_time = time.perf_counter()
-
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
-            end_time = time.perf_counter()
-            execution_time_ms = (end_time - start_time) * 1000
             return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=str(e),
             )
 
@@ -1104,19 +1134,13 @@ class AdapterIntentGraph:
                     parameters=parameters,
                 )
 
-                end_time = time.perf_counter()
-                execution_time_ms = (end_time - start_time) * 1000
-
                 if not result.records:
                     logger.debug(
                         "No recent intents found in last %d hours",
                         effective_time_range,
                     )
                     return ModelIntentQueryResult(
-                        status="no_results",
-                        intents=[],
-                        total_count=0,
-                        execution_time_ms=execution_time_ms,
+                        success=True,
                     )
 
                 # Convert records to intent models
@@ -1140,11 +1164,12 @@ class AdapterIntentGraph:
                         )
                         continue
 
-                    # Extract session_id for session_ref field
+                    # Extract session_id
                     session_id_raw = record.get("session_id")
-                    session_ref: str | None = (
-                        str(session_id_raw) if session_id_raw is not None else None
-                    )
+                    if session_id_raw is None:
+                        logger.warning("Skipping intent record with missing session_id")
+                        continue
+                    record_session_id = str(session_id_raw)
 
                     keywords_raw = record.get("keywords", [])
                     keywords: list[str] = (
@@ -1175,7 +1200,7 @@ class AdapterIntentGraph:
                     # Parse datetime from ISO string
                     created_at_raw = record.get("created_at_utc", "")
                     try:
-                        created_at_utc = datetime.fromisoformat(str(created_at_raw))
+                        created_at = datetime.fromisoformat(str(created_at_raw))
                     except ValueError:
                         logger.warning(
                             "Skipping intent record with invalid created_at_utc: %s",
@@ -1183,14 +1208,25 @@ class AdapterIntentGraph:
                         )
                         continue
 
+                    # Convert stored string to EnumIntentCategory
+                    intent_category_str = str(record.get("intent_category", "unknown"))
+                    try:
+                        intent_category = EnumIntentCategory(intent_category_str)
+                    except ValueError:
+                        logger.warning(
+                            "Unknown intent category '%s', using UNKNOWN",
+                            intent_category_str,
+                        )
+                        intent_category = EnumIntentCategory.UNKNOWN
+
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
-                            session_ref=session_ref,
-                            intent_category=str(record.get("intent_category", "")),
+                            session_id=record_session_id,
+                            intent_category=intent_category,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at_utc=created_at_utc,
+                            created_at=created_at,
                             correlation_id=correlation_id,
                         )
                     )
@@ -1202,43 +1238,59 @@ class AdapterIntentGraph:
                 )
 
                 return ModelIntentQueryResult(
-                    status="success",
+                    success=True,
                     intents=intents,
-                    total_count=len(intents),
-                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
-            end_time = time.perf_counter()
-            execution_time_ms = (end_time - start_time) * 1000
             logger.warning(
-                "Timeout querying recent intents after %.2fms",
-                execution_time_ms,
+                "Timeout querying recent intents after %ss",
+                self._config.timeout_seconds,
             )
             return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
         except Exception as e:
-            end_time = time.perf_counter()
-            execution_time_ms = (end_time - start_time) * 1000
             logger.error(
                 "Error querying recent intents: %s",
                 e,
             )
             return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+                success=False,
                 error_message=f"Query failed: {e}",
             )
 
-    async def health_check(self) -> ModelIntentGraphHealth:
-        """Check if the graph connection is healthy.
+    async def health_check(self) -> bool:
+        """Check if the intent graph storage is healthy and accessible.
 
-        Performs connectivity check and optionally gathers graph
-        statistics (session and intent counts).
+        Implements ProtocolIntentGraph.health_check.
+
+        Returns:
+            True if the storage is healthy, False otherwise.
+
+        Note:
+            For detailed health information (counts, timestamps, error messages),
+            use get_health_details() instead.
+        """
+        if not self._initialized or self._handler is None:
+            return False
+
+        try:
+            async with asyncio.timeout(self._config.timeout_seconds):
+                health = await self._handler.health_check()
+                return bool(health.healthy)
+        except Exception as e:
+            logger.warning("Health check failed: %s", e)
+            return False
+
+    async def get_health_details(self) -> ModelIntentGraphHealth:
+        """Get detailed health status of the graph connection.
+
+        This method provides richer health information than health_check(),
+        including session/intent counts and timestamps. Use this when you
+        need more than a simple healthy/unhealthy indicator.
 
         Returns:
             ModelIntentGraphHealth with detailed health status.
