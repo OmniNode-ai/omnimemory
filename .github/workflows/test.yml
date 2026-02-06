@@ -294,6 +294,7 @@ jobs:
           path: omnibase_core
 
       - name: Verify handshake is current
+        id: verify-handshake
         run: |
           echo "::group::Architecture Handshake Verification"
           if [ ! -f "./omnibase_core/architecture-handshakes/check-handshake.sh" ]; then
@@ -308,9 +309,14 @@ jobs:
       - name: Handshake verification summary
         if: always()
         run: |
+          result="${{ steps.verify-handshake.outcome }}"
           echo "## Architecture Handshake" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Verified .claude/architecture-handshake.md matches source in omnibase_core" >> $GITHUB_STEP_SUMMARY
+          if [ "${result}" = "success" ]; then
+            echo "Verified .claude/architecture-handshake.md matches source in omnibase_core" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Handshake verification failed or was skipped; see logs." >> $GITHUB_STEP_SUMMARY
+          fi
 
   # Phase 2 - Test Suite
   test:
