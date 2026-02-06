@@ -30,6 +30,9 @@ jobs:
   #
   # Phase 2 - Full Test Suite (after Phase 1 completes):
   #   - test: Run all tests (depends on lint, pyright, onex-validation)
+  #   Note: check-handshake runs independently and is evaluated in test-summary,
+  #   NOT in test's needs, because it may be skipped on fork PRs and GitHub Actions
+  #   propagates skipped status to dependent jobs.
   #
   # Phase 3 - Aggregation:
   #   - test-summary: Aggregates all job results
@@ -302,7 +305,7 @@ jobs:
   # Phase 2 - Test Suite
   test:
     name: Tests
-    needs: [lint, pyright, onex-validation, check-handshake]
+    needs: [lint, pyright, onex-validation]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
