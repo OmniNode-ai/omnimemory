@@ -26,6 +26,7 @@ jobs:
   #   - lint: Code quality (ruff format, ruff check, mypy strict)
   #   - pyright: Type checking (complementary to mypy)
   #   - onex-validation: ONEX pattern validation (pydantic, naming, enums, etc.)
+  #   - check-handshake: Architecture handshake verification (cross-repo)
   #
   # Phase 2 - Full Test Suite (after Phase 1 completes):
   #   - test: Run all tests (depends on lint, pyright, onex-validation)
@@ -269,10 +270,39 @@ jobs:
           echo "- Naming conventions" >> $GITHUB_STEP_SUMMARY
           echo "- HTTP import boundary enforcement" >> $GITHUB_STEP_SUMMARY
 
+  # Phase 1 - Architecture Handshake Verification
+  check-handshake:
+    name: Verify Architecture Handshake
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Skip on fork PRs - forks may not have access to cross-repo checkout
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout omnibase_core
+        uses: actions/checkout@v4
+        with:
+          repository: OmniNode-ai/omnibase_core
+          path: omnibase_core
+
+      - name: Verify handshake is current
+        run: |
+          echo "::group::Architecture Handshake Verification"
+          if [ ! -f "./omnibase_core/architecture-handshakes/check-handshake.sh" ]; then
+            echo "::error::check-handshake.sh not found in omnibase_core"
+            exit 1
+          fi
+          echo "Verifying .claude/architecture-handshake.md matches source in omnibase_core..."
+          echo ""
+          ./omnibase_core/architecture-handshakes/check-handshake.sh ./omnibase_core
+          echo "::endgroup::"
+
   # Phase 2 - Test Suite
   test:
     name: Tests
-    needs: [lint, pyright, onex-validation]
+    needs: [lint, pyright, onex-validation, check-handshake]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -353,7 +383,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [lint, pyright, onex-validation, test]
+    needs: [lint, pyright, onex-validation, check-handshake, test]
     if: always()
 
     steps:
@@ -362,16 +392,19 @@ jobs:
           lint="${{ needs.lint.result }}"
           pyright="${{ needs.pyright.result }}"
           onex="${{ needs.onex-validation.result }}"
+          handshake="${{ needs.check-handshake.result }}"
           test="${{ needs.test.result }}"
 
           if [[ "$lint" == "success" ]] && \
              [[ "$pyright" == "success" ]] && \
              [[ "$onex" == "success" ]] && \
+             [[ "$handshake" == "success" || "$handshake" == "skipped" ]] && \
              [[ "$test" == "success" ]]; then
             echo "All tests passed successfully"
             echo "Code Quality: Passed"
             echo "Pyright Type Checking: Passed"
             echo "ONEX Validation: Passed"
+            echo "Architecture Handshake: $handshake"
             echo "Tests: Passed"
             exit 0
           else
@@ -379,6 +412,7 @@ jobs:
             echo "Lint: $lint"
             echo "Pyright: $pyright"
             echo "ONEX Validation: $onex"
+            echo "Architecture Handshake: $handshake"
             echo "Tests: $test"
             exit 1
           fi
