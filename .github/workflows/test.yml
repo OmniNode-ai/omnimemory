@@ -284,6 +284,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Uses default GITHUB_TOKEN which has read access to public repos in the org.
+      # Same pattern as omniclaude ci-cd.yml. If omnibase_core becomes private,
+      # add: token: ${{ secrets.OMNIBASE_CORE_ACCESS_TOKEN }}
       - name: Checkout omnibase_core
         uses: actions/checkout@v4
         with:
@@ -301,6 +304,13 @@ jobs:
           echo ""
           ./omnibase_core/architecture-handshakes/check-handshake.sh ./omnibase_core
           echo "::endgroup::"
+
+      - name: Handshake verification summary
+        if: always()
+        run: |
+          echo "## Architecture Handshake" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Verified .claude/architecture-handshake.md matches source in omnibase_core" >> $GITHUB_STEP_SUMMARY
 
   # Phase 2 - Test Suite
   test:
