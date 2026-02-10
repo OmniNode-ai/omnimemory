@@ -9,7 +9,7 @@ installed_by: jonah
 # OmniNode Architecture – Constraint Map (omnimemory)
 
 > **Role**: Memory system – persistence, recall, embeddings, vector storage
-> **Handshake Version**: 0.1.0
+> **Handshake Version**: 0.1.0 <!-- contract format version; source_version in metadata tracks the template -->
 
 ## Platform-Wide Rules
 
