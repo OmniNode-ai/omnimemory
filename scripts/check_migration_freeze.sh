@@ -12,6 +12,8 @@
 set -euo pipefail
 
 FREEZE_FILE=".migration_freeze"
+# Path to migrations directory. git diff returns empty (not error) if this path
+# does not exist yet, which is correct — no migrations means no violations.
 MIGRATIONS_DIR="deployment/database/migrations"
 
 # If no freeze file, nothing to enforce.
@@ -37,6 +39,8 @@ if [ "$MODE" = "--ci" ]; then
     # Detect added (A) or renamed (R) files in the migrations directory.
     # Modified (M) files are intentionally allowed — fixing existing
     # migrations (rollback bug fixes, comment tweaks) is safe during freeze.
+    # Three-dot diff finds the merge-base automatically. If no common ancestor
+    # exists (orphan branch), git diff falls back to two-dot behavior — safe.
     # Uses awk (not grep|awk) to avoid grep exit-code 1 on no-match with pipefail.
     NEW_MIGRATIONS=$(git diff --name-status "origin/${BASE_BRANCH}...HEAD" -- "$MIGRATIONS_DIR" \
         | awk '/^[AR]/ {print $NF}')
