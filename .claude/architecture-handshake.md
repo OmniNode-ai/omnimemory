@@ -1,8 +1,8 @@
 <!-- HANDSHAKE_METADATA
 source: omnibase_core/architecture-handshakes/repos/omnimemory.md
-source_version: 0.15.0
-source_sha256: d8453d4b0ff2e2f84289d4c965426832e8e1ad9a8d6bd419ef727a5058fcec6a
-installed_at: 2026-02-06T21:14:03Z
+source_version: 0.16.0
+source_sha256: f8f997a43e97d3b2c83972d1fec94ff9e0429ad76c10477979fe70db57443811
+installed_at: 2026-02-10T16:35:34Z
 installed_by: jonah
 -->
 
@@ -11,9 +11,20 @@ installed_by: jonah
 > **Role**: Memory system – persistence, recall, embeddings, vector storage
 > **Handshake Version**: 0.1.0
 
+## Platform-Wide Rules
+
+1. **No backwards compatibility** - Breaking changes always acceptable. No deprecation periods, shims, or migration paths.
+2. **Delete old code immediately** - Never leave deprecated code "for reference." If unused, delete it.
+3. **No speculative refactors** - Only make changes that are directly requested or clearly necessary.
+4. **No silent schema changes** - All schema changes must be explicit and deliberate.
+5. **Frozen event schemas** - All models crossing boundaries (events, intents, actions, envelopes, projections) must use `frozen=True`. Internal mutable state is fine.
+6. **Explicit timestamps** - Never use `datetime.now()` defaults. Inject timestamps explicitly.
+7. **No hardcoded configuration** - All config via `.env` or Pydantic Settings. No localhost defaults.
+8. **Kafka is required infrastructure** - Use async/non-blocking patterns. Never block the calling thread waiting for Kafka acks.
+9. **No `# type: ignore` without justification** - Requires explanation comment and ticket reference.
+
 ## Core Principles
 
-- **ZERO BACKWARDS COMPATIBILITY** - Breaking changes always acceptable
 - Sub-100ms memory operations
 - ONEX 4.0 compliance
 - Strong typing (zero `Any` types)
@@ -29,17 +40,13 @@ installed_by: jonah
 ## Rules the Agent Must Obey
 
 1. **ALL version fields MUST use `ModelSemVer` directly** - No `str` fallbacks, no union types
-2. **No backwards compatibility EVER** - Delete old code, never deprecate
-3. **Zero `Any` types** - Strong typing throughout
-4. **All models must have Field descriptions** - `Field(..., description="...")`
-5. **Models in `models/` directory** - Not `core/`
-6. **Follow model exemption pattern** when placing models with handlers
+2. **Zero `Any` types** - Strong typing throughout
+3. **All models must have Field descriptions** - `Field(..., description="...")`
+4. **Models in `models/` directory** - Not `core/`
+5. **Follow model exemption pattern** when placing models with handlers
 
 ## Non-Goals (DO NOT)
 
-- ❌ No backwards compatibility - breaking changes always acceptable
-- ❌ No deprecated code maintenance - Delete old code immediately
-- ❌ No compatibility shims or migration paths
 - ❌ No `version: ModelSemVer | str` union types
 - ❌ No string-to-semver convenience validators
 
