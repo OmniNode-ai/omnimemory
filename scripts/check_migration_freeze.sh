@@ -26,19 +26,25 @@ MODE="${1:-precommit}"
 
 if [ "$MODE" = "--ci" ]; then
     # CI mode: compare against base branch
-    BASE_BRANCH="${GITHUB_BASE_REF:-main}"
+    # GITHUB_BASE_REF is set automatically for pull_request events.
+    # DEFAULT_BRANCH can be passed from the workflow for push events.
+    BASE_BRANCH="${GITHUB_BASE_REF:-${DEFAULT_BRANCH:-main}}"
     # Defensive fetch: ensure origin/<base> ref is up-to-date even if
     # the CI runner's checkout didn't fully resolve it.
-    git fetch origin "${BASE_BRANCH}" --quiet 2>/dev/null || true
+    if ! git fetch origin "${BASE_BRANCH}" --quiet 2>/dev/null; then
+        echo "Warning: git fetch origin ${BASE_BRANCH} failed; using existing refs." >&2
+    fi
     # Detect added (A) or renamed (R) files in the migrations directory.
     # Modified (M) files are intentionally allowed — fixing existing
     # migrations (rollback bug fixes, comment tweaks) is safe during freeze.
+    # Uses awk (not grep|awk) to avoid grep exit-code 1 on no-match with pipefail.
     NEW_MIGRATIONS=$(git diff --name-status "origin/${BASE_BRANCH}...HEAD" -- "$MIGRATIONS_DIR" \
-        | grep -E '^[AR]' | awk '{print $NF}' || true)
+        | awk '/^[AR]/ {print $NF}')
 else
     # Pre-commit mode: check staged files
+    # Uses awk (not grep|awk) to avoid grep exit-code 1 on no-match with pipefail.
     NEW_MIGRATIONS=$(git diff --cached --name-status -- "$MIGRATIONS_DIR" \
-        | grep -E '^[AR]' | awk '{print $NF}' || true)
+        | awk '/^[AR]/ {print $NF}')
 fi
 
 if [ -n "$NEW_MIGRATIONS" ]; then

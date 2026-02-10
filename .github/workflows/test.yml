@@ -82,10 +82,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for git diff
+          fetch-depth: 0  # Needed for three-dot diff (merge-base with origin/main)
 
       - name: Check migration freeze
         run: ./scripts/check_migration_freeze.sh --ci
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
   # Phase 1 - Code Quality
   lint:
