@@ -17,8 +17,8 @@
 
 ## Tables Owned by omnimemory
 
-| Table | Non-PK Constraints | Notes |
-|-------|-------------------|-------|
+| Table | Notable Constraints (excl. NOT NULL / DEFAULT) | Notes |
+|-------|--------------------------------------------------|-------|
 | `subscriptions` | `UNIQUE(agent_id, topic)`, `CHECK(status)` | No FKs |
 | `memories` | `CHECK(lifecycle_state)` | No FKs |
 
