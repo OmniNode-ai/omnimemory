@@ -27,6 +27,7 @@
 # ====================================
 # Pre-commit Hook                   | CI Workflow Job          | Command
 # ----------------------------------|--------------------------|----------------------------------
+# migration-freeze-check (pre-commit)| migration-freeze        | ./scripts/check_migration_freeze.sh [--ci]
 # ruff-format (pre-commit)          | lint                     | ruff format --check src/ tests/
 # ruff (pre-commit)                 | lint                     | ruff check src/ tests/
 # mypy (pre-push)                   | lint                     | mypy --show-error-codes --no-error-summary src/omnimemory
@@ -157,10 +158,30 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
-  # Local hooks for cleanup and ONEX validation
+  # Local hooks for cleanup, migration freeze, and ONEX validation
   # These use language: python or language: system with no Poetry dependency
   - repo: local
     hooks:
+      # --------------------------------------------------------------------------
+      # Migration Freeze Check - Block new migrations during DB-per-repo refactor
+      # Validates: No new .sql files added to deployment/database/migrations/
+      # Scope: Only triggers when migration files or .migration_freeze change
+      # Purpose: Enforces schema freeze (OMN-2055) while .migration_freeze exists
+      # --------------------------------------------------------------------------
+      - id: migration-freeze-check
+        name: migration freeze check
+        entry: ./scripts/check_migration_freeze.sh
+        language: system
+        pass_filenames: false
+        # Trigger when migration files or the freeze file itself change.
+        # Note: pre-commit sees deletions in the changeset, so deleting
+        # .migration_freeze will trigger this hook. The script then checks
+        # [ ! -f .migration_freeze ] at runtime and exits 0, which means
+        # removing the freeze file + adding a migration in the same commit
+        # is intentionally allowed (freeze is lifted).
+        files: ^(deployment/database/migrations/|\.migration_freeze)
+        stages: [pre-commit]
+
       # Cleanup: Clear tmp/ directory before commits
       - id: clean-tmp-directory
         name: Clean tmp directory

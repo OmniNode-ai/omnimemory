@@ -23,6 +23,7 @@ jobs:
   # =============================================================================
   #
   # Phase 1 - Quick Validation (parallel, ~2-5 min):
+  #   - migration-freeze: Block new DB migrations during schema freeze (OMN-2055)
   #   - lint: Code quality (ruff format, ruff check, mypy strict)
   #   - pyright: Type checking (complementary to mypy)
   #   - onex-validation: ONEX pattern validation (pydantic, naming, enums, etc.)
@@ -51,6 +52,7 @@ jobs:
   # CI-TO-HOOK SYNCHRONIZATION MAP:
   # CI Job          | Pre-commit Hook                   | Command
   # ----------------|-----------------------------------|----------------------------------
+  # migration-freeze| migration-freeze-check (pre-commit)| ./scripts/check_migration_freeze.sh [--ci]
   # lint            | ruff-format (pre-commit)          | ruff format --check src/ tests/
   # lint            | ruff (pre-commit)                 | ruff check src/ tests/
   # lint            | mypy (pre-push)                   | mypy --show-error-codes --no-error-summary src/omnimemory
@@ -67,6 +69,23 @@ jobs:
   #
   # POETRY VERSION: Must match POETRY_VERSION env var (currently 2.2.1)
   # =============================================================================
+
+  # Phase 1 - Migration Freeze Enforcement
+  # Blocks new migrations when .migration_freeze exists (DB-per-repo refactor OMN-2055)
+  # SYNC: Pre-commit hook 'migration-freeze-check' at pre-commit stage
+  migration-freeze:
+    name: Migration Freeze Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git diff
+
+      - name: Check migration freeze
+        run: ./scripts/check_migration_freeze.sh --ci
 
   # Phase 1 - Code Quality
   lint:
@@ -402,24 +421,27 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [lint, pyright, onex-validation, check-handshake, test]
+    needs: [migration-freeze, lint, pyright, onex-validation, check-handshake, test]
     if: always()
 
     steps:
       - name: Check test results
         run: |
+          migration_freeze="${{ needs.migration-freeze.result }}"
           lint="${{ needs.lint.result }}"
           pyright="${{ needs.pyright.result }}"
           onex="${{ needs.onex-validation.result }}"
           handshake="${{ needs.check-handshake.result }}"
           test="${{ needs.test.result }}"
 
-          if [[ "$lint" == "success" ]] && \
+          if [[ "$migration_freeze" == "success" ]] && \
+             [[ "$lint" == "success" ]] && \
              [[ "$pyright" == "success" ]] && \
              [[ "$onex" == "success" ]] && \
              [[ "$handshake" == "success" || "$handshake" == "skipped" ]] && \
              [[ "$test" == "success" ]]; then
             echo "All tests passed successfully"
+            echo "Migration Freeze: Passed"
             echo "Code Quality: Passed"
             echo "Pyright Type Checking: Passed"
             echo "ONEX Validation: Passed"
@@ -428,6 +450,7 @@ jobs:
             exit 0
           else
             echo "Tests failed"
+            echo "Migration Freeze: $migration_freeze"
             echo "Lint: $lint"
             echo "Pyright: $pyright"
             echo "ONEX Validation: $onex"
