@@ -120,6 +120,7 @@ event_type:
   event_categories: ["memory", "effect", "retrieval", "search"]
   publish_events: true
   subscribe_events: true
+  invocation_mode: "subscription"
   event_routing: "memory"
 
 # === INFRASTRUCTURE ===
