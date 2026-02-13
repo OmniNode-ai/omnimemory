@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 from omnibase_core.container import ModelONEXContainer
-from omnibase_core.models.core.model_base_error import ModelBaseError
 from omnibase_core.models.core.model_base_result import ModelBaseResult
+from omnibase_core.models.core.model_error_details import ModelErrorDetails
 from omnibase_core.models.results.model_simple_metadata import ModelGenericMetadata
 
 from omnimemory import (  # Protocols; Data models; Error handling
@@ -95,10 +95,11 @@ class MockMemoryStorageNode:
                 success=False,
                 exit_code=1,
                 errors=[
-                    ModelBaseError(
-                        message=f"Mock storage failed: {e!s}",
-                        code="STORAGE_ERROR",
-                        details="mock_storage.store_memory.failed",
+                    ModelErrorDetails(
+                        error_message=f"Mock storage failed: {e!s}",
+                        error_code="STORAGE_ERROR",
+                        error_type="runtime",
+                        component="mock_storage.store_memory.failed",
                     )
                 ],
             )
@@ -260,10 +261,11 @@ class TestFoundationArchitecture:
             success=False,
             exit_code=1,
             errors=[
-                ModelBaseError(
-                    message="Test failure",
-                    code="SYSTEM_ERROR",
-                    details="test_component",
+                ModelErrorDetails(
+                    error_message="Test failure",
+                    error_code="SYSTEM_ERROR",
+                    error_type="system",
+                    component="test_component",
                 )
             ],
             metadata=ModelGenericMetadata(
@@ -274,7 +276,7 @@ class TestFoundationArchitecture:
         assert failure_result.success is False
         assert failure_result.exit_code == 1
         assert len(failure_result.errors) == 1
-        assert failure_result.errors[0].message == "Test failure"
+        assert failure_result.errors[0].error_message == "Test failure"
         assert failure_result.metadata is not None
         assert (
             "test.operation.failed"

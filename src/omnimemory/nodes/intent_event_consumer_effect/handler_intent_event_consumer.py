@@ -91,7 +91,7 @@ class HandlerIntentEventConsumer:
     Consumer group is derived from node identity per ADR:
     {env}.{service}.{node_name}.{purpose}.{version}
 
-    Example: dev.omnimemory.intent_event_consumer_effect.consume.v1
+    Example: onex.omnimemory.intent_event_consumer_effect.consume.v1
 
     Attributes:
         _config: Consumer configuration.

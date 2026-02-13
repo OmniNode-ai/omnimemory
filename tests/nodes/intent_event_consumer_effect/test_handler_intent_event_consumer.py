@@ -622,7 +622,7 @@ class TestEventEmission:
         """Successful storage should emit an intent-stored event.
 
         Uses canonical ModelIntentStoredEvent from omnibase_core which has:
-        - Versioned event_type: "dev.omnimemory.intent.stored.v1"
+        - Versioned event_type: "onex.omnimemory.intent.stored.v1"
         - session_ref field (mapped from session_id at boundary)
         - status="success" for successful storage
         """
@@ -653,7 +653,7 @@ class TestEventEmission:
         # Check stored event was emitted with canonical event_type
         stored_events = [c for c in publish_calls if "intent-stored" in c[0]]
         assert len(stored_events) == 1
-        assert stored_events[0][1]["event_type"] == "dev.omnimemory.intent.stored.v1"
+        assert stored_events[0][1]["event_type"] == "onex.omnimemory.intent.stored.v1"
         assert stored_events[0][1]["intent_id"] == str(intent_id)
         assert stored_events[0][1]["status"] == "success"
         # session_id is mapped to session_ref at boundary
@@ -693,7 +693,7 @@ class TestEventEmission:
         # Uses same topic as success events - status field distinguishes
         stored_events = [c for c in publish_calls if "intent-stored" in c[0]]
         assert len(stored_events) == 1
-        assert stored_events[0][1]["event_type"] == "dev.omnimemory.intent.stored.v1"
+        assert stored_events[0][1]["event_type"] == "onex.omnimemory.intent.stored.v1"
         assert stored_events[0][1]["status"] == "error"
         assert "RuntimeError" in str(stored_events[0][1]["error_message"])
         assert "Storage failed" in str(stored_events[0][1]["error_message"])

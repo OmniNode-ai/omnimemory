@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "omnimemory"
-version = "0.1.0"
+version = "0.2.0"
 description = "Advanced memory management and retrieval system for AI applications"
 authors = ["OmniNode-ai <contact@omninode.ai>"]
 readme = "README.md"
@@ -49,9 +49,9 @@ asyncio-mqtt = "^0.16.0"
 pyyaml = "^6.0.2"
 
 # ONEX dependencies - versioned releases from PyPI
-omnibase-core = "^0.13.1"
-omnibase-spi = "^0.6.4"
-omnibase-infra = "^0.3.2"
+omnibase-core = "^0.17.0"
+omnibase-spi = "^0.8.0"
+omnibase-infra = "^0.7.0"
 
 # Logging and monitoring
 # Version ^23.3.0 required for compatibility with omnibase-infra (requires ^23.2.0)
