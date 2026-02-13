@@ -11,6 +11,10 @@ These tests verify the handler's integration behavior including:
 - Retry logic with exponential backoff
 
 All tests use mocked dependencies (no real Kafka/Memgraph).
+
+.. versionchanged:: 0.2.0
+    Updated for event_bus.subscribe_topics migration (OMN-1746).
+    Config uses list-based topic fields instead of singular suffix fields.
 """
 
 from __future__ import annotations
@@ -130,7 +134,11 @@ class TestInitialization:
 
     @pytest.mark.asyncio
     async def test_consumer_initialized_after_initialize(self) -> None:
-        """Consumer should report initialized after initialize() is called."""
+        """Consumer should report initialized after initialize() is called.
+
+        Verifies that all topics in subscribe_topics are subscribed to
+        with the correct env prefix.
+        """
         config = ModelIntentEventConsumerConfig()
         storage = create_mock_storage_adapter()
         subscribe_fn, subscriptions = create_mock_subscribe()
@@ -142,6 +150,30 @@ class TestInitialization:
         assert len(subscriptions) == 1
         assert (
             subscriptions[0][0] == "test.onex.evt.omniintelligence.intent-classified.v1"
+        )
+
+    @pytest.mark.asyncio
+    async def test_consumer_subscribes_to_multiple_topics(self) -> None:
+        """Consumer should subscribe to all topics in subscribe_topics list."""
+        config = ModelIntentEventConsumerConfig(
+            subscribe_topics=[
+                "onex.evt.omniintelligence.intent-classified.v1",
+                "onex.evt.omniintelligence.intent-classified.v2",
+            ],
+        )
+        storage = create_mock_storage_adapter()
+        subscribe_fn, subscriptions = create_mock_subscribe()
+
+        consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
+        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+
+        assert consumer.is_initialized is True
+        assert len(subscriptions) == 2
+        assert (
+            subscriptions[0][0] == "test.onex.evt.omniintelligence.intent-classified.v1"
+        )
+        assert (
+            subscriptions[1][0] == "test.onex.evt.omniintelligence.intent-classified.v2"
         )
 
     @pytest.mark.asyncio
@@ -711,7 +743,7 @@ class TestStopCleanup:
 
     @pytest.mark.asyncio
     async def test_stop_unsubscribes_and_resets(self) -> None:
-        """stop() should unsubscribe and reset initialization state."""
+        """stop() should unsubscribe from all topics and reset initialization state."""
         storage = create_mock_storage_adapter()
         config = ModelIntentEventConsumerConfig()
         unsubscribe_mock = MagicMock()
@@ -726,10 +758,41 @@ class TestStopCleanup:
 
         await consumer.stop()
 
-        # Should have called unsubscribe
+        # Should have called unsubscribe for each topic
         unsubscribe_mock.assert_called_once()
 
         # Should reset state
+        assert consumer.is_initialized is False
+
+    @pytest.mark.asyncio
+    async def test_stop_unsubscribes_multiple_topics(self) -> None:
+        """stop() should unsubscribe from all topics when multiple are configured."""
+        storage = create_mock_storage_adapter()
+        config = ModelIntentEventConsumerConfig(
+            subscribe_topics=[
+                "onex.evt.topic-a.v1",
+                "onex.evt.topic-b.v1",
+            ],
+        )
+        unsubscribe_mocks: list[MagicMock] = []
+
+        def mock_subscribe(topic: str, handler: object) -> MagicMock:
+            mock = MagicMock()
+            unsubscribe_mocks.append(mock)
+            return mock
+
+        consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
+        await consumer.initialize(subscribe_callback=mock_subscribe, env_prefix="test")
+
+        assert consumer.is_initialized is True
+        assert len(unsubscribe_mocks) == 2
+
+        await consumer.stop()
+
+        # Both unsubscribe functions should have been called
+        for mock in unsubscribe_mocks:
+            mock.assert_called_once()
+
         assert consumer.is_initialized is False
 
     @pytest.mark.asyncio
@@ -748,3 +811,43 @@ class TestStopCleanup:
         await consumer.stop()
 
         assert consumer.is_initialized is False
+
+
+# =============================================================================
+# Config Model Tests
+# =============================================================================
+
+
+class TestConfigModel:
+    """Tests for ModelIntentEventConsumerConfig with list-based topic fields."""
+
+    def test_default_config_has_correct_topics(self) -> None:
+        """Default config should have the standard topic suffixes."""
+        config = ModelIntentEventConsumerConfig()
+
+        assert config.subscribe_topics == [
+            "onex.evt.omniintelligence.intent-classified.v1"
+        ]
+        assert config.publish_topics == ["onex.evt.omnimemory.intent-stored.v1"]
+        assert config.dlq_topics == [
+            "onex.evt.omniintelligence.intent-classified.v1.dlq"
+        ]
+
+    def test_config_accepts_multiple_topics(self) -> None:
+        """Config should accept multiple topics in each list."""
+        config = ModelIntentEventConsumerConfig(
+            subscribe_topics=["topic-a.v1", "topic-b.v1"],
+            publish_topics=["publish-a.v1", "publish-b.v1"],
+            dlq_topics=["dlq-a.v1", "dlq-b.v1"],
+        )
+
+        assert len(config.subscribe_topics) == 2
+        assert len(config.publish_topics) == 2
+        assert len(config.dlq_topics) == 2
+
+    def test_config_rejects_extra_fields(self) -> None:
+        """Config with extra='forbid' should reject unknown fields."""
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            ModelIntentEventConsumerConfig(
+                unknown_field="value",  # type: ignore[call-arg]
+            )

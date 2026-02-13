@@ -1,4 +1,8 @@
-"""Consumer configuration model for intent event consumer."""
+"""Consumer configuration model for intent event consumer.
+
+Migrated from singular topic suffix fields to standard event_bus.subscribe_topics
+list format per OMN-1746 for EventBusSubcontractWiring compatibility.
+"""
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7,6 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelIntentEventConsumerConfig(BaseModel):
     """Configuration for intent event consumer.
 
+    Topic configuration uses list-based fields matching the standard
+    ``event_bus.subscribe_topics`` contract format. This enables
+    declarative wiring via ``EventBusSubcontractWiring`` instead of
+    manual ``subscribe_callback`` injection.
+
     Note: consumer_group is NOT configured here. It is derived from
     ModelNodeIdentity via compute_consumer_group_id() per ADR.
     """
@@ -14,17 +23,18 @@ class ModelIntentEventConsumerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     # Topic configuration (suffixes only - env prefix added at runtime)
-    subscribe_topic_suffix: str = Field(
-        default="onex.evt.omniintelligence.intent-classified.v1",
-        description="Topic suffix to subscribe to",
+    # Uses list format matching event_bus.subscribe_topics contract standard
+    subscribe_topics: list[str] = Field(
+        default=["onex.evt.omniintelligence.intent-classified.v1"],
+        description="Topic suffixes to subscribe to (env prefix added at runtime)",
     )
-    publish_stored_topic_suffix: str = Field(
-        default="onex.evt.omnimemory.intent-stored.v1",
-        description="Topic suffix for storage events (success and error use same topic via status field)",
+    publish_topics: list[str] = Field(
+        default=["onex.evt.omnimemory.intent-stored.v1"],
+        description="Topic suffixes to publish to (env prefix added at runtime)",
     )
-    dlq_topic_suffix: str = Field(
-        default="onex.evt.omniintelligence.intent-classified.v1.dlq",
-        description="Dead letter queue topic suffix",
+    dlq_topics: list[str] = Field(
+        default=["onex.evt.omniintelligence.intent-classified.v1.dlq"],
+        description="Dead letter queue topic suffixes",
     )
 
     # Circuit breaker configuration

@@ -26,6 +26,10 @@ Consumer Group:
     Derived from node identity per ADR:
     ``{env_prefix}.omnimemory.intent_event_consumer_effect.consume.v1``
 
+Contract Format:
+    Uses standard ``event_bus.subscribe_topics`` contract format (OMN-1746)
+    enabling declarative wiring via ``EventBusSubcontractWiring``.
+
 Example::
 
     from omnimemory.nodes.intent_event_consumer_effect import (
@@ -57,6 +61,11 @@ Example::
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1619.
+
+.. versionchanged:: 0.2.0
+    Migrated to standard event_bus.subscribe_topics format (OMN-1746).
+    Config now uses list-based topic fields (subscribe_topics, publish_topics,
+    dlq_topics) instead of singular suffix fields.
 """
 
 from __future__ import annotations
@@ -106,8 +115,12 @@ class HandlerIntentEventConsumer:
     The ``env_prefix`` parameter is a deployment realm (e.g., ``"dev"``,
     ``"staging"``, ``"prod"``) that isolates environments on the same Kafka
     cluster. It is separate from the ``onex.`` namespace embedded in topic
-    suffixes. See :class:`ModelIntentEventConsumerConfig` for topic suffix
-    defaults.
+    suffixes.
+
+    Topic configuration uses list-based fields matching the standard
+    ``event_bus.subscribe_topics`` contract format (OMN-1746). The first
+    entry in each list is used as the primary topic for backwards
+    compatibility with single-topic consumers.
 
     Attributes:
         _config: Consumer configuration.
@@ -133,7 +146,7 @@ class HandlerIntentEventConsumer:
         """Initialize the consumer handler.
 
         Args:
-            config: Consumer configuration including topic suffixes,
+            config: Consumer configuration including topic lists,
                 circuit breaker settings, and staleness threshold.
             storage_adapter: Adapter for storing intents to graph.
                 Must be initialized before calling consumer.initialize().
@@ -154,7 +167,7 @@ class HandlerIntentEventConsumer:
         self._messages_consumed = 0
         self._messages_failed = 0
         self._messages_dlq = 0
-        self._unsubscribe: Callable[[], None] | None = None
+        self._unsubscribe_fns: list[Callable[[], None]] = []
 
         # Kafka publish callback (set during initialize)
         self._publish_callback: Callable[[str, dict[str, object]], None] | None = None
@@ -167,8 +180,8 @@ class HandlerIntentEventConsumer:
             "HandlerIntentEventConsumer initialized",
             extra={
                 "handler": HANDLER_ID_INTENT_CONSUMER,
-                "subscribe_topic": config.subscribe_topic_suffix,
-                "publish_stored_topic": config.publish_stored_topic_suffix,
+                "subscribe_topics": config.subscribe_topics,
+                "publish_topics": config.publish_topics,
             },
         )
 
@@ -194,7 +207,10 @@ class HandlerIntentEventConsumer:
         env_prefix: str = "dev",
         publish_callback: Callable[[str, dict[str, object]], None] | None = None,
     ) -> None:
-        """Initialize Kafka subscription.
+        """Initialize Kafka subscriptions for all configured subscribe_topics.
+
+        Subscribes to each topic in ``config.subscribe_topics``, constructing
+        full topic names as ``{env_prefix}.{topic_suffix}``.
 
         Args:
             subscribe_callback: Function to subscribe to Kafka topic.
@@ -213,19 +229,21 @@ class HandlerIntentEventConsumer:
         self._env_prefix = env_prefix
         self._publish_callback = publish_callback
 
-        full_topic = f"{env_prefix}.{self._config.subscribe_topic_suffix}"
+        for topic_suffix in self._config.subscribe_topics:
+            full_topic = f"{env_prefix}.{topic_suffix}"
+            unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
+            self._unsubscribe_fns.append(unsubscribe)
 
-        self._unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
+            logger.info(
+                "Kafka subscription initialized",
+                extra={
+                    "handler": HANDLER_ID_INTENT_CONSUMER,
+                    "topic": full_topic,
+                    "env_prefix": env_prefix,
+                },
+            )
+
         self._initialized = True
-
-        logger.info(
-            "Kafka subscription initialized",
-            extra={
-                "handler": HANDLER_ID_INTENT_CONSUMER,
-                "topic": full_topic,
-                "env_prefix": env_prefix,
-            },
-        )
 
     def _handle_message_sync(self, message: dict[str, object]) -> None:
         """Synchronous message handler wrapper for Kafka callback.
@@ -349,7 +367,7 @@ class HandlerIntentEventConsumer:
                 self._last_consume_timestamp = datetime.now(timezone.utc)
 
                 # Emit success event using canonical omnibase_core model
-                # Maps session_id → session_ref at the emission boundary
+                # Maps session_id -> session_ref at the emission boundary
                 stored_event = ModelIntentStoredEvent.create(
                     session_ref=event.session_id,  # Map at boundary
                     intent_category=event.intent_category,
@@ -464,6 +482,8 @@ class HandlerIntentEventConsumer:
         both success (status="success") and error (status="error") cases
         via a single event type.
 
+        Publishes to the first topic in ``config.publish_topics``.
+
         Args:
             event: The stored event to emit (success or error).
         """
@@ -478,7 +498,8 @@ class HandlerIntentEventConsumer:
             )
             return
 
-        topic = f"{self._env_prefix}.{self._config.publish_stored_topic_suffix}"
+        publish_topic = self._config.publish_topics[0]
+        topic = f"{self._env_prefix}.{publish_topic}"
         try:
             self._publish_callback(topic, event.model_dump(mode="json"))
             logger.debug(
@@ -507,12 +528,15 @@ class HandlerIntentEventConsumer:
     ) -> None:
         """Route failed message to dead letter queue.
 
+        Publishes to the first topic in ``config.dlq_topics``.
+
         Args:
             message: The original message.
             reason: Why the message failed.
             retry_count: Number of retry attempts made before DLQ routing.
         """
         self._messages_dlq += 1
+        dlq_topic = self._config.dlq_topics[0]
 
         if self._publish_callback is None:
             logger.warning(
@@ -521,12 +545,12 @@ class HandlerIntentEventConsumer:
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "reason": reason,
                     "retry_count": retry_count,
-                    "dlq_topic": self._config.dlq_topic_suffix,
+                    "dlq_topic": dlq_topic,
                 },
             )
             return
 
-        topic = f"{self._env_prefix}.{self._config.dlq_topic_suffix}"
+        topic = f"{self._env_prefix}.{dlq_topic}"
         dlq_message = {
             "original_message": message,
             "failure_reason": reason,
@@ -657,14 +681,14 @@ class HandlerIntentEventConsumer:
     async def stop(self) -> None:
         """Graceful shutdown.
 
-        Unsubscribes from Kafka topic, cancels pending message processing tasks,
-        and resets initialization state. Does not shutdown the storage adapter
-        (caller's responsibility).
+        Unsubscribes from all Kafka topics, cancels pending message processing
+        tasks, and resets initialization state. Does not shutdown the storage
+        adapter (caller's responsibility).
         """
         # Unsubscribe FIRST to prevent new messages during shutdown
-        if self._unsubscribe:
+        for unsubscribe in self._unsubscribe_fns:
             try:
-                self._unsubscribe()
+                unsubscribe()
             except Exception as e:
                 logger.warning(
                     "Error during Kafka unsubscribe",
@@ -673,7 +697,7 @@ class HandlerIntentEventConsumer:
                         "error": str(e),
                     },
                 )
-            self._unsubscribe = None
+        self._unsubscribe_fns.clear()
 
         # THEN cancel pending tasks
         if self._pending_tasks:
