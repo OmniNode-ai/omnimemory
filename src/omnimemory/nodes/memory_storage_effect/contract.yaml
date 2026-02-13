@@ -189,7 +189,9 @@ validation_rules:
 # It publishes CRUD operation events but does not subscribe to topics.
 #
 # Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
+#   - kind=cmd for commands/inputs
 #   - kind=evt for events/outputs
+#   - Internal runtime events use onex.internal.* namespace
 # =============================================================================
 event_bus:
   version:

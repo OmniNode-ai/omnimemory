@@ -49,10 +49,10 @@ event_type:
 #   - event_bus = runtime routing layer (WHERE)
 #
 # Topic naming: onex.{kind}[.{producer}].{event-name}.v{n}
-#   - kind=cmd for commands/inputs
-#   - kind=evt for events/outputs
-#   - {producer} segment: REQUIRED for internal single-producer topics
-#   - {producer} segment: OMITTED for multi-producer business events
+#   - kind=cmd for commands/inputs, kind=evt for events/outputs
+#   - producer=omnimemory for this node's topics
+#   - DLQ topics may use different producer segments (e.g., omniintelligence)
+#   - Internal runtime events use onex.internal.* namespace
 # =============================================================================
 event_bus:
   version:

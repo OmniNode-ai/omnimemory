@@ -45,6 +45,9 @@
 #   - {env}.onex.evt.omnimemory.memory-archive-initiated.v1
 #   - {env}.onex.evt.omnimemory.memory-restored.v1
 #   - {env}.onex.evt.omnimemory.lifecycle-transition-failed.v1
+#
+# NOTE: memory-consolidated.v1 removed — consolidation is not a lifecycle
+# state transition. If needed, it belongs in a separate consolidation node.
 # =============================================================================
 
 contract_version:
@@ -215,15 +218,17 @@ event_bus:
       description: "Periodic runtime tick for TTL expiration evaluation. Injected timestamp enables deterministic
         lifecycle checks."
     "onex.cmd.omnimemory.archive-memory.v1":
-      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelArchiveMemoryCommand"
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_archive.ModelArchiveMemoryCommand"
       description: "Command to transition an EXPIRED memory to ARCHIVED state in cold storage."
     "onex.cmd.omnimemory.expire-memory.v1":
-      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelExpireMemoryCommand"
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire.ModelExpireMemoryCommand"
       description: "Command to explicitly transition an ACTIVE memory to EXPIRED state."
     "onex.cmd.omnimemory.restore-memory.v1":
+      # TODO(OMN-1453): Forward-declared — model not yet implemented
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelRestoreMemoryCommand"
       description: "Command to restore an ARCHIVED memory back to ACTIVE state."
     "onex.evt.omnimemory.memory-accessed.v1":
+      # TODO(OMN-1453): Forward-declared — model not yet implemented
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryAccessedEvent"
       description: "Memory access event for TTL extension tracking. Resets or extends memory TTL based
         on access patterns."
@@ -235,18 +240,22 @@ event_bus:
       description: "Memory expiration event. Emitted when a memory exceeds its hard TTL and transitions
         from ACTIVE to EXPIRED state."
     "onex.evt.omnimemory.memory-archived.v1":
+      # TODO(OMN-1453): Forward-declared — model not yet implemented
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
       description: "Memory archival confirmation event. Emitted when a memory is successfully moved from
         EXPIRED to ARCHIVED state in cold storage."
     "onex.evt.omnimemory.memory-archive-initiated.v1":
+      # TODO(OMN-1453): Forward-declared — model not yet implemented
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
       description: "Memory archive initiation event. Emitted when an archive operation begins for an expired
         memory entity."
     "onex.evt.omnimemory.memory-restored.v1":
+      # TODO(OMN-1453): Forward-declared — model not yet implemented
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryRestoredEvent"
       description: "Memory restoration confirmation event. Emitted when a memory is successfully restored
         from ARCHIVED to ACTIVE state."
     "onex.evt.omnimemory.lifecycle-transition-failed.v1":
+      # TODO(OMN-1453): Forward-declared — model not yet implemented
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelLifecycleTransitionFailedEvent"
       description: "Lifecycle transition failure event. Emitted when a lifecycle state transition fails
         with error details and the attempted transition."
