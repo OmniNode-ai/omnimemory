@@ -27,7 +27,7 @@ OmniMemory includes a compatibility layer (`src/omnimemory/compat/`) that provid
 **New Usage**:
 ```python
 from omnibase_core.models.core.model_base_result import ModelBaseResult
-from omnibase_core.models.core.model_base_error import ModelBaseError
+from omnibase_core.models.core.model_error_details import ModelErrorDetails
 from omnibase_core.models.results.model_simple_metadata import ModelGenericMetadata
 
 # Create success result
@@ -42,7 +42,7 @@ result = ModelBaseResult(
 result = ModelBaseResult(
     success=False,
     exit_code=1,
-    errors=[ModelBaseError(message="Operation failed", code="ERR_001")]
+    errors=[ModelErrorDetails(error_message="Operation failed", error_code="ERR_001", error_type="runtime", component="memory_operation")]
 )
 
 # Check result
