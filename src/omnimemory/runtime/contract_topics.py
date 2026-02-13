@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
-from typing import Any
 
 import yaml
 
@@ -229,7 +228,7 @@ def _read_event_bus_topics(package: str, field: str) -> list[str]:
     package_files = importlib.resources.files(package)
     contract_file = package_files.joinpath("contract.yaml")
     content = contract_file.read_text()
-    contract: Any = yaml.safe_load(content)
+    contract: object = yaml.safe_load(content)
 
     if not isinstance(contract, dict):
         logger.warning(
@@ -239,7 +238,7 @@ def _read_event_bus_topics(package: str, field: str) -> list[str]:
         )
         return []
 
-    event_bus = contract.get("event_bus", {})
+    event_bus: object = contract.get("event_bus", {})
     if not isinstance(event_bus, dict):
         logger.warning(
             "event_bus in %s contract.yaml is not a mapping (got %s), skipping",
@@ -251,7 +250,23 @@ def _read_event_bus_topics(package: str, field: str) -> list[str]:
     if not event_bus.get("event_bus_enabled", False):
         return []
 
-    topics: list[str] = event_bus.get(field, [])
+    topics_raw: object = event_bus.get(field, [])
+    if not isinstance(topics_raw, list):
+        logger.warning(
+            "%s in %s contract.yaml is not a list, skipping",
+            field,
+            package,
+        )
+        return []
+
+    topics: list[str] = [t for t in topics_raw if isinstance(t, str)]
+    if len(topics) != len(topics_raw):
+        logger.warning(
+            "%s in %s contract.yaml contains non-string entries, skipping invalid items",
+            field,
+            package,
+        )
+
     if topics:
         logger.debug(
             "Discovered %s from %s: %s",
