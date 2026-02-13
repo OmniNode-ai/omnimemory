@@ -64,7 +64,7 @@ name: "memory_lifecycle_orchestrator"
 node_type: "ORCHESTRATOR_GENERIC"
 description: >-
   Memory lifecycle orchestrator that manages expiration, archival, and cleanup of memory entities based
-  on configurable TTL and retention policies. #magic___^_^___line
+  on configurable TTL and retention policies.
 # Model specifications - fully qualified class names
 input_model: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelLifecycleOrchestratorInput"
 output_model: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelLifecycleOrchestratorOutput"
@@ -214,7 +214,7 @@ event_bus:
   # Metadata for subscribed topics
   subscribe_topic_metadata:
     "onex.internal.runtime-tick.v1":
-      schema_ref: "omnibase_core.models.runtime.ModelRuntimeTick"
+      schema_ref: "omnibase_infra.runtime.models.model_runtime_tick.ModelRuntimeTick"
       description: "Periodic runtime tick for TTL expiration evaluation. Injected timestamp enables deterministic
         lifecycle checks."
     "onex.cmd.omnimemory.archive-memory.v1":
@@ -246,7 +246,7 @@ event_bus:
         EXPIRED to ARCHIVED state in cold storage."
     "onex.evt.omnimemory.memory-archive-initiated.v1":
       # TODO(OMN-1453): Forward-declared — model not yet implemented
-      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"  # TODO(OMN-1453): Needs its own model (e.g., ModelMemoryArchiveInitiatedEvent)
       description: "Memory archive initiation event. Emitted when an archive operation begins for an expired
         memory entity."
     "onex.evt.omnimemory.memory-restored.v1":
