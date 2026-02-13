@@ -214,24 +214,19 @@ event_bus:
       schema_ref: "omnibase_core.models.runtime.ModelRuntimeTick"
       description: "Periodic runtime tick for TTL expiration evaluation. Injected timestamp enables deterministic
         lifecycle checks."
-      content_type: "application/json"
     "onex.cmd.omnimemory.archive-memory.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelArchiveMemoryCommand"
       description: "Command to transition an EXPIRED memory to ARCHIVED state in cold storage."
-      content_type: "application/json"
     "onex.cmd.omnimemory.expire-memory.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelExpireMemoryCommand"
       description: "Command to explicitly transition an ACTIVE memory to EXPIRED state."
-      content_type: "application/json"
     "onex.cmd.omnimemory.restore-memory.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelRestoreMemoryCommand"
       description: "Command to restore an ARCHIVED memory back to ACTIVE state."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-accessed.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryAccessedEvent"
       description: "Memory access event for TTL extension tracking. Resets or extends memory TTL based
         on access patterns."
-      content_type: "application/json"
 
   # Metadata for published topics
   publish_topic_metadata:
@@ -239,27 +234,22 @@ event_bus:
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_tick.ModelMemoryExpiredEvent"
       description: "Memory expiration event. Emitted when a memory exceeds its hard TTL and transitions
         from ACTIVE to EXPIRED state."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-archived.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
       description: "Memory archival confirmation event. Emitted when a memory is successfully moved from
         EXPIRED to ARCHIVED state in cold storage."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-archive-initiated.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
       description: "Memory archive initiation event. Emitted when an archive operation begins for an expired
         memory entity."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-restored.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryRestoredEvent"
       description: "Memory restoration confirmation event. Emitted when a memory is successfully restored
         from ARCHIVED to ACTIVE state."
-      content_type: "application/json"
     "onex.evt.omnimemory.lifecycle-transition-failed.v1":
       schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelLifecycleTransitionFailedEvent"
       description: "Lifecycle transition failure event. Emitted when a lifecycle state transition fails
         with error details and the attempted transition."
-      content_type: "application/json"
 
 # Orchestration configuration - use defaults
 load_balancing_enabled: true

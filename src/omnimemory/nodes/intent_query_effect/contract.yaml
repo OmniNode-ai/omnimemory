@@ -214,7 +214,6 @@ event_bus:
       schema_ref: "omnibase_core.models.events.ModelIntentQueryRequestedEvent"
       description: "Intent query request events containing query type, session reference, and filtering
         parameters. Runtime dispatches inbound events to this node."
-      content_type: "application/json"
 
   # Metadata for published topics
   publish_topic_metadata:
@@ -222,7 +221,6 @@ event_bus:
       schema_ref: "omnibase_core.models.events.ModelIntentQueryResponseEvent"
       description: "Intent query response events containing distribution data, intent records, or error
         details based on the query type."
-      content_type: "application/json"
 
 # === TAGS ===
 tags:

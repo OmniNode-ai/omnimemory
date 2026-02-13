@@ -196,12 +196,10 @@ event_bus:
       schema_ref: "omnimemory.nodes.intent_storage_effect.models.model_intent_storage_response.ModelIntentStorageResponse"
       description: "Intent storage confirmation event. Emitted when an intent is successfully stored in
         Memgraph with session linkage."
-      content_type: "application/json"
     "onex.evt.omnimemory.intent-store-failed.v1":
       schema_ref: "omnimemory.nodes.intent_storage_effect.models.model_intent_storage_response.ModelIntentStorageResponse"
       description: "Intent storage failure event. Emitted when an intent storage operation fails with
         error details."
-      content_type: "application/json"
 
 # === TAGS ===
 tags:

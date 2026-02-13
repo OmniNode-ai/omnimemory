@@ -66,10 +66,12 @@ event_bus:
     - "onex.evt.omniintelligence.intent-classified.v1"
 
   # Topics this node publishes to (sends events to)
+  # NOTE: DLQ topic included here for publish_topic_metadata consistency
   publish_topics:
     - "onex.evt.omnimemory.intent-stored.v1"
+    - "onex.evt.omniintelligence.intent-classified.v1.dlq"
 
-  # Dead letter queue topics
+  # Dead letter queue topics (documentation; also listed in publish_topics)
   dlq_topics:
     - "onex.evt.omniintelligence.intent-classified.v1.dlq"
 
@@ -79,7 +81,6 @@ event_bus:
       schema_ref: "omnimemory.models.events.model_intent_classified_event.ModelIntentClassifiedEvent"
       description: "Intent classification events from omniintelligence. Contains classified intent data
         with confidence scores, session references, and classification metadata."
-      content_type: "application/json"
 
   # Metadata for published topics
   publish_topic_metadata:
@@ -87,12 +88,10 @@ event_bus:
       schema_ref: "omnibase_core.models.events.ModelIntentStoredEvent"
       description: "Intent storage confirmation events. Emitted after successfully persisting a classified
         intent to Memgraph. Uses status field to indicate success or error."
-      content_type: "application/json"
     "onex.evt.omniintelligence.intent-classified.v1.dlq":
       schema_ref: "omnimemory.models.events.model_intent_classified_event.ModelIntentClassifiedEvent"
       description: "Dead letter queue for intent-classified events that failed processing after max retries.
         Contains the original event plus error metadata."
-      content_type: "application/json"
 
 # === HANDLER CONFIGURATION ===
 handler_config:

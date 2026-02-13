@@ -214,22 +214,18 @@ event_bus:
       schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
       description: "Memory storage confirmation event. Emitted when a memory snapshot is successfully
         persisted to the storage backend."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-retrieved.v1":
       schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
       description: "Memory retrieval confirmation event. Emitted when a memory snapshot is successfully
         retrieved from the storage backend."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-updated.v1":
       schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
       description: "Memory update confirmation event. Emitted when a memory snapshot is successfully updated
         in the storage backend."
-      content_type: "application/json"
     "onex.evt.omnimemory.memory-deleted.v1":
       schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
       description: "Memory deletion confirmation event. Emitted when a memory snapshot is successfully
         soft-deleted from the storage backend."
-      content_type: "application/json"
 
 # === TAGS ===
 tags:

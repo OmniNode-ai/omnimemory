@@ -119,7 +119,7 @@ event_type:
   primary_events: ["memory_searched", "memory_retrieved", "graph_traversed"]
   event_categories: ["memory", "effect", "retrieval", "search"]
   publish_events: true
-  subscribe_events: false
+  subscribe_events: true
   event_routing: "memory"
 
 # === INFRASTRUCTURE ===
@@ -214,7 +214,6 @@ event_bus:
       schema_ref: "omnimemory.nodes.memory_retrieval_effect.models.model_memory_retrieval_request.ModelMemoryRetrievalRequest"
       description: "Memory retrieval request events containing search parameters including query text,
         embeddings, similarity thresholds, and backend selection."
-      content_type: "application/json"
 
   # Metadata for published topics
   publish_topic_metadata:
@@ -222,7 +221,6 @@ event_bus:
       schema_ref: "omnimemory.nodes.memory_retrieval_effect.models.model_memory_retrieval_response.ModelMemoryRetrievalResponse"
       description: "Memory retrieval response events containing search results with similarity scores,
         total counts, and metadata from the queried backends."
-      content_type: "application/json"
 
 # === TAGS ===
 tags:
