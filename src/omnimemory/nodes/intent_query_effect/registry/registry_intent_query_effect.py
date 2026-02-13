@@ -236,33 +236,6 @@ class RegistryIntentQueryEffect:
         return ["distribution", "session", "recent"]
 
     @staticmethod
-    def get_topic_suffixes() -> dict[str, str]:
-        """Get Kafka topic suffixes for this node.
-
-        Returns topic SUFFIXES (not full topics). Runtime composes
-        full topics by adding env prefix:
-            full_topic = f"{topic_env_prefix}.{suffix}"
-
-        Example full topics (with "dev" env prefix):
-            - dev.onex.cmd.omnimemory.intent-query-requested.v1
-            - dev.onex.evt.omnimemory.intent-query-response.v1
-
-        Note:
-            These values MUST match the ``event_bus.subscribe_topics`` and
-            ``event_bus.publish_topics`` declared in this node's contract.yaml.
-            The contract is the source of truth for topic declarations.
-
-        Returns:
-            Dictionary with 'subscribe' and 'publish' topic suffixes.
-
-        .. versionadded:: 0.1.0
-        """
-        return {
-            "subscribe": "onex.cmd.omnimemory.intent-query-requested.v1",
-            "publish": "onex.evt.omnimemory.intent-query-response.v1",
-        }
-
-    @staticmethod
     def get_invocation_mode() -> str:
         """Get the invocation mode for this node.
 

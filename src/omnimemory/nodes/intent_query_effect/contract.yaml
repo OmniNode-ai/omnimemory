@@ -117,9 +117,8 @@ event_type:
   subscribe_events: true
   event_routing: "intent"
   invocation_mode: "subscription"  # vs "orchestrator" - explicit per contract checklist
-  # Topic suffixes - runtime adds env prefix (e.g., "dev.", "prod.")
-  subscribe_topic_suffix: "onex.cmd.omnimemory.intent-query-requested.v1"
-  publish_topic_suffix: "onex.evt.omnimemory.intent-query-response.v1"
+  # NOTE: Topic declarations live in the event_bus section below (source of truth).
+  # Formerly had subscribe_topic_suffix / publish_topic_suffix here -- removed per OMN-2213.
 
 # === INFRASTRUCTURE ===
 infrastructure:

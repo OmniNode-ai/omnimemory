@@ -26,10 +26,9 @@ event_type:
   subscribe_events: true
   event_routing: "intent"
   invocation_mode: "subscription"
-  # Custom topic fields (extensions to standard subcontract)
-  subscribe_topic_suffix: "onex.evt.omniintelligence.intent-classified.v1"
-  publish_stored_topic_suffix: "onex.evt.omnimemory.intent-stored.v1"
-  dlq_topic_suffix: "onex.evt.omniintelligence.intent-classified.v1.dlq"
+  # NOTE: Topic declarations live in the event_bus section below (source of truth).
+  # Formerly had subscribe_topic_suffix / publish_stored_topic_suffix /
+  # dlq_topic_suffix here -- removed per OMN-2213.
 
 # =============================================================================
 # EVENT BUS SUBCONTRACT - Runtime Routing Layer
