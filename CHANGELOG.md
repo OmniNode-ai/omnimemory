@@ -39,9 +39,9 @@ These features are now available from the updated dependencies:
   `EnumWorkflowStatus`, `EnumHealthStatus`
 - **Intelligence protocols** (spi 0.8.0): `ProtocolIntentClassifier`, `ProtocolIntentGraph`,
   `ProtocolPatternExtractor`
-- **Pipeline contracts** (spi 0.7.0): 14 models for workflow execution
-- **Validation contracts** (spi 0.7.0): 6 models for validation runs
-- **Measurement contracts** (spi 0.7.0): 8 models for quality metrics
+- **Pipeline contracts** (spi 0.8.0): 14 models for workflow execution
+- **Validation contracts** (spi 0.8.0): 6 models for validation runs
+- **Measurement contracts** (spi 0.8.0): 8 models for quality metrics
 - **Event ledger sinks** (infra 0.7.0): File-based and in-memory event ledgers
 - **Validation framework** (infra 0.7.0): ONEX compliance validators
 - **Gateway module** (infra 0.7.0): API gateway infrastructure

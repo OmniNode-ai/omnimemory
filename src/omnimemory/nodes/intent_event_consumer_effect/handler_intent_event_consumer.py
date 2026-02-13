@@ -12,9 +12,19 @@ Architecture:
     - Success/failure event emission for observability
     - Staleness detection for health monitoring
 
+Topic Naming:
+    Full topic names are constructed as ``{env_prefix}.{topic_suffix}`` where:
+
+    - ``env_prefix`` is a deployment realm (e.g., ``"dev"``, ``"staging"``,
+      ``"prod"``) that isolates environments on the same Kafka cluster.
+    - ``topic_suffix`` contains the ``onex.`` namespace and event path
+      (e.g., ``onex.evt.omnimemory.intent-stored.v1``).
+
+    Resulting topic example: ``dev.onex.evt.omnimemory.intent-stored.v1``
+
 Consumer Group:
     Derived from node identity per ADR:
-    {env}.omnimemory.intent_event_consumer_effect.consume.v1
+    ``{env_prefix}.omnimemory.intent_event_consumer_effect.consume.v1``
 
 Example::
 
@@ -89,9 +99,15 @@ class HandlerIntentEventConsumer:
     """Kafka consumer for intent-classified events.
 
     Consumer group is derived from node identity per ADR:
-    {env}.{service}.{node_name}.{purpose}.{version}
+    ``{env_prefix}.{service}.{node_name}.{purpose}.{version}``
 
-    Example: onex.omnimemory.intent_event_consumer_effect.consume.v1
+    Example: ``dev.omnimemory.intent_event_consumer_effect.consume.v1``
+
+    The ``env_prefix`` parameter is a deployment realm (e.g., ``"dev"``,
+    ``"staging"``, ``"prod"``) that isolates environments on the same Kafka
+    cluster. It is separate from the ``onex.`` namespace embedded in topic
+    suffixes. See :class:`ModelIntentEventConsumerConfig` for topic suffix
+    defaults.
 
     Attributes:
         _config: Consumer configuration.
