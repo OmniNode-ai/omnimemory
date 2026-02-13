@@ -172,6 +172,58 @@ handler_routing:
       output_events: []
   default_handler: null
 
+# =============================================================================
+# EVENT BUS SUBCONTRACT - Runtime Routing Layer
+# =============================================================================
+# PURPOSE: Machine-readable configuration of WHERE events are routed.
+#
+# This subcontract provides structured topic routing for:
+#   - RuntimeHostProcess auto-discovery and wiring
+#   - Kafka topic subscription/publication
+#   - Schema validation via topic metadata
+#
+# Contains: topic suffixes (simple strings) + optional schema references.
+#
+# NOTE: This is intentionally separate from event_type (above) which
+# documents WHAT events this node produces. Both are needed for Effect nodes:
+#   - event_type = documentation layer (WHAT)
+#   - event_bus = runtime routing layer (WHERE)
+#
+# Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
+#   - kind=cmd for commands/inputs
+#   - kind=evt for events/outputs
+# =============================================================================
+event_bus:
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  event_bus_enabled: true
+
+  # Topics this node subscribes to (receives events from)
+  subscribe_topics:
+    - "onex.cmd.omnimemory.intent-query-requested.v1"
+
+  # Topics this node publishes to (sends events to)
+  publish_topics:
+    - "onex.evt.omnimemory.intent-query-response.v1"
+
+  # Metadata for subscribed topics
+  subscribe_topic_metadata:
+    "onex.cmd.omnimemory.intent-query-requested.v1":
+      schema_ref: "omnibase_core.models.events.ModelIntentQueryRequestedEvent"
+      description: "Intent query request events containing query type, session reference, and filtering
+        parameters. Runtime dispatches inbound events to this node."
+      content_type: "application/json"
+
+  # Metadata for published topics
+  publish_topic_metadata:
+    "onex.evt.omnimemory.intent-query-response.v1":
+      schema_ref: "omnibase_core.models.events.ModelIntentQueryResponseEvent"
+      description: "Intent query response events containing distribution data, intent records, or error
+        details based on the query type."
+      content_type: "application/json"
+
 # === TAGS ===
 tags:
   - intent

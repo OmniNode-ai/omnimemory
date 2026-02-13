@@ -9,6 +9,11 @@ class ModelIntentEventConsumerConfig(BaseModel):
 
     Note: consumer_group is NOT configured here. It is derived from
     ModelNodeIdentity via compute_consumer_group_id() per ADR.
+
+    Note: Topic suffix defaults MUST match the ``event_bus.subscribe_topics``,
+    ``event_bus.publish_topics``, and ``event_bus.dlq_topics`` declared in this
+    node's contract.yaml. The contract is the source of truth for topic
+    declarations.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)

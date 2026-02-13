@@ -31,6 +31,69 @@ event_type:
   publish_stored_topic_suffix: "onex.evt.omnimemory.intent-stored.v1"
   dlq_topic_suffix: "onex.evt.omniintelligence.intent-classified.v1.dlq"
 
+# =============================================================================
+# EVENT BUS SUBCONTRACT - Runtime Routing Layer
+# =============================================================================
+# PURPOSE: Machine-readable configuration of WHERE events are routed.
+#
+# This subcontract provides structured topic routing for:
+#   - RuntimeHostProcess auto-discovery and wiring
+#   - Kafka topic subscription/publication
+#   - Schema validation via topic metadata
+#
+# Contains: topic suffixes (simple strings) + optional schema references.
+#
+# NOTE: This is intentionally separate from event_type (above) which
+# documents WHAT events this node produces. Both are needed for Effect nodes:
+#   - event_type = documentation layer (WHAT)
+#   - event_bus = runtime routing layer (WHERE)
+#
+# Topic naming: onex.{kind}[.{producer}].{event-name}.v{n}
+#   - kind=cmd for commands/inputs
+#   - kind=evt for events/outputs
+#   - {producer} segment: REQUIRED for internal single-producer topics
+#   - {producer} segment: OMITTED for multi-producer business events
+# =============================================================================
+event_bus:
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  event_bus_enabled: true
+
+  # Topics this node subscribes to (receives events from)
+  subscribe_topics:
+    - "onex.evt.omniintelligence.intent-classified.v1"
+
+  # Topics this node publishes to (sends events to)
+  publish_topics:
+    - "onex.evt.omnimemory.intent-stored.v1"
+
+  # Dead letter queue topics
+  dlq_topics:
+    - "onex.evt.omniintelligence.intent-classified.v1.dlq"
+
+  # Metadata for subscribed topics
+  subscribe_topic_metadata:
+    "onex.evt.omniintelligence.intent-classified.v1":
+      schema_ref: "omnimemory.models.events.model_intent_classified_event.ModelIntentClassifiedEvent"
+      description: "Intent classification events from omniintelligence. Contains classified intent data
+        with confidence scores, session references, and classification metadata."
+      content_type: "application/json"
+
+  # Metadata for published topics
+  publish_topic_metadata:
+    "onex.evt.omnimemory.intent-stored.v1":
+      schema_ref: "omnibase_core.models.events.ModelIntentStoredEvent"
+      description: "Intent storage confirmation events. Emitted after successfully persisting a classified
+        intent to Memgraph. Uses status field to indicate success or error."
+      content_type: "application/json"
+    "onex.evt.omniintelligence.intent-classified.v1.dlq":
+      schema_ref: "omnimemory.models.events.model_intent_classified_event.ModelIntentClassifiedEvent"
+      description: "Dead letter queue for intent-classified events that failed processing after max retries.
+        Contains the original event plus error metadata."
+      content_type: "application/json"
+
 # === HANDLER CONFIGURATION ===
 handler_config:
   handler_class: "HandlerIntentEventConsumer"

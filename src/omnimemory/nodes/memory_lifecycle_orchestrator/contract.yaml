@@ -39,13 +39,12 @@
 #   - ModelRestoreMemoryCommand -> HandlerRestoreMemory (ARCHIVED -> ACTIVE)
 #   - ModelMemoryAccessedEvent -> HandlerMemoryAccessed (TTL extension tracking)
 #
-# Published Event Topics:
-#   - {env}.{namespace}.memory.evt.memory-expired.v1
-#   - {env}.{namespace}.memory.evt.memory-archived.v1
-#   - {env}.{namespace}.memory.evt.memory-archive-initiated.v1
-#   - {env}.{namespace}.memory.evt.memory-restored.v1
-#   - {env}.{namespace}.memory.evt.memory-consolidated.v1
-#   - {env}.{namespace}.memory.evt.lifecycle-transition-failed.v1
+# Published Event Topics (ONEX canonical naming):
+#   - {env}.onex.evt.omnimemory.memory-expired.v1
+#   - {env}.onex.evt.omnimemory.memory-archived.v1
+#   - {env}.onex.evt.omnimemory.memory-archive-initiated.v1
+#   - {env}.onex.evt.omnimemory.memory-restored.v1
+#   - {env}.onex.evt.omnimemory.lifecycle-transition-failed.v1
 # =============================================================================
 
 contract_version:
@@ -103,23 +102,24 @@ tags:
 author: "OmniNode Team"
 
 # Consumed events - follows ModelEventSubscription schema
+# Topic names follow ONEX canonical naming: onex.{cmd/evt}.omnimemory.{action}.v{N}
 consumed_events:
   # RuntimeTick - Periodic lifecycle evaluation trigger
   - event_pattern: "onex.internal.runtime-tick.v1"
     handler_function: "handle_runtime_tick"
 
   # Memory lifecycle command events
-  - event_pattern: "memory.cmd.archive-memory.v1"
+  - event_pattern: "onex.cmd.omnimemory.archive-memory.v1"
     handler_function: "handle_archive_memory"
 
-  - event_pattern: "memory.cmd.expire-memory.v1"
+  - event_pattern: "onex.cmd.omnimemory.expire-memory.v1"
     handler_function: "handle_expire_memory"
 
-  - event_pattern: "memory.cmd.restore-memory.v1"
+  - event_pattern: "onex.cmd.omnimemory.restore-memory.v1"
     handler_function: "handle_restore_memory"
 
   # Memory access events for lifecycle tracking
-  - event_pattern: "memory.evt.memory-accessed.v1"
+  - event_pattern: "onex.evt.omnimemory.memory-accessed.v1"
     handler_function: "handle_memory_accessed"
 
 # Published events - empty list since ModelEventDescriptor requires complex
@@ -162,6 +162,104 @@ handler_routing:
       output_events: []
   # Future handlers (OMN-1453): restore, memory-accessed
   default_handler: null
+
+# =============================================================================
+# EVENT BUS SUBCONTRACT - Runtime Routing Layer
+# =============================================================================
+# PURPOSE: Machine-readable configuration of WHERE events are routed.
+#
+# This subcontract provides structured topic routing for:
+#   - RuntimeHostProcess auto-discovery and wiring
+#   - Kafka topic subscription/publication
+#   - Schema validation via topic metadata
+#
+# Contains: topic suffixes (simple strings) + optional schema references.
+#
+# NOTE: This is intentionally separate from consumed_events/published_events
+# (above) which documents WHAT events this node handles. Both are needed:
+#   - consumed_events/published_events = documentation layer (WHAT)
+#   - event_bus = runtime routing layer (WHERE)
+#
+# Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
+#   - kind=cmd for commands/inputs
+#   - kind=evt for events/outputs
+#   - Internal runtime events use onex.internal.* namespace
+# =============================================================================
+event_bus:
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  event_bus_enabled: true
+
+  # Topics this node subscribes to (receives events from)
+  subscribe_topics:
+    - "onex.internal.runtime-tick.v1"
+    - "onex.cmd.omnimemory.archive-memory.v1"
+    - "onex.cmd.omnimemory.expire-memory.v1"
+    - "onex.cmd.omnimemory.restore-memory.v1"
+    - "onex.evt.omnimemory.memory-accessed.v1"
+
+  # Topics this node publishes to (sends events to)
+  publish_topics:
+    - "onex.evt.omnimemory.memory-expired.v1"
+    - "onex.evt.omnimemory.memory-archived.v1"
+    - "onex.evt.omnimemory.memory-archive-initiated.v1"
+    - "onex.evt.omnimemory.memory-restored.v1"
+    - "onex.evt.omnimemory.lifecycle-transition-failed.v1"
+
+  # Metadata for subscribed topics
+  subscribe_topic_metadata:
+    "onex.internal.runtime-tick.v1":
+      schema_ref: "omnibase_core.models.runtime.ModelRuntimeTick"
+      description: "Periodic runtime tick for TTL expiration evaluation. Injected timestamp enables deterministic
+        lifecycle checks."
+      content_type: "application/json"
+    "onex.cmd.omnimemory.archive-memory.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelArchiveMemoryCommand"
+      description: "Command to transition an EXPIRED memory to ARCHIVED state in cold storage."
+      content_type: "application/json"
+    "onex.cmd.omnimemory.expire-memory.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelExpireMemoryCommand"
+      description: "Command to explicitly transition an ACTIVE memory to EXPIRED state."
+      content_type: "application/json"
+    "onex.cmd.omnimemory.restore-memory.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelRestoreMemoryCommand"
+      description: "Command to restore an ARCHIVED memory back to ACTIVE state."
+      content_type: "application/json"
+    "onex.evt.omnimemory.memory-accessed.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryAccessedEvent"
+      description: "Memory access event for TTL extension tracking. Resets or extends memory TTL based
+        on access patterns."
+      content_type: "application/json"
+
+  # Metadata for published topics
+  publish_topic_metadata:
+    "onex.evt.omnimemory.memory-expired.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_tick.ModelMemoryExpiredEvent"
+      description: "Memory expiration event. Emitted when a memory exceeds its hard TTL and transitions
+        from ACTIVE to EXPIRED state."
+      content_type: "application/json"
+    "onex.evt.omnimemory.memory-archived.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
+      description: "Memory archival confirmation event. Emitted when a memory is successfully moved from
+        EXPIRED to ARCHIVED state in cold storage."
+      content_type: "application/json"
+    "onex.evt.omnimemory.memory-archive-initiated.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
+      description: "Memory archive initiation event. Emitted when an archive operation begins for an expired
+        memory entity."
+      content_type: "application/json"
+    "onex.evt.omnimemory.memory-restored.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryRestoredEvent"
+      description: "Memory restoration confirmation event. Emitted when a memory is successfully restored
+        from ARCHIVED to ACTIVE state."
+      content_type: "application/json"
+    "onex.evt.omnimemory.lifecycle-transition-failed.v1":
+      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelLifecycleTransitionFailedEvent"
+      description: "Lifecycle transition failure event. Emitted when a lifecycle state transition fails
+        with error details and the attempted transition."
+      content_type: "application/json"
 
 # Orchestration configuration - use defaults
 load_balancing_enabled: true
