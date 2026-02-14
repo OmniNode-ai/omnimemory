@@ -195,7 +195,10 @@ async def create_default_event_bus(
     from omnibase_infra.event_bus.event_bus_kafka import EventBusKafka
 
     event_bus = EventBusKafka()
-    await event_bus.initialize({"bootstrap_servers": bootstrap_servers})
+    try:
+        await event_bus.initialize({"bootstrap_servers": bootstrap_servers})
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize event bus: {e}") from e
     # EventBusKafka satisfies ProtocolEventBusPublish (has async publish method)
     # but mypy cannot verify cross-package structural subtyping.
     return cast(ProtocolEventBusPublish, event_bus)

@@ -1813,6 +1813,7 @@ class HandlerSubscription:
                         f"({type(health_result).__name__})"
                     )
             except Exception as e:
+                event_bus_healthy = False
                 errors.append(f"Event bus check failed: {e}")
 
         # Healthy when all known components report True.
