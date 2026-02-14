@@ -2,7 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Intent event consumer handler.
 
-Consumes intent-classified.v1 events from Kafka and persists to Memgraph.
+Consumes intent-classified.v1 events from the event bus and persists to Memgraph.
 
 Architecture:
     This handler subscribes to intent classification events from omniintelligence
@@ -16,7 +16,7 @@ Topic Naming:
     Full topic names are constructed as ``{env_prefix}.{topic_suffix}`` where:
 
     - ``env_prefix`` is a deployment realm (e.g., ``"dev"``, ``"staging"``,
-      ``"prod"``) that isolates environments on the same Kafka cluster.
+      ``"prod"``) that isolates environments on the same cluster.
     - ``topic_suffix`` contains the ``onex.`` namespace and event path
       (e.g., ``onex.evt.omnimemory.intent-stored.v1``).
 
@@ -97,7 +97,7 @@ HANDLER_ID_INTENT_CONSUMER: str = "intent-event-consumer"
 
 
 class HandlerIntentEventConsumer:
-    """Kafka consumer for intent-classified events.
+    """Event bus consumer for intent-classified events.
 
     Consumer group is derived from node identity per ADR:
     ``{env_prefix}.{service}.{node_name}.{purpose}.{version}``
@@ -105,7 +105,7 @@ class HandlerIntentEventConsumer:
     Example: ``dev.omnimemory.intent_event_consumer_effect.consume.v1``
 
     The ``env_prefix`` parameter is a deployment realm (e.g., ``"dev"``,
-    ``"staging"``, ``"prod"``) that isolates environments on the same Kafka
+    ``"staging"``, ``"prod"``) that isolates environments on the same event bus
     cluster. It is separate from the ``onex.`` namespace embedded in topic
     suffixes. See :class:`ModelIntentEventConsumerConfig` for topic suffix
     defaults.
@@ -157,7 +157,7 @@ class HandlerIntentEventConsumer:
         self._messages_dlq = 0
         self._unsubscribe: Callable[[], None] | None = None
 
-        # Kafka publish callback (set during initialize)
+        # Event bus publish callback (set during initialize)
         self._publish_callback: Callable[[str, dict[str, object]], None] | None = None
         self._env_prefix: str = "dev"
 
@@ -460,7 +460,7 @@ class HandlerIntentEventConsumer:
             await self._route_to_dlq(message, str(e), retry_count=retry_count)
 
     async def _emit_stored_event(self, event: ModelIntentStoredEvent) -> None:
-        """Emit intent-stored event to Kafka.
+        """Emit intent-stored event to the event bus.
 
         Uses canonical omnibase_core.ModelIntentStoredEvent which supports
         both success (status="success") and error (status="error") cases

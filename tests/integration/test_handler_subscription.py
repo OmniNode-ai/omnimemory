@@ -660,7 +660,7 @@ class TestHealthCheck:
         assert health.initialized is True
         assert health.db_healthy is not None
         assert health.valkey_healthy is not None
-        assert health.kafka_healthy is not None
+        assert health.event_bus_healthy is not None
 
     @pytest.mark.asyncio
     async def test_health_check_before_initialize(

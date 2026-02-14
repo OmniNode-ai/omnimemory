@@ -3,19 +3,19 @@
 This module provides the core subscription management functionality:
 - subscribe(): Register agent subscriptions to memory topics
 - unsubscribe(): Remove agent subscriptions
-- notify(): Publish notification events to Kafka for subscriber consumption
+- notify(): Publish notification events to the event bus for subscriber consumption
 - list_subscriptions(): Get subscriptions for an agent (with optional pagination)
 
 Architecture:
 - Persistence: Valkey (fast lookups) + PostgreSQL (source of truth)
-- Delivery: Kafka event bus (agents consume directly)
+- Delivery: Event bus (agents consume directly)
 - Topic naming: memory.<entity>.<event> convention
 
 Event Bus Strategy:
-    Notifications are published to Kafka topics. Internal agents consume
-    events directly via consumer groups. If external (non-Kafka) delivery
-    is needed in the future, implement a WebhookEmitterEffect node that
-    consumes bus events and handles HTTP delivery separately.
+    Notifications are published to event bus topics. Internal agents consume
+    events directly via consumer groups. If external delivery is needed in
+    the future, implement a WebhookEmitterEffect node that consumes bus
+    events and handles HTTP delivery separately.
 
 Known Limitations:
     Transaction Boundaries:
@@ -70,7 +70,7 @@ Example::
         topic="memory.item.created",
     )
 
-    # Notify all subscribers (publishes to Kafka)
+    # Notify all subscribers (publishes to event bus)
     event = ModelNotificationEvent(
         event_id="evt_456",
         topic="memory.item.created",
@@ -88,7 +88,7 @@ Example::
     Initial implementation for OMN-1393.
 
 .. versionchanged:: 0.2.0
-    Removed webhook delivery in favor of Kafka event bus.
+    Removed webhook delivery in favor of event bus.
     Webhook delivery moved to optional WebhookEmitterEffect node.
 """
 
@@ -278,7 +278,7 @@ class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler internal
     and observability.
 
     Attributes:
-        notifications_published: Count of notifications published to Kafka.
+        notifications_published: Count of notifications published to event bus.
         subscriptions_created: Count of new subscriptions created.
         subscriptions_updated: Count of existing subscriptions updated (re-subscriptions).
         subscriptions_deleted: Count of subscriptions deleted.
@@ -293,7 +293,7 @@ class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler internal
     notifications_published: int = Field(
         default=0,
         ge=0,
-        description="Count of notifications published to Kafka",
+        description="Count of notifications published to event bus",
     )
     subscriptions_created: int = Field(
         default=0,
@@ -322,7 +322,7 @@ class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler health
         initialized: Whether the handler has been initialized.
         db_healthy: Database connection health.
         valkey_healthy: Valkey connection health.
-        kafka_healthy: Kafka connection health.
+        event_bus_healthy: Event bus connection health.
         error_message: Error details if unhealthy.
         metrics: Optional metrics for observability.
     """
@@ -349,9 +349,9 @@ class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler health
         default=None,
         description="Valkey connection health",
     )
-    kafka_healthy: bool | None = Field(
+    event_bus_healthy: bool | None = Field(
         default=None,
-        description="Kafka connection health",
+        description="Event bus connection health",
     )
     error_message: str | None = Field(
         default=None,
@@ -438,17 +438,17 @@ class HandlerSubscription:
     """Handler for agent subscriptions and memory change notifications.
 
     Manages the lifecycle of subscriptions and publishes notification events
-    to Kafka for consumption by subscribing agents.
+    to the event bus for consumption by subscribing agents.
 
     Architecture:
         - Subscription store: PostgreSQL (source of truth) + Valkey (cache)
-        - Notification delivery: Kafka event bus
+        - Notification delivery: Event bus
         - Agents consume events directly via consumer groups
 
     Note on External Delivery:
         If webhook delivery to external systems is needed, implement a
-        WebhookEmitterEffect node that consumes Kafka events and handles
-        HTTP delivery with its own retry/circuit breaker logic.
+        WebhookEmitterEffect node that consumes event bus messages and
+        handles HTTP delivery with its own retry/circuit breaker logic.
 
     ONEX Container Pattern:
         This handler follows the ONEX container-driven pattern:
@@ -593,6 +593,11 @@ class HandlerSubscription:
                     if isinstance(event_bus, ProtocolEventBusHealthCheck)
                     else None
                 )
+                if self._event_bus_health is None:
+                    logger.warning(
+                        "Event bus does not implement ProtocolEventBusHealthCheck; "
+                        "health status will be unknown"
+                    )
                 self._publisher = AdapterKafkaPublisher(event_bus)
                 logger.info("Event bus initialized (via protocol adapter)")
 
@@ -870,11 +875,11 @@ class HandlerSubscription:
         topic: str,
         event: ModelNotificationEvent,
     ) -> int:
-        """Publish notification event to Kafka for subscriber consumption.
+        """Publish notification event to the event bus for subscriber consumption.
 
-        Agents subscribe to Kafka topics and consume events via consumer groups.
-        This method publishes the event to the event bus - actual delivery to
-        agents happens through their Kafka consumers.
+        Agents subscribe to event bus topics and consume events via consumer
+        groups. This method publishes the event to the event bus - actual
+        delivery to agents happens through their event bus consumers.
 
         Args:
             topic: The topic to notify (format: memory.<entity>.<event>).
@@ -909,16 +914,25 @@ class HandlerSubscription:
         # Agents consume from this topic via consumer groups keyed by agent_id
         kafka_topic = config.kafka_notification_topic
         event_payload = cast(dict[str, object], event.model_dump(mode="json"))
-        await publisher.publish(
-            topic=kafka_topic,
-            key=topic,  # Partition by topic for ordering
-            value=event_payload,
-            headers={
-                "event_id": event.event_id,
-                "topic": topic,
-                "subscriber_count": str(subscriber_count),
-            },
-        )
+        try:
+            await publisher.publish(
+                topic=kafka_topic,
+                key=topic,  # Partition by topic for ordering
+                value=event_payload,
+                headers={
+                    "event_id": event.event_id,
+                    "topic": topic,
+                    "subscriber_count": str(subscriber_count),
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to publish notification to topic %s for event %s: %s",
+                kafka_topic,
+                event.event_id,
+                exc,
+            )
+            raise
 
         await self._increment_metric("notifications_published")
 
@@ -1731,7 +1745,7 @@ class HandlerSubscription:
     async def health_check(self) -> ModelSubscriptionHealth:
         """Check if all handler components are healthy.
 
-        Performs health checks on Valkey, database, and Kafka handlers.
+        Performs health checks on Valkey, database, and event bus handlers.
         Component health is reported as:
         - True: Component is healthy and responding
         - False: Component is unhealthy or failed health check
@@ -1830,7 +1844,7 @@ class HandlerSubscription:
             initialized=True,
             db_healthy=db_healthy,
             valkey_healthy=valkey_healthy,
-            kafka_healthy=event_bus_healthy,
+            event_bus_healthy=event_bus_healthy,
             error_message="; ".join(errors) if errors else None,
             metrics=await self.get_metrics(),
         )
@@ -1855,7 +1869,7 @@ class HandlerSubscription:
             "pagination",
             "metrics",
             "health_check",
-            "kafka_delivery",
+            "event_bus_delivery",
             "valkey_caching",
             "postgresql_persistence",
         ]

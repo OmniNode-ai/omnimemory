@@ -58,13 +58,23 @@ class ProtocolEventBusPublish(Protocol):
                 await self._bus.publish(topic=topic, key=None, value=data)
     """
 
-    async def publish(self, *, topic: str, key: bytes | None, value: bytes) -> None:
+    async def publish(
+        self,
+        *,
+        topic: str,
+        key: bytes | None,
+        value: bytes,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         """Publish raw bytes to a topic.
 
         Args:
             topic: Target topic name.
             key: Optional message key for partitioning.
             value: Message payload as bytes.
+            headers: Optional string key-value headers. Concrete implementations
+                may convert these to transport-specific formats (e.g.,
+                ModelEventHeaders for Kafka).
         """
         ...
 
@@ -80,7 +90,12 @@ class ProtocolEventBusHealthCheck(Protocol):
         """Return health status.
 
         Returns:
-            Dict with at minimum a "healthy" key (bool).
+            Dict with health information. Required keys:
+
+            - ``"healthy"`` (bool): Whether the bus is operational and can
+              accept publish calls. Implementations may include additional
+              keys (e.g., ``"started"``, ``"environment"``,
+              ``"circuit_state"``).
         """
         ...
 
@@ -96,7 +111,16 @@ class ProtocolEventBusLifecycle(Protocol):
         """Initialize the event bus with configuration.
 
         Args:
-            config: Configuration dictionary.
+            config: Configuration dictionary. Recognized keys:
+
+                - ``"bootstrap_servers"`` (str): Kafka broker addresses,
+                  comma-separated (e.g., ``"kafka:9092,kafka2:9092"``).
+                - ``"environment"`` (str): Environment identifier for
+                  message routing (e.g., ``"dev"``, ``"prod"``).
+                - ``"timeout_seconds"`` (int): Timeout in seconds for
+                  connection and publish operations.
+
+                Unknown keys are ignored by the default implementation.
         """
         ...
 
@@ -117,7 +141,7 @@ class AdapterKafkaPublisher:
     to the event bus protocol interface (topic, key: bytes, value: bytes).
 
     Serialization:
-        - key: UTF-8 encoded bytes
+        - key: UTF-8 encoded bytes (empty string encodes as b"")
         - value: compact JSON bytes (no whitespace, non-ASCII preserved)
 
     Example::
@@ -147,15 +171,16 @@ class AdapterKafkaPublisher:
 
         Args:
             topic: Target topic name.
-            key: Message key (for partitioning).
+            key: Message key (for partitioning). Empty string is preserved
+                as ``b""``, which differs from ``None`` in Kafka partitioning.
             value: Event payload dict (serialized to JSON bytes).
-            headers: Optional headers (logged but not passed to raw publish;
-                extend ProtocolEventBusPublish if header support is required).
+            headers: Optional string key-value headers forwarded to the
+                event bus publish call.
         """
         value_bytes = json.dumps(
             value, separators=(",", ":"), ensure_ascii=False, default=str
         ).encode("utf-8")
-        key_bytes = key.encode("utf-8") if key else None
+        key_bytes = key.encode("utf-8") if key is not None else None
 
         if headers:
             logger.debug(
@@ -164,7 +189,9 @@ class AdapterKafkaPublisher:
                 list(headers.keys()),
             )
 
-        await self._event_bus.publish(topic=topic, key=key_bytes, value=value_bytes)
+        await self._event_bus.publish(
+            topic=topic, key=key_bytes, value=value_bytes, headers=headers
+        )
 
 
 # =============================================================================
@@ -173,7 +200,7 @@ class AdapterKafkaPublisher:
 
 
 async def create_default_event_bus(
-    bootstrap_servers: str = "localhost:9092",
+    bootstrap_servers: str,
 ) -> ProtocolEventBusPublish:
     """Create and initialize a default event bus instance.
 
@@ -183,6 +210,8 @@ async def create_default_event_bus(
 
     Args:
         bootstrap_servers: Event bus bootstrap servers (comma-separated).
+            Must be provided explicitly; no default to prevent accidental
+            use of localhost in production.
 
     Returns:
         An initialized event bus conforming to ProtocolEventBusPublish.
@@ -193,10 +222,14 @@ async def create_default_event_bus(
         RuntimeError: If the event bus cannot be initialized.
     """
     from omnibase_infra.event_bus.event_bus_kafka import EventBusKafka
+    from omnibase_infra.event_bus.models.config import ModelKafkaEventBusConfig
 
-    event_bus = EventBusKafka()
+    config = ModelKafkaEventBusConfig(
+        bootstrap_servers=bootstrap_servers,
+    )
+    event_bus = EventBusKafka(config=config)
     try:
-        await event_bus.initialize({"bootstrap_servers": bootstrap_servers})
+        await event_bus.start()
     except Exception as e:
         raise RuntimeError(f"Failed to initialize event bus: {e}") from e
     # EventBusKafka satisfies ProtocolEventBusPublish (has async publish method)
