@@ -42,7 +42,7 @@ EXPECTED_MEMORY_RETRIEVAL_REQUESTED = (
 )
 
 # memory_lifecycle_orchestrator
-EXPECTED_RUNTIME_TICK = "onex.internal.runtime-tick.v1"
+EXPECTED_RUNTIME_TICK = "onex.cmd.omnimemory.runtime-tick.v1"
 EXPECTED_ARCHIVE_MEMORY = "onex.cmd.omnimemory.archive-memory.v1"
 EXPECTED_EXPIRE_MEMORY = "onex.cmd.omnimemory.expire-memory.v1"
 
@@ -97,6 +97,7 @@ EXPECTED_ALL_PUBLISH_TOPICS = {
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCollectSubscribeTopics:
     """Validate contract-driven subscribe topic collection."""
 
@@ -170,6 +171,7 @@ class TestCollectSubscribeTopics:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCollectPublishTopicsForDispatch:
     """Validate contract-driven publish topic collection for dispatch engine."""
 
@@ -245,6 +247,7 @@ class TestCollectPublishTopicsForDispatch:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCollectAllPublishTopics:
     """Validate full publish topic collection across all contracts."""
 
@@ -280,6 +283,7 @@ class TestCollectAllPublishTopics:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCanonicalTopicToDispatchAlias:
     """Validate canonical-to-dispatch topic conversion."""
 
@@ -304,7 +308,7 @@ class TestCanonicalTopicToDispatchAlias:
 
     def test_internal_topic_unchanged(self) -> None:
         """Internal topics without .cmd./.evt. pass through."""
-        topic = "onex.internal.runtime-tick.v1"
+        topic = "onex.internal.some-internal-event.v1"
         assert canonical_topic_to_dispatch_alias(topic) == topic
 
     @pytest.mark.parametrize(
@@ -327,6 +331,10 @@ class TestCanonicalTopicToDispatchAlias:
                 "onex.commands.omnimemory.expire-memory.v1",
             ),
             (
+                EXPECTED_RUNTIME_TICK,
+                "onex.commands.omnimemory.runtime-tick.v1",
+            ),
+            (
                 EXPECTED_INTENT_CLASSIFIED,
                 "onex.events.omniintelligence.intent-classified.v1",
             ),
@@ -346,6 +354,7 @@ class TestCanonicalTopicToDispatchAlias:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestDeriveDispatchKey:
     """Validate dispatch key derivation from package paths."""
 
@@ -386,6 +395,7 @@ class TestDeriveDispatchKey:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestNodePackageRegistry:
     """Validate that _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES is complete."""
 
@@ -441,6 +451,7 @@ class TestNodePackageRegistry:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestNoHardcodedTopics:
     """Validate that hardcoded topic constants have been removed."""
 

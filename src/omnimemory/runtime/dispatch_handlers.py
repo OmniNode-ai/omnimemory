@@ -55,7 +55,16 @@ logger = logging.getLogger(__name__)
 
 @runtime_checkable
 class ProtocolIntentEventConsumer(Protocol):
-    """Protocol for intent event consumer handler."""
+    """Protocol for intent event consumer handler.
+
+    Note on ``_handle_message`` naming:
+        The underscore-prefixed method name is intentional and mirrors the actual
+        implementation in omnibase_core's ``HandlerIntentEventConsumer``, where
+        ``_handle_message`` is the concrete method called by the base-class
+        ``on_message`` template.  Renaming it here would break structural typing
+        compatibility.  The ``# noqa: SLF001`` suppression on call-sites
+        acknowledges this cross-boundary private-method access.
+    """
 
     async def _handle_message(
         self, message: dict[str, object], *, retry_count: int = 0
@@ -93,8 +102,8 @@ DISPATCH_ALIAS_INTENT_QUERY_REQUESTED = (
 )
 """Dispatch-compatible alias for intent-query-requested canonical topic."""
 
-DISPATCH_ALIAS_RUNTIME_TICK = "onex.internal.runtime-tick.v1"
-"""Dispatch alias for runtime tick events (internal namespace, no conversion)."""
+DISPATCH_ALIAS_RUNTIME_TICK = "omnimemory.commands.runtime-tick.v1"
+"""Dispatch-compatible alias for runtime-tick command topic."""
 
 DISPATCH_ALIAS_ARCHIVE_MEMORY = "onex.commands.omnimemory.archive-memory.v1"
 """Dispatch-compatible alias for archive-memory command topic."""
@@ -438,9 +447,8 @@ def create_memory_dispatch_engine(
         node_kind=EnumNodeKind.ORCHESTRATOR,
         message_types=None,
     )
-    # Runtime-tick is an internal namespace topic. EnumMessageCategory.from_topic()
-    # may map onex.internal.* to COMMAND or None. Registered as COMMAND for
-    # consistency with the orchestrator command pattern.
+    # Runtime-tick uses .commands. segment so EnumMessageCategory.from_topic()
+    # returns COMMAND, consistent with the other lifecycle command routes.
     engine.register_route(
         ModelDispatchRoute(
             route_id="memory-lifecycle-tick-route",
@@ -558,6 +566,13 @@ def create_dispatch_callback(
             # Derive message category from dispatch_topic so EVENT topics
             # produce EVENT envelopes (not hard-coded COMMAND).
             topic_category = EnumMessageCategory.from_topic(dispatch_topic)
+            if topic_category is None:
+                logger.warning(
+                    "from_topic() returned None for dispatch_topic=%r; "
+                    "falling back to 'command' category (correlation_id=%s)",
+                    dispatch_topic,
+                    msg_correlation_id,
+                )
             envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
                 payload=payload_dict,
                 correlation_id=msg_correlation_id,

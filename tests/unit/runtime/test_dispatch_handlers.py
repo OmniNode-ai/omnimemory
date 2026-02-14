@@ -114,6 +114,7 @@ class _MockEventMessage:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestTopicAliases:
     """Verify topic alias constants are correctly formed."""
 
@@ -149,9 +150,9 @@ class TestTopicAliases:
         """Expire memory alias must contain .commands. segment."""
         assert ".commands." in DISPATCH_ALIAS_EXPIRE_MEMORY
 
-    def test_runtime_tick_alias_is_internal_namespace(self) -> None:
-        """Runtime tick alias must be in the internal namespace."""
-        assert "onex.internal." in DISPATCH_ALIAS_RUNTIME_TICK
+    def test_runtime_tick_alias_contains_commands_segment(self) -> None:
+        """Runtime tick alias must contain .commands. for from_topic() to work."""
+        assert ".commands." in DISPATCH_ALIAS_RUNTIME_TICK
 
 
 # =============================================================================
@@ -159,6 +160,7 @@ class TestTopicAliases:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCreateMemoryDispatchEngine:
     """Validate dispatch engine creation and configuration."""
 
@@ -219,6 +221,7 @@ class TestCreateMemoryDispatchEngine:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestIntentClassifiedDispatchHandler:
     """Validate the bridge handler for intent-classified events."""
 
@@ -336,6 +339,7 @@ class TestIntentClassifiedDispatchHandler:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestIntentQueryDispatchHandler:
     """Validate the bridge handler for intent-query-requested events."""
 
@@ -490,6 +494,7 @@ class TestIntentQueryDispatchHandler:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestLifecycleDispatchHandler:
     """Validate the fail-fast lifecycle dispatch handler."""
 
@@ -563,6 +568,7 @@ class TestLifecycleDispatchHandler:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCreateDispatchCallback:
     """Validate the event bus callback that bridges to the dispatch engine."""
 

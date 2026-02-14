@@ -108,7 +108,7 @@ author: "OmniNode Team"
 # Topic names follow ONEX canonical naming: onex.{cmd/evt}.omnimemory.{action}.v{N}
 consumed_events:
   # RuntimeTick - Periodic lifecycle evaluation trigger
-  - event_pattern: "onex.internal.runtime-tick.v1"
+  - event_pattern: "onex.cmd.omnimemory.runtime-tick.v1"
     handler_function: "handle_runtime_tick"
 
   # Memory lifecycle command events
@@ -187,7 +187,7 @@ handler_routing:
 # Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
 #   - kind=cmd for commands/inputs
 #   - kind=evt for events/outputs
-#   - Internal runtime events use onex.internal.* namespace
+#   - Runtime tick uses onex.cmd.omnimemory.* (command namespace)
 # =============================================================================
 event_bus:
   version:
@@ -198,7 +198,7 @@ event_bus:
 
   # Topics this node subscribes to (receives events from)
   subscribe_topics:
-    - "onex.internal.runtime-tick.v1"
+    - "onex.cmd.omnimemory.runtime-tick.v1"
     - "onex.cmd.omnimemory.archive-memory.v1"
     - "onex.cmd.omnimemory.expire-memory.v1"
 
@@ -208,7 +208,7 @@ event_bus:
 
   # Metadata for subscribed topics
   subscribe_topic_metadata:
-    "onex.internal.runtime-tick.v1":
+    "onex.cmd.omnimemory.runtime-tick.v1":
       schema_ref: "omnibase_infra.runtime.models.model_runtime_tick.ModelRuntimeTick"
       description: "Periodic runtime tick for TTL expiration evaluation. Injected timestamp enables deterministic
         lifecycle checks."
