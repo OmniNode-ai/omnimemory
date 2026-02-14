@@ -751,6 +751,7 @@ class HandlerIntent:
             return ModelIntentQueryResult(
                 status=status,
                 intents=local_intents,
+                total_count=len(local_intents),
                 error_message=core_result.error_message,
             )
         except Exception as e:
