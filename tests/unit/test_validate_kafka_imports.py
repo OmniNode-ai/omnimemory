@@ -119,6 +119,61 @@ class TestNoKafkaImports:
 
 
 @pytest.mark.unit
+class TestAllKafkaLibraryPatterns:
+    """All six Kafka import patterns must produce violations, not just aiokafka."""
+
+    @pytest.mark.parametrize(
+        ("source", "expected_fragment"),
+        [
+            pytest.param(
+                "import aiokafka\n",
+                "aiokafka",
+                id="import-aiokafka",
+            ),
+            pytest.param(
+                "from confluent_kafka import Consumer\n",
+                "confluent_kafka",
+                id="from-confluent_kafka",
+            ),
+            pytest.param(
+                "from kafka.errors import KafkaError\n",
+                "kafka",
+                id="from-kafka-submodule",
+            ),
+        ],
+    )
+    def test_library_pattern_produces_violation(
+        self,
+        tmp_path: Path,
+        source: str,
+        expected_fragment: str,
+    ) -> None:
+        filepath = _write_node_file(tmp_path, source)
+        violations = validate_file(filepath)
+
+        assert len(violations) == 1
+        assert expected_fragment in violations[0].message
+        assert violations[0].line == 1
+
+
+@pytest.mark.unit
+class TestOutsideEnforcedPath:
+    """Files outside ``omnimemory/nodes/`` must be ignored regardless of content."""
+
+    def test_kafka_import_outside_nodes_is_ignored(self, tmp_path: Path) -> None:
+        utils_dir = tmp_path / "omnimemory" / "utils"
+        utils_dir.mkdir(parents=True, exist_ok=True)
+        target = utils_dir / "kafka_helper.py"
+        target.write_text(
+            "from aiokafka import AIOKafkaConsumer\n",
+            encoding="utf-8",
+        )
+        violations = validate_file(target)
+
+        assert violations == []
+
+
+@pytest.mark.unit
 class TestElseBlockAfterTypeChecking:
     """Kafka imports in an ``else:`` block after ``if TYPE_CHECKING:`` are
     runtime imports and must produce a violation."""
