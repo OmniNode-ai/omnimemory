@@ -37,7 +37,9 @@ _spec.loader.exec_module(_module)
 validate_file = _module.validate_file
 
 
-def _write_node_file(tmp_path: Path, content: str) -> Path:
+def _write_node_file(
+    tmp_path: Path, content: str, filename: str = "example_node.py"
+) -> Path:
     """Write content into a file under a fake ``omnimemory/nodes/`` tree.
 
     ``validate_file`` only checks files whose path contains
@@ -48,7 +50,7 @@ def _write_node_file(tmp_path: Path, content: str) -> Path:
     """
     node_dir = tmp_path / "omnimemory" / "nodes"
     node_dir.mkdir(parents=True, exist_ok=True)
-    target = node_dir / "example_node.py"
+    target = node_dir / filename
     target.write_text(content, encoding="utf-8")
     return target
 
@@ -139,6 +141,16 @@ class TestAllKafkaLibraryPatterns:
                 "from kafka.errors import KafkaError\n",
                 "kafka",
                 id="from-kafka-submodule",
+            ),
+            pytest.param(
+                "import kafka\n",
+                "kafka",
+                id="import-kafka",
+            ),
+            pytest.param(
+                "import confluent_kafka\n",
+                "confluent_kafka",
+                id="import-confluent_kafka",
             ),
         ],
     )
