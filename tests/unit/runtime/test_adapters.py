@@ -15,7 +15,7 @@ Related:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -24,6 +24,7 @@ from omnimemory.runtime.adapters import (
     ProtocolEventBusHealthCheck,
     ProtocolEventBusLifecycle,
     ProtocolEventBusPublish,
+    create_default_event_bus,
 )
 
 # =============================================================================
@@ -322,8 +323,6 @@ class TestCreateDefaultEventBus:
     @pytest.mark.asyncio
     async def test_factory_returns_protocol_conforming_object(self) -> None:
         """create_default_event_bus must return ProtocolEventBusPublish."""
-        from unittest.mock import patch
-
         mock_config_cls = MagicMock()
         mock_bus_instance = AsyncMock(spec=_StubFullBus)
         mock_bus_instance.start = AsyncMock()
@@ -340,8 +339,6 @@ class TestCreateDefaultEventBus:
                 mock_config_cls,
             ),
         ):
-            from omnimemory.runtime.adapters import create_default_event_bus
-
             result = await create_default_event_bus(
                 bootstrap_servers="localhost:9092",
             )
@@ -352,8 +349,6 @@ class TestCreateDefaultEventBus:
     @pytest.mark.asyncio
     async def test_factory_calls_start_on_bus(self) -> None:
         """create_default_event_bus must call start() on the bus."""
-        from unittest.mock import patch
-
         mock_config_cls = MagicMock()
         mock_bus_instance = AsyncMock(spec=_StubFullBus)
         mock_bus_instance.start = AsyncMock()
@@ -369,8 +364,6 @@ class TestCreateDefaultEventBus:
                 mock_config_cls,
             ),
         ):
-            from omnimemory.runtime.adapters import create_default_event_bus
-
             await create_default_event_bus(
                 bootstrap_servers="localhost:9092",
             )
@@ -380,8 +373,6 @@ class TestCreateDefaultEventBus:
     @pytest.mark.asyncio
     async def test_factory_raises_runtime_error_on_start_failure(self) -> None:
         """create_default_event_bus must raise RuntimeError if start() fails."""
-        from unittest.mock import patch
-
         mock_config_cls = MagicMock()
         mock_bus_instance = AsyncMock(spec=_StubFullBus)
         mock_bus_instance.start = AsyncMock(side_effect=ConnectionError("broker down"))
@@ -397,8 +388,6 @@ class TestCreateDefaultEventBus:
                 mock_config_cls,
             ),
         ):
-            from omnimemory.runtime.adapters import create_default_event_bus
-
             with pytest.raises(RuntimeError, match="Failed to initialize event bus"):
                 await create_default_event_bus(
                     bootstrap_servers="localhost:9092",

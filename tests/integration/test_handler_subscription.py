@@ -462,7 +462,8 @@ class TestNotify:
             )
             assert count == 1
         except RuntimeError as e:
-            # Event bus may not be available - skip gracefully
+            # NOTE: Error message matching is coupled to EventBusKafka's exception text.
+            # If the event bus adapter changes error messages, update these skip guards.
             if "Kafka" in str(e) or "kafka" in str(e).lower():
                 pytest.skip(f"Event bus not available: {e}")
             raise
@@ -1245,7 +1246,7 @@ class TestEventBusFailureHandling:
     """
 
     @pytest.mark.asyncio
-    async def test_notify_returns_subscriber_count_even_with_kafka_issues(
+    async def test_notify_returns_subscriber_count_even_with_bus_issues(
         self,
         subscription_handler: HandlerSubscription,
         unique_agent_id: str,
@@ -1287,7 +1288,7 @@ class TestEventBusFailureHandling:
             raise
 
     @pytest.mark.asyncio
-    async def test_notify_handles_kafka_timeout_gracefully(
+    async def test_notify_handles_event_bus_timeout_gracefully(
         self,
         subscription_handler: HandlerSubscription,
     ) -> None:

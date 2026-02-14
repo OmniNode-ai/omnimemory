@@ -29,12 +29,8 @@ Related:
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import Mapping
 from typing import Protocol, cast, runtime_checkable
-
-logger = logging.getLogger(__name__)
-
 
 # =============================================================================
 # Protocol Definitions
