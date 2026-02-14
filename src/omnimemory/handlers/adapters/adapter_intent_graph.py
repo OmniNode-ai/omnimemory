@@ -2,8 +2,8 @@
 # Copyright (c) 2025 OmniNode Team
 """Adapter for storing intent classifications in Memgraph.
 
-This adapter implements ProtocolIntentGraph from omnibase_spi, providing
-a Memgraph-backed implementation for storing and retrieving intent
+This adapter structurally conforms to ProtocolIntentGraph from omnibase_spi,
+providing a Memgraph-backed implementation for storing and retrieving intent
 classifications.
 
 The storage boundary accepts **classification output** (category, confidence,
@@ -56,7 +56,7 @@ Example::
     Initial implementation for OMN-1457.
 
 .. versionchanged:: 0.2.0
-    Implements ProtocolIntentGraph from omnibase_spi (OMN-1476).
+    Structurally conforms to ProtocolIntentGraph from omnibase_spi (OMN-1476).
 """
 
 from __future__ import annotations
@@ -745,7 +745,7 @@ class AdapterIntentGraph:
     ) -> ModelIntentQueryResult:
         """Get intents for a session with optional filtering.
 
-        Implements ProtocolIntentGraph.get_session_intents.
+        Structurally conforms to ProtocolIntentGraph.get_session_intents.
 
         Retrieves intent classifications associated with the specified
         session, ordered by creation time (most recent first).
@@ -1286,7 +1286,7 @@ class AdapterIntentGraph:
     async def health_check(self) -> bool:
         """Check if the intent graph storage is healthy and accessible.
 
-        Implements ProtocolIntentGraph.health_check.
+        Structurally conforms to ProtocolIntentGraph.health_check.
 
         Returns:
             True if the storage is healthy, False otherwise.
