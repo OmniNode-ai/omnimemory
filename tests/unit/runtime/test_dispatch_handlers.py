@@ -176,29 +176,29 @@ class TestCreateMemoryDispatchEngine:
         )
         assert engine.is_frozen
 
-    def test_engine_has_three_handlers(
+    def test_engine_has_four_handlers(
         self,
         mock_intent_consumer: MagicMock,
         mock_intent_query_handler: MagicMock,
     ) -> None:
-        """All 3 memory domain handlers must be registered."""
+        """All 4 memory domain handlers must be registered."""
         engine = create_memory_dispatch_engine(
             intent_consumer=mock_intent_consumer,
             intent_query_handler=mock_intent_query_handler,
         )
-        assert engine.handler_count == 3
+        assert engine.handler_count == 4
 
-    def test_engine_has_five_routes(
+    def test_engine_has_six_routes(
         self,
         mock_intent_consumer: MagicMock,
         mock_intent_query_handler: MagicMock,
     ) -> None:
-        """All 5 memory domain routes must be registered."""
+        """All 6 memory domain routes must be registered."""
         engine = create_memory_dispatch_engine(
             intent_consumer=mock_intent_consumer,
             intent_query_handler=mock_intent_query_handler,
         )
-        assert engine.route_count == 5
+        assert engine.route_count == 6
 
     def test_engine_accepts_publish_topics(
         self,

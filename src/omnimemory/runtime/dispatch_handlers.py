@@ -112,6 +112,11 @@ DISPATCH_ALIAS_ARCHIVE_MEMORY = "onex.commands.omnimemory.archive-memory.v1"
 DISPATCH_ALIAS_EXPIRE_MEMORY = "onex.commands.omnimemory.expire-memory.v1"
 """Dispatch-compatible alias for expire-memory command topic."""
 
+DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED = (
+    "onex.commands.omnimemory.memory-retrieval-requested.v1"
+)
+"""Dispatch-compatible alias for memory-retrieval-requested command topic."""
+
 
 # =============================================================================
 # Bridge Handler: Intent Classified Event
@@ -374,10 +379,11 @@ def create_memory_dispatch_engine(
     Creates the engine, registers all omnimemory domain handlers and routes,
     and freezes it. The engine is ready for dispatch after this call.
 
-    Registers 3 handlers covering 5 routes:
+    Registers 4 handlers covering 6 routes:
         1. intent-classified handler (1 route: intent-classified.v1 events)
         2. intent-query handler (1 route: intent-query-requested.v1 commands)
-        3. lifecycle handler (3 routes: runtime-tick, archive, expire -- fail-fast)
+        3. memory-retrieval handler (1 route: memory-retrieval-requested.v1 -- fail-fast)
+        4. lifecycle handler (3 routes: runtime-tick, archive, expire -- fail-fast)
 
     Args:
         intent_consumer: REQUIRED intent event consumer handler.
@@ -447,7 +453,31 @@ def create_memory_dispatch_engine(
         )
     )
 
-    # --- Handler 3: lifecycle orchestrator (fail-fast) ---
+    # --- Handler 3: memory-retrieval-requested (fail-fast) ---
+    # Full HandlerMemoryRetrieval integration requires container-injected deps
+    # (vector store, DB adapters). Uses fail-fast handler until wired.
+    retrieval_handler = create_lifecycle_dispatch_handler()
+    engine.register_handler(
+        handler_id="memory-retrieval-handler",
+        handler=retrieval_handler,
+        category=EnumMessageCategory.COMMAND,
+        node_kind=EnumNodeKind.EFFECT,
+        message_types=None,
+    )
+    engine.register_route(
+        ModelDispatchRoute(
+            route_id="memory-retrieval-route",
+            topic_pattern=DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED,
+            message_category=EnumMessageCategory.COMMAND,
+            handler_id="memory-retrieval-handler",
+            description=(
+                "Routes memory-retrieval-requested commands to "
+                "HandlerMemoryRetrieval (fail-fast until fully wired)."
+            ),
+        )
+    )
+
+    # --- Handler 4: lifecycle orchestrator (fail-fast) ---
     lifecycle_handler = create_lifecycle_dispatch_handler()
     engine.register_handler(
         handler_id="memory-lifecycle-handler",
@@ -666,6 +696,7 @@ __all__ = [
     "DISPATCH_ALIAS_EXPIRE_MEMORY",
     "DISPATCH_ALIAS_INTENT_CLASSIFIED",
     "DISPATCH_ALIAS_INTENT_QUERY_REQUESTED",
+    "DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED",
     "DISPATCH_ALIAS_RUNTIME_TICK",
     "create_dispatch_callback",
     "create_intent_classified_dispatch_handler",

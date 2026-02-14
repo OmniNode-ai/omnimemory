@@ -283,7 +283,8 @@ class PluginMemory:
         Dispatchers registered:
             1. intent-classified handler (1 route: intent-classified.v1 events)
             2. intent-query handler (1 route: intent-query-requested.v1 commands)
-            3. lifecycle handler (3 routes: runtime-tick, archive, expire -- fail-fast)
+            3. memory-retrieval handler (1 route: memory-retrieval-requested.v1 -- fail-fast)
+            4. lifecycle handler (3 routes: runtime-tick, archive, expire -- fail-fast)
 
         The dispatch engine requires intent_consumer and intent_query_handler
         protocol implementations. These are created as stub instances for

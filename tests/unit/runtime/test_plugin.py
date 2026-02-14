@@ -221,26 +221,26 @@ class TestPluginWireDispatchers:
         assert plugin._dispatch_engine.is_frozen
 
     @pytest.mark.asyncio
-    async def test_wire_dispatchers_engine_has_five_routes(self) -> None:
-        """Engine should have exactly 5 routes (2 handler + 3 lifecycle)."""
+    async def test_wire_dispatchers_engine_has_six_routes(self) -> None:
+        """Engine should have exactly 6 routes (2 handler + 1 retrieval + 3 lifecycle)."""
         plugin = PluginMemory()
         config = _make_config()
 
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
 
         assert plugin._dispatch_engine is not None
-        assert plugin._dispatch_engine.route_count == 5
+        assert plugin._dispatch_engine.route_count == 6
 
     @pytest.mark.asyncio
-    async def test_wire_dispatchers_engine_has_three_handlers(self) -> None:
-        """Engine should have exactly 3 handlers."""
+    async def test_wire_dispatchers_engine_has_four_handlers(self) -> None:
+        """Engine should have exactly 4 handlers."""
         plugin = PluginMemory()
         config = _make_config()
 
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
 
         assert plugin._dispatch_engine is not None
-        assert plugin._dispatch_engine.handler_count == 3
+        assert plugin._dispatch_engine.handler_count == 4
 
     @pytest.mark.asyncio
     async def test_wire_dispatchers_returns_resources_created(self) -> None:
