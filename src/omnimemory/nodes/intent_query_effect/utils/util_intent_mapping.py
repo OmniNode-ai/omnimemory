@@ -75,16 +75,11 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
             - ModelIntentRecord.intent_category (str) -> ModelIntentRecordPayload.intent_category (str)
             - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
     """
-    # Defensive: ensure intent_category is a plain str even if an enum leaks through
-    intent_category = (
-        record.intent_category.value
-        if hasattr(record.intent_category, "value")
-        else record.intent_category
-    )
+    # ModelIntentRecord.intent_category is typed as str, so use directly.
     return ModelIntentRecordPayload(
         intent_id=record.intent_id,
         session_ref=record.session_ref or "",
-        intent_category=intent_category,
+        intent_category=record.intent_category,
         confidence=record.confidence,
         keywords=record.keywords,
         created_at=record.created_at_utc,

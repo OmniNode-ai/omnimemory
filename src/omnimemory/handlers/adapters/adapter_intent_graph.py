@@ -71,6 +71,10 @@ from typing import cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
+# NOTE: This file uses omnibase_core's ModelIntentClassificationOutput (where
+# intent_category is EnumIntentCategory enum), not the omnimemory local version
+# (where intent_category is plain str). The core version is used because
+# store_intent() receives data from the upstream classification pipeline.
 from omnibase_core.container import ModelONEXContainer
 from omnibase_core.enums.intelligence import EnumIntentCategory
 from omnibase_core.models.intelligence import (
@@ -588,7 +592,11 @@ class AdapterIntentGraph:
             This method never raises on business errors - it returns
             an error status in the result model instead.
         """
-        # Extract intent category string from the classification output
+        # Extract intent category string from the classification output.
+        # intent_data.intent_category is EnumIntentCategory (from
+        # omnibase_core.models.intelligence.ModelIntentClassificationOutput),
+        # so .value extracts the underlying str. The hasattr guard handles
+        # any edge case where a plain str is passed instead of the enum.
         raw_category = intent_data.intent_category
         intent_category_str = (
             raw_category.value if hasattr(raw_category, "value") else str(raw_category)
