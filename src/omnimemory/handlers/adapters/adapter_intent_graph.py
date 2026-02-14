@@ -589,7 +589,10 @@ class AdapterIntentGraph:
             an error status in the result model instead.
         """
         # Extract intent category string from the classification output
-        intent_category_str = intent_data.intent_category.value
+        raw_category = intent_data.intent_category
+        intent_category_str = (
+            raw_category.value if hasattr(raw_category, "value") else str(raw_category)
+        )
 
         # Validate session_id is non-empty
         if not session_id or not session_id.strip():

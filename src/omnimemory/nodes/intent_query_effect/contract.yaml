@@ -7,7 +7,7 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "intent_query_effect"
-contract_version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 0, minor: 2, patch: 0}
 node_version: {major: 0, minor: 1, patch: 0}
 description: "Effect node for event-driven intent queries via Kafka. Provides distribution analysis, session-based
   lookups, and recent intent retrieval from Memgraph."

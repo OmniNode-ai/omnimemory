@@ -124,7 +124,6 @@ def adapter_with_mock(
 def sample_intent_classification() -> ModelIntentClassificationOutput:
     """Create a sample intent classification for testing."""
     return ModelIntentClassificationOutput(
-        success=True,
         intent_category=EnumIntentCategory.DEBUGGING,
         confidence=0.92,
         keywords=["error", "traceback", "fix"],
@@ -312,44 +311,62 @@ class TestModels:
     """Tests for Pydantic model validation."""
 
     def test_intent_classification_output_required_fields(self) -> None:
-        """Test ModelIntentClassificationOutput with required fields only."""
+        """Test ModelIntentClassificationOutput requires intent_category and confidence."""
+        from pydantic import ValidationError
+
+        # Verify that omitting required fields raises ValidationError
+        with pytest.raises(ValidationError, match="intent_category"):
+            ModelIntentClassificationOutput(confidence=0.5)
+
+        with pytest.raises(ValidationError, match="confidence"):
+            ModelIntentClassificationOutput(intent_category="debugging")
+
+        # Verify construction with only required fields succeeds
         classification = ModelIntentClassificationOutput(
-            success=True,
+            intent_category="unknown",
+            confidence=0.0,
         )
 
-        assert classification.success is True
-        assert classification.intent_category == EnumIntentCategory.UNKNOWN
+        assert classification.intent_category == "unknown"
         assert classification.confidence == 0.0
         assert classification.keywords == []
+        assert classification.raw_text is None
+        assert classification.metadata == {}
 
     def test_intent_classification_output_all_fields(self) -> None:
         """Test ModelIntentClassificationOutput with all fields."""
         classification = ModelIntentClassificationOutput(
-            success=True,
             intent_category=EnumIntentCategory.CODE_GENERATION,
             confidence=0.95,
             keywords=["python", "function", "async"],
+            raw_text="Write a python async function",
+            metadata={"model_version": "1.0"},
         )
 
-        assert classification.success is True
-        assert classification.intent_category == EnumIntentCategory.CODE_GENERATION
+        assert (
+            classification.intent_category == EnumIntentCategory.CODE_GENERATION.value
+        )
         assert classification.confidence == 0.95
         assert classification.keywords == ["python", "function", "async"]
+        assert classification.raw_text == "Write a python async function"
+        assert classification.metadata == {"model_version": "1.0"}
 
     def test_intent_classification_output_confidence_bounds(self) -> None:
         """Test ModelIntentClassificationOutput confidence must be 0.0-1.0."""
         from pydantic import ValidationError
 
         # Valid bounds
-        ModelIntentClassificationOutput(success=True, confidence=0.0)
-        ModelIntentClassificationOutput(success=True, confidence=1.0)
+        ModelIntentClassificationOutput(intent_category="debugging", confidence=0.0)
+        ModelIntentClassificationOutput(intent_category="debugging", confidence=1.0)
 
         # Invalid
         with pytest.raises(ValidationError):
-            ModelIntentClassificationOutput(success=True, confidence=-0.1)
+            ModelIntentClassificationOutput(
+                intent_category="debugging", confidence=-0.1
+            )
 
         with pytest.raises(ValidationError):
-            ModelIntentClassificationOutput(success=True, confidence=1.1)
+            ModelIntentClassificationOutput(intent_category="debugging", confidence=1.1)
 
     def test_intent_storage_result_success(self) -> None:
         """Test ModelIntentStorageResult success case."""
@@ -1027,7 +1044,6 @@ class TestContextManager:
                     result = await adapter.store_intent(
                         session_id="session_123",
                         intent_data=ModelIntentClassificationOutput(
-                            success=True,
                             intent_category=EnumIntentCategory.DEBUGGING,
                             confidence=0.9,
                         ),
@@ -1631,7 +1647,6 @@ class TestErrorHandling:
         mock_handler.execute_query.side_effect = RuntimeError("Unexpected error")
 
         classification = ModelIntentClassificationOutput(
-            success=True,
             intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
         )
@@ -1699,7 +1714,6 @@ class TestErrorHandling:
 
         # All operations should return error status
         classification = ModelIntentClassificationOutput(
-            success=True,
             intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
         )

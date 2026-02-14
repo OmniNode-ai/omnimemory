@@ -7,7 +7,7 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "memory_storage_effect"
-contract_version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 0, minor: 2, patch: 0}
 node_version: {major: 0, minor: 1, patch: 0}
 description: "Memory storage effect node for CRUD operations. P1A: FileSystem backend for snapshot persistence.
   Phase 2: PostgreSQL, Redis, and Pinecone backends."
@@ -149,6 +149,7 @@ event_type:
   publish_events: true
   subscribe_events: false
   event_routing: "memory"
+  invocation_mode: "orchestrator"
 
 # === INFRASTRUCTURE ===
 infrastructure:

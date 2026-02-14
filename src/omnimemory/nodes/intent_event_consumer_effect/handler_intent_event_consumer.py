@@ -119,8 +119,8 @@ class HandlerIntentEventConsumer:
 
     Topic configuration uses list-based fields matching the standard
     ``event_bus.subscribe_topics`` contract format (OMN-1746). The first
-    entry in each list is used as the primary topic for backwards
-    compatibility with single-topic consumers.
+    entry in each list is used as the primary topic. Both single topic
+    string and topic list formats are accepted.
 
     Attributes:
         _config: Consumer configuration.

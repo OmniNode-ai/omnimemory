@@ -58,8 +58,8 @@ def collect_subscribe_topics_from_contracts(
     """Collect subscribe topics from omnimemory node contracts.
 
     Scans ``contract.yaml`` files from omnimemory nodes and extracts
-    ``event_bus.subscribe_topics`` from each enabled node.  Returns the union
-    of all topics in package-declaration order.
+    ``event_bus.subscribe_topics`` from each enabled node.  Returns the
+    aggregate list of all topics in package-declaration order.
 
     This is the single replacement for formerly-hardcoded topic constants
     such as ``RegistryIntentQueryEffect.get_topic_suffixes()["subscribe"]``.
@@ -117,6 +117,11 @@ def collect_publish_topics_for_dispatch(
     Returns:
         Dict mapping dispatch key to first publish topic string.
         Empty dict if no publish topics are declared.
+
+    Raises:
+        ModuleNotFoundError: If a node package is not installed/importable.
+        FileNotFoundError: If a ``contract.yaml`` is missing from a package.
+        yaml.YAMLError: If a ``contract.yaml`` is malformed YAML.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     result: dict[str, str] = {}
@@ -151,7 +156,13 @@ def collect_all_publish_topics(
             the built-in omnimemory event bus nodes.
 
     Returns:
-        Ordered list of all publish topic strings.
+        Ordered list of all publish topic strings.  Results may contain
+        duplicate topics if multiple nodes publish to the same topic.
+
+    Raises:
+        ModuleNotFoundError: If a node package is not installed/importable.
+        FileNotFoundError: If a ``contract.yaml`` is missing from a package.
+        yaml.YAMLError: If a ``contract.yaml`` is malformed YAML.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     all_topics: list[str] = []

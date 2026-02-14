@@ -7,7 +7,7 @@
 
 # === REQUIRED ROOT FIELDS ===
 name: "intent_storage_effect"
-contract_version: {major: 0, minor: 1, patch: 0}
+contract_version: {major: 0, minor: 2, patch: 0}
 node_version: {major: 0, minor: 1, patch: 0}
 description: "Intent storage effect node for persisting classified intents to Memgraph. Links intents
   to sessions for analytics and pattern learning."
@@ -111,6 +111,7 @@ event_type:
   publish_events: true
   subscribe_events: false
   event_routing: "intent"
+  invocation_mode: "orchestrator"
 
 # === VALIDATION RULES ===
 validation_rules:
