@@ -454,11 +454,11 @@ class TestModels:
     def test_intent_query_result_no_results(self) -> None:
         """Test ModelIntentQueryResult when no intents found."""
         result = ModelIntentQueryResult(
-            status="success",
+            status="no_results",
             intents=[],
         )
 
-        assert result.status == "success"
+        assert result.status == "no_results"
         assert result.intents == []
 
     def test_intent_query_result_error(self) -> None:
@@ -1295,7 +1295,7 @@ class TestGetSessionIntents:
             session_id="session_empty",
         )
 
-        assert result.status == "success"
+        assert result.status == "no_results"
         assert result.intents == []
 
     @pytest.mark.asyncio

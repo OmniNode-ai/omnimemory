@@ -498,6 +498,13 @@ class HandlerIntentEventConsumer:
             )
             return
 
+        if not self._config.publish_topics:
+            logger.warning(
+                "No publish topics configured, skipping event emission",
+                extra={"handler": HANDLER_ID_INTENT_CONSUMER},
+            )
+            return
+
         publish_topic = self._config.publish_topics[0]
         topic = f"{self._env_prefix}.{publish_topic}"
         try:
@@ -536,6 +543,14 @@ class HandlerIntentEventConsumer:
             retry_count: Number of retry attempts made before DLQ routing.
         """
         self._messages_dlq += 1
+
+        if not self._config.dlq_topics:
+            logger.warning(
+                "No DLQ topics configured, skipping DLQ publish",
+                extra={"handler": HANDLER_ID_INTENT_CONSUMER},
+            )
+            return
+
         dlq_topic = self._config.dlq_topics[0]
 
         if self._publish_callback is None:

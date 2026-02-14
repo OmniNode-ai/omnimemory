@@ -350,10 +350,17 @@ class HandlerIntentStorageAdapter:
             limit=request.limit,
         )
 
+        # Handle no_results/not_found as valid (non-error) outcomes
+        status = getattr(result, "status", None)
+        if status in {"no_results", "not_found"}:
+            return ModelIntentStorageResponse(
+                status="no_results",
+                intents=[],
+                total_count=0,
+            )
+
         # Handle both local model (status field) and core model (success field)
-        is_success = getattr(result, "status", None) == "success" or getattr(
-            result, "success", False
-        )
+        is_success = status == "success" or getattr(result, "success", False)
 
         if is_success:
             if not result.intents:
@@ -365,17 +372,28 @@ class HandlerIntentStorageAdapter:
             # Convert to response model format
             # Handle both omnibase_core field name (created_at) and local field
             # name (created_at_utc) for cross-model compatibility.
-            intents = [
-                ModelIntentRecordResponse(
-                    intent_id=intent.intent_id,
-                    intent_category=str(intent.intent_category),
-                    confidence=intent.confidence,
-                    keywords=intent.keywords,
-                    created_at_utc=intent.created_at_utc.isoformat(),
-                    correlation_id=intent.correlation_id,
+            intents: list[ModelIntentRecordResponse] = []
+            for intent in result.intents:
+                created_at = getattr(intent, "created_at_utc", None) or getattr(
+                    intent, "created_at", None
                 )
-                for intent in result.intents
-            ]
+                created_at_str = (
+                    created_at.isoformat() if created_at is not None else ""
+                )
+                intents.append(
+                    ModelIntentRecordResponse(
+                        intent_id=intent.intent_id,
+                        intent_category=(
+                            intent.intent_category.value
+                            if hasattr(intent.intent_category, "value")
+                            else str(intent.intent_category)
+                        ),
+                        confidence=intent.confidence,
+                        keywords=intent.keywords,
+                        created_at_utc=created_at_str,
+                        correlation_id=intent.correlation_id,
+                    )
+                )
             return ModelIntentStorageResponse(
                 status="success",
                 intents=intents,

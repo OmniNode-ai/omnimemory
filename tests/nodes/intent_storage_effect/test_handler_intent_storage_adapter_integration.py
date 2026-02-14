@@ -476,10 +476,10 @@ class TestGetSessionOperation:
         handler_with_mock: HandlerIntentStorageAdapter,
         mock_adapter: MagicMock,
     ) -> None:
-        """Verify error status when adapter returns failure."""
-        # Arrange - in new model, not_found is represented as success=False with error
+        """Verify no_results status when adapter returns not_found."""
+        # Arrange - adapter returns not_found which handler maps to no_results
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="error",
+            status="no_results",
             error_message="Session not found",
         )
 
@@ -492,8 +492,8 @@ class TestGetSessionOperation:
         response = await handler_with_mock.execute(request)
 
         # Assert
-        assert response.status == "error"
-        assert "not found" in (response.error_message or "").lower()
+        assert response.status == "no_results"
+        assert response.error_message is None
 
     async def test_get_session_handles_no_results(
         self,

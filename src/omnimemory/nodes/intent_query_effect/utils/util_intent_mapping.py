@@ -7,21 +7,20 @@ ModelIntentRecord and the event payload models used for Kafka event
 transmission.
 
 The key difference between models:
-    - ModelIntentRecord.session_id is required (local domain model)
+    - ModelIntentRecord.session_ref is required (local domain model)
     - ModelIntentRecordPayload.session_ref is required (for event transmission)
-    - ModelIntentRecord.intent_category is EnumIntentCategory (enum)
+    - ModelIntentRecord.intent_category is str
     - ModelIntentRecordPayload.intent_category is str
 
 Example::
 
     from omnimemory.handlers.adapters.models import ModelIntentRecord
-    from omnibase_core.enums.intelligence import EnumIntentCategory
     from omnimemory.nodes.intent_query_effect.utils import map_to_intent_payload
 
     record = ModelIntentRecord(
         intent_id=uuid4(),
-        session_id="session_abc123",
-        intent_category=EnumIntentCategory.DEBUGGING,
+        session_ref="session_abc123",
+        intent_category="debugging",
         confidence=0.9,
         keywords=["error", "fix"],
     )
@@ -67,14 +66,18 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
 
     Note:
         Field mappings:
-            - ModelIntentRecord.session_id -> ModelIntentRecordPayload.session_ref
+            - ModelIntentRecord.session_ref -> ModelIntentRecordPayload.session_ref
             - ModelIntentRecord.intent_category (enum) -> str value
-            - ModelIntentRecord.created_at -> ModelIntentRecordPayload.created_at
+            - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
     """
     return ModelIntentRecordPayload(
         intent_id=record.intent_id,
         session_ref=record.session_ref or "",
-        intent_category=record.intent_category,
+        intent_category=(
+            record.intent_category.value
+            if hasattr(record.intent_category, "value")
+            else str(record.intent_category)
+        ),
         confidence=record.confidence,
         keywords=record.keywords,
         created_at=record.created_at_utc,

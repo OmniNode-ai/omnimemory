@@ -67,10 +67,11 @@ import time
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
+from omnibase_core.container import ModelONEXContainer
 from omnibase_core.enums.intelligence import EnumIntentCategory
 from omnibase_core.models.intelligence import (
     ModelIntentClassificationOutput,
@@ -78,7 +79,6 @@ from omnibase_core.models.intelligence import (
 )
 from omnibase_core.types.type_json import JsonType
 from omnibase_infra.handlers.handler_graph import HandlerGraph
-from omnibase_spi.protocols.intelligence import ProtocolIntentGraph
 
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
@@ -87,10 +87,6 @@ from omnimemory.handlers.adapters.models import (
     ModelIntentQueryResult,
     ModelIntentRecord,
 )
-
-if TYPE_CHECKING:
-    from omnibase_core.container import ModelONEXContainer
-
 
 __all__ = ["AdapterIntentGraph", "IntentCypherTemplates"]
 
@@ -245,11 +241,11 @@ class IntentCypherTemplates:
         """
 
 
-class AdapterIntentGraph(ProtocolIntentGraph):
+class AdapterIntentGraph:
     """Adapter that wraps HandlerGraph for intent classification storage.
 
-    Implements the ProtocolIntentGraph protocol from omnibase_spi, providing
-    a Memgraph-backed implementation for storing and retrieving intent
+    Structurally conforms to the ProtocolIntentGraph protocol from omnibase_spi,
+    providing a Memgraph-backed implementation for storing and retrieving intent
     classifications.
 
     This adapter provides an intent-domain interface on top of the generic
@@ -429,8 +425,6 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                     try:
                         # Create container if not provided
                         if self._container is None:
-                            from omnibase_core.container import ModelONEXContainer
-
                             self._container = ModelONEXContainer()
 
                         # Create and initialize handler
@@ -620,6 +614,23 @@ class AdapterIntentGraph(ProtocolIntentGraph):
         intent_id = uuid4()
         timestamp_utc = datetime.now(UTC)
 
+        # Validate correlation_id as UUID
+        parsed_correlation_id: UUID | None = None
+        if correlation_id:
+            try:
+                parsed_correlation_id = UUID(correlation_id)
+            except ValueError:
+                logger.warning("Invalid correlation_id format: %s", correlation_id)
+                parsed_correlation_id = None
+
+        # Extract confidence and keywords defensively
+        confidence_raw = intent_data.confidence
+        confidence_val = (
+            float(confidence_raw) if isinstance(confidence_raw, int | float) else 0.0
+        )
+        keywords_raw = intent_data.keywords
+        keywords_val = list(keywords_raw) if isinstance(keywords_raw, list) else []
+
         try:
             async with asyncio.timeout(self._config.timeout_seconds):
                 query = IntentCypherTemplates.store_intent_query(
@@ -635,11 +646,13 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                     "user_context": intent_category_str,
                     "intent_id": str(intent_id),
                     "intent_category": intent_category_str,
-                    "confidence": intent_data.confidence,
-                    "keywords": cast(list[JsonType], intent_data.keywords),
+                    "confidence": confidence_val,
+                    "keywords": cast(list[JsonType], keywords_val),
                     "created_at_utc": timestamp_utc_str,
                     "timestamp_utc": timestamp_utc_str,
-                    "correlation_id": correlation_id,
+                    "correlation_id": str(parsed_correlation_id)
+                    if parsed_correlation_id
+                    else None,
                 }
 
                 result = await handler.execute_query(
@@ -717,7 +730,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 error_message=f"Storage failed: {e}",
             )
 
-    async def get_session_intents(  # type: ignore[override]
+    async def get_session_intents(
         self,
         session_id: str,
         min_confidence: float = 0.0,
@@ -796,7 +809,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                         execution_time_ms,
                     )
                     return ModelIntentQueryResult(
-                        status="success",
+                        status="no_results",
                     )
 
                 # Convert records to intent models
@@ -888,7 +901,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                     execution_time_ms,
                 )
                 return ModelIntentQueryResult(
-                    status="success",
+                    status="success" if intents else "no_results",
                     intents=intents,
                 )
 
@@ -1141,7 +1154,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                         effective_time_range,
                     )
                     return ModelIntentQueryResult(
-                        status="success",
+                        status="no_results",
                     )
 
                 # Convert records to intent models
@@ -1239,7 +1252,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 )
 
                 return ModelIntentQueryResult(
-                    status="success",
+                    status="success" if intents else "no_results",
                     intents=intents,
                 )
 

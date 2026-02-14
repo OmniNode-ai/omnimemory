@@ -604,6 +604,8 @@ class HandlerIntent:
                 "correlation_id": correlation_id,
                 "session_id": session_id,
                 "intent_category": intent_category_str,
+                "confidence": intent_data.confidence,
+                "keywords": intent_data.keywords,
             },
         )
 
@@ -722,7 +724,9 @@ class HandlerIntent:
                 limit=limit,
             )
             # Record success if operation completed without exception
-            if result.status == "success":
+            # Non-error statuses (no_results, not_found) are still healthy
+            # adapter responses and should not trip the circuit breaker.
+            if result.status in {"success", "no_results", "not_found"}:
                 circuit_breaker.record_success()
             return result
         except Exception as e:
