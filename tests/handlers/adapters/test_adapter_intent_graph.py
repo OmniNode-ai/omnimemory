@@ -1273,7 +1273,7 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert len(result.intents) == 2
 
         # Verify first intent
@@ -1295,7 +1295,7 @@ class TestGetSessionIntents:
             session_id="session_empty",
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert result.intents == []
 
     @pytest.mark.asyncio
@@ -1367,7 +1367,7 @@ class TestGetSessionIntents:
 
         result = await adapter.get_session_intents(session_id="session_123")
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1384,7 +1384,7 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1683,7 +1683,7 @@ class TestErrorHandling:
 
         result = await adapter_with_mock.get_session_intents(session_id="session_123")
 
-        assert result.success is True
+        assert result.status == "success"
         # Only the valid record with proper UUID should be included
         assert len(result.intents) == 1
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
@@ -1714,7 +1714,7 @@ class TestErrorHandling:
         query_result = await adapter_with_mock.get_session_intents(
             session_id="session_123",
         )
-        assert query_result.success is False
+        assert query_result.status == "error"
 
         distribution = await adapter_with_mock.get_intent_distribution()
         assert distribution.status == "error"

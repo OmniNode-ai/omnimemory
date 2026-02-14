@@ -363,6 +363,8 @@ class HandlerIntentStorageAdapter:
                     total_count=0,
                 )
             # Convert to response model format
+            # Handle both omnibase_core field name (created_at) and local field
+            # name (created_at_utc) for cross-model compatibility.
             intents = [
                 ModelIntentRecordResponse(
                     intent_id=intent.intent_id,

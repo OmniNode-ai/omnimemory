@@ -30,16 +30,16 @@ from uuid import UUID, uuid4
 
 import pytest
 from omnibase_core.enums.intelligence import EnumIntentCategory
+from omnibase_core.models.intelligence import ModelIntentClassificationOutput
 from omnibase_core.models.intelligence import (
-    ModelIntentClassificationOutput,
-    ModelIntentQueryResult,
-    ModelIntentRecord,
-    ModelIntentStorageResult,
+    ModelIntentStorageResult as CoreIntentStorageResult,
 )
 
 from omnimemory.handlers.adapters.models import (
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
+    ModelIntentQueryResult,
+    ModelIntentRecord,
 )
 from omnimemory.handlers.handler_intent import (
     CircuitBreakerOpenError,
@@ -72,7 +72,7 @@ class MockAdapterIntentGraph:
     def __init__(
         self,
         *,
-        store_result: ModelIntentStorageResult | None = None,
+        store_result: CoreIntentStorageResult | None = None,
         query_result: ModelIntentQueryResult | None = None,
         distribution_result: ModelIntentDistributionResult | None = None,
         health_result: ModelIntentGraphHealth | None = None,
@@ -118,7 +118,7 @@ class MockAdapterIntentGraph:
         session_id: str,
         intent_data: ModelIntentClassificationOutput,
         correlation_id: str,
-    ) -> ModelIntentStorageResult:
+    ) -> CoreIntentStorageResult:
         self.store_intent_calls.append(
             {
                 "session_id": session_id,
@@ -133,7 +133,7 @@ class MockAdapterIntentGraph:
         if self._store_result:
             return self._store_result
 
-        return ModelIntentStorageResult(
+        return CoreIntentStorageResult(
             success=True,
             intent_id=uuid4(),
             created=True,
@@ -160,7 +160,7 @@ class MockAdapterIntentGraph:
             return self._query_result
 
         return ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=[],
         )
 
@@ -481,7 +481,7 @@ class TestCircuitBreaker:
                 correlation_id=str(uuid4()),
             )
 
-            assert result.success is True
+            assert result.status == "success"
             assert handler._circuit_breaker is not None
             assert handler._circuit_breaker.state == CircuitBreakerState.CLOSED
             assert handler._circuit_breaker.failure_count == 0
@@ -497,7 +497,7 @@ class TestCircuitBreaker:
         class PartiallyFailingAdapter(MockAdapterIntentGraph):
             async def store_intent(
                 self, *args: object, **kwargs: object
-            ) -> ModelIntentStorageResult:
+            ) -> CoreIntentStorageResult:
                 nonlocal call_count
                 call_count += 1
                 if call_count <= 2:
@@ -541,7 +541,7 @@ class TestCircuitBreaker:
                 correlation_id=str(uuid4()),
             )
 
-            assert result.success is True
+            assert result.status == "success"
             assert handler._circuit_breaker.failure_count == 0
 
 
@@ -574,7 +574,7 @@ class TestOperations:
                 correlation_id=correlation_id,
             )
 
-            assert result.success is True
+            assert result.status == "success"
             assert len(mock_adapter.store_intent_calls) == 1
 
             call = mock_adapter.store_intent_calls[0]
@@ -596,7 +596,7 @@ class TestOperations:
             correlation_id=correlation_id,
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -609,15 +609,15 @@ class TestOperations:
         expected_intents = [
             ModelIntentRecord(
                 intent_id=uuid4(),
-                session_id="session_123",
-                intent_category=EnumIntentCategory.DEBUGGING,
+                session_ref="session_123",
+                intent_category="debugging",
                 confidence=0.92,
                 keywords=["error"],
-                created_at=datetime.now(UTC),
+                created_at_utc=datetime.now(UTC),
             )
         ]
         mock_adapter._query_result = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=expected_intents,
         )
 
@@ -633,7 +633,7 @@ class TestOperations:
                 limit=10,
             )
 
-            assert result.success is True
+            assert result.status == "success"
             assert len(result.intents) == 1
             assert len(mock_adapter.get_session_intents_calls) == 1
 
@@ -649,7 +649,7 @@ class TestOperations:
         """query_session on uninitialized handler should return error result."""
         result = await handler.query_session(session_id="session_123")
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -989,15 +989,15 @@ class TestIntegration:
         # Set up query to return the stored intent
         stored_intent = ModelIntentRecord(
             intent_id=uuid4(),
-            session_id="session_123",
-            intent_category=intent_data.intent_category,
+            session_ref="session_123",
+            intent_category=intent_data.intent_category.value,
             confidence=intent_data.confidence,
             keywords=intent_data.keywords,
-            created_at=datetime.now(UTC),
+            created_at_utc=datetime.now(UTC),
             correlation_id=UUID(correlation_id),
         )
         mock_adapter._query_result = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=[stored_intent],
         )
 
@@ -1013,18 +1013,16 @@ class TestIntegration:
                 intent_data=intent_data,
                 correlation_id=correlation_id,
             )
-            assert store_result.success is True
+            assert store_result.status == "success"
 
             # Query it back
             query_result = await handler.query_session(
                 session_id="session_123",
                 min_confidence=0.5,
             )
-            assert query_result.success is True
+            assert query_result.status == "success"
             assert len(query_result.intents) == 1
-            assert (
-                query_result.intents[0].intent_category == EnumIntentCategory.DEBUGGING
-            )
+            assert query_result.intents[0].intent_category == "debugging"
 
     @pytest.mark.asyncio
     async def test_reinitialize_after_shutdown(self, handler: HandlerIntent) -> None:

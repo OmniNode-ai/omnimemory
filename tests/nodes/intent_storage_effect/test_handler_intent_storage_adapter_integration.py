@@ -44,14 +44,14 @@ try:
     from omnibase_core.enums.intelligence import EnumIntentCategory
     from omnibase_core.models.intelligence import (
         ModelIntentClassificationOutput,
-        ModelIntentQueryResult,
-        ModelIntentRecord,
         ModelIntentStorageResult,
     )
 
     from omnimemory.handlers.adapters.models import (
         ModelAdapterIntentGraphConfig,
         ModelIntentDistributionResult,
+        ModelIntentQueryResult,
+        ModelIntentRecord,
     )
     from omnimemory.models.utils import ModelPIIDetectionResult, ModelPIIMatch, PIIType
     from omnimemory.nodes.intent_storage_effect import (
@@ -150,11 +150,11 @@ def sample_intent_record() -> ModelIntentRecord:
     """Create a sample intent record as returned by adapter queries."""
     return ModelIntentRecord(
         intent_id=TEST_INTENT_ID,
-        session_id=TEST_SESSION_ID,
-        intent_category=EnumIntentCategory.DEBUGGING,
+        session_ref=TEST_SESSION_ID,
+        intent_category="debugging",
         confidence=0.92,
         keywords=["error", "traceback"],
-        created_at=TEST_CREATED_AT,
+        created_at_utc=TEST_CREATED_AT,
         correlation_id=TEST_CORRELATION_ID,
     )
 
@@ -415,7 +415,7 @@ class TestGetSessionOperation:
         """Verify get_session_intents() is called with correct arguments."""
         # Arrange
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=[sample_intent_record],
         )
 
@@ -445,7 +445,7 @@ class TestGetSessionOperation:
         """Verify get_session returns correctly populated response."""
         # Arrange
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=[sample_intent_record],
         )
 
@@ -479,7 +479,7 @@ class TestGetSessionOperation:
         """Verify error status when adapter returns failure."""
         # Arrange - in new model, not_found is represented as success=False with error
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            success=False,
+            status="error",
             error_message="Session not found",
         )
 
@@ -503,7 +503,7 @@ class TestGetSessionOperation:
         """Verify no_results status when adapter returns empty list."""
         # Arrange - in new model, no_results is success=True with empty intents
         mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=[],
         )
 
