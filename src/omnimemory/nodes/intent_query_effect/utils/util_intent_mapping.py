@@ -8,9 +8,9 @@ transmission.
 
 The key difference between models:
     - ModelIntentRecord.session_id is required (local domain model)
-    - IntentRecordPayload.session_ref is required (for event transmission)
+    - ModelIntentRecordPayload.session_ref is required (for event transmission)
     - ModelIntentRecord.intent_category is EnumIntentCategory (enum)
-    - IntentRecordPayload.intent_category is str
+    - ModelIntentRecordPayload.intent_category is str
 
 Example::
 
@@ -37,7 +37,7 @@ Example::
     instead of local domain model (omnibase-core 0.13.1).
 
 .. versionchanged:: 0.3.0
-    ModelIntentRecordPayload renamed to IntentRecordPayload (omnibase-core 0.17).
+    Uses ModelIntentRecordPayload from omnibase-core 0.17.
     ModelIntentRecord now imported from local domain model.
 """
 
@@ -45,7 +45,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from omnibase_core.models.events import IntentRecordPayload
+from omnibase_core.models.events import ModelIntentRecordPayload
 
 if TYPE_CHECKING:
     from omnimemory.handlers.adapters.models import ModelIntentRecord
@@ -53,8 +53,8 @@ if TYPE_CHECKING:
 __all__ = ["map_intent_records", "map_to_intent_payload"]
 
 
-def map_to_intent_payload(record: ModelIntentRecord) -> IntentRecordPayload:
-    """Convert a ModelIntentRecord to IntentRecordPayload.
+def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload:
+    """Convert a ModelIntentRecord to ModelIntentRecordPayload.
 
     Maps from the core intent model to the event payload model
     for transmission in Kafka events.
@@ -63,15 +63,15 @@ def map_to_intent_payload(record: ModelIntentRecord) -> IntentRecordPayload:
         record: The intent record from AdapterIntentGraph (omnibase_core model).
 
     Returns:
-        IntentRecordPayload suitable for event transmission.
+        ModelIntentRecordPayload suitable for event transmission.
 
     Note:
         Field mappings:
-            - ModelIntentRecord.session_id -> IntentRecordPayload.session_ref
+            - ModelIntentRecord.session_id -> ModelIntentRecordPayload.session_ref
             - ModelIntentRecord.intent_category (enum) -> str value
-            - ModelIntentRecord.created_at -> IntentRecordPayload.created_at
+            - ModelIntentRecord.created_at -> ModelIntentRecordPayload.created_at
     """
-    return IntentRecordPayload(
+    return ModelIntentRecordPayload(
         intent_id=record.intent_id,
         session_ref=record.session_ref or "",
         intent_category=record.intent_category,
@@ -83,8 +83,8 @@ def map_to_intent_payload(record: ModelIntentRecord) -> IntentRecordPayload:
 
 def map_intent_records(
     records: list[ModelIntentRecord],
-) -> list[IntentRecordPayload]:
-    """Convert a list of ModelIntentRecord to IntentRecordPayload.
+) -> list[ModelIntentRecordPayload]:
+    """Convert a list of ModelIntentRecord to ModelIntentRecordPayload.
 
     Convenience function for bulk conversion of intent records.
 

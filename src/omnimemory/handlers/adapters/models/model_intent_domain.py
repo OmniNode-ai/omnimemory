@@ -185,7 +185,7 @@ class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
     Attributes:
         intent_id: Unique identifier (UUID) for the intent node in the graph.
         session_ref: Optional session reference this intent belongs to, used
-            for mapping to IntentRecordPayload.
+            for mapping to ModelIntentRecordPayload.
         intent_category: The classified intent category.
         confidence: Confidence score from the original classification.
         keywords: Keywords associated with this intent.

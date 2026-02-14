@@ -302,29 +302,14 @@ class HandlerIntentStorageAdapter:
             str(request.correlation_id) if request.correlation_id else str(uuid4())
         )
 
-        # Convert ModelIntentClassificationOutput to ModelIntentClassificationInput
-        # for the adapter's protocol-conforming interface
-        from omnibase_core.models.intelligence import ModelIntentClassificationInput
-
-        intent_category_str = (
-            request.intent_data.intent_category.value
-            if hasattr(request.intent_data.intent_category, "value")
-            else str(request.intent_data.intent_category)
-        )
-        adapter_input = ModelIntentClassificationInput(
-            content=intent_category_str,
-            context={"domain": intent_category_str},
-            correlation_id=request.correlation_id,
-        )
-
-        # Call the adapter (user_context removed in omnibase-core 0.13.1)
+        # Call the adapter with classification output directly
         result = await self._adapter.store_intent(
             session_id=request.session_id,
-            intent_data=adapter_input,
+            intent_data=request.intent_data,
             correlation_id=correlation_id,
         )
 
-        if result.status == "success":
+        if result.success:
             return ModelIntentStorageResponse(
                 status="success",
                 intent_id=result.intent_id,
@@ -365,7 +350,12 @@ class HandlerIntentStorageAdapter:
             limit=request.limit,
         )
 
-        if result.status == "success":
+        # Handle both local model (status field) and core model (success field)
+        is_success = getattr(result, "status", None) == "success" or getattr(
+            result, "success", False
+        )
+
+        if is_success:
             if not result.intents:
                 return ModelIntentStorageResponse(
                     status="no_results",

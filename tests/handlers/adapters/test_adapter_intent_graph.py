@@ -354,12 +354,13 @@ class TestModels:
     def test_intent_storage_result_success(self) -> None:
         """Test ModelIntentStorageResult success case."""
         result = ModelIntentStorageResult(
-            success=True,
+            status="success",
             intent_id=TEST_INTENT_ID_1,
+            session_id="session_123",
             created=True,
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert result.intent_id == TEST_INTENT_ID_1
         assert result.created is True
         assert result.error_message is None
@@ -367,11 +368,12 @@ class TestModels:
     def test_intent_storage_result_error(self) -> None:
         """Test ModelIntentStorageResult error case."""
         result = ModelIntentStorageResult(
-            success=False,
+            status="error",
+            session_id="session_123",
             error_message="Connection timeout",
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.intent_id is None
         assert result.created is False
         assert result.error_message == "Connection timeout"
@@ -379,41 +381,43 @@ class TestModels:
     def test_intent_storage_result_merged(self) -> None:
         """Test ModelIntentStorageResult when intent was merged (not created)."""
         result = ModelIntentStorageResult(
-            success=True,
+            status="success",
             intent_id=TEST_INTENT_ID_EXISTING,
+            session_id="session_123",
             created=False,  # Merged with existing
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert result.created is False
 
     def test_intent_record_model(self) -> None:
         """Test ModelIntentRecord creation."""
         record = ModelIntentRecord(
             intent_id=TEST_INTENT_ID_1,
-            session_id="session_123",
-            intent_category=EnumIntentCategory.DEBUGGING,
+            session_ref="session_123",
+            intent_category=EnumIntentCategory.DEBUGGING.value,
             confidence=0.92,
             keywords=["error", "fix"],
-            created_at=TEST_CREATED_AT_1,
+            created_at_utc=TEST_CREATED_AT_1,
             correlation_id=TEST_CORRELATION_ID,
         )
 
         assert record.intent_id == TEST_INTENT_ID_1
-        assert record.session_id == "session_123"
-        assert record.intent_category == EnumIntentCategory.DEBUGGING
+        assert record.session_ref == "session_123"
+        assert record.intent_category == EnumIntentCategory.DEBUGGING.value
         assert record.confidence == 0.92
         assert record.keywords == ["error", "fix"]
-        assert record.created_at == TEST_CREATED_AT_1
+        assert record.created_at_utc == TEST_CREATED_AT_1
         assert record.correlation_id == TEST_CORRELATION_ID
 
     def test_intent_record_defaults(self) -> None:
         """Test ModelIntentRecord default values."""
         record = ModelIntentRecord(
             intent_id=TEST_INTENT_ID_1,
-            session_id="session_123",
-            intent_category=EnumIntentCategory.UNKNOWN,
+            session_ref="session_123",
+            intent_category=EnumIntentCategory.UNKNOWN.value,
             confidence=0.5,
+            created_at_utc=TEST_CREATED_AT_1,
         )
 
         assert record.keywords == []
@@ -424,63 +428,59 @@ class TestModels:
         intents = [
             ModelIntentRecord(
                 intent_id=TEST_INTENT_ID_1,
-                session_id="session_123",
-                intent_category=EnumIntentCategory.DEBUGGING,
+                session_ref="session_123",
+                intent_category=EnumIntentCategory.DEBUGGING.value,
                 confidence=0.9,
-                created_at=TEST_CREATED_AT_1,
+                created_at_utc=TEST_CREATED_AT_1,
             ),
             ModelIntentRecord(
                 intent_id=TEST_INTENT_ID_2,
-                session_id="session_123",
-                intent_category=EnumIntentCategory.CODE_GENERATION,
+                session_ref="session_123",
+                intent_category=EnumIntentCategory.CODE_GENERATION.value,
                 confidence=0.85,
-                created_at=TEST_CREATED_AT_2,
+                created_at_utc=TEST_CREATED_AT_2,
             ),
         ]
 
         result = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=intents,
-            total_count=2,
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert len(result.intents) == 2
-        assert result.total_count == 2
         assert result.error_message is None
 
     def test_intent_query_result_no_results(self) -> None:
         """Test ModelIntentQueryResult when no intents found."""
         result = ModelIntentQueryResult(
-            success=True,
+            status="success",
             intents=[],
-            total_count=0,
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert result.intents == []
-        assert result.total_count == 0
 
     def test_intent_query_result_error(self) -> None:
         """Test ModelIntentQueryResult error case."""
         result = ModelIntentQueryResult(
-            success=False,
+            status="error",
             error_message="Query timeout",
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.intents == []
         assert result.error_message == "Query timeout"
 
     def test_intent_query_result_status_values(self) -> None:
         """Test ModelIntentQueryResult with success/failure states."""
         # Success case
-        result_success = ModelIntentQueryResult(success=True)
-        assert result_success.success is True
+        result_success = ModelIntentQueryResult(status="success")
+        assert result_success.status == "success"
 
         # Error case
-        result_error = ModelIntentQueryResult(success=False, error_message="Failed")
-        assert result_error.success is False
+        result_error = ModelIntentQueryResult(status="error", error_message="Failed")
+        assert result_error.status == "error"
 
     def test_intent_graph_health_healthy(self) -> None:
         """Test ModelIntentGraphHealth when healthy."""

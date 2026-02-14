@@ -607,34 +607,23 @@ class HandlerIntent:
             },
         )
 
-        # Convert ModelIntentClassificationOutput to ModelIntentClassificationInput
-        # for the adapter's protocol-conforming interface
-        from omnibase_core.models.intelligence import ModelIntentClassificationInput
-
-        adapter_input = ModelIntentClassificationInput(
-            content=intent_category_str,
-            context={"domain": intent_category_str},
-            correlation_id=None,
-        )
-
         try:
-            event = await adapter.store_intent(
+            result = await adapter.store_intent(
                 session_id=session_id,
-                intent_data=adapter_input,
+                intent_data=intent_data,
                 correlation_id=correlation_id,
             )
             # Record success if operation completed without exception
             # Business errors (e.g., validation) are not circuit breaker failures
-            if event.status == "success":
+            if result.success:
                 circuit_breaker.record_success()
-            # Convert ModelIntentStoredEvent to ModelIntentStorageResult
+            # Convert omnibase_core ModelIntentStorageResult to local ModelIntentStorageResult
             return ModelIntentStorageResult(
-                status=event.status,
-                intent_id=event.intent_id,
+                status="success" if result.success else "error",
+                intent_id=result.intent_id,
                 session_id=session_id,
-                created=event.created,
-                execution_time_ms=event.execution_time_ms,
-                error_message=event.error_message,
+                created=result.created,
+                error_message=result.error_message,
             )
         except Exception as e:
             circuit_breaker.record_failure()

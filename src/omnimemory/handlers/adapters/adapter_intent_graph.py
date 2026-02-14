@@ -72,7 +72,10 @@ from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from omnibase_core.enums.intelligence import EnumIntentCategory
-from omnibase_core.models.events import ModelIntentStoredEvent
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput,
+    ModelIntentStorageResult,
+)
 from omnibase_core.types.type_json import JsonType
 from omnibase_infra.handlers.handler_graph import HandlerGraph
 from omnibase_spi.protocols.intelligence import ProtocolIntentGraph
@@ -87,7 +90,6 @@ from omnimemory.handlers.adapters.models import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
-    from omnibase_core.models.intelligence import ModelIntentClassificationInput
 
 
 __all__ = ["AdapterIntentGraph", "IntentCypherTemplates"]
@@ -567,9 +569,9 @@ class AdapterIntentGraph(ProtocolIntentGraph):
     async def store_intent(
         self,
         session_id: str,
-        intent_data: ModelIntentClassificationInput,
-        correlation_id: str | None = None,
-    ) -> ModelIntentStoredEvent:
+        intent_data: ModelIntentClassificationOutput,
+        correlation_id: str,
+    ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
         Implements ProtocolIntentGraph.store_intent.
@@ -580,56 +582,43 @@ class AdapterIntentGraph(ProtocolIntentGraph):
 
         Args:
             session_id: Unique identifier for the session.
-            intent_data: The classification input containing content, context,
-                and optional correlation metadata.
-            correlation_id: Optional correlation ID for request tracing.
+            intent_data: The classification output containing category,
+                confidence, and keywords.
+            correlation_id: Correlation ID for request tracing.
 
         Returns:
-            ModelIntentStoredEvent confirming the intent was stored or
-            indicating an error via the status field.
+            ModelIntentStorageResult indicating success or failure with
+            metadata about the stored intent.
 
         Note:
             This method never raises on business errors - it returns
             an error status in the result model instead.
         """
-        # Extract domain from context as intent category, default to "unclassified"
-        intent_category_str = intent_data.context.get("domain", "unclassified")
+        # Extract intent category string from the classification output
+        intent_category_str = (
+            intent_data.intent_category.value
+            if hasattr(intent_data.intent_category, "value")
+            else str(intent_data.intent_category)
+        )
 
         # Validate session_id is non-empty
         if not session_id or not session_id.strip():
-            return ModelIntentStoredEvent.from_error(
-                session_ref=session_id or "",
-                intent_category=intent_category_str,
+            return ModelIntentStorageResult(
+                success=False,
                 error_message="session_id cannot be empty",
-                correlation_id=(
-                    UUID(correlation_id)
-                    if correlation_id
-                    else intent_data.correlation_id
-                ),
             )
 
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
-            return ModelIntentStoredEvent.from_error(
-                session_ref=session_id,
-                intent_category=intent_category_str,
+            return ModelIntentStorageResult(
+                success=False,
                 error_message=str(e),
-                correlation_id=(
-                    UUID(correlation_id)
-                    if correlation_id
-                    else intent_data.correlation_id
-                ),
             )
 
         start_time = time.perf_counter()
         intent_id = uuid4()
         timestamp_utc = datetime.now(UTC)
-
-        # Resolve correlation ID: prefer explicit parameter, fall back to intent_data
-        resolved_correlation_id = (
-            UUID(correlation_id) if correlation_id else intent_data.correlation_id
-        )
 
         try:
             async with asyncio.timeout(self._config.timeout_seconds):
@@ -643,18 +632,14 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 parameters: dict[str, JsonType] = {
                     "session_id": session_id,
                     "started_at_utc": timestamp_utc_str,
-                    "user_context": intent_data.content,
+                    "user_context": intent_category_str,
                     "intent_id": str(intent_id),
                     "intent_category": intent_category_str,
-                    "confidence": 0.0,
-                    "keywords": [],
+                    "confidence": intent_data.confidence,
+                    "keywords": cast(list[JsonType], intent_data.keywords),
                     "created_at_utc": timestamp_utc_str,
                     "timestamp_utc": timestamp_utc_str,
-                    "correlation_id": (
-                        str(resolved_correlation_id)
-                        if resolved_correlation_id
-                        else None
-                    ),
+                    "correlation_id": correlation_id,
                 }
 
                 result = await handler.execute_query(
@@ -700,13 +685,10 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                     execution_time_ms,
                 )
 
-                return ModelIntentStoredEvent.create(
-                    session_ref=session_id,
-                    intent_category=intent_category_str,
+                return ModelIntentStorageResult(
+                    success=True,
                     intent_id=returned_intent_id,
                     created=was_created,
-                    execution_time_ms=execution_time_ms,
-                    correlation_id=resolved_correlation_id,
                 )
 
         except TimeoutError:
@@ -717,11 +699,9 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 session_id,
                 execution_time_ms,
             )
-            return ModelIntentStoredEvent.from_error(
-                session_ref=session_id,
-                intent_category=intent_category_str,
+            return ModelIntentStorageResult(
+                success=False,
                 error_message=f"Operation timed out after {self._config.timeout_seconds}s",
-                correlation_id=resolved_correlation_id,
             )
 
         except Exception as e:
@@ -732,11 +712,9 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 session_id,
                 e,
             )
-            return ModelIntentStoredEvent.from_error(
-                session_ref=session_id,
-                intent_category=intent_category_str,
+            return ModelIntentStorageResult(
+                success=False,
                 error_message=f"Storage failed: {e}",
-                correlation_id=resolved_correlation_id,
             )
 
     async def get_session_intents(  # type: ignore[override]
