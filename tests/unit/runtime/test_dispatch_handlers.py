@@ -488,6 +488,51 @@ class TestIntentQueryDispatchHandler:
         with pytest.raises(ValueError, match="Failed to parse payload"):
             await handler(envelope, context)
 
+    @pytest.mark.asyncio
+    async def test_handler_awaits_async_publish_callback(
+        self,
+        sample_intent_query_payload: dict[str, object],
+        correlation_id: UUID,
+        mock_intent_query_handler: MagicMock,
+    ) -> None:
+        """Handler should await an async publish_callback without error."""
+        from omnibase_core.models.core.model_envelope_metadata import (
+            ModelEnvelopeMetadata,
+        )
+        from omnibase_core.models.effect.model_effect_context import ModelEffectContext
+        from omnibase_core.models.events.model_event_envelope import (
+            ModelEventEnvelope,
+        )
+
+        async_publish_callback = AsyncMock()
+        publish_topic = "dev.onex.evt.omnimemory.intent-query-response.v1"
+
+        handler = create_intent_query_dispatch_handler(
+            query_handler=mock_intent_query_handler,
+            publish_callback=async_publish_callback,
+            publish_topic=publish_topic,
+            correlation_id=correlation_id,
+        )
+
+        envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
+            payload=sample_intent_query_payload,
+            correlation_id=correlation_id,
+            metadata=ModelEnvelopeMetadata(
+                tags={"message_category": "command"},
+            ),
+        )
+        context = ModelEffectContext(
+            correlation_id=correlation_id,
+            envelope_id=uuid4(),
+        )
+
+        await handler(envelope, context)
+
+        async_publish_callback.assert_awaited_once()
+        call_args = async_publish_callback.call_args
+        assert call_args[0][0] == publish_topic
+        assert isinstance(call_args[0][1], dict)
+
 
 # =============================================================================
 # Tests: Lifecycle Dispatch Handler (fail-fast)
@@ -732,4 +777,31 @@ class TestCreateDispatchCallback:
         await callback(msg)
 
         assert msg._nacked, "Message should be nacked for unexpected value type"
+        assert not msg._acked
+
+    @pytest.mark.asyncio
+    async def test_callback_nacks_on_non_dict_json_payload(
+        self,
+        mock_intent_consumer: MagicMock,
+        mock_intent_query_handler: MagicMock,
+    ) -> None:
+        """Callback should nack when JSON payload deserializes to a non-dict (e.g. array)."""
+        engine = create_memory_dispatch_engine(
+            intent_consumer=mock_intent_consumer,
+            intent_query_handler=mock_intent_query_handler,
+        )
+
+        callback = create_dispatch_callback(
+            engine=engine,
+            dispatch_topic=DISPATCH_ALIAS_INTENT_CLASSIFIED,
+        )
+
+        # JSON array is valid JSON but not a valid dispatch payload
+        msg = _MockEventMessage(
+            value=json.dumps([1, 2, 3]).encode("utf-8"),
+        )
+
+        await callback(msg)
+
+        assert msg._nacked, "Message should be nacked for non-dict JSON payload"
         assert not msg._acked

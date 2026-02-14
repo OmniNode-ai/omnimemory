@@ -350,7 +350,7 @@ class TestHandlerMemoryTickInitialization:
         handler = HandlerMemoryTick(container)
 
         assert handler.handler_id == "handler-memory-tick"
-        assert handler.category == EnumMessageCategory.EVENT
+        assert handler.category == EnumMessageCategory.COMMAND
         assert handler.message_types == {"ModelRuntimeTick"}
         assert handler.node_kind == EnumNodeKind.ORCHESTRATOR
 

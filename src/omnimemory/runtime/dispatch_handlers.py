@@ -26,10 +26,11 @@ Related:
 from __future__ import annotations
 
 import contextlib
+import inspect
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 from uuid import UUID, uuid4
 
 from omnibase_core.enums.enum_execution_shape import EnumMessageCategory
@@ -186,7 +187,9 @@ def create_intent_classified_dispatch_handler(
 def create_intent_query_dispatch_handler(
     *,
     query_handler: ProtocolIntentQueryHandler,
-    publish_callback: Callable[[str, dict[str, object]], None] | None = None,
+    publish_callback: Callable[[str, dict[str, object]], Awaitable[None]]
+    | Callable[[str, dict[str, object]], None]
+    | None = None,
     publish_topic: str | None = None,
     correlation_id: UUID | None = None,
 ) -> Callable[
@@ -203,6 +206,7 @@ def create_intent_query_dispatch_handler(
     Args:
         query_handler: REQUIRED intent query handler instance.
         publish_callback: Optional callback for publishing response events.
+            Accepts both sync and async callables; async results are awaited.
         publish_topic: Full topic for intent query response events (from contract).
         correlation_id: Optional fixed correlation ID for tracing.
 
@@ -273,10 +277,12 @@ def create_intent_query_dispatch_handler(
         # Publish response if callback and topic are configured
         if publish_callback and publish_topic and hasattr(response, "model_dump"):
             try:
-                publish_callback(
+                publish_result = publish_callback(
                     publish_topic,
                     response.model_dump(mode="json"),
                 )
+                if inspect.isawaitable(publish_result):
+                    await publish_result
                 logger.debug(
                     "Published intent query response (topic=%s, query_id=%s)",
                     publish_topic,
@@ -358,7 +364,9 @@ def create_memory_dispatch_engine(
     *,
     intent_consumer: ProtocolIntentEventConsumer,
     intent_query_handler: ProtocolIntentQueryHandler,
-    publish_callback: Callable[[str, dict[str, object]], None] | None = None,
+    publish_callback: Callable[[str, dict[str, object]], Awaitable[None]]
+    | Callable[[str, dict[str, object]], None]
+    | None = None,
     publish_topics: dict[str, str] | None = None,
 ) -> MessageDispatchEngine:
     """Create and configure a MessageDispatchEngine for OmniMemory domain.
@@ -375,6 +383,7 @@ def create_memory_dispatch_engine(
         intent_consumer: REQUIRED intent event consumer handler.
         intent_query_handler: REQUIRED intent query handler.
         publish_callback: Optional callback for publishing response events.
+            Accepts both sync and async callables; async results are awaited.
         publish_topics: Optional mapping of handler name to publish topic.
             Keys: "intent_query". Values: full topic strings from contract
             event_bus.publish_topics.
@@ -561,6 +570,21 @@ def create_dispatch_callback(
                     await msg.nack()
                 return
 
+            # Guard: json.loads can return arrays, scalars, etc.
+            # Only dict payloads are valid for dispatch envelope wrapping.
+            if not isinstance(payload_dict, dict):
+                logger.warning(
+                    "Expected JSON object but got %s; nacking message on topic %s",
+                    type(payload_dict).__name__,
+                    dispatch_topic,
+                )
+                if hasattr(msg, "nack"):
+                    await msg.nack()
+                return
+
+            # Narrow the type from Any (json.loads return) to dict[str, object].
+            payload: dict[str, object] = cast(dict[str, object], payload_dict)
+
             # Extract correlation_id from payload if available.
             # Precedence (highest wins):
             #   1. payload correlation_id  (from the message body)
@@ -569,7 +593,7 @@ def create_dispatch_callback(
             # If the payload contains a valid UUID correlation_id, it overrides the
             # caller-supplied value. If parsing fails, the current value (caller-
             # supplied or auto-generated) is silently retained via suppress().
-            payload_correlation_id = payload_dict.get("correlation_id")
+            payload_correlation_id = payload.get("correlation_id")
             if payload_correlation_id:
                 with contextlib.suppress(ValueError, AttributeError):
                     msg_correlation_id = UUID(str(payload_correlation_id))
@@ -585,7 +609,7 @@ def create_dispatch_callback(
                     msg_correlation_id,
                 )
             envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
-                payload=payload_dict,
+                payload=payload,
                 correlation_id=msg_correlation_id,
                 metadata=ModelEnvelopeMetadata(
                     tags={

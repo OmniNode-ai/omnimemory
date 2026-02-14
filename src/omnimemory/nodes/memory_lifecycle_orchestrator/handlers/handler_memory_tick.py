@@ -610,7 +610,7 @@ class HandlerMemoryTick:
     @property
     def category(self) -> EnumMessageCategory:
         """Return the message category this handler processes."""
-        return EnumMessageCategory.EVENT
+        return EnumMessageCategory.COMMAND
 
     @property
     def message_types(self) -> set[str]:
