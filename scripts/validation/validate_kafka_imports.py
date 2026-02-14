@@ -140,7 +140,13 @@ def validate_file(filepath: Path) -> list[Violation]:
             indent_level = len(line) - len(line.lstrip())
             continue
 
-        # Exit TYPE_CHECKING block when indentation decreases
+        # Exit TYPE_CHECKING block when indentation decreases.
+        # Known limitation: this heuristic does not handle `else:` or `elif`
+        # clauses at the same indent level following the TYPE_CHECKING block
+        # (e.g., `if TYPE_CHECKING: ... else: ...`). Those would be incorrectly
+        # treated as exiting the block. This is acceptable for the current use
+        # case, which only involves simple module-level TYPE_CHECKING guards
+        # with no else/elif branches.
         if in_type_checking_block and stripped and not stripped.startswith("#"):
             current_indent = len(line) - len(line.lstrip())
             if current_indent <= indent_level:

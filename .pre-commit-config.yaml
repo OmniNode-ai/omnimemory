@@ -279,6 +279,9 @@ repos:
         args: ['src/']
         language: python
         pass_filenames: false
+        # NOTE: This filter is coupled to ENFORCED_PATHS in the script
+        # (scripts/validation/validate_kafka_imports.py). If ENFORCED_PATHS
+        # changes, update this pattern to match so the hook triggers correctly.
         files: ^src/omnimemory/nodes/.*\.py$
         exclude: ^tests/.*\.py$
         stages: [pre-commit]
