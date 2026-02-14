@@ -230,11 +230,10 @@ class TestHandlerIds:
         """Handler IDs match the expected node directory names."""
         entry = frozen_registry.get_entry(message_type)
         assert entry is not None
-        for handler_id in expected_handlers:
-            assert handler_id in entry.handler_ids, (
-                f"Expected handler '{handler_id}' for '{message_type}', "
-                f"got {entry.handler_ids}"
-            )
+        assert set(entry.handler_ids) == set(expected_handlers), (
+            f"Expected handlers {expected_handlers} for '{message_type}', "
+            f"got {entry.handler_ids}"
+        )
 
 
 # =============================================================================
