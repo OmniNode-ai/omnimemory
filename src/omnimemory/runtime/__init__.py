@@ -2,12 +2,13 @@
 # Copyright (c) 2025 OmniNode Team
 """OmniMemory Runtime Package.
 
-Provides contract-driven topic discovery and protocol adapters for the
-OmniMemory domain.
+Provides contract-driven topic discovery, protocol adapters, and dispatch
+handlers for the OmniMemory domain.
 
 This package contains:
     - Contract-driven topic discovery (contract_topics module)
     - Protocol adapters bridging infrastructure to handler protocols (adapters module)
+    - Dispatch handlers routing events through MessageDispatchEngine (dispatch_handlers module)
 
 Usage:
     from omnimemory.runtime.contract_topics import (
@@ -22,6 +23,11 @@ Usage:
         ProtocolEventBusPublish,
         ProtocolEventBusHealthCheck,
         ProtocolEventBusLifecycle,
+    )
+
+    from omnimemory.runtime.dispatch_handlers import (
+        create_memory_dispatch_engine,
+        create_dispatch_callback,
     )
 """
 
@@ -39,6 +45,9 @@ from omnimemory.runtime.contract_topics import (
     collect_publish_topics_for_dispatch,
     collect_subscribe_topics_from_contracts,
 )
+
+# Dispatch handlers are lazy-imported to avoid pulling in omnibase_core.runtime
+# at package import time. Import from omnimemory.runtime.dispatch_handlers directly.
 
 __all__ = [
     # Protocol adapters (ARCH-002)
