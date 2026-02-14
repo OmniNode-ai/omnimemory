@@ -119,7 +119,8 @@ event_type:
   primary_events: ["memory_searched", "memory_retrieved", "graph_traversed"]
   event_categories: ["memory", "effect", "retrieval", "search"]
   publish_events: true
-  subscribe_events: false
+  subscribe_events: true
+  invocation_mode: "subscription"
   event_routing: "memory"
 
 # === INFRASTRUCTURE ===
@@ -172,6 +173,56 @@ handler_routing:
       priority: 0
       output_events: []
   default_handler: "HandlerMemoryRetrieval"
+
+# =============================================================================
+# EVENT BUS SUBCONTRACT - Runtime Routing Layer
+# =============================================================================
+# PURPOSE: Machine-readable configuration of WHERE events are routed.
+#
+# This subcontract provides structured topic routing for:
+#   - RuntimeHostProcess auto-discovery and wiring
+#   - Kafka topic subscription/publication
+#   - Schema validation via topic metadata
+#
+# Contains: topic suffixes (simple strings) + optional schema references.
+#
+# NOTE: This node supports both orchestrator invocation and subscription mode.
+# When subscription-driven, it listens for retrieval request commands and
+# publishes response events.
+#
+# Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
+#   - kind=cmd for commands/inputs
+#   - kind=evt for events/outputs
+#   - Internal runtime events use onex.internal.* namespace
+# =============================================================================
+event_bus:
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  event_bus_enabled: true
+
+  # Topics this node subscribes to (receives events from)
+  subscribe_topics:
+    - "onex.cmd.omnimemory.memory-retrieval-requested.v1"
+
+  # Topics this node publishes to (sends events to)
+  publish_topics:
+    - "onex.evt.omnimemory.memory-retrieval-response.v1"
+
+  # Metadata for subscribed topics
+  subscribe_topic_metadata:
+    "onex.cmd.omnimemory.memory-retrieval-requested.v1":
+      schema_ref: "omnimemory.nodes.memory_retrieval_effect.models.model_memory_retrieval_request.ModelMemoryRetrievalRequest"
+      description: "Memory retrieval request events containing search parameters including query text,
+        embeddings, similarity thresholds, and backend selection."
+
+  # Metadata for published topics
+  publish_topic_metadata:
+    "onex.evt.omnimemory.memory-retrieval-response.v1":
+      schema_ref: "omnimemory.nodes.memory_retrieval_effect.models.model_memory_retrieval_response.ModelMemoryRetrievalResponse"
+      description: "Memory retrieval response events containing search results with similarity scores,
+        total counts, and metadata from the queried backends."
 
 # === TAGS ===
 tags:

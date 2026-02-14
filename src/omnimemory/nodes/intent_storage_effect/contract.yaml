@@ -157,6 +157,52 @@ handler_routing:
       output_events: []
   default_handler: null
 
+# =============================================================================
+# EVENT BUS SUBCONTRACT - Runtime Routing Layer
+# =============================================================================
+# PURPOSE: Machine-readable configuration of WHERE events are routed.
+#
+# This subcontract provides structured topic routing for:
+#   - RuntimeHostProcess auto-discovery and wiring
+#   - Kafka topic subscription/publication
+#   - Schema validation via topic metadata
+#
+# Contains: topic suffixes (simple strings) + optional schema references.
+#
+# NOTE: This node is orchestrator-invoked (not subscription-driven).
+# It publishes storage confirmation events but does not subscribe to topics.
+#
+# Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
+#   - kind=cmd for commands/inputs
+#   - kind=evt for events/outputs
+#   - Internal runtime events use onex.internal.* namespace
+# =============================================================================
+event_bus:
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  event_bus_enabled: true
+
+  # This node does not subscribe to topics (orchestrator-invoked)
+  subscribe_topics: []
+
+  # Topics this node publishes to (sends events to)
+  publish_topics:
+    - "onex.evt.omnimemory.intent-stored.v1"
+    - "onex.evt.omnimemory.intent-store-failed.v1"
+
+  # Metadata for published topics
+  publish_topic_metadata:
+    "onex.evt.omnimemory.intent-stored.v1":
+      schema_ref: "omnimemory.nodes.intent_storage_effect.models.model_intent_storage_response.ModelIntentStorageResponse"
+      description: "Intent storage confirmation event. Emitted when an intent is successfully stored in
+        Memgraph with session linkage."
+    "onex.evt.omnimemory.intent-store-failed.v1":
+      schema_ref: "omnimemory.nodes.intent_storage_effect.models.model_intent_storage_response.ModelIntentStorageResponse"
+      description: "Intent storage failure event. Emitted when an intent storage operation fails with
+        error details."
+
 # === TAGS ===
 tags:
   - intent

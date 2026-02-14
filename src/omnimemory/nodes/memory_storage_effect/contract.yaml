@@ -173,6 +173,62 @@ validation_rules:
     metadata: "dict type for additional operation metadata"
     tags: "list of strings for filtering operations"
 
+# =============================================================================
+# EVENT BUS SUBCONTRACT - Runtime Routing Layer
+# =============================================================================
+# PURPOSE: Machine-readable configuration of WHERE events are routed.
+#
+# This subcontract provides structured topic routing for:
+#   - RuntimeHostProcess auto-discovery and wiring
+#   - Kafka topic subscription/publication
+#   - Schema validation via topic metadata
+#
+# Contains: topic suffixes (simple strings) + optional schema references.
+#
+# NOTE: This node is orchestrator-invoked (not subscription-driven).
+# It publishes CRUD operation events but does not subscribe to topics.
+#
+# Topic naming: onex.{kind}.omnimemory.{event-name}.v{n}
+#   - kind=cmd for commands/inputs
+#   - kind=evt for events/outputs
+#   - Internal runtime events use onex.internal.* namespace
+# =============================================================================
+event_bus:
+  version:
+    major: 1
+    minor: 0
+    patch: 0
+  event_bus_enabled: true
+
+  # This node does not subscribe to topics (orchestrator-invoked)
+  subscribe_topics: []
+
+  # Topics this node publishes to (sends events to)
+  publish_topics:
+    - "onex.evt.omnimemory.memory-stored.v1"
+    - "onex.evt.omnimemory.memory-retrieved.v1"
+    - "onex.evt.omnimemory.memory-updated.v1"
+    - "onex.evt.omnimemory.memory-deleted.v1"
+
+  # Metadata for published topics
+  publish_topic_metadata:
+    "onex.evt.omnimemory.memory-stored.v1":
+      schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
+      description: "Memory storage confirmation event. Emitted when a memory snapshot is successfully
+        persisted to the storage backend."
+    "onex.evt.omnimemory.memory-retrieved.v1":
+      schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
+      description: "Memory retrieval confirmation event. Emitted when a memory snapshot is successfully
+        retrieved from the storage backend."
+    "onex.evt.omnimemory.memory-updated.v1":
+      schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
+      description: "Memory update confirmation event. Emitted when a memory snapshot is successfully updated
+        in the storage backend."
+    "onex.evt.omnimemory.memory-deleted.v1":
+      schema_ref: "omnimemory.nodes.memory_storage_effect.models.model_memory_storage_response.ModelMemoryStorageResponse"
+      description: "Memory deletion confirmation event. Emitted when a memory snapshot is successfully
+        soft-deleted from the storage backend."
+
 # === TAGS ===
 tags:
   - memory

@@ -5,15 +5,11 @@
 Provides factory methods and metadata for the intent_query_effect node,
 following ONEX registry patterns for dependency injection and service discovery.
 
-Topic Naming:
-    This node uses topic SUFFIXES (not full topics). Runtime composes
-    full topics by adding env prefix::
-
-        full_topic = f"{topic_env_prefix}.{suffix}"
-
-    Example with "dev" env prefix:
-        - dev.onex.cmd.omnimemory.intent-query-requested.v1
-        - dev.onex.evt.omnimemory.intent-query-response.v1
+Topic Discovery:
+    Topics are declared in this node's ``contract.yaml`` (``event_bus`` section)
+    and discovered at runtime via ``omnimemory.runtime.contract_topics``.
+    See ``collect_subscribe_topics_from_contracts()`` and
+    ``collect_publish_topics_for_dispatch()`` for contract-driven topic discovery.
 
 Example::
 
@@ -26,11 +22,12 @@ Example::
 
     # Query node metadata
     node_type = RegistryIntentQueryEffect.get_node_type()  # "EFFECT"
-    suffixes = RegistryIntentQueryEffect.get_topic_suffixes()
-    # {"subscribe": "onex.cmd...", "publish": "onex.evt..."}
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1504.
+
+.. versionchanged:: 0.3.0
+    Removed get_topic_suffixes() -- topics are now contract-driven (OMN-2213).
 """
 
 from omnimemory.nodes.intent_query_effect.registry.registry_intent_query_effect import (
