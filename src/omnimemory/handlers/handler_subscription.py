@@ -920,11 +920,6 @@ class HandlerSubscription:
                 topic=kafka_topic,
                 key=topic,  # Partition by topic for ordering
                 value=event_payload,
-                headers={
-                    "event_id": event.event_id,
-                    "topic": topic,
-                    "subscriber_count": str(subscriber_count),
-                },
             )
         except Exception as exc:
             logger.warning(

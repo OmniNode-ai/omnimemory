@@ -64,7 +64,6 @@ class ProtocolEventBusPublish(Protocol):
         topic: str,
         key: bytes | None,
         value: bytes,
-        headers: Mapping[str, str] | None = None,
     ) -> None:
         """Publish raw bytes to a topic.
 
@@ -72,9 +71,6 @@ class ProtocolEventBusPublish(Protocol):
             topic: Target topic name.
             key: Optional message key for partitioning.
             value: Message payload as bytes.
-            headers: Optional string key-value headers. Concrete implementations
-                may convert these to transport-specific formats (e.g.,
-                ModelEventHeaders for Kafka).
         """
         ...
 
@@ -179,7 +175,6 @@ class AdapterKafkaPublisher:
         topic: str,
         key: str | None,
         value: Mapping[str, object],
-        headers: dict[str, str] | None = None,
     ) -> None:
         """Publish event to topic via event bus protocol.
 
@@ -189,8 +184,6 @@ class AdapterKafkaPublisher:
                 partitioning. Empty string is preserved as ``b""``, which
                 differs from ``None`` in Kafka partitioning.
             value: Event payload dict (serialized to JSON bytes).
-            headers: Optional string key-value headers forwarded to the
-                event bus publish call.
         """
         # default=str handles datetime/UUID serialization; callers should
         # pre-validate complex types to avoid silent str() conversion.
@@ -199,16 +192,7 @@ class AdapterKafkaPublisher:
         ).encode("utf-8")
         key_bytes = key.encode("utf-8") if key is not None else None
 
-        if headers:
-            logger.debug(
-                "Publishing to %s with headers: %s",
-                topic,
-                list(headers.keys()),
-            )
-
-        await self._event_bus.publish(
-            topic=topic, key=key_bytes, value=value_bytes, headers=headers
-        )
+        await self._event_bus.publish(topic=topic, key=key_bytes, value=value_bytes)
 
 
 # =============================================================================
