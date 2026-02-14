@@ -79,7 +79,13 @@ async def wire_memory_handlers(
     services_registered: list[str] = []
 
     for module_path, attr_name, is_class in _HANDLER_SPECS:
-        mod = importlib.import_module(module_path)
+        try:
+            mod = importlib.import_module(module_path)
+        except ModuleNotFoundError as e:
+            raise ImportError(
+                f"Failed to import handler module '{module_path}' "
+                f"(correlation_id={correlation_id})"
+            ) from e
         try:
             handler_attr = getattr(mod, attr_name)
         except AttributeError as e:

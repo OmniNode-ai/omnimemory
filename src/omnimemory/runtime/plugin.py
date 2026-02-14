@@ -321,7 +321,8 @@ class PluginMemory:
             intent_consumer = _StubIntentEventConsumer()
             intent_query_handler = _StubIntentQueryHandler()
 
-            # Kafka publisher: optional (graceful degradation in handlers)
+            # Kafka publisher: optional (graceful degradation in handlers).
+            # config.event_bus may be None; hasattr safely returns False for None.
             publish_callback = None
             if hasattr(config.event_bus, "publish"):
                 from omnimemory.runtime.adapters import AdapterKafkaPublisher
@@ -636,7 +637,7 @@ class PluginMemory:
             except Exception as unsub_error:
                 errors.append(f"unsubscribe: {unsub_error}")
                 logger.warning(
-                    "Failed to unsubscribe memory consumer: %s " "(correlation_id=%s)",
+                    "Failed to unsubscribe memory consumer: %s (correlation_id=%s)",
                     unsub_error,
                     correlation_id,
                 )
@@ -708,7 +709,7 @@ class _StubIntentEventConsumer:
         HandlerIntentEventConsumer.  For initial plugin wiring, the
         bridge handler in dispatch_handlers.py handles the core logic.
         """
-        logger.debug(
+        logger.warning(
             "Stub intent event consumer received message (keys=%s)",
             list(message.keys()) if isinstance(message, dict) else "N/A",
         )
@@ -732,7 +733,7 @@ class _StubIntentQueryHandler:
         Returns:
             Empty dict as placeholder response.
         """
-        logger.debug(
+        logger.warning(
             "Stub intent query handler received request (type=%s)",
             type(request).__name__,
         )
