@@ -8,8 +8,32 @@ types used across plugin and wiring tests.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from uuid import uuid4
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_introspection_guard() -> Iterator[None]:
+    """Reset the introspection single-call guard before and after each test.
+
+    ``publish_memory_introspection()`` sets a module-level
+    ``_introspection_published`` guard that prevents it from being called
+    twice in the same process.  Without resetting this guard, the first
+    test that triggers ``wire_dispatchers()`` (which calls
+    ``publish_memory_introspection``) permanently blocks all subsequent
+    tests from calling it again, causing ``RuntimeError``.
+
+    Resetting both before **and** after ensures clean state regardless of
+    test ordering or whether a previous test failed mid-execution.
+    """
+    from omnimemory.runtime.introspection import reset_introspection_guard
+
+    reset_introspection_guard()
+    yield
+    reset_introspection_guard()
 
 
 @dataclass

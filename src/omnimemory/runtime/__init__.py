@@ -95,6 +95,19 @@ def __getattr__(name: str) -> object:
 
         return getattr(wiring, name)
 
+    _introspection_symbols = {
+        "MEMORY_NODES",
+        "IntrospectionResult",
+        "MemoryNodeIntrospectionProxy",
+        "publish_memory_introspection",
+        "publish_memory_shutdown",
+        "reset_introspection_guard",
+    }
+    if name in _introspection_symbols:
+        from omnimemory.runtime import introspection
+
+        return getattr(introspection, name)
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -124,4 +137,11 @@ __all__ = [
     "PluginMemory",
     # Wiring (lazy-imported via __getattr__)
     "wire_memory_handlers",
+    # Introspection (lazy-imported via __getattr__)
+    "MEMORY_NODES",
+    "IntrospectionResult",
+    "MemoryNodeIntrospectionProxy",
+    "publish_memory_introspection",
+    "publish_memory_shutdown",
+    "reset_introspection_guard",
 ]

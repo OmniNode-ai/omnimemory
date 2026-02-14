@@ -68,7 +68,10 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
     from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
+
+    from omnimemory.runtime.introspection import MemoryNodeIntrospectionProxy
 
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
@@ -134,6 +137,9 @@ class PluginMemory:
         self._shutdown_in_progress: bool = False
         self._services_registered: list[str] = []
         self._dispatch_engine: MessageDispatchEngine | None = None
+        self._event_bus: ProtocolEventBus | None = None
+        self._introspection_nodes: list[str] = []
+        self._introspection_proxies: list[MemoryNodeIntrospectionProxy] = []
 
     @property
     def plugin_id(self) -> str:
@@ -337,24 +343,46 @@ class PluginMemory:
                 publish_topics=publish_topics,
             )
 
+            # Store event_bus reference for introspection publishing.
+            # NOTE: This reference is captured at wire time and used during
+            # shutdown. The caller is responsible for keeping the event bus
+            # alive until shutdown completes.
+            self._event_bus = config.event_bus
+
+            # Publish introspection events for all memory nodes
+            from omnimemory.runtime.introspection import (
+                publish_memory_introspection,
+            )
+
+            introspection_result = await publish_memory_introspection(
+                event_bus=config.event_bus,
+                correlation_id=correlation_id,
+            )
+            self._introspection_nodes = introspection_result.registered_nodes
+            self._introspection_proxies = introspection_result.proxies
+
             duration = time.time() - start_time
             logger.info(
                 "Memory dispatch engine wired "
-                "(routes=%d, handlers=%d, kafka=%s, correlation_id=%s)",
+                "(routes=%d, handlers=%d, kafka=%s, introspection=%d, "
+                "correlation_id=%s)",
                 self._dispatch_engine.route_count,
                 self._dispatch_engine.handler_count,
                 publish_callback is not None,
+                len(self._introspection_nodes),
                 correlation_id,
                 extra={"publish_topics": publish_topics},
             )
+
+            resources_created = ["dispatch_engine"]
+            if self._introspection_nodes:
+                resources_created.append("node_introspection")
 
             return ModelDomainPluginResult(
                 plugin_id=self.plugin_id,
                 success=True,
                 message="Memory dispatch engine wired",
-                resources_created=[
-                    "dispatch_engine",
-                ],
+                resources_created=resources_created,
                 duration_seconds=duration,
             )
 
@@ -364,6 +392,32 @@ class PluginMemory:
                 "Failed to wire memory dispatch engine (correlation_id=%s)",
                 correlation_id,
             )
+            # Clean up partially-captured state to avoid stale references.
+            # Stop heartbeat tasks on any introspection proxies that were
+            # started before the failure, then reset the single-call guard
+            # so a retry is not permanently blocked.
+            for proxy in self._introspection_proxies:
+                try:
+                    await proxy.stop_introspection_tasks()
+                except Exception as stop_error:
+                    logger.debug(
+                        "Error stopping introspection tasks for %s during "
+                        "wire_dispatchers cleanup: %s (correlation_id=%s)",
+                        proxy.name,
+                        str(stop_error),
+                        correlation_id,
+                    )
+
+            from omnimemory.runtime.introspection import (
+                reset_introspection_guard,
+            )
+
+            reset_introspection_guard()
+
+            self._event_bus = None
+            self._introspection_nodes = []
+            self._introspection_proxies = []
+            self._dispatch_engine = None
             return ModelDomainPluginResult.failed(
                 plugin_id=self.plugin_id,
                 error_message=str(e),
@@ -546,6 +600,35 @@ class PluginMemory:
         correlation_id = config.correlation_id
         errors: list[str] = []
 
+        # Publish shutdown introspection for all memory nodes.
+        # Gate on _event_bus (set in wire_dispatchers before introspection
+        # is attempted), NOT on _introspection_nodes.
+        if self._event_bus is not None:
+            try:
+                from omnimemory.runtime.introspection import (
+                    publish_memory_shutdown,
+                )
+
+                await publish_memory_shutdown(
+                    event_bus=self._event_bus,
+                    proxies=self._introspection_proxies,
+                    correlation_id=correlation_id,
+                )
+            except Exception as shutdown_intro_error:
+                errors.append(f"introspection_shutdown: {shutdown_intro_error}")
+                logger.warning(
+                    "Failed to publish shutdown introspection: %s (correlation_id=%s)",
+                    shutdown_intro_error,
+                    correlation_id,
+                )
+        else:
+            logger.debug(
+                "Introspection shutdown skipped: wire_dispatchers was never "
+                "called or did not capture event_bus "
+                "(correlation_id=%s)",
+                correlation_id,
+            )
+
         # Unsubscribe from topics
         for unsub in self._unsubscribe_callbacks:
             try:
@@ -561,6 +644,9 @@ class PluginMemory:
 
         self._services_registered = []
         self._dispatch_engine = None
+        self._event_bus = None
+        self._introspection_nodes = []
+        self._introspection_proxies = []
 
         duration = time.time() - start_time
 

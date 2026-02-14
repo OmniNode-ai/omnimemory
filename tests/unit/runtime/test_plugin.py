@@ -8,7 +8,8 @@ Validates:
     - should_activate() checks OMNIMEMORY_ENABLED env var
     - initialize() returns success result
     - wire_handlers() verifies handler importability
-    - shutdown() cleans up resources and clears state
+    - wire_dispatchers() creates dispatch engine and stores introspection state
+    - shutdown() cleans up resources, introspection state, and publishes shutdown
     - Concurrent shutdown is guarded by _shutdown_in_progress flag
 
 Related:
@@ -17,11 +18,13 @@ Related:
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
+from omnimemory.runtime.introspection import IntrospectionResult
 from omnimemory.runtime.plugin import PluginMemory
 
 from .conftest import StubConfig, StubEventBus
@@ -39,6 +42,84 @@ def _make_config(
     bus = event_bus if event_bus is not None else StubEventBus()
     cid = correlation_id if correlation_id is not None else uuid4()
     return StubConfig(event_bus=bus, correlation_id=cid)
+
+
+# =============================================================================
+# Fixtures: Introspection mocking
+# =============================================================================
+
+
+@pytest.fixture
+def mock_introspection(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Mock publish_memory_introspection to avoid heartbeat task leaks.
+
+    Returns an IntrospectionResult with registered node names but no
+    proxies (so no background heartbeat tasks are created). The mock
+    is applied at the source module so that the local import inside
+    wire_dispatchers picks it up.
+
+    Returns:
+        A list that records each call's keyword arguments for assertions.
+    """
+    calls: list[dict[str, Any]] = []
+
+    async def _mock_publish(
+        event_bus: object,
+        *,
+        correlation_id: UUID | None = None,
+        enable_heartbeat: bool = True,
+        heartbeat_interval_seconds: float = 30.0,
+    ) -> IntrospectionResult:
+        calls.append(
+            {
+                "event_bus": event_bus,
+                "correlation_id": correlation_id,
+                "enable_heartbeat": enable_heartbeat,
+                "heartbeat_interval_seconds": heartbeat_interval_seconds,
+            }
+        )
+        return IntrospectionResult(
+            registered_nodes=["node_1", "node_2"],
+            proxies=[],
+        )
+
+    monkeypatch.setattr(
+        "omnimemory.runtime.introspection.publish_memory_introspection",
+        _mock_publish,
+    )
+    return calls
+
+
+@pytest.fixture
+def mock_shutdown_introspection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[dict[str, Any]]:
+    """Mock publish_memory_shutdown to track shutdown calls.
+
+    Returns:
+        A list that records each call's keyword arguments for assertions.
+    """
+    calls: list[dict[str, Any]] = []
+
+    async def _mock_shutdown(
+        event_bus: object,
+        *,
+        proxies: list[object] | None = None,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        calls.append(
+            {
+                "event_bus": event_bus,
+                "proxies": proxies,
+                "correlation_id": correlation_id,
+            }
+        )
+
+    monkeypatch.setattr(
+        "omnimemory.runtime.introspection.publish_memory_shutdown",
+        _mock_shutdown,
+    )
+    return calls
 
 
 # =============================================================================
@@ -159,10 +240,12 @@ class TestPluginWireHandlers:
 
 
 class TestPluginWireDispatchers:
-    """Validate wire_dispatchers() creates the dispatch engine."""
+    """Validate wire_dispatchers() creates the dispatch engine and introspection state."""
 
     @pytest.mark.asyncio
-    async def test_wire_dispatchers_creates_engine(self) -> None:
+    async def test_wire_dispatchers_creates_engine(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
         """wire_dispatchers should create and store a dispatch engine."""
         plugin = PluginMemory()
         config = _make_config()
@@ -174,7 +257,9 @@ class TestPluginWireDispatchers:
         assert plugin._dispatch_engine.is_frozen
 
     @pytest.mark.asyncio
-    async def test_wire_dispatchers_engine_has_six_routes(self) -> None:
+    async def test_wire_dispatchers_engine_has_six_routes(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
         """Engine should have exactly 6 routes (2 handler + 1 retrieval + 3 lifecycle)."""
         plugin = PluginMemory()
         config = _make_config()
@@ -185,7 +270,9 @@ class TestPluginWireDispatchers:
         assert plugin._dispatch_engine.route_count == 6
 
     @pytest.mark.asyncio
-    async def test_wire_dispatchers_engine_has_four_handlers(self) -> None:
+    async def test_wire_dispatchers_engine_has_four_handlers(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
         """Engine should have exactly 4 handlers."""
         plugin = PluginMemory()
         config = _make_config()
@@ -196,14 +283,77 @@ class TestPluginWireDispatchers:
         assert plugin._dispatch_engine.handler_count == 4
 
     @pytest.mark.asyncio
-    async def test_wire_dispatchers_returns_resources_created(self) -> None:
-        """Result should list dispatch_engine in resources_created."""
+    async def test_wire_dispatchers_returns_resources_created(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
+        """Result should list dispatch_engine and node_introspection in resources_created."""
         plugin = PluginMemory()
         config = _make_config()
 
         result = await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
 
         assert "dispatch_engine" in result.resources_created
+        assert "node_introspection" in result.resources_created
+
+    @pytest.mark.asyncio
+    async def test_wire_dispatchers_stores_event_bus(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
+        """wire_dispatchers should store the event_bus reference for shutdown."""
+        event_bus = StubEventBus()
+        plugin = PluginMemory()
+        config = _make_config(event_bus=event_bus)
+
+        await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
+
+        assert plugin._event_bus is event_bus
+
+    @pytest.mark.asyncio
+    async def test_wire_dispatchers_stores_introspection_nodes(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
+        """wire_dispatchers should populate _introspection_nodes from the result."""
+        plugin = PluginMemory()
+        config = _make_config()
+
+        await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
+
+        assert plugin._introspection_nodes == ["node_1", "node_2"]
+
+    @pytest.mark.asyncio
+    async def test_wire_dispatchers_error_cleans_introspection_state(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If introspection publishing fails, state should be cleaned up.
+
+        Simulates publish_memory_introspection raising an exception after
+        the dispatch engine and event_bus have already been captured. The
+        except block in wire_dispatchers should reset all state fields
+        (event_bus, introspection_nodes, introspection_proxies,
+        dispatch_engine) and reset the single-call guard.
+        """
+
+        async def _boom_publish(
+            event_bus: object, **kwargs: Any
+        ) -> IntrospectionResult:
+            raise RuntimeError("simulated introspection failure")
+
+        monkeypatch.setattr(
+            "omnimemory.runtime.introspection.publish_memory_introspection",
+            _boom_publish,
+        )
+
+        plugin = PluginMemory()
+        config = _make_config()
+
+        result = await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
+
+        assert not result.success
+        assert "simulated introspection failure" in (result.error_message or "")
+        assert plugin._event_bus is None
+        assert plugin._introspection_nodes == []
+        assert plugin._introspection_proxies == []
+        assert plugin._dispatch_engine is None
 
 
 # =============================================================================
@@ -226,7 +376,9 @@ class TestPluginStartConsumers:
         assert "skipped" in result.message.lower()
 
     @pytest.mark.asyncio
-    async def test_subscribes_to_all_topics(self) -> None:
+    async def test_subscribes_to_all_topics(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
         """After wire_dispatchers, all topics should be subscribed."""
         from omnimemory.runtime.plugin import MEMORY_SUBSCRIBE_TOPICS
 
@@ -252,7 +404,9 @@ class TestPluginStartConsumers:
         assert len(event_bus.subscriptions) == 0
 
     @pytest.mark.asyncio
-    async def test_all_topics_use_dispatch_callback(self) -> None:
+    async def test_all_topics_use_dispatch_callback(
+        self, mock_introspection: list[dict[str, Any]]
+    ) -> None:
         """All subscribed topics should use dispatch callback (not noop)."""
 
         event_bus = StubEventBus()
@@ -274,19 +428,28 @@ class TestPluginStartConsumers:
 
 
 class TestPluginShutdown:
-    """Validate shutdown() cleans up resources."""
+    """Validate shutdown() cleans up resources and introspection state."""
 
     @pytest.mark.asyncio
-    async def test_shutdown_clears_engine(self) -> None:
-        """After shutdown, _dispatch_engine should be None."""
+    async def test_shutdown_clears_engine(
+        self,
+        mock_introspection: list[dict[str, Any]],
+        mock_shutdown_introspection: list[dict[str, Any]],
+    ) -> None:
+        """After shutdown, _dispatch_engine and introspection state should be None/empty."""
         plugin = PluginMemory()
         config = _make_config()
 
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
         assert plugin._dispatch_engine is not None
+        assert plugin._event_bus is not None
+        assert len(plugin._introspection_nodes) > 0
 
         await plugin.shutdown(config)  # type: ignore[arg-type]
         assert plugin._dispatch_engine is None
+        assert plugin._event_bus is None
+        assert plugin._introspection_nodes == []
+        assert plugin._introspection_proxies == []
 
     @pytest.mark.asyncio
     async def test_shutdown_clears_services(self) -> None:
@@ -324,6 +487,42 @@ class TestPluginShutdown:
 
         assert result.success
         assert "skipped" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_publishes_shutdown_introspection(
+        self,
+        mock_introspection: list[dict[str, Any]],
+        mock_shutdown_introspection: list[dict[str, Any]],
+    ) -> None:
+        """Shutdown should call publish_memory_shutdown when event_bus is set."""
+        event_bus = StubEventBus()
+        plugin = PluginMemory()
+        config = _make_config(event_bus=event_bus)
+
+        await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
+        assert plugin._event_bus is event_bus
+
+        await plugin.shutdown(config)  # type: ignore[arg-type]
+
+        assert len(mock_shutdown_introspection) == 1
+        call = mock_shutdown_introspection[0]
+        assert call["event_bus"] is event_bus
+
+    @pytest.mark.asyncio
+    async def test_shutdown_skips_introspection_without_event_bus(
+        self,
+        mock_shutdown_introspection: list[dict[str, Any]],
+    ) -> None:
+        """Shutdown should not call publish_memory_shutdown when event_bus is None."""
+        plugin = PluginMemory()
+        config = _make_config()
+
+        # Do not call wire_dispatchers, so _event_bus remains None
+        assert plugin._event_bus is None
+
+        await plugin.shutdown(config)  # type: ignore[arg-type]
+
+        assert len(mock_shutdown_introspection) == 0
 
 
 # =============================================================================
