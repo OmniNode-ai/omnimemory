@@ -105,10 +105,24 @@ class ProtocolEventBusLifecycle(Protocol):
     """Minimal protocol for event bus lifecycle (initialize/shutdown).
 
     Matches the initialize/shutdown signatures used by EventBusKafka.
+
+    Note on ``initialize()``:
+        This method supports implementations that require deferred
+        initialization separate from construction. The default factory
+        (``create_default_event_bus()``) does **not** call ``initialize()``
+        because ``EventBusKafka`` handles setup via its constructor and
+        ``start()`` method. Implementations that need a two-phase init
+        (construct, then configure) should document this requirement and
+        have their own factory call ``initialize()`` explicitly.
     """
 
     async def initialize(self, config: dict[str, object]) -> None:
         """Initialize the event bus with configuration.
+
+        This method is for implementations that require deferred
+        initialization separate from construction. The default factory
+        (``create_default_event_bus()``) uses constructor + ``start()``
+        instead, so this method is not called by that factory.
 
         Args:
             config: Configuration dictionary. Recognized keys:
@@ -163,7 +177,7 @@ class AdapterKafkaPublisher:
     async def publish(
         self,
         topic: str,
-        key: str,
+        key: str | None,
         value: Mapping[str, object],
         headers: dict[str, str] | None = None,
     ) -> None:
@@ -171,12 +185,15 @@ class AdapterKafkaPublisher:
 
         Args:
             topic: Target topic name.
-            key: Message key (for partitioning). Empty string is preserved
-                as ``b""``, which differs from ``None`` in Kafka partitioning.
+            key: Message key (for partitioning), or None for round-robin
+                partitioning. Empty string is preserved as ``b""``, which
+                differs from ``None`` in Kafka partitioning.
             value: Event payload dict (serialized to JSON bytes).
             headers: Optional string key-value headers forwarded to the
                 event bus publish call.
         """
+        # default=str handles datetime/UUID serialization; callers should
+        # pre-validate complex types to avoid silent str() conversion.
         value_bytes = json.dumps(
             value, separators=(",", ":"), ensure_ascii=False, default=str
         ).encode("utf-8")

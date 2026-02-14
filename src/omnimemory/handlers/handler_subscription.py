@@ -681,6 +681,7 @@ class HandlerSubscription:
             not self._initialized
             or self._valkey is None
             or self._db_handler is None
+            or self._event_bus is None
             or self._publisher is None
             or self._config is None
         ):
@@ -1747,10 +1748,21 @@ class HandlerSubscription:
 
         Performs health checks on Valkey, database, and event bus handlers.
         Component health is reported as:
+
         - True: Component is healthy and responding
         - False: Component is unhealthy or failed health check
+        - None (event bus only): Event bus does not implement
+          ``ProtocolEventBusHealthCheck``; treated as non-failure so that
+          adapters without health-check support do not block overall health.
 
-        The overall is_healthy is True when ALL components are healthy.
+        The overall ``is_healthy`` is True when Valkey and DB are True **and**
+        event bus is not explicitly False (None is acceptable).
+
+        .. versionchanged:: 0.3.0
+            Event bus health uses ``is not False`` instead of ``is True``,
+            so ``None`` (health check not supported) is no longer treated
+            as unhealthy. This accommodates event bus adapters that do not
+            implement ``ProtocolEventBusHealthCheck``.
 
         Returns:
             ModelSubscriptionHealth with detailed status for each component.
@@ -1831,8 +1843,14 @@ class HandlerSubscription:
                 errors.append(f"Event bus check failed: {e}")
 
         # Healthy when all known components report True.
-        # event_bus_healthy=None means the bus lacks health-check support;
-        # this is acceptable (not a failure), so treat None as non-blocking.
+        # event_bus_healthy semantics (uses ``is not False`` deliberately):
+        #   True  -> bus is healthy
+        #   False -> bus is unhealthy (explicit failure)
+        #   None  -> bus does not implement ProtocolEventBusHealthCheck;
+        #            treated as non-failure for backwards compatibility with
+        #            adapters that don't support health checks. This means
+        #            None (unknown) does NOT block overall health, unlike the
+        #            prior Kafka-specific check which required ``is True``.
         is_healthy = (
             valkey_healthy is True
             and db_healthy is True
