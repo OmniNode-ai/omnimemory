@@ -47,7 +47,32 @@ from omnimemory.runtime.contract_topics import (
 )
 
 # Dispatch handlers are lazy-imported to avoid pulling in omnibase_core.runtime
-# at package import time. Import from omnimemory.runtime.dispatch_handlers directly.
+# at package import time. Import from omnimemory.runtime.dispatch_handlers directly,
+# or access via __all__ (the symbols are provided by __getattr__ below).
+
+
+def __getattr__(name: str) -> object:
+    """Lazy-import dispatch handler symbols on first access.
+
+    This avoids pulling omnibase_core.runtime into the module namespace at
+    package import time while still allowing ``from omnimemory.runtime import
+    create_memory_dispatch_engine`` to work.
+    """
+    _dispatch_symbols = {
+        "DISPATCH_ALIAS_ARCHIVE_MEMORY",
+        "DISPATCH_ALIAS_EXPIRE_MEMORY",
+        "DISPATCH_ALIAS_INTENT_CLASSIFIED",
+        "DISPATCH_ALIAS_INTENT_QUERY_REQUESTED",
+        "DISPATCH_ALIAS_RUNTIME_TICK",
+        "create_dispatch_callback",
+        "create_memory_dispatch_engine",
+    }
+    if name in _dispatch_symbols:
+        from omnimemory.runtime import dispatch_handlers
+
+        return getattr(dispatch_handlers, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Protocol adapters (ARCH-002)
@@ -61,4 +86,12 @@ __all__ = [
     "collect_all_publish_topics",
     "collect_publish_topics_for_dispatch",
     "collect_subscribe_topics_from_contracts",
+    # Dispatch handlers (lazy-imported via __getattr__)
+    "DISPATCH_ALIAS_ARCHIVE_MEMORY",
+    "DISPATCH_ALIAS_EXPIRE_MEMORY",
+    "DISPATCH_ALIAS_INTENT_CLASSIFIED",
+    "DISPATCH_ALIAS_INTENT_QUERY_REQUESTED",
+    "DISPATCH_ALIAS_RUNTIME_TICK",
+    "create_dispatch_callback",
+    "create_memory_dispatch_engine",
 ]

@@ -516,7 +516,11 @@ def create_dispatch_callback(
     Args:
         engine: Frozen MessageDispatchEngine.
         dispatch_topic: Dispatch-compatible topic alias to pass to dispatch().
-        correlation_id: Optional fixed correlation ID for tracing.
+        correlation_id: Optional fixed correlation ID for tracing. Note that a
+            correlation_id found in the message payload takes precedence over
+            this value. Full precedence order (highest wins): payload
+            correlation_id > caller-provided correlation_id > auto-generated
+            UUID.
 
     Returns:
         Async callback compatible with event bus subscribe(on_message=...).
@@ -557,7 +561,14 @@ def create_dispatch_callback(
                     await msg.nack()
                 return
 
-            # Extract correlation_id from payload if available
+            # Extract correlation_id from payload if available.
+            # Precedence (highest wins):
+            #   1. payload correlation_id  (from the message body)
+            #   2. caller-provided fixed correlation_id  (passed to create_dispatch_callback)
+            #   3. auto-generated UUID  (uuid4 fallback)
+            # If the payload contains a valid UUID correlation_id, it overrides the
+            # caller-supplied value. If parsing fails, the current value (caller-
+            # supplied or auto-generated) is silently retained via suppress().
             payload_correlation_id = payload_dict.get("correlation_id")
             if payload_correlation_id:
                 with contextlib.suppress(ValueError, AttributeError):
