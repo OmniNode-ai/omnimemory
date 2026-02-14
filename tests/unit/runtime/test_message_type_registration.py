@@ -24,6 +24,8 @@ from omnibase_infra.runtime.registry import RegistryMessageType
 from omnimemory.runtime.message_type_registration import (
     EXPECTED_MESSAGE_TYPE_COUNT,
     MEMORY_DOMAIN,
+    get_registration_metrics,
+    is_registry_ready,
     register_memory_message_types,
 )
 
@@ -327,3 +329,45 @@ class TestRegistryProperties:
     def test_memory_domain_constant(self) -> None:
         """MEMORY_DOMAIN is 'memory'."""
         assert MEMORY_DOMAIN == "memory"
+
+
+# =============================================================================
+# Observability: Readiness & Metrics
+# =============================================================================
+
+
+class TestRegistrationObservability:
+    """Verify readiness flag and metric counters after registration."""
+
+    def test_is_ready_after_success(self, registry: RegistryMessageType) -> None:
+        """is_registry_ready() returns True after successful registration."""
+        register_memory_message_types(registry)
+        assert is_registry_ready() is True
+
+    def test_metrics_after_success(self, registry: RegistryMessageType) -> None:
+        """get_registration_metrics() reports correct counts after success."""
+        register_memory_message_types(registry)
+        metrics = get_registration_metrics()
+        assert metrics["registered_count"] == EXPECTED_MESSAGE_TYPE_COUNT
+        assert metrics["expected_count"] == EXPECTED_MESSAGE_TYPE_COUNT
+        # failure_count is cumulative across the process so we only check
+        # it is non-negative (other tests may have triggered failures).
+        assert metrics["failure_count"] >= 0
+
+    def test_readiness_false_after_failure(
+        self, frozen_registry: RegistryMessageType
+    ) -> None:
+        """is_registry_ready() returns False after a failed registration attempt."""
+        with pytest.raises(ModelOnexError):
+            register_memory_message_types(frozen_registry)
+        assert is_registry_ready() is False
+
+    def test_failure_count_increments(
+        self, frozen_registry: RegistryMessageType
+    ) -> None:
+        """Failure counter increments on registration error."""
+        before = get_registration_metrics()["failure_count"]
+        with pytest.raises(ModelOnexError):
+            register_memory_message_types(frozen_registry)
+        after = get_registration_metrics()["failure_count"]
+        assert after == before + 1

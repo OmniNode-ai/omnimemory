@@ -17,6 +17,11 @@ Design:
     - ``category`` follows topic naming: ``.cmd.`` -> COMMAND, ``.evt.`` -> EVENT
     - Consumed events from external domains use EVENT category
 
+Observability:
+    - ``_registry_ready`` module-level flag tracks registration readiness
+    - ``_registered_count`` / ``_registration_failure_count`` track metrics
+    - ``is_registry_ready()`` exposes readiness for health checks
+
 Related:
     - OMN-2217: Phase 6 -- Wire model registration & entry point declaration
     - OMN-937: Central Message Type Registry implementation
@@ -41,6 +46,42 @@ MEMORY_DOMAIN = "memory"
 # Used in tests and validate_startup logging.
 EXPECTED_MESSAGE_TYPE_COUNT = 10
 
+# ---------------------------------------------------------------------------
+# Observability: readiness flag and metric counters
+# ---------------------------------------------------------------------------
+_registry_ready: bool = False
+"""Module-level readiness flag.  True after successful registration."""
+
+_registered_count: int = 0
+"""Number of message types successfully registered in the last call."""
+
+_registration_failure_count: int = 0
+"""Number of registration failures encountered in the last call."""
+
+
+def is_registry_ready() -> bool:
+    """Return whether the memory message type registry is ready.
+
+    This function is intended for health-check integrations.  It returns
+    ``True`` only after ``register_memory_message_types`` has completed
+    successfully (i.e., all expected types registered without error).
+    """
+    return _registry_ready
+
+
+def get_registration_metrics() -> dict[str, int]:
+    """Return current registration metrics for observability.
+
+    Returns:
+        Dict with ``registered_count``, ``failure_count``, and
+        ``expected_count`` keys.
+    """
+    return {
+        "registered_count": _registered_count,
+        "failure_count": _registration_failure_count,
+        "expected_count": EXPECTED_MESSAGE_TYPE_COUNT,
+    }
+
 
 def register_memory_message_types(
     registry: RegistryMessageType,
@@ -58,6 +99,11 @@ def register_memory_message_types(
     The registry is NOT frozen by this function.  The caller is responsible
     for calling ``registry.freeze()`` after all domains have registered.
 
+    On success the module-level readiness flag is set to ``True`` and the
+    ``_registered_count`` counter is updated.  On failure the readiness flag
+    is set to ``False``, ``_registration_failure_count`` is incremented, and
+    the exception is re-raised.
+
     Args:
         registry: An unfrozen RegistryMessageType instance.
 
@@ -68,140 +114,164 @@ def register_memory_message_types(
         ModelOnexError: If registry is already frozen.
         MessageTypeRegistryError: If any registration fails validation.
     """
+    global _registry_ready, _registered_count, _registration_failure_count  # noqa: PLW0603
+
+    # Reset readiness at the start of each registration attempt so that a
+    # retry after a previous failure does not report stale readiness.
+    _registry_ready = False
+
     registered: list[str] = []
 
-    # =========================================================================
-    # Consumed Kafka Event (from omniintelligence) -- EVENT category
-    # =========================================================================
+    try:
+        # =====================================================================
+        # Consumed Kafka Event (from omniintelligence) -- EVENT category
+        # =====================================================================
 
-    # 1. Intent classification event consumed from omniintelligence
-    registry.register_simple(
-        message_type="ModelIntentClassifiedEvent",
-        handler_id="intent_event_consumer_effect",
-        category=EnumMessageCategory.EVENT,
-        domain=MEMORY_DOMAIN,
-        description=(
-            "Intent classification event consumed from omniintelligence "
-            "for memory storage"
-        ),
-    )
-    registered.append("ModelIntentClassifiedEvent")
+        # 1. Intent classification event consumed from omniintelligence
+        registry.register_simple(
+            message_type="ModelIntentClassifiedEvent",
+            handler_id="intent_event_consumer_effect",
+            category=EnumMessageCategory.EVENT,
+            domain=MEMORY_DOMAIN,
+            description=(
+                "Intent classification event consumed from omniintelligence "
+                "for memory storage"
+            ),
+        )
+        registered.append("ModelIntentClassifiedEvent")
 
-    # =========================================================================
-    # Intent Storage Effect (orchestrator-invoked) -- COMMAND/EVENT
-    # =========================================================================
+        # =====================================================================
+        # Intent Storage Effect (orchestrator-invoked) -- COMMAND/EVENT
+        # =====================================================================
 
-    # 2. Intent storage request (command input)
-    registry.register_simple(
-        message_type="ModelIntentStorageRequest",
-        handler_id="intent_storage_effect",
-        category=EnumMessageCategory.COMMAND,
-        domain=MEMORY_DOMAIN,
-        description="Intent storage request command input",
-    )
-    registered.append("ModelIntentStorageRequest")
+        # 2. Intent storage request (command input)
+        registry.register_simple(
+            message_type="ModelIntentStorageRequest",
+            handler_id="intent_storage_effect",
+            category=EnumMessageCategory.COMMAND,
+            domain=MEMORY_DOMAIN,
+            description="Intent storage request command input",
+        )
+        registered.append("ModelIntentStorageRequest")
 
-    # 3. Intent storage response (event output)
-    registry.register_simple(
-        message_type="ModelIntentStorageResponse",
-        handler_id="intent_storage_effect",
-        category=EnumMessageCategory.EVENT,
-        domain=MEMORY_DOMAIN,
-        description="Intent storage response event output",
-    )
-    registered.append("ModelIntentStorageResponse")
+        # 3. Intent storage response (event output)
+        registry.register_simple(
+            message_type="ModelIntentStorageResponse",
+            handler_id="intent_storage_effect",
+            category=EnumMessageCategory.EVENT,
+            domain=MEMORY_DOMAIN,
+            description="Intent storage response event output",
+        )
+        registered.append("ModelIntentStorageResponse")
 
-    # =========================================================================
-    # Memory Retrieval Effect -- COMMAND/EVENT
-    # =========================================================================
+        # =====================================================================
+        # Memory Retrieval Effect -- COMMAND/EVENT
+        # =====================================================================
 
-    # 4. Memory retrieval request (command input)
-    registry.register_simple(
-        message_type="ModelMemoryRetrievalRequest",
-        handler_id="memory_retrieval_effect",
-        category=EnumMessageCategory.COMMAND,
-        domain=MEMORY_DOMAIN,
-        description="Memory retrieval request command consumed from Kafka",
-    )
-    registered.append("ModelMemoryRetrievalRequest")
+        # 4. Memory retrieval request (command input)
+        registry.register_simple(
+            message_type="ModelMemoryRetrievalRequest",
+            handler_id="memory_retrieval_effect",
+            category=EnumMessageCategory.COMMAND,
+            domain=MEMORY_DOMAIN,
+            description="Memory retrieval request command consumed from Kafka",
+        )
+        registered.append("ModelMemoryRetrievalRequest")
 
-    # 5. Memory retrieval response (event output)
-    registry.register_simple(
-        message_type="ModelMemoryRetrievalResponse",
-        handler_id="memory_retrieval_effect",
-        category=EnumMessageCategory.EVENT,
-        domain=MEMORY_DOMAIN,
-        description="Memory retrieval response event output",
-    )
-    registered.append("ModelMemoryRetrievalResponse")
+        # 5. Memory retrieval response (event output)
+        registry.register_simple(
+            message_type="ModelMemoryRetrievalResponse",
+            handler_id="memory_retrieval_effect",
+            category=EnumMessageCategory.EVENT,
+            domain=MEMORY_DOMAIN,
+            description="Memory retrieval response event output",
+        )
+        registered.append("ModelMemoryRetrievalResponse")
 
-    # =========================================================================
-    # Memory Storage Effect (orchestrator-invoked) -- COMMAND/EVENT
-    # =========================================================================
+        # =====================================================================
+        # Memory Storage Effect (orchestrator-invoked) -- COMMAND/EVENT
+        # =====================================================================
 
-    # 6. Memory storage request (command input)
-    registry.register_simple(
-        message_type="ModelMemoryStorageRequest",
-        handler_id="memory_storage_effect",
-        category=EnumMessageCategory.COMMAND,
-        domain=MEMORY_DOMAIN,
-        description="Memory storage CRUD request command input",
-    )
-    registered.append("ModelMemoryStorageRequest")
+        # 6. Memory storage request (command input)
+        registry.register_simple(
+            message_type="ModelMemoryStorageRequest",
+            handler_id="memory_storage_effect",
+            category=EnumMessageCategory.COMMAND,
+            domain=MEMORY_DOMAIN,
+            description="Memory storage CRUD request command input",
+        )
+        registered.append("ModelMemoryStorageRequest")
 
-    # 7. Memory storage response (event output)
-    registry.register_simple(
-        message_type="ModelMemoryStorageResponse",
-        handler_id="memory_storage_effect",
-        category=EnumMessageCategory.EVENT,
-        domain=MEMORY_DOMAIN,
-        description="Memory storage CRUD response event output",
-    )
-    registered.append("ModelMemoryStorageResponse")
+        # 7. Memory storage response (event output)
+        registry.register_simple(
+            message_type="ModelMemoryStorageResponse",
+            handler_id="memory_storage_effect",
+            category=EnumMessageCategory.EVENT,
+            domain=MEMORY_DOMAIN,
+            description="Memory storage CRUD response event output",
+        )
+        registered.append("ModelMemoryStorageResponse")
 
-    # =========================================================================
-    # Agent Coordinator Orchestrator -- COMMAND/EVENT
-    # =========================================================================
+        # =====================================================================
+        # Agent Coordinator Orchestrator -- COMMAND/EVENT
+        # =====================================================================
 
-    # 8. Agent coordinator request (command input)
-    registry.register_simple(
-        message_type="ModelAgentCoordinatorRequest",
-        handler_id="agent_coordinator_orchestrator",
-        category=EnumMessageCategory.COMMAND,
-        domain=MEMORY_DOMAIN,
-        description=(
-            "Agent coordinator request for subscription management "
-            "and notification dispatch"
-        ),
-    )
-    registered.append("ModelAgentCoordinatorRequest")
+        # 8. Agent coordinator request (command input)
+        registry.register_simple(
+            message_type="ModelAgentCoordinatorRequest",
+            handler_id="agent_coordinator_orchestrator",
+            category=EnumMessageCategory.COMMAND,
+            domain=MEMORY_DOMAIN,
+            description=(
+                "Agent coordinator request for subscription management "
+                "and notification dispatch"
+            ),
+        )
+        registered.append("ModelAgentCoordinatorRequest")
 
-    # 9. Agent coordinator response (event output)
-    registry.register_simple(
-        message_type="ModelAgentCoordinatorResponse",
-        handler_id="agent_coordinator_orchestrator",
-        category=EnumMessageCategory.EVENT,
-        domain=MEMORY_DOMAIN,
-        description="Agent coordinator response with operation result",
-    )
-    registered.append("ModelAgentCoordinatorResponse")
+        # 9. Agent coordinator response (event output)
+        registry.register_simple(
+            message_type="ModelAgentCoordinatorResponse",
+            handler_id="agent_coordinator_orchestrator",
+            category=EnumMessageCategory.EVENT,
+            domain=MEMORY_DOMAIN,
+            description="Agent coordinator response with operation result",
+        )
+        registered.append("ModelAgentCoordinatorResponse")
 
-    # 10. Notification event (published by coordinator to Kafka)
-    registry.register_simple(
-        message_type="ModelNotificationEvent",
-        handler_id="agent_coordinator_orchestrator",
-        category=EnumMessageCategory.EVENT,
-        domain=MEMORY_DOMAIN,
-        description=(
-            "Notification event published to Kafka for cross-agent "
-            "memory change notifications"
-        ),
-    )
-    registered.append("ModelNotificationEvent")
+        # 10. Notification event (published by coordinator to Kafka)
+        registry.register_simple(
+            message_type="ModelNotificationEvent",
+            handler_id="agent_coordinator_orchestrator",
+            category=EnumMessageCategory.EVENT,
+            domain=MEMORY_DOMAIN,
+            description=(
+                "Notification event published to Kafka for cross-agent "
+                "memory change notifications"
+            ),
+        )
+        registered.append("ModelNotificationEvent")
+
+    except Exception:
+        _registration_failure_count += 1
+        _registry_ready = False
+        logger.exception(
+            "Memory message type registration failed " "(registered=%d, failures=%d)",
+            len(registered),
+            _registration_failure_count,
+        )
+        raise
+
+    # Update metrics on success
+    _registered_count = len(registered)
+    _registry_ready = True
 
     logger.info(
-        "Registered %d memory message types with RegistryMessageType",
-        len(registered),
+        "Registered %d memory message types with RegistryMessageType "
+        "(ready=%s, failures=%d)",
+        _registered_count,
+        _registry_ready,
+        _registration_failure_count,
     )
 
     return registered
@@ -210,5 +280,7 @@ def register_memory_message_types(
 __all__ = [
     "EXPECTED_MESSAGE_TYPE_COUNT",
     "MEMORY_DOMAIN",
+    "get_registration_metrics",
+    "is_registry_ready",
     "register_memory_message_types",
 ]

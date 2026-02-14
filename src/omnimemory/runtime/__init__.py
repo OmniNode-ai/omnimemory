@@ -111,6 +111,8 @@ def __getattr__(name: str) -> object:
     _message_type_symbols = {
         "EXPECTED_MESSAGE_TYPE_COUNT",
         "MEMORY_DOMAIN",
+        "get_registration_metrics",
+        "is_registry_ready",
         "register_memory_message_types",
     }
     if name in _message_type_symbols:
@@ -157,5 +159,7 @@ __all__ = [
     # Message type registration (lazy-imported via __getattr__)
     "EXPECTED_MESSAGE_TYPE_COUNT",
     "MEMORY_DOMAIN",
+    "get_registration_metrics",
+    "is_registry_ready",
     "register_memory_message_types",
 ]
