@@ -63,12 +63,7 @@ Example::
 """
 
 # Contract models from omnibase_core (ProtocolIntentGraph conformance)
-from omnibase_core.models.intelligence import (
-    ModelIntentClassificationOutput,
-    ModelIntentQueryResult,
-    ModelIntentRecord,
-    ModelIntentStorageResult,
-)
+from omnibase_core.models.intelligence import ModelIntentClassificationOutput
 
 from omnimemory.handlers.adapters.adapter_embedding_http import (
     EmbeddingHttpClient,
@@ -95,6 +90,9 @@ from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
+    ModelIntentQueryResult,
+    ModelIntentRecord,
+    ModelIntentStorageResult,
 )
 from omnimemory.models.adapters import (
     ModelConnectionsResult,

@@ -15,9 +15,6 @@ def map_event_to_storage_request(
 ) -> ModelIntentStorageRequest:
     """Map incoming classified event to storage request.
 
-    The keywords field defaults to [] if not present in the event,
-    providing forward compatibility with OMN-1626.
-
     Args:
         event: The incoming intent-classified event from omniintelligence.
 
@@ -37,7 +34,6 @@ def map_event_to_storage_request(
             success=True,
             intent_category=intent_category,
             confidence=event.confidence,
-            keywords=event.keywords,  # Empty list if not present (forward-compatible)
         ),
         correlation_id=event.correlation_id,
     )

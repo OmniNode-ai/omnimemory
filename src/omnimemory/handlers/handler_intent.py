@@ -79,11 +79,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from omnibase_core.models.intelligence import (
-    ModelIntentClassificationOutput,
-    ModelIntentQueryResult,
-    ModelIntentStorageResult,
-)
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.handlers.adapters.adapter_intent_graph import AdapterIntentGraph
@@ -91,6 +86,8 @@ from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
+    ModelIntentQueryResult,
+    ModelIntentStorageResult,
 )
 from omnimemory.utils.concurrency import (
     CircuitBreaker,
@@ -100,6 +97,7 @@ from omnimemory.utils.concurrency import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
+    from omnibase_core.models.intelligence import ModelIntentClassificationOutput
 
 __all__ = [
     "CircuitBreakerOpenError",
@@ -571,7 +569,8 @@ class HandlerIntent:
                 },
             )
             return ModelIntentStorageResult(
-                success=False,
+                status="error",
+                session_id=session_id,
                 error_message=str(e),
             )
 
@@ -590,6 +589,13 @@ class HandlerIntent:
                 f"Circuit breaker is {circuit_breaker.state.value}"
             )
 
+        # Resolve intent category string for logging
+        intent_category_str = (
+            intent_data.intent_category.value
+            if hasattr(intent_data.intent_category, "value")
+            else str(intent_data.intent_category)
+        )
+
         logger.debug(
             "Storing intent for session %s",
             session_id,
@@ -597,23 +603,39 @@ class HandlerIntent:
                 "handler": HANDLER_ID_INTENT,
                 "correlation_id": correlation_id,
                 "session_id": session_id,
-                "intent_category": intent_data.intent_category.value
-                if hasattr(intent_data.intent_category, "value")
-                else intent_data.intent_category,
+                "intent_category": intent_category_str,
             },
         )
 
+        # Convert ModelIntentClassificationOutput to ModelIntentClassificationInput
+        # for the adapter's protocol-conforming interface
+        from omnibase_core.models.intelligence import ModelIntentClassificationInput
+
+        adapter_input = ModelIntentClassificationInput(
+            content=intent_category_str,
+            context={"domain": intent_category_str},
+            correlation_id=None,
+        )
+
         try:
-            result = await adapter.store_intent(
+            event = await adapter.store_intent(
                 session_id=session_id,
-                intent_data=intent_data,
+                intent_data=adapter_input,
                 correlation_id=correlation_id,
             )
             # Record success if operation completed without exception
             # Business errors (e.g., validation) are not circuit breaker failures
-            if result.success:
+            if event.status == "success":
                 circuit_breaker.record_success()
-            return result
+            # Convert ModelIntentStoredEvent to ModelIntentStorageResult
+            return ModelIntentStorageResult(
+                status=event.status,
+                intent_id=event.intent_id,
+                session_id=session_id,
+                created=event.created,
+                execution_time_ms=event.execution_time_ms,
+                error_message=event.error_message,
+            )
         except Exception as e:
             circuit_breaker.record_failure()
             logger.error(
@@ -673,7 +695,7 @@ class HandlerIntent:
                 },
             )
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
                 error_message=str(e),
             )
 
@@ -711,7 +733,7 @@ class HandlerIntent:
                 limit=limit,
             )
             # Record success if operation completed without exception
-            if result.success:
+            if result.status == "success":
                 circuit_breaker.record_success()
             return result
         except Exception as e:
