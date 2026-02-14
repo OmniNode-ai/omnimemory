@@ -229,72 +229,86 @@ async def publish_memory_introspection(
                 "because they are no-ops that create no proxies or tasks.)"
             )
 
-    if event_bus is None:
-        # No-op path: intentionally does NOT set _introspection_published.
-        # A no-op call creates no proxies or heartbeat tasks, so there is
-        # nothing to orphan. A later call with a real event bus must still
-        # be allowed to proceed.
-        logger.info(
-            "Skipping memory introspection: no event bus available "
-            "(correlation_id=%s)",
-            correlation_id,
-        )
-        return IntrospectionResult()
+        if event_bus is None:
+            # No-op path: intentionally does NOT set _introspection_published.
+            # A no-op call creates no proxies or heartbeat tasks, so there is
+            # nothing to orphan. A later call with a real event bus must still
+            # be allowed to proceed.
+            logger.info(
+                "Skipping memory introspection: no event bus available "
+                "(correlation_id=%s)",
+                correlation_id,
+            )
+            return IntrospectionResult()
+
+        # Set the guard atomically with the check to eliminate the TOCTOU
+        # race window. If the subsequent work fails, the guard is reset in
+        # the except block below so a retry is still possible.
+        _introspection_published = True
 
     result = IntrospectionResult()
 
-    for descriptor in MEMORY_NODES:
-        try:
-            proxy = MemoryNodeIntrospectionProxy(
-                descriptor=descriptor,
-                event_bus=event_bus,
-            )
-
-            success = await proxy.publish_introspection(
-                reason=EnumIntrospectionReason.STARTUP,
-                correlation_id=correlation_id,
-            )
-
-            if success:
-                result.registered_nodes.append(descriptor.name)
-                logger.debug(
-                    "Published introspection for %s (node_id=%s, type=%s, "
-                    "correlation_id=%s)",
-                    descriptor.name,
-                    descriptor.node_id,
-                    descriptor.node_type,
-                    correlation_id,
+    try:
+        for descriptor in MEMORY_NODES:
+            try:
+                proxy = MemoryNodeIntrospectionProxy(
+                    descriptor=descriptor,
+                    event_bus=event_bus,
                 )
 
-                # Start heartbeat for effect nodes only
-                if enable_heartbeat and descriptor.node_type == EnumNodeKind.EFFECT:
-                    await proxy.start_introspection_tasks(
-                        enable_heartbeat=True,
-                        heartbeat_interval_seconds=heartbeat_interval_seconds,
-                        enable_registry_listener=False,
+                success = await proxy.publish_introspection(
+                    reason=EnumIntrospectionReason.STARTUP,
+                    correlation_id=correlation_id,
+                )
+
+                if success:
+                    result.registered_nodes.append(descriptor.name)
+                    logger.debug(
+                        "Published introspection for %s (node_id=%s, type=%s, "
+                        "correlation_id=%s)",
+                        descriptor.name,
+                        descriptor.node_id,
+                        descriptor.node_type,
+                        correlation_id,
                     )
-                    result.proxies.append(proxy)
-            else:
+
+                    # Start heartbeat for effect nodes only
+                    if enable_heartbeat and descriptor.node_type == EnumNodeKind.EFFECT:
+                        await proxy.start_introspection_tasks(
+                            enable_heartbeat=True,
+                            heartbeat_interval_seconds=heartbeat_interval_seconds,
+                            enable_registry_listener=False,
+                        )
+                        result.proxies.append(proxy)
+                else:
+                    logger.warning(
+                        "Failed to publish introspection for %s (correlation_id=%s)",
+                        descriptor.name,
+                        correlation_id,
+                    )
+
+            except Exception as e:
                 logger.warning(
-                    "Failed to publish introspection for %s (correlation_id=%s)",
+                    "Error publishing introspection for %s: %s " "(correlation_id=%s)",
                     descriptor.name,
+                    str(e),
                     correlation_id,
+                    exc_info=True,
+                    extra={
+                        "error_type": type(e).__name__,
+                        "node_name": descriptor.name,
+                        "node_type": descriptor.node_type.value
+                        if hasattr(descriptor.node_type, "value")
+                        else str(descriptor.node_type),
+                        "correlation_id": str(correlation_id),
+                    },
                 )
-
-        except Exception as e:
-            logger.warning(
-                "Error publishing introspection for %s: %s (correlation_id=%s)",
-                descriptor.name,
-                str(e),
-                correlation_id,
-                exc_info=True,
-            )
-
-    # Set the single-call guard AFTER the loop completes successfully.
-    # If an exception propagates out of the loop, the guard remains unset,
-    # allowing a legitimate retry instead of permanently blocking.
-    async with _introspection_lock:
-        _introspection_published = True
+    except Exception:
+        # Reset guard on failure so a retry is possible instead of
+        # permanently blocking all future calls.
+        async with _introspection_lock:
+            _introspection_published = False
+        raise
 
     logger.info(
         "Memory introspection published: %d/%d nodes (correlation_id=%s)",

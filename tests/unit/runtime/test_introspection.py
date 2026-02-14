@@ -507,3 +507,128 @@ class TestIntrospectionResult:
         result = IntrospectionResult()
         result.registered_nodes.append("test_node")
         assert "test_node" in result.registered_nodes
+
+
+# =============================================================================
+# Tests: Introspection Lifecycle Integration
+# =============================================================================
+
+
+class TestIntrospectionLifecycle:
+    """Integration-level tests for the full introspection lifecycle.
+
+    Validates end-to-end flows including publish -> shutdown -> re-publish,
+    concurrent publish guards (TOCTOU fix), and failure-retry behavior.
+    """
+
+    @pytest.mark.unit
+    async def test_full_lifecycle(self) -> None:
+        """Publish -> verify nodes -> shutdown -> cleanup -> re-publish succeeds.
+
+        Exercises the full plugin lifecycle: initial introspection publish
+        registers all nodes, shutdown cleans up proxies and resets the guard,
+        and a subsequent publish succeeds (proving the guard was reset by
+        shutdown).
+        """
+        bus = MockEventBus()
+
+        # Phase 1: Publish introspection
+        result = await publish_memory_introspection(
+            event_bus=bus,  # type: ignore[arg-type]
+            enable_heartbeat=False,
+        )
+        assert len(result.registered_nodes) == len(MEMORY_NODES)
+        for descriptor in MEMORY_NODES:
+            assert descriptor.name in result.registered_nodes
+        assert len(bus.published) >= len(MEMORY_NODES)
+
+        # Phase 2: Shutdown -- resets guard and publishes SHUTDOWN events
+        published_before_shutdown = len(bus.published)
+        await publish_memory_shutdown(
+            event_bus=bus,  # type: ignore[arg-type]
+            proxies=result.proxies,
+        )
+        # Shutdown should have published additional events
+        assert len(bus.published) > published_before_shutdown
+
+        # Phase 3: Re-publish succeeds (guard was reset by shutdown)
+        result2 = await publish_memory_introspection(
+            event_bus=bus,  # type: ignore[arg-type]
+            enable_heartbeat=False,
+        )
+        assert len(result2.registered_nodes) == len(MEMORY_NODES)
+
+    @pytest.mark.unit
+    async def test_concurrent_publish_only_one_succeeds(self) -> None:
+        """Two concurrent publishes: exactly one succeeds, the other raises.
+
+        Validates the TOCTOU fix: the guard is set atomically inside the
+        asyncio.Lock, so even with concurrent coroutines, only one can
+        proceed past the guard check.
+        """
+        import asyncio
+
+        bus = MockEventBus()
+
+        results = await asyncio.gather(
+            publish_memory_introspection(
+                event_bus=bus,  # type: ignore[arg-type]
+                enable_heartbeat=False,
+            ),
+            publish_memory_introspection(
+                event_bus=bus,  # type: ignore[arg-type]
+                enable_heartbeat=False,
+            ),
+            return_exceptions=True,
+        )
+
+        successes = [r for r in results if isinstance(r, IntrospectionResult)]
+        failures = [r for r in results if isinstance(r, RuntimeError)]
+
+        assert len(successes) == 1, f"Expected exactly 1 success, got {len(successes)}"
+        assert (
+            len(failures) == 1
+        ), f"Expected exactly 1 RuntimeError, got {len(failures)}"
+        assert "already been called" in str(failures[0])
+
+        # The successful result should have all nodes registered
+        assert len(successes[0].registered_nodes) == len(MEMORY_NODES)
+
+    @pytest.mark.unit
+    async def test_publish_failure_allows_retry(self) -> None:
+        """When publish fails mid-execution, the guard is reset for retry.
+
+        Validates the try/except guard-reset path: if the publish loop
+        raises an unrecoverable exception, ``_introspection_published``
+        is reset to ``False`` so a subsequent call can succeed instead of
+        being permanently blocked.
+        """
+        from unittest.mock import patch
+
+        class _FailingIterable:
+            """Iterable that raises on iteration to trigger outer except."""
+
+            def __iter__(self) -> None:  # type: ignore[override]
+                raise RuntimeError("simulated iteration failure")
+
+        bus = MockEventBus()
+
+        # Patch MEMORY_NODES to an iterable that raises, triggering the
+        # outer except block which resets the guard.
+        with patch(
+            "omnimemory.runtime.introspection.MEMORY_NODES",
+            _FailingIterable(),
+        ):
+            with pytest.raises(RuntimeError, match="simulated iteration failure"):
+                await publish_memory_introspection(
+                    event_bus=bus,  # type: ignore[arg-type]
+                    enable_heartbeat=False,
+                )
+
+        # Guard should have been reset by the except block.
+        # A retry with the real MEMORY_NODES should succeed.
+        result = await publish_memory_introspection(
+            event_bus=bus,  # type: ignore[arg-type]
+            enable_heartbeat=False,
+        )
+        assert len(result.registered_nodes) == len(MEMORY_NODES)

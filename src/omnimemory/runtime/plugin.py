@@ -61,6 +61,7 @@ Related:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -334,8 +335,12 @@ class PluginMemory:
 
                 publish_callback = _publish
 
-            # Read publish topics from contract.yaml declarations
-            publish_topics = collect_publish_topics_for_dispatch()
+            # Read publish topics from contract.yaml declarations.
+            # Runs in a thread because the helper performs synchronous
+            # filesystem I/O (importlib.resources.files + yaml.safe_load).
+            publish_topics = await asyncio.to_thread(
+                collect_publish_topics_for_dispatch,
+            )
 
             self._dispatch_engine = create_memory_dispatch_engine(
                 intent_consumer=intent_consumer,
@@ -502,6 +507,19 @@ class PluginMemory:
             )
 
         except Exception as e:
+            # Rollback any successful subscriptions before returning failure.
+            for unsub in unsubscribe_callbacks:
+                try:
+                    await unsub()
+                except Exception as rollback_err:
+                    logger.debug(
+                        "Failed to rollback subscription during "
+                        "start_consumers error handling: %s "
+                        "(correlation_id=%s)",
+                        rollback_err,
+                        correlation_id,
+                    )
+
             duration = time.time() - start_time
             logger.exception(
                 "Failed to start memory consumers (correlation_id=%s)",
@@ -621,6 +639,8 @@ class PluginMemory:
                     "Failed to publish shutdown introspection: %s (correlation_id=%s)",
                     shutdown_intro_error,
                     correlation_id,
+                    exc_info=True,
+                    extra={"error_type": type(shutdown_intro_error).__name__},
                 )
         else:
             logger.debug(
@@ -640,6 +660,8 @@ class PluginMemory:
                     "Failed to unsubscribe memory consumer: %s (correlation_id=%s)",
                     unsub_error,
                     correlation_id,
+                    exc_info=True,
+                    extra={"error_type": type(unsub_error).__name__},
                 )
         self._unsubscribe_callbacks = []
 
