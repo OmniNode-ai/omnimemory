@@ -231,15 +231,15 @@ event_bus:
       description: "Memory expiration event. Emitted when a memory exceeds its hard TTL and transitions
         from ACTIVE to EXPIRED state."
     "onex.evt.omnimemory.memory-archived.v1":
-      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchivedEvent"
+      # schema_ref: TBD - ModelMemoryArchivedEvent not yet implemented (OMN-1453)
       description: "Memory archival event. Emitted when an EXPIRED memory is successfully transitioned
         to ARCHIVED state in cold storage."
     "onex.evt.omnimemory.memory-archive-initiated.v1":
-      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelMemoryArchiveInitiatedEvent"
+      # schema_ref: TBD - ModelMemoryArchiveInitiatedEvent not yet implemented (OMN-1453)
       description: "Memory archive initiation event. Emitted when an archive operation begins for an EXPIRED
         memory entity."
     "onex.evt.omnimemory.lifecycle-transition-failed.v1":
-      schema_ref: "omnimemory.nodes.memory_lifecycle_orchestrator.models.ModelLifecycleTransitionFailedEvent"
+      # schema_ref: TBD - ModelLifecycleTransitionFailedEvent not yet implemented (OMN-1453)
       description: "Lifecycle transition failure event. Emitted when a memory lifecycle state transition
         fails due to validation errors, storage failures, or constraint violations."
 

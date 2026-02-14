@@ -7,12 +7,16 @@ ModelIntentRecord and the event payload models used for Kafka event
 transmission.
 
 The key difference between models:
-    - ModelIntentRecord.session_ref is required (local domain model)
-    - ModelIntentRecordPayload.session_ref is required (for event transmission)
+    - ModelIntentRecord.session_ref is optional (str | None, local domain model)
+    - ModelIntentRecordPayload.session_ref is required (str, for event transmission)
     - ModelIntentRecord.intent_category is str
     - ModelIntentRecordPayload.intent_category is str
+    - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
 
 Example::
+
+    from datetime import datetime, timezone
+    from uuid import uuid4
 
     from omnimemory.handlers.adapters.models import ModelIntentRecord
     from omnimemory.nodes.intent_query_effect.utils import map_to_intent_payload
@@ -23,6 +27,7 @@ Example::
         intent_category="debugging",
         confidence=0.9,
         keywords=["error", "fix"],
+        created_at_utc=datetime.now(tz=timezone.utc),
     )
 
     payload = map_to_intent_payload(record)
@@ -66,14 +71,20 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
 
     Note:
         Field mappings:
-            - ModelIntentRecord.session_ref -> ModelIntentRecordPayload.session_ref
-            - ModelIntentRecord.intent_category -> str value
+            - ModelIntentRecord.session_ref (str | None) -> ModelIntentRecordPayload.session_ref (str, defaults to "")
+            - ModelIntentRecord.intent_category (str) -> ModelIntentRecordPayload.intent_category (str)
             - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
     """
+    # Defensive: ensure intent_category is a plain str even if an enum leaks through
+    intent_category = (
+        record.intent_category.value
+        if hasattr(record.intent_category, "value")
+        else record.intent_category
+    )
     return ModelIntentRecordPayload(
         intent_id=record.intent_id,
         session_ref=record.session_ref or "",
-        intent_category=record.intent_category,
+        intent_category=intent_category,
         confidence=record.confidence,
         keywords=record.keywords,
         created_at=record.created_at_utc,

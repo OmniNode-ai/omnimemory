@@ -226,12 +226,37 @@ class HandlerIntentEventConsumer:
             )
             return
 
+        if not self._config.subscribe_topics:
+            logger.warning(
+                "subscribe_topics is empty, consumer will not receive any events",
+                extra={"handler": HANDLER_ID_INTENT_CONSUMER},
+            )
+            raise ValueError(
+                "subscribe_topics must not be empty: "
+                "consumer would initialize with no subscriptions"
+            )
+
         self._env_prefix = env_prefix
         self._publish_callback = publish_callback
 
+        failed_topics: list[tuple[str, str]] = []
         for topic_suffix in self._config.subscribe_topics:
             full_topic = f"{env_prefix}.{topic_suffix}"
-            unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
+            try:
+                unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
+            except Exception as e:
+                logger.error(
+                    "Failed to subscribe to topic",
+                    extra={
+                        "handler": HANDLER_ID_INTENT_CONSUMER,
+                        "topic": full_topic,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                )
+                failed_topics.append((full_topic, str(e)))
+                continue
+
             self._unsubscribe_fns.append(unsubscribe)
 
             logger.info(
@@ -240,6 +265,21 @@ class HandlerIntentEventConsumer:
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "topic": full_topic,
                     "env_prefix": env_prefix,
+                },
+            )
+
+        if failed_topics and not self._unsubscribe_fns:
+            # All subscriptions failed -- cannot operate at all
+            raise RuntimeError(f"All topic subscriptions failed: {failed_topics}")
+
+        if failed_topics:
+            logger.warning(
+                "Some topic subscriptions failed, continuing with partial subscriptions",
+                extra={
+                    "handler": HANDLER_ID_INTENT_CONSUMER,
+                    "failed_topics": [t[0] for t in failed_topics],
+                    "successful_count": len(self._unsubscribe_fns),
+                    "failed_count": len(failed_topics),
                 },
             )
 

@@ -44,6 +44,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Mapping
+from datetime import datetime
 from uuid import uuid4
 
 import structlog
@@ -368,13 +369,25 @@ class HandlerIntentStorageAdapter:
             # Convert to response model format
             intents: list[ModelIntentRecordResponse] = []
             for intent in result.intents:
+                # Defensive enum normalization: extract .value if an enum leaks through
+                category = (
+                    intent.intent_category.value
+                    if hasattr(intent.intent_category, "value")
+                    else intent.intent_category
+                )
+                # Guard against None created_at_utc from external data sources
+                created_at = (
+                    intent.created_at_utc
+                    if intent.created_at_utc is not None
+                    else datetime.min
+                )
                 intents.append(
                     ModelIntentRecordResponse(
                         intent_id=intent.intent_id,
-                        intent_category=intent.intent_category,
+                        intent_category=category,
                         confidence=intent.confidence,
                         keywords=intent.keywords,
-                        created_at_utc=intent.created_at_utc.isoformat(),
+                        created_at_utc=created_at.isoformat(),
                         correlation_id=intent.correlation_id,
                     )
                 )

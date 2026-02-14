@@ -194,6 +194,76 @@ class TestInitialization:
         assert len(subscriptions) == 1  # Still 1, not 2
         assert consumer.is_initialized is True
 
+    @pytest.mark.asyncio
+    async def test_initialize_raises_on_empty_subscribe_topics(self) -> None:
+        """Initialize should raise ValueError when subscribe_topics is empty."""
+        config = ModelIntentEventConsumerConfig(subscribe_topics=[])
+        storage = create_mock_storage_adapter()
+        subscribe_fn, subscriptions = create_mock_subscribe()
+
+        consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
+
+        with pytest.raises(ValueError, match="subscribe_topics must not be empty"):
+            await consumer.initialize(
+                subscribe_callback=subscribe_fn, env_prefix="test"
+            )
+
+        assert consumer.is_initialized is False
+        assert len(subscriptions) == 0
+
+    @pytest.mark.asyncio
+    async def test_initialize_partial_subscription_failure(self) -> None:
+        """Initialize should continue with partial subscriptions if some fail."""
+        config = ModelIntentEventConsumerConfig(
+            subscribe_topics=[
+                "onex.evt.topic-good.v1",
+                "onex.evt.topic-bad.v1",
+                "onex.evt.topic-good2.v1",
+            ],
+        )
+        storage = create_mock_storage_adapter()
+        subscriptions: list[SubscriptionEntry] = []
+
+        def subscribe_with_failure(topic: str, handler: object) -> MagicMock:
+            if "topic-bad" in topic:
+                raise RuntimeError("Subscription failed for topic-bad")
+            subscriptions.append((topic, handler))
+            return MagicMock()
+
+        consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
+        await consumer.initialize(
+            subscribe_callback=subscribe_with_failure, env_prefix="test"
+        )
+
+        # Should be initialized with 2 of 3 topics
+        assert consumer.is_initialized is True
+        assert len(subscriptions) == 2
+        assert subscriptions[0][0] == "test.onex.evt.topic-good.v1"
+        assert subscriptions[1][0] == "test.onex.evt.topic-good2.v1"
+
+    @pytest.mark.asyncio
+    async def test_initialize_all_subscriptions_fail_raises(self) -> None:
+        """Initialize should raise RuntimeError when all subscriptions fail."""
+        config = ModelIntentEventConsumerConfig(
+            subscribe_topics=[
+                "onex.evt.topic-a.v1",
+                "onex.evt.topic-b.v1",
+            ],
+        )
+        storage = create_mock_storage_adapter()
+
+        def subscribe_always_fails(topic: str, handler: object) -> MagicMock:
+            raise RuntimeError(f"Cannot subscribe to {topic}")
+
+        consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
+
+        with pytest.raises(RuntimeError, match="All topic subscriptions failed"):
+            await consumer.initialize(
+                subscribe_callback=subscribe_always_fails, env_prefix="test"
+            )
+
+        assert consumer.is_initialized is False
+
 
 # =============================================================================
 # Message Processing Tests

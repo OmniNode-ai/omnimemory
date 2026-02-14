@@ -1294,7 +1294,7 @@ class TestGetSessionIntents:
 
         # Verify first intent
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
-        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING
+        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING.value
         assert result.intents[0].confidence == 0.92
         assert result.intents[0].keywords == ["error", "fix"]
 

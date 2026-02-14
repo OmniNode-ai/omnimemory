@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
+from collections.abc import Callable
 
 import yaml
 
@@ -82,27 +83,9 @@ def collect_subscribe_topics_from_contracts(
     all_topics: list[str] = []
 
     for package in packages:
-        try:
-            topics = _read_subscribe_topics(package)
-        except FileNotFoundError:
-            logger.warning(
-                "contract.yaml not found in package %s, skipping",
-                package,
-            )
-            continue
-        except ModuleNotFoundError:
-            logger.warning(
-                "Package %s is not installed/importable, skipping",
-                package,
-            )
-            continue
-        except yaml.YAMLError:
-            logger.warning(
-                "contract.yaml in package %s contains invalid YAML, skipping",
-                package,
-            )
-            continue
-        all_topics.extend(topics)
+        topics = _safe_read_topics(_read_subscribe_topics, package)
+        if topics is not None:
+            all_topics.extend(topics)
 
     logger.debug(
         "Collected %d omnimemory subscribe topics from %d contracts",
@@ -150,26 +133,7 @@ def collect_publish_topics_for_dispatch(
     result: dict[str, str] = {}
 
     for package in packages:
-        try:
-            topics = _read_publish_topics(package)
-        except FileNotFoundError:
-            logger.warning(
-                "contract.yaml not found in package %s, skipping",
-                package,
-            )
-            continue
-        except ModuleNotFoundError:
-            logger.warning(
-                "Package %s is not installed/importable, skipping",
-                package,
-            )
-            continue
-        except yaml.YAMLError:
-            logger.warning(
-                "contract.yaml in package %s contains invalid YAML, skipping",
-                package,
-            )
-            continue
+        topics = _safe_read_topics(_read_publish_topics, package)
         if topics:
             key = _derive_dispatch_key(package)
             result[key] = topics[0]
@@ -212,27 +176,9 @@ def collect_all_publish_topics(
     all_topics: list[str] = []
 
     for package in packages:
-        try:
-            topics = _read_publish_topics(package)
-        except FileNotFoundError:
-            logger.warning(
-                "contract.yaml not found in package %s, skipping",
-                package,
-            )
-            continue
-        except ModuleNotFoundError:
-            logger.warning(
-                "Package %s is not installed/importable, skipping",
-                package,
-            )
-            continue
-        except yaml.YAMLError:
-            logger.warning(
-                "contract.yaml in package %s contains invalid YAML, skipping",
-                package,
-            )
-            continue
-        all_topics.extend(topics)
+        topics = _safe_read_topics(_read_publish_topics, package)
+        if topics is not None:
+            all_topics.extend(topics)
 
     return all_topics
 
@@ -258,6 +204,48 @@ def canonical_topic_to_dispatch_alias(topic: str) -> str:
 # ============================================================================
 # Internal helpers
 # ============================================================================
+
+
+def _safe_read_topics(
+    reader: Callable[[str], list[str]],
+    package: str,
+) -> list[str] | None:
+    """Call *reader* for *package*, handling common contract read errors.
+
+    Wraps ``FileNotFoundError``, ``ModuleNotFoundError``, and
+    ``yaml.YAMLError`` with appropriate warning-level log messages and
+    returns ``None`` so the caller can skip the package.
+
+    Args:
+        reader: A callable that accepts a package name and returns a list
+            of topic strings (e.g. ``_read_subscribe_topics``).
+        package: Fully-qualified Python package path containing a
+            ``contract.yaml`` file.
+
+    Returns:
+        The topic list on success, or ``None`` if the contract could not
+        be read.
+    """
+    try:
+        return reader(package)
+    except FileNotFoundError:
+        logger.warning(
+            "contract.yaml not found in package %s, skipping",
+            package,
+        )
+        return None
+    except ModuleNotFoundError:
+        logger.warning(
+            "Package %s is not installed/importable, skipping",
+            package,
+        )
+        return None
+    except yaml.YAMLError:
+        logger.warning(
+            "contract.yaml in package %s contains invalid YAML, skipping",
+            package,
+        )
+        return None
 
 
 def _derive_dispatch_key(package: str) -> str:
