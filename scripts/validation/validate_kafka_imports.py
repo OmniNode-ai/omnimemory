@@ -195,6 +195,9 @@ def main() -> int:
         else:
             logging.warning("Skipping invalid path: %s", path)
 
+    # Sort for deterministic output across runs
+    files_to_check = sorted(set(files_to_check))
+
     all_violations: list[Violation] = []
     for filepath in files_to_check:
         violations = validate_file(filepath)
