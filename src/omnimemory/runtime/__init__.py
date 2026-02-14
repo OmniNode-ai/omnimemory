@@ -108,6 +108,16 @@ def __getattr__(name: str) -> object:
 
         return getattr(introspection, name)
 
+    _message_type_symbols = {
+        "EXPECTED_MESSAGE_TYPE_COUNT",
+        "MEMORY_DOMAIN",
+        "register_memory_message_types",
+    }
+    if name in _message_type_symbols:
+        from omnimemory.runtime import message_type_registration
+
+        return getattr(message_type_registration, name)
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -144,4 +154,8 @@ __all__ = [
     "publish_memory_introspection",
     "publish_memory_shutdown",
     "reset_introspection_guard",
+    # Message type registration (lazy-imported via __getattr__)
+    "EXPECTED_MESSAGE_TYPE_COUNT",
+    "MEMORY_DOMAIN",
+    "register_memory_message_types",
 ]

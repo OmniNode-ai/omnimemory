@@ -71,6 +71,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
     from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
+    from omnibase_infra.runtime.registry import RegistryMessageType
 
     from omnimemory.runtime.introspection import MemoryNodeIntrospectionProxy
 
@@ -138,9 +139,15 @@ class PluginMemory:
         self._shutdown_in_progress: bool = False
         self._services_registered: list[str] = []
         self._dispatch_engine: MessageDispatchEngine | None = None
+        self._message_type_registry: RegistryMessageType | None = None
         self._event_bus: ProtocolEventBus | None = None
         self._introspection_nodes: list[str] = []
         self._introspection_proxies: list[MemoryNodeIntrospectionProxy] = []
+
+    @property
+    def message_type_registry(self) -> RegistryMessageType | None:
+        """Return the message type registry (for external access)."""
+        return self._message_type_registry
 
     @property
     def plugin_id(self) -> str:
@@ -197,8 +204,43 @@ class PluginMemory:
         correlation_id = config.correlation_id
 
         try:
-            # Memory plugin has no dedicated initialization work;
-            # handlers use container-injected adapters for storage.
+            resources_created: list[str] = []
+
+            # Register memory message types (OMN-2217)
+            # NOTE: This creates a plugin-local registry for the memory
+            # domain only.  Cross-domain validation requires a kernel-level
+            # shared registry (future enhancement).
+            from omnibase_infra.runtime.registry import RegistryMessageType
+
+            from omnimemory.runtime.message_type_registration import (
+                register_memory_message_types,
+            )
+
+            registry = RegistryMessageType()
+            registered_types = register_memory_message_types(registry)
+            registry.freeze()
+
+            # Validate startup -- log warnings but do not fail init
+            warnings = registry.validate_startup()
+            if warnings:
+                for warning in warnings:
+                    logger.warning(
+                        "Message type registry warning: %s (correlation_id=%s)",
+                        warning,
+                        correlation_id,
+                    )
+
+            self._message_type_registry = registry
+            resources_created.append("message_type_registry")
+
+            logger.info(
+                "Memory message type registry created and frozen "
+                "(types=%d, warnings=%d, correlation_id=%s)",
+                len(registered_types),
+                len(warnings),
+                correlation_id,
+            )
+
             duration = time.time() - start_time
 
             logger.info(
@@ -210,7 +252,7 @@ class PluginMemory:
                 plugin_id=self.plugin_id,
                 success=True,
                 message="Memory plugin initialized",
-                resources_created=[],
+                resources_created=resources_created,
                 duration_seconds=duration,
             )
 
@@ -667,6 +709,7 @@ class PluginMemory:
 
         self._services_registered = []
         self._dispatch_engine = None
+        self._message_type_registry = None
         self._event_bus = None
         self._introspection_nodes = []
         self._introspection_proxies = []
