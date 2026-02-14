@@ -73,11 +73,7 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     return ModelIntentRecordPayload(
         intent_id=record.intent_id,
         session_ref=record.session_ref or "",
-        intent_category=(
-            record.intent_category.value
-            if hasattr(record.intent_category, "value")
-            else str(record.intent_category)
-        ),
+        intent_category=record.intent_category,
         confidence=record.confidence,
         keywords=record.keywords,
         created_at=record.created_at_utc,

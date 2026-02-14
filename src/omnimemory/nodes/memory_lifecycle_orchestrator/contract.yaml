@@ -118,12 +118,11 @@ consumed_events:
   - event_pattern: "onex.cmd.omnimemory.expire-memory.v1"
     handler_function: "handle_expire_memory"
 
-  - event_pattern: "onex.cmd.omnimemory.restore-memory.v1"
-    handler_function: "handle_restore_memory"
-
-  # Memory access events for lifecycle tracking
-  - event_pattern: "onex.evt.omnimemory.memory-accessed.v1"
-    handler_function: "handle_memory_accessed"
+# Planned events (OMN-1453) - uncomment when handlers are implemented:
+#   - event_pattern: "onex.cmd.omnimemory.restore-memory.v1"
+#     handler_function: "handle_restore_memory"
+#   - event_pattern: "onex.evt.omnimemory.memory-accessed.v1"
+#     handler_function: "handle_memory_accessed"
 
 # Published events - empty list since ModelEventDescriptor requires complex
 # fields (UUIDs, enums, etc.) that are better defined at runtime
@@ -203,8 +202,14 @@ event_bus:
     - "onex.cmd.omnimemory.expire-memory.v1"
 
   # Topics this node publishes to (sends events to)
+  # See ARCHITECTURAL NOTES above for full list of published event topics
   publish_topics:
     - "onex.evt.omnimemory.memory-expired.v1"
+    - "onex.evt.omnimemory.memory-archived.v1"
+    - "onex.evt.omnimemory.memory-archive-initiated.v1"
+    # Planned topics (OMN-1453) - uncomment when handlers are implemented:
+    #   - "onex.evt.omnimemory.memory-restored.v1"
+    - "onex.evt.omnimemory.lifecycle-transition-failed.v1"
 
   # Metadata for subscribed topics
   subscribe_topic_metadata:

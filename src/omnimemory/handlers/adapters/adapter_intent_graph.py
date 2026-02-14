@@ -589,11 +589,7 @@ class AdapterIntentGraph:
             an error status in the result model instead.
         """
         # Extract intent category string from the classification output
-        intent_category_str = (
-            intent_data.intent_category.value
-            if hasattr(intent_data.intent_category, "value")
-            else str(intent_data.intent_category)
-        )
+        intent_category_str = intent_data.intent_category.value
 
         # Validate session_id is non-empty
         if not session_id or not session_id.strip():
@@ -643,7 +639,7 @@ class AdapterIntentGraph:
                 parameters: dict[str, JsonType] = {
                     "session_id": session_id,
                     "started_at_utc": timestamp_utc_str,
-                    "user_context": intent_category_str,
+                    "user_context": "",
                     "intent_id": str(intent_id),
                     "intent_category": intent_category_str,
                     "confidence": confidence_val,

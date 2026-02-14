@@ -89,6 +89,9 @@ EXPECTED_ALL_PUBLISH_TOPICS = {
     "onex.evt.omnimemory.memory-deleted.v1",
     # memory_lifecycle_orchestrator
     "onex.evt.omnimemory.memory-expired.v1",
+    "onex.evt.omnimemory.memory-archived.v1",
+    "onex.evt.omnimemory.memory-archive-initiated.v1",
+    "onex.evt.omnimemory.lifecycle-transition-failed.v1",
 }
 
 

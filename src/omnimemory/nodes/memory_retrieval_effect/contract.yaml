@@ -150,6 +150,7 @@ validation_rules:
 # === HANDLER ROUTING (ONEX Multi-Backend Effect Pattern) ===
 # Declarative routing configuration for backend handlers.
 # The main HandlerMemoryRetrieval acts as router, dispatching to backend handlers.
+# Supports both orchestrator invocation and event subscription (OMN-1746/OMN-2212).
 handler_routing:
   version:
     major: 1
