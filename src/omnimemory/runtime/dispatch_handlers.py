@@ -102,7 +102,7 @@ DISPATCH_ALIAS_INTENT_QUERY_REQUESTED = (
 )
 """Dispatch-compatible alias for intent-query-requested canonical topic."""
 
-DISPATCH_ALIAS_RUNTIME_TICK = "omnimemory.commands.runtime-tick.v1"
+DISPATCH_ALIAS_RUNTIME_TICK = "onex.commands.omnimemory.runtime-tick.v1"
 """Dispatch-compatible alias for runtime-tick command topic."""
 
 DISPATCH_ALIAS_ARCHIVE_MEMORY = "onex.commands.omnimemory.archive-memory.v1"
