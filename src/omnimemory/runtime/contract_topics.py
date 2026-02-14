@@ -72,6 +72,7 @@ def collect_subscribe_topics_from_contracts(
         Ordered list of subscribe topic strings.
 
     Raises:
+        ModuleNotFoundError: If a node package is not installed/importable.
         FileNotFoundError: If a ``contract.yaml`` is missing from a package.
         yaml.YAMLError: If a ``contract.yaml`` is malformed YAML.
     """
@@ -227,7 +228,7 @@ def _read_event_bus_topics(package: str, field: str) -> list[str]:
     """
     package_files = importlib.resources.files(package)
     contract_file = package_files.joinpath("contract.yaml")
-    content = contract_file.read_text()
+    content = contract_file.read_text(encoding="utf-8")
     contract: object = yaml.safe_load(content)
 
     if not isinstance(contract, dict):
