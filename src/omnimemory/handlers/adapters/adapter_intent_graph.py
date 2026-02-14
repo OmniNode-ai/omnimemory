@@ -568,7 +568,7 @@ class AdapterIntentGraph:
     ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
-        Implements ProtocolIntentGraph.store_intent.
+        Structurally conforms to ProtocolIntentGraph.store_intent.
 
         Uses MERGE semantics to create or update the session and intent
         nodes. If an intent with the same category already exists for

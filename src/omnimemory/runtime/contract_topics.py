@@ -71,16 +71,30 @@ def collect_subscribe_topics_from_contracts(
     Returns:
         Ordered list of subscribe topic strings.
 
-    Raises:
-        ModuleNotFoundError: If a node package is not installed/importable.
-        FileNotFoundError: If a ``contract.yaml`` is missing from a package.
-        yaml.YAMLError: If a ``contract.yaml`` is malformed YAML.
+    Note:
+        If a ``contract.yaml`` is missing or a node package is not
+        installed, a warning is logged and the package is skipped.
+        This prevents a single missing contract from blocking
+        discovery of topics from all other valid contracts.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     all_topics: list[str] = []
 
     for package in packages:
-        topics = _read_subscribe_topics(package)
+        try:
+            topics = _read_subscribe_topics(package)
+        except FileNotFoundError:
+            logger.warning(
+                "contract.yaml not found in package %s, skipping",
+                package,
+            )
+            continue
+        except ModuleNotFoundError:
+            logger.warning(
+                "Package %s is not installed/importable, skipping",
+                package,
+            )
+            continue
         all_topics.extend(topics)
 
     logger.debug(
@@ -118,16 +132,30 @@ def collect_publish_topics_for_dispatch(
         Dict mapping dispatch key to first publish topic string.
         Empty dict if no publish topics are declared.
 
-    Raises:
-        ModuleNotFoundError: If a node package is not installed/importable.
-        FileNotFoundError: If a ``contract.yaml`` is missing from a package.
-        yaml.YAMLError: If a ``contract.yaml`` is malformed YAML.
+    Note:
+        If a ``contract.yaml`` is missing or a node package is not
+        installed, a warning is logged and the package is skipped.
+        This prevents a single missing contract from blocking
+        discovery of topics from all other valid contracts.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     result: dict[str, str] = {}
 
     for package in packages:
-        topics = _read_publish_topics(package)
+        try:
+            topics = _read_publish_topics(package)
+        except FileNotFoundError:
+            logger.warning(
+                "contract.yaml not found in package %s, skipping",
+                package,
+            )
+            continue
+        except ModuleNotFoundError:
+            logger.warning(
+                "Package %s is not installed/importable, skipping",
+                package,
+            )
+            continue
         if topics:
             key = _derive_dispatch_key(package)
             result[key] = topics[0]
@@ -159,16 +187,30 @@ def collect_all_publish_topics(
         Ordered list of all publish topic strings.  Results may contain
         duplicate topics if multiple nodes publish to the same topic.
 
-    Raises:
-        ModuleNotFoundError: If a node package is not installed/importable.
-        FileNotFoundError: If a ``contract.yaml`` is missing from a package.
-        yaml.YAMLError: If a ``contract.yaml`` is malformed YAML.
+    Note:
+        If a ``contract.yaml`` is missing or a node package is not
+        installed, a warning is logged and the package is skipped.
+        This prevents a single missing contract from blocking
+        discovery of topics from all other valid contracts.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     all_topics: list[str] = []
 
     for package in packages:
-        topics = _read_publish_topics(package)
+        try:
+            topics = _read_publish_topics(package)
+        except FileNotFoundError:
+            logger.warning(
+                "contract.yaml not found in package %s, skipping",
+                package,
+            )
+            continue
+        except ModuleNotFoundError:
+            logger.warning(
+                "Package %s is not installed/importable, skipping",
+                package,
+            )
+            continue
         all_topics.extend(topics)
 
     return all_topics

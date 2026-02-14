@@ -59,7 +59,7 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     for transmission in Kafka events.
 
     Args:
-        record: The intent record from AdapterIntentGraph (omnibase_core model).
+        record: The intent record from AdapterIntentGraph (omnimemory domain model).
 
     Returns:
         ModelIntentRecordPayload suitable for event transmission.
@@ -67,7 +67,7 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     Note:
         Field mappings:
             - ModelIntentRecord.session_ref -> ModelIntentRecordPayload.session_ref
-            - ModelIntentRecord.intent_category (enum) -> str value
+            - ModelIntentRecord.intent_category -> str value
             - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
     """
     return ModelIntentRecordPayload(
@@ -88,7 +88,7 @@ def map_intent_records(
     Convenience function for bulk conversion of intent records.
 
     Args:
-        records: List of intent records from omnibase_core.
+        records: List of intent records from omnimemory.
 
     Returns:
         List of payload models for event transmission.
