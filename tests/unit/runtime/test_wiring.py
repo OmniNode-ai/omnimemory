@@ -13,39 +13,11 @@ Related:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from uuid import uuid4
-
 import pytest
 
 from omnimemory.runtime.wiring import wire_memory_handlers
 
-# =============================================================================
-# Helpers
-# =============================================================================
-
-
-@dataclass
-class _StubContainer:
-    """Minimal container stub."""
-
-    service_registry: object = None
-
-
-@dataclass
-class _StubConfig:
-    """Minimal ModelDomainPluginConfig-compatible stub."""
-
-    container: object = field(default_factory=_StubContainer)
-    event_bus: object = None
-    correlation_id: object = field(default_factory=uuid4)
-    input_topic: str = "test.input"
-    output_topic: str = "test.output"
-    consumer_group: str = "test-consumer"
-    dispatch_engine: object = None
-    node_identity: object = None
-    kafka_bootstrap_servers: str | None = None
-
+from .conftest import StubConfig
 
 # =============================================================================
 # Tests
@@ -58,7 +30,7 @@ class TestWireMemoryHandlers:
     @pytest.mark.asyncio
     async def test_returns_handler_names(self) -> None:
         """wire_memory_handlers should return list of handler names."""
-        config = _StubConfig()
+        config = StubConfig()
 
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
@@ -68,7 +40,7 @@ class TestWireMemoryHandlers:
     @pytest.mark.asyncio
     async def test_includes_intent_consumer(self) -> None:
         """HandlerIntentEventConsumer should be in the registered services."""
-        config = _StubConfig()
+        config = StubConfig()
 
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
@@ -77,7 +49,7 @@ class TestWireMemoryHandlers:
     @pytest.mark.asyncio
     async def test_includes_intent_query(self) -> None:
         """HandlerIntentQuery should be in the registered services."""
-        config = _StubConfig()
+        config = StubConfig()
 
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
@@ -86,7 +58,7 @@ class TestWireMemoryHandlers:
     @pytest.mark.asyncio
     async def test_includes_subscription(self) -> None:
         """HandlerSubscription should be in the registered services."""
-        config = _StubConfig()
+        config = StubConfig()
 
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
@@ -95,7 +67,7 @@ class TestWireMemoryHandlers:
     @pytest.mark.asyncio
     async def test_all_handlers_callable(self) -> None:
         """All registered handlers should be callable classes/functions."""
-        config = _StubConfig()
+        config = StubConfig()
 
         # If any handler is not callable, wire_memory_handlers raises ImportError
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]

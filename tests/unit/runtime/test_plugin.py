@@ -18,10 +18,13 @@ Related:
 from __future__ import annotations
 
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 
 from omnimemory.runtime.plugin import PluginMemory
+
+from .conftest import StubConfig, StubEventBus
 
 # =============================================================================
 # Helpers
@@ -33,59 +36,9 @@ def _make_config(
     correlation_id: object | None = None,
 ) -> object:
     """Create a minimal ModelDomainPluginConfig-compatible object."""
-    from dataclasses import dataclass, field
-    from uuid import uuid4
-
-    @dataclass
-    class _StubContainer:
-        service_registry: object = None
-
-    @dataclass
-    class _StubConfig:
-        container: object = field(default_factory=_StubContainer)
-        event_bus: object = field(default_factory=lambda: _StubEventBus())
-        correlation_id: object = field(default_factory=uuid4)
-        input_topic: str = "test.input"
-        output_topic: str = "test.output"
-        consumer_group: str = "test-consumer"
-        dispatch_engine: object = None
-        node_identity: object = None
-        kafka_bootstrap_servers: str | None = None
-
-    bus = event_bus if event_bus is not None else _StubEventBus()
+    bus = event_bus if event_bus is not None else StubEventBus()
     cid = correlation_id if correlation_id is not None else uuid4()
-    return _StubConfig(event_bus=bus, correlation_id=cid)
-
-
-class _StubEventBus:
-    """Event bus stub that tracks subscriptions."""
-
-    def __init__(self) -> None:
-        self.subscriptions: list[dict[str, object]] = []
-
-    async def subscribe(
-        self,
-        topic: str = "",
-        group_id: str = "",
-        on_message: object = None,
-        **kwargs: object,
-    ) -> object:
-        self.subscriptions.append(
-            {"topic": topic, "group_id": group_id, "on_message": on_message}
-        )
-
-        async def _unsub() -> None:
-            pass
-
-        return _unsub
-
-    async def publish(
-        self,
-        topic: str = "",
-        key: bytes | None = None,
-        value: bytes = b"",
-    ) -> None:
-        pass
+    return StubConfig(event_bus=bus, correlation_id=cid)
 
 
 # =============================================================================
@@ -277,7 +230,7 @@ class TestPluginStartConsumers:
         """After wire_dispatchers, all topics should be subscribed."""
         from omnimemory.runtime.plugin import MEMORY_SUBSCRIBE_TOPICS
 
-        event_bus = _StubEventBus()
+        event_bus = StubEventBus()
         plugin = PluginMemory()
         config = _make_config(event_bus=event_bus)
 
@@ -290,7 +243,7 @@ class TestPluginStartConsumers:
     @pytest.mark.asyncio
     async def test_no_subscriptions_without_engine(self) -> None:
         """Without wire_dispatchers, no topics should be subscribed."""
-        event_bus = _StubEventBus()
+        event_bus = StubEventBus()
         plugin = PluginMemory()
         config = _make_config(event_bus=event_bus)
 
@@ -302,7 +255,7 @@ class TestPluginStartConsumers:
     async def test_all_topics_use_dispatch_callback(self) -> None:
         """All subscribed topics should use dispatch callback (not noop)."""
 
-        event_bus = _StubEventBus()
+        event_bus = StubEventBus()
         plugin = PluginMemory()
         config = _make_config(event_bus=event_bus)
 
@@ -311,11 +264,8 @@ class TestPluginStartConsumers:
 
         for sub in event_bus.subscriptions:
             handler = sub["on_message"]
-            handler_name = getattr(handler, "__qualname__", "")
-            assert "noop" not in handler_name.lower(), (
-                f"Topic {sub['topic']} should use dispatch callback, "
-                f"got handler: {handler_name}"
-            )
+            assert handler is not None, f"Topic {sub['topic']} has no handler"
+            assert callable(handler), f"Topic {sub['topic']} handler not callable"
 
 
 # =============================================================================

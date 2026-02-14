@@ -80,7 +80,13 @@ async def wire_memory_handlers(
 
     for module_path, attr_name, is_class in _HANDLER_SPECS:
         mod = importlib.import_module(module_path)
-        handler_attr = getattr(mod, attr_name)
+        try:
+            handler_attr = getattr(mod, attr_name)
+        except AttributeError as e:
+            raise ImportError(f"{attr_name} not found in {module_path}") from e
+
+        if not callable(handler_attr):
+            raise ImportError(f"{attr_name} in {module_path} is not callable")
 
         if is_class:
             # Instantiate class-based handlers (pure compute, no deps)
@@ -91,9 +97,6 @@ async def wire_memory_handlers(
                 correlation_id,
             )
         else:
-            # Verify function/class-based handlers are importable
-            if not callable(handler_attr):
-                raise ImportError(f"{attr_name} in {module_path} is not callable")
             logger.debug(
                 "Verified %s importable (correlation_id=%s)",
                 attr_name,

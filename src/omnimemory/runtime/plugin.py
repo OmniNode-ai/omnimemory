@@ -190,6 +190,8 @@ class PluginMemory:
         correlation_id = config.correlation_id
 
         try:
+            # Memory plugin has no dedicated initialization work;
+            # handlers use container-injected adapters for storage.
             duration = time.time() - start_time
 
             logger.info(
