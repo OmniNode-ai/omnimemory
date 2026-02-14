@@ -39,6 +39,7 @@
 # validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
 # validate-naming-conventions       | onex-validation          | python scripts/validation/validate_naming.py src/
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
+# validate-kafka-imports            | onex-validation          | python scripts/validation/validate_kafka_imports.py src/
 # validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
 #
 # IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
@@ -266,6 +267,19 @@ repos:
         language: python
         pass_filenames: false
         files: ^src/.*\.py$
+        exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # Kafka Import Boundary Enforcement (ARCH-002)
+      # Ensures direct Kafka consumer imports do not appear in nodes/
+      # Nodes must use the EventBus SPI from the runtime layer
+      - id: validate-kafka-imports
+        name: ONEX Kafka Import Boundary Enforcement (ARCH-002)
+        entry: python scripts/validation/validate_kafka_imports.py
+        args: ['src/']
+        language: python
+        pass_filenames: false
+        files: ^src/omnimemory/nodes/.*\.py$
         exclude: ^tests/.*\.py$
         stages: [pre-commit]
 

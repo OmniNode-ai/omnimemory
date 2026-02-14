@@ -64,6 +64,7 @@ jobs:
   # onex-validation | validate-secrets                  | python scripts/validation/validate_secrets.py src/
   # onex-validation | validate-naming-conventions       | python scripts/validation/validate_naming.py src/
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
+  # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
   #
   # IMPORTANT: When modifying any CI step, update the corresponding hook in .pre-commit-config.yaml
   #
@@ -280,6 +281,11 @@ jobs:
       - name: Validate HTTP import boundary
         run: poetry run python scripts/validation/validate_http_imports.py src/
 
+      # SYNC: Pre-commit hook 'validate-kafka-imports' at pre-commit stage
+      # Enforces ARCH-002 - runtime owns all Kafka plumbing, nodes use EventBus SPI
+      - name: Validate Kafka import boundary (ARCH-002)
+        run: poetry run python scripts/validation/validate_kafka_imports.py src/
+
       - name: ONEX validation summary
         if: always()
         run: |
@@ -293,6 +299,7 @@ jobs:
           echo "- Secret detection" >> $GITHUB_STEP_SUMMARY
           echo "- Naming conventions" >> $GITHUB_STEP_SUMMARY
           echo "- HTTP import boundary enforcement" >> $GITHUB_STEP_SUMMARY
+          echo "- Kafka import boundary enforcement (ARCH-002)" >> $GITHUB_STEP_SUMMARY
 
   # Phase 1 - Architecture Handshake Verification
   check-handshake:
