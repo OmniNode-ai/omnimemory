@@ -72,10 +72,11 @@ def collect_subscribe_topics_from_contracts(
         Ordered list of subscribe topic strings.
 
     Note:
-        If a ``contract.yaml`` is missing or a node package is not
-        installed, a warning is logged and the package is skipped.
-        This prevents a single missing contract from blocking
-        discovery of topics from all other valid contracts.
+        If a ``contract.yaml`` is missing, contains invalid YAML, or a
+        node package is not installed, a warning is logged and the
+        package is skipped.  This prevents a single missing or corrupt
+        contract from blocking discovery of topics from all other valid
+        contracts.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     all_topics: list[str] = []
@@ -92,6 +93,12 @@ def collect_subscribe_topics_from_contracts(
         except ModuleNotFoundError:
             logger.warning(
                 "Package %s is not installed/importable, skipping",
+                package,
+            )
+            continue
+        except yaml.YAMLError:
+            logger.warning(
+                "contract.yaml in package %s contains invalid YAML, skipping",
                 package,
             )
             continue
@@ -133,10 +140,11 @@ def collect_publish_topics_for_dispatch(
         Empty dict if no publish topics are declared.
 
     Note:
-        If a ``contract.yaml`` is missing or a node package is not
-        installed, a warning is logged and the package is skipped.
-        This prevents a single missing contract from blocking
-        discovery of topics from all other valid contracts.
+        If a ``contract.yaml`` is missing, contains invalid YAML, or a
+        node package is not installed, a warning is logged and the
+        package is skipped.  This prevents a single missing or corrupt
+        contract from blocking discovery of topics from all other valid
+        contracts.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     result: dict[str, str] = {}
@@ -153,6 +161,12 @@ def collect_publish_topics_for_dispatch(
         except ModuleNotFoundError:
             logger.warning(
                 "Package %s is not installed/importable, skipping",
+                package,
+            )
+            continue
+        except yaml.YAMLError:
+            logger.warning(
+                "contract.yaml in package %s contains invalid YAML, skipping",
                 package,
             )
             continue
@@ -188,10 +202,11 @@ def collect_all_publish_topics(
         duplicate topics if multiple nodes publish to the same topic.
 
     Note:
-        If a ``contract.yaml`` is missing or a node package is not
-        installed, a warning is logged and the package is skipped.
-        This prevents a single missing contract from blocking
-        discovery of topics from all other valid contracts.
+        If a ``contract.yaml`` is missing, contains invalid YAML, or a
+        node package is not installed, a warning is logged and the
+        package is skipped.  This prevents a single missing or corrupt
+        contract from blocking discovery of topics from all other valid
+        contracts.
     """
     packages = node_packages or _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
     all_topics: list[str] = []
@@ -208,6 +223,12 @@ def collect_all_publish_topics(
         except ModuleNotFoundError:
             logger.warning(
                 "Package %s is not installed/importable, skipping",
+                package,
+            )
+            continue
+        except yaml.YAMLError:
+            logger.warning(
+                "contract.yaml in package %s contains invalid YAML, skipping",
                 package,
             )
             continue
