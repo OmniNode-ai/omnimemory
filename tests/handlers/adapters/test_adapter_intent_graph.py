@@ -548,6 +548,28 @@ class TestModels:
 
 
 # =============================================================================
+# Protocol Conformance Tests
+# =============================================================================
+
+
+class TestProtocolConformance:
+    """Tests that AdapterIntentGraph conforms to ProtocolIntentGraph."""
+
+    def test_isinstance_check(self, config: ModelAdapterIntentGraphConfig) -> None:
+        """Test that AdapterIntentGraph is an instance of ProtocolIntentGraph."""
+        from omnibase_spi.protocols import ProtocolIntentGraph
+
+        adapter = AdapterIntentGraph(config)
+        assert isinstance(adapter, ProtocolIntentGraph)
+
+    def test_inherits_from_protocol(self) -> None:
+        """Test that AdapterIntentGraph explicitly inherits from ProtocolIntentGraph."""
+        from omnibase_spi.protocols import ProtocolIntentGraph
+
+        assert issubclass(AdapterIntentGraph, ProtocolIntentGraph)
+
+
+# =============================================================================
 # Cypher Templates Tests
 # =============================================================================
 
@@ -1289,12 +1311,12 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert len(result.intents) == 2
 
-        # Verify first intent
+        # Verify first intent (core ModelIntentRecord uses EnumIntentCategory, not str)
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
-        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING.value
+        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING
         assert result.intents[0].confidence == 0.92
         assert result.intents[0].keywords == ["error", "fix"]
 
@@ -1311,7 +1333,7 @@ class TestGetSessionIntents:
             session_id="session_empty",
         )
 
-        assert result.status == "no_results"
+        assert result.success is True
         assert result.intents == []
 
     @pytest.mark.asyncio
@@ -1383,7 +1405,7 @@ class TestGetSessionIntents:
 
         result = await adapter.get_session_intents(session_id="session_123")
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1400,7 +1422,7 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1698,7 +1720,7 @@ class TestErrorHandling:
 
         result = await adapter_with_mock.get_session_intents(session_id="session_123")
 
-        assert result.status == "success"
+        assert result.success is True
         # Only the valid record with proper UUID should be included
         assert len(result.intents) == 1
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
@@ -1728,7 +1750,7 @@ class TestErrorHandling:
         query_result = await adapter_with_mock.get_session_intents(
             session_id="session_123",
         )
-        assert query_result.status == "error"
+        assert query_result.success is False
 
         distribution = await adapter_with_mock.get_intent_distribution()
         assert distribution.status == "error"

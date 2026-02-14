@@ -555,7 +555,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if result.status == "error":
+        if not result.success:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="session",
@@ -563,7 +563,7 @@ class HandlerIntentQuery:
                 correlation_id=request.correlation_id,
             )
 
-        if result.status == "no_results" or not result.intents:
+        if not result.intents:
             return ModelIntentQueryResponseEvent.create_session_response(
                 query_id=request.query_id,
                 intents=[],
@@ -623,7 +623,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if result.status == "error":
+        if not result.success:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="recent",
@@ -631,7 +631,7 @@ class HandlerIntentQuery:
                 correlation_id=request.correlation_id,
             )
 
-        if result.status == "no_results" or not result.intents:
+        if not result.intents:
             return ModelIntentQueryResponseEvent.create_recent_response(
                 query_id=request.query_id,
                 intents=[],

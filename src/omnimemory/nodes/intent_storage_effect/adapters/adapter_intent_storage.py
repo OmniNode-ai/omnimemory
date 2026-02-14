@@ -350,44 +350,37 @@ class HandlerIntentStorageAdapter:
             limit=request.limit,
         )
 
-        # Handle no_results/not_found as valid (non-error) outcomes
-        if result.status in {"no_results", "not_found"}:
+        if not result.success:
+            return ModelIntentStorageResponse(
+                status="error",
+                error_message=result.error_message,
+            )
+
+        if not result.intents:
             return ModelIntentStorageResponse(
                 status="no_results",
                 intents=[],
                 total_count=0,
             )
 
-        if result.status == "success":
-            if not result.intents:
-                return ModelIntentStorageResponse(
-                    status="no_results",
-                    intents=[],
-                    total_count=0,
+        # Convert core ModelIntentRecord to response model format
+        intents: list[ModelIntentRecordResponse] = []
+        for intent in result.intents:
+            intents.append(
+                ModelIntentRecordResponse(
+                    intent_id=intent.intent_id,
+                    intent_category=intent.intent_category.value,
+                    confidence=intent.confidence,
+                    keywords=intent.keywords,
+                    created_at_utc=intent.created_at.isoformat(),
+                    correlation_id=intent.correlation_id,
                 )
-            # Convert to response model format
-            intents: list[ModelIntentRecordResponse] = []
-            for intent in result.intents:
-                intents.append(
-                    ModelIntentRecordResponse(
-                        intent_id=intent.intent_id,
-                        intent_category=intent.intent_category,
-                        confidence=intent.confidence,
-                        keywords=intent.keywords,
-                        created_at_utc=intent.created_at_utc.isoformat(),
-                        correlation_id=intent.correlation_id,
-                    )
-                )
-            return ModelIntentStorageResponse(
-                status="success",
-                intents=intents,
-                total_count=len(intents),
             )
-        else:
-            return ModelIntentStorageResponse(
-                status="error",
-                error_message=result.error_message,
-            )
+        return ModelIntentStorageResponse(
+            status="success",
+            intents=intents,
+            total_count=len(intents),
+        )
 
     async def _get_distribution(
         self,

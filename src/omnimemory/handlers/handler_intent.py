@@ -87,6 +87,7 @@ from omnimemory.handlers.adapters.models import (
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
     ModelIntentQueryResult,
+    ModelIntentRecord,
     ModelIntentStorageResult,
 )
 from omnimemory.utils.concurrency import (
@@ -718,17 +719,40 @@ class HandlerIntent:
         )
 
         try:
-            result = await adapter.get_session_intents(
+            core_result = await adapter.get_session_intents(
                 session_id=session_id,
                 min_confidence=min_confidence if min_confidence is not None else 0.0,
                 limit=limit,
             )
             # Record success if operation completed without exception
-            # Non-error statuses (no_results, not_found) are still healthy
-            # adapter responses and should not trip the circuit breaker.
-            if result.status in {"success", "no_results", "not_found"}:
+            # The core ModelIntentQueryResult uses success: bool, so we
+            # treat any non-error result as a healthy adapter response.
+            if core_result.success:
                 circuit_breaker.record_success()
-            return result
+            # Convert omnibase_core ModelIntentQueryResult to local ModelIntentQueryResult
+            has_intents = len(core_result.intents) > 0
+            if core_result.success:
+                status = "success" if has_intents else "no_results"
+            else:
+                status = "error"
+            # Convert core ModelIntentRecord to local ModelIntentRecord
+            local_intents = [
+                ModelIntentRecord(
+                    intent_id=r.intent_id,
+                    session_ref=r.session_id,
+                    intent_category=r.intent_category.value,
+                    confidence=r.confidence,
+                    keywords=r.keywords,
+                    created_at_utc=r.created_at,
+                    correlation_id=r.correlation_id,
+                )
+                for r in core_result.intents
+            ]
+            return ModelIntentQueryResult(
+                status=status,
+                intents=local_intents,
+                error_message=core_result.error_message,
+            )
         except Exception as e:
             circuit_breaker.record_failure()
             logger.error(

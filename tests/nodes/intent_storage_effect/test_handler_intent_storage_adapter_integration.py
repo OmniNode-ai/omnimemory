@@ -46,12 +46,16 @@ try:
         ModelIntentClassificationOutput,
         ModelIntentStorageResult,
     )
+    from omnibase_core.models.intelligence import (
+        ModelIntentQueryResult as CoreIntentQueryResult,
+    )
+    from omnibase_core.models.intelligence import (
+        ModelIntentRecord as CoreIntentRecord,
+    )
 
     from omnimemory.handlers.adapters.models import (
         ModelAdapterIntentGraphConfig,
         ModelIntentDistributionResult,
-        ModelIntentQueryResult,
-        ModelIntentRecord,
     )
     from omnimemory.models.utils import ModelPIIDetectionResult, ModelPIIMatch, PIIType
     from omnimemory.nodes.intent_storage_effect import (
@@ -146,15 +150,15 @@ def sample_intent_data() -> ModelIntentClassificationOutput:
 
 
 @pytest.fixture
-def sample_intent_record() -> ModelIntentRecord:
-    """Create a sample intent record as returned by adapter queries."""
-    return ModelIntentRecord(
+def core_intent_record() -> CoreIntentRecord:
+    """Create a core intent record as returned by the adapter."""
+    return CoreIntentRecord(
         intent_id=TEST_INTENT_ID,
-        session_ref=TEST_SESSION_ID,
-        intent_category="debugging",
+        session_id=TEST_SESSION_ID,
+        intent_category=EnumIntentCategory.DEBUGGING,
         confidence=0.92,
         keywords=["error", "traceback"],
-        created_at_utc=TEST_CREATED_AT,
+        created_at=TEST_CREATED_AT,
         correlation_id=TEST_CORRELATION_ID,
     )
 
@@ -410,13 +414,13 @@ class TestGetSessionOperation:
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
         mock_adapter: MagicMock,
-        sample_intent_record: ModelIntentRecord,
+        core_intent_record: CoreIntentRecord,
     ) -> None:
         """Verify get_session_intents() is called with correct arguments."""
         # Arrange
-        mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="success",
-            intents=[sample_intent_record],
+        mock_adapter.get_session_intents.return_value = CoreIntentQueryResult(
+            success=True,
+            intents=[core_intent_record],
         )
 
         request = ModelIntentStorageRequest(
@@ -440,13 +444,13 @@ class TestGetSessionOperation:
         self,
         handler_with_mock: HandlerIntentStorageAdapter,
         mock_adapter: MagicMock,
-        sample_intent_record: ModelIntentRecord,
+        core_intent_record: CoreIntentRecord,
     ) -> None:
         """Verify get_session returns correctly populated response."""
         # Arrange
-        mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="success",
-            intents=[sample_intent_record],
+        mock_adapter.get_session_intents.return_value = CoreIntentQueryResult(
+            success=True,
+            intents=[core_intent_record],
         )
 
         request = ModelIntentStorageRequest(
@@ -476,11 +480,11 @@ class TestGetSessionOperation:
         handler_with_mock: HandlerIntentStorageAdapter,
         mock_adapter: MagicMock,
     ) -> None:
-        """Verify no_results status when adapter returns not_found."""
-        # Arrange - adapter returns not_found which handler maps to no_results
-        mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="no_results",
-            error_message="Session not found",
+        """Verify no_results status when adapter returns empty results."""
+        # Arrange - adapter returns success with no intents
+        mock_adapter.get_session_intents.return_value = CoreIntentQueryResult(
+            success=True,
+            intents=[],
         )
 
         request = ModelIntentStorageRequest(
@@ -501,9 +505,9 @@ class TestGetSessionOperation:
         mock_adapter: MagicMock,
     ) -> None:
         """Verify no_results status when adapter returns empty list."""
-        # Arrange - in new model, no_results is success=True with empty intents
-        mock_adapter.get_session_intents.return_value = ModelIntentQueryResult(
-            status="success",
+        # Arrange - adapter returns success=True with empty intents
+        mock_adapter.get_session_intents.return_value = CoreIntentQueryResult(
+            success=True,
             intents=[],
         )
 
