@@ -276,29 +276,39 @@ class TestContractVersionField:
                 )
 
     @pytest.mark.migration
-    @pytest.mark.parametrize("node_name", MIGRATED_CONTRACTS, ids=str)
+    @pytest.mark.parametrize(
+        ("node_name", "expected_version"),
+        [
+            ("memory_retrieval_effect", {"major": 0, "minor": 2, "patch": 0}),
+            ("memory_storage_effect", {"major": 0, "minor": 2, "patch": 0}),
+            ("similarity_compute", {"major": 0, "minor": 1, "patch": 0}),
+        ],
+        ids=["memory_retrieval_effect", "memory_storage_effect", "similarity_compute"],
+    )
     def test_contract_version_values(
-        self, contract_data: MappingResultDict, node_name: str
+        self,
+        contract_data: MappingResultDict,
+        node_name: str,
+        expected_version: dict[str, int],
     ) -> None:
-        """Verify contract_version has expected initial values after migration.
+        """Verify contract_version has expected values for each migrated contract.
 
         This test validates the actual version values, not just the structure.
-        All contracts migrated in PR #19 (OMN-1436) should have the initial
-        version 0.1.0 (major=0, minor=1, patch=0) as their starting point.
+        Contracts migrated in PR #19 (OMN-1436) started at 0.1.0. Some were
+        bumped to 0.2.0 when event_bus subcontracts were added (OMN-1746).
 
         This ensures:
         - Migration set consistent initial versions across all contracts
-        - Future version bumps can be tracked against this baseline
-        - No accidental version drift during migration
+        - Version bumps from subsequent PRs are tracked correctly
+        - No accidental version drift
 
         Note:
             This test has the @pytest.mark.migration marker because it asserts
             exact version values that will change when versions are bumped.
             Post-release, skip with: pytest -m "not migration"
         """
-        expected: dict[str, int] = {"major": 0, "minor": 1, "patch": 0}
-        assert contract_data.get("contract_version") == expected, (
-            f"Expected contract_version {expected} for {node_name}, "
+        assert contract_data.get("contract_version") == expected_version, (
+            f"Expected contract_version {expected_version} for {node_name}, "
             f"got {contract_data.get('contract_version')}"
         )
 
