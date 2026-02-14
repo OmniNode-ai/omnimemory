@@ -120,6 +120,7 @@ from omnimemory.runtime.adapters import (
     ProtocolEventBusHealthCheck,
     ProtocolEventBusLifecycle,
     ProtocolEventBusPublish,
+    create_default_event_bus,
 )
 
 if TYPE_CHECKING:
@@ -204,9 +205,9 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
         valkey_port: Valkey server port.
         valkey_db: Valkey database index.
         valkey_password: Optional Valkey password.
-        kafka_bootstrap_servers: Kafka bootstrap servers.
+        kafka_bootstrap_servers: Event bus bootstrap servers (Kafka endpoint).
         cache_ttl_seconds: TTL for cached subscription data.
-        kafka_notification_topic: Kafka topic for memory notification events.
+        kafka_notification_topic: Event bus topic for memory notification events.
         pagination_max_limit: Maximum allowed limit for pagination queries.
         cache_rebuild_batch_size: Batch size for cache rebuild operations.
     """
@@ -243,7 +244,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
     )
     kafka_bootstrap_servers: str = Field(
         default="localhost:9092",
-        description="Kafka bootstrap servers (comma-separated)",
+        description="Event bus bootstrap servers, comma-separated (Kafka endpoint)",
     )
     cache_ttl_seconds: int = Field(
         default=3600,
@@ -253,7 +254,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
     )
     kafka_notification_topic: str = Field(
         default="omnimemory.memory.notification.v1",
-        description="Kafka topic for memory notification events",
+        description="Event bus topic for memory notification events (Kafka topic name)",
     )
     pagination_max_limit: int = Field(
         default=1000,
@@ -576,8 +577,6 @@ class HandlerSubscription:
                 # Initialize event bus (ARCH-002 compliant)
                 # Handler depends on protocol, not concrete transport.
                 if event_bus is None:
-                    from omnimemory.runtime.adapters import create_default_event_bus
-
                     event_bus = await create_default_event_bus(
                         bootstrap_servers=self._config.kafka_bootstrap_servers,
                     )
@@ -882,6 +881,13 @@ class HandlerSubscription:
         groups. This method publishes the event to the event bus - actual
         delivery to agents happens through their event bus consumers.
 
+        Error Propagation:
+            Publish failures are propagated to callers rather than silently
+            swallowed. This is intentional -- silent failures masked delivery
+            problems and violated the principle of least surprise. Callers
+            that need fire-and-forget semantics should catch exceptions at
+            their own level.
+
         Args:
             topic: The topic to notify (format: memory.<entity>.<event>).
             event: The notification event to publish.
@@ -892,6 +898,8 @@ class HandlerSubscription:
         Raises:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
+            Exception: If the event bus publish operation fails (propagated
+                intentionally; see Error Propagation above).
         """
         _, _, publisher, config = self._ensure_initialized()
 
@@ -928,6 +936,7 @@ class HandlerSubscription:
                 event.event_id,
                 exc,
             )
+            # Intentionally propagate: silent failures were a bug, not a feature.
             raise
 
         await self._increment_metric("notifications_published")

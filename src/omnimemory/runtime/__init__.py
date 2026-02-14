@@ -25,6 +25,7 @@ Usage:
     )
 """
 
+# Eager imports: adapters module is lightweight and used by all handler consumers.
 from omnimemory.runtime.adapters import (
     AdapterKafkaPublisher,
     ProtocolEventBusHealthCheck,

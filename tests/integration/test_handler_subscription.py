@@ -89,10 +89,10 @@ pytestmark = [
 # Test Configuration
 # =============================================================================
 
-DEFAULT_KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+DEFAULT_EVENT_BUS_BOOTSTRAP_SERVERS = "localhost:9092"
 
 
-def get_test_kafka_bootstrap_servers() -> str:
+def get_test_event_bus_bootstrap_servers() -> str:
     """Get event bus bootstrap servers from environment or default.
 
     Returns:
@@ -100,7 +100,7 @@ def get_test_kafka_bootstrap_servers() -> str:
     """
     return os.environ.get(
         "TEST_KAFKA_BOOTSTRAP_SERVERS",
-        DEFAULT_KAFKA_BOOTSTRAP_SERVERS,
+        DEFAULT_EVENT_BUS_BOOTSTRAP_SERVERS,
     )
 
 
@@ -131,7 +131,7 @@ async def subscription_handler(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
-        kafka_bootstrap_servers=get_test_kafka_bootstrap_servers(),
+        kafka_bootstrap_servers=get_test_event_bus_bootstrap_servers(),
     )
     handler = HandlerSubscription(container)
 
@@ -160,7 +160,7 @@ def handler_config(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
-        kafka_bootstrap_servers=get_test_kafka_bootstrap_servers(),
+        kafka_bootstrap_servers=get_test_event_bus_bootstrap_servers(),
     )
 
 

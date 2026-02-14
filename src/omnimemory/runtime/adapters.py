@@ -60,7 +60,6 @@ class ProtocolEventBusPublish(Protocol):
 
     async def publish(
         self,
-        *,
         topic: str,
         key: bytes | None,
         value: bytes,
