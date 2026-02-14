@@ -45,7 +45,12 @@ class Violation(NamedTuple):
     message: str
 
 
-# Kafka consumer import patterns to detect
+# Kafka consumer import patterns to detect.
+# Each regex uses \b (word boundary) after the package name to prevent false
+# positives on prefixed names like `kafka_utils` or `aiokafka_wrapper` (where
+# `_` is a word character so \b does NOT match), while still catching dotted
+# submodule imports like `kafka.errors` (where `.` is NOT a word character so
+# \b DOES match).
 KAFKA_IMPORT_PATTERNS = [
     (
         # from aiokafka import AIOKafkaConsumer (or any other import)
@@ -225,6 +230,10 @@ def main() -> int:
         print("instead of importing Kafka clients directly.")
         return 1
 
+    print(
+        f"No Kafka import violations found. "
+        f"Checked {len(files_to_check)} file(s)."
+    )
     return 0
 
 
