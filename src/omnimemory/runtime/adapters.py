@@ -6,7 +6,7 @@ Bridges available infrastructure (event bus, handlers) to the protocol
 interfaces expected by omnimemory domain handlers.
 
 Adapters:
-    - AdapterEventBusPublisher: event bus -> ProtocolEventBusPublisher
+    - AdapterKafkaPublisher: event bus -> ProtocolEventBusPublish
       Wraps a ProtocolEventBusPublish-conforming event bus into the
       higher-level publish interface used by HandlerSubscription.
 
@@ -30,7 +30,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Protocol, cast, runtime_checkable
+from collections.abc import Mapping
+from typing import Protocol, cast, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class AdapterKafkaPublisher:
         self,
         topic: str,
         key: str,
-        value: dict[str, Any],
+        value: Mapping[str, object],
         headers: dict[str, str] | None = None,
     ) -> None:
         """Publish event to topic via event bus protocol.
@@ -149,7 +150,7 @@ class AdapterKafkaPublisher:
             key: Message key (for partitioning).
             value: Event payload dict (serialized to JSON bytes).
             headers: Optional headers (logged but not passed to raw publish;
-                use ProtocolEventBusPublisher for header support).
+                extend ProtocolEventBusPublish if header support is required).
         """
         value_bytes = json.dumps(
             value, separators=(",", ":"), ensure_ascii=False, default=str

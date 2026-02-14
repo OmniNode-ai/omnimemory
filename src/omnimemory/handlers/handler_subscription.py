@@ -908,7 +908,7 @@ class HandlerSubscription:
         # Publish event via protocol adapter (ARCH-002 compliant)
         # Agents consume from this topic via consumer groups keyed by agent_id
         kafka_topic = config.kafka_notification_topic
-        event_payload = json.loads(event.model_dump_json())
+        event_payload = cast(dict[str, object], event.model_dump(mode="json"))
         await publisher.publish(
             topic=kafka_topic,
             key=topic,  # Partition by topic for ordering
@@ -1778,7 +1778,8 @@ class HandlerSubscription:
                 errors.append(f"Database check failed: {e}")
 
         # Check event bus health via protocol
-        event_bus_healthy = False
+        # None = unknown (bus does not implement health check protocol)
+        event_bus_healthy: bool | None = None
         if self._event_bus_health:
             try:
                 health_result = await self._event_bus_health.health_check()
@@ -1814,9 +1815,13 @@ class HandlerSubscription:
             except Exception as e:
                 errors.append(f"Event bus check failed: {e}")
 
-        # Only fully healthy if all components are explicitly True
+        # Healthy when all known components report True.
+        # event_bus_healthy=None means the bus lacks health-check support;
+        # this is acceptable (not a failure), so treat None as non-blocking.
         is_healthy = (
-            valkey_healthy is True and db_healthy is True and event_bus_healthy is True
+            valkey_healthy is True
+            and db_healthy is True
+            and event_bus_healthy is not False
         )
 
         return ModelSubscriptionHealth(
