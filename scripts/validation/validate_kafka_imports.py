@@ -79,16 +79,18 @@ KAFKA_IMPORT_PATTERNS = [
     ),
 ]
 
-# Only scan nodes/ directory - ARCH-002 applies to node code specifically
+# Only scan omnimemory/nodes/ directory - ARCH-002 applies to node code specifically.
 # The runtime layer (which IS allowed to use Kafka directly) lives elsewhere.
+# Using the fully-qualified path avoids false positives on other packages' nodes/.
 ENFORCED_PATHS = [
-    "nodes/",
+    "omnimemory/nodes/",
 ]
+
+# Pattern to detect TYPE_CHECKING guard blocks (both bare and qualified forms)
+TYPE_CHECKING_GUARD = re.compile(r"^\s*(?:if|elif)\s+(?:typing\.)?TYPE_CHECKING\b")
 
 # Skip patterns (lines that should be ignored)
 SKIP_PATTERNS = [
-    # TYPE_CHECKING blocks are fine (type hints only, not runtime)
-    re.compile(r"if\s+TYPE_CHECKING"),
     # Explicit Kafka boundary exemption annotation
     # Format: # omnimemory-kafka-exempt: <reason>
     re.compile(r"#\s*omnimemory-kafka-exempt:", re.IGNORECASE),
@@ -133,7 +135,7 @@ def validate_file(filepath: Path) -> list[Violation]:
         stripped = line.strip()
 
         # Track TYPE_CHECKING blocks (imports there are fine)
-        if "if TYPE_CHECKING" in line:
+        if TYPE_CHECKING_GUARD.search(line):
             in_type_checking_block = True
             indent_level = len(line) - len(line.lstrip())
             continue
