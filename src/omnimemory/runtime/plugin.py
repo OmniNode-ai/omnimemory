@@ -413,7 +413,7 @@ class PluginMemory:
                 reset_introspection_guard,
             )
 
-            reset_introspection_guard()
+            await reset_introspection_guard()
 
             self._event_bus = None
             self._introspection_nodes = []

@@ -26,8 +26,8 @@ Related:
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import NAMESPACE_DNS, UUID, uuid5
@@ -45,10 +45,11 @@ logger = logging.getLogger(__name__)
 # Guard for single-call invariant on publish_memory_introspection.
 # See the function docstring for rationale: calling it more than once orphans
 # heartbeat tasks from the first call, leaking asyncio tasks.
-# Thread-safety: guarded by _introspection_lock. While the kernel currently
-# calls plugin lifecycle methods sequentially, the lock ensures correctness
-# even if the concurrency model changes in the future.
-_introspection_lock = threading.Lock()
+# Async-safety: guarded by _introspection_lock (asyncio.Lock). A threading.Lock
+# cannot prevent race conditions in async code because two coroutines on the
+# same thread can both acquire a threading.Lock before either releases it.
+# asyncio.Lock correctly serializes coroutines sharing an event loop.
+_introspection_lock = asyncio.Lock()
 _introspection_published: bool = False
 
 # Standard DNS namespace for deterministic UUID5 generation.
@@ -217,7 +218,7 @@ async def publish_memory_introspection(
         for lifecycle management.
     """
     global _introspection_published  # noqa: PLW0603
-    with _introspection_lock:
+    async with _introspection_lock:
         if _introspection_published:
             raise RuntimeError(
                 "publish_memory_introspection() has already been called "
@@ -286,12 +287,13 @@ async def publish_memory_introspection(
                 descriptor.name,
                 str(e),
                 correlation_id,
+                exc_info=True,
             )
 
     # Set the single-call guard AFTER the loop completes successfully.
     # If an exception propagates out of the loop, the guard remains unset,
     # allowing a legitimate retry instead of permanently blocking.
-    with _introspection_lock:
+    async with _introspection_lock:
         _introspection_published = True
 
     logger.info(
@@ -342,10 +344,11 @@ async def publish_memory_shutdown(
                     "Error stopping introspection tasks for %s: %s",
                     proxy.name,
                     str(e),
+                    exc_info=True,
                 )
 
     if event_bus is None:
-        reset_introspection_guard()
+        await reset_introspection_guard()
         return
 
     # New proxies are created here because startup only retains proxies for
@@ -375,26 +378,27 @@ async def publish_memory_shutdown(
                 "Error publishing shutdown introspection for %s: %s",
                 descriptor.name,
                 str(e),
+                exc_info=True,
             )
 
     # Reset the single-call guard so the plugin can be re-initialized in the
     # same process (tests, hot-reload).  This MUST happen after all shutdown
     # events have been published so the guard remains set while shutdown is
     # in progress, preventing a concurrent re-init from racing with shutdown.
-    reset_introspection_guard()
+    await reset_introspection_guard()
 
 
-def reset_introspection_guard() -> None:
+async def reset_introspection_guard() -> None:
     """Reset the single-call guard for publish_memory_introspection.
 
     Called during shutdown to allow re-initialization, and in tests for
     isolation between test cases that invoke
     ``publish_memory_introspection``.
 
-    Thread-safety: guarded by ``_introspection_lock``.
+    Async-safety: guarded by ``_introspection_lock`` (asyncio.Lock).
     """
     global _introspection_published  # noqa: PLW0603
-    with _introspection_lock:
+    async with _introspection_lock:
         _introspection_published = False
 
 

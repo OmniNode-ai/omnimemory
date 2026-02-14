@@ -8,7 +8,7 @@ types used across plugin and wiring tests.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from uuid import uuid4
 
@@ -16,7 +16,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _reset_introspection_guard() -> Iterator[None]:
+async def _reset_introspection_guard() -> AsyncIterator[None]:
     """Reset the introspection single-call guard before and after each test.
 
     ``publish_memory_introspection()`` sets a module-level
@@ -31,9 +31,9 @@ def _reset_introspection_guard() -> Iterator[None]:
     """
     from omnimemory.runtime.introspection import reset_introspection_guard
 
-    reset_introspection_guard()
+    await reset_introspection_guard()
     yield
-    reset_introspection_guard()
+    await reset_introspection_guard()
 
 
 @dataclass

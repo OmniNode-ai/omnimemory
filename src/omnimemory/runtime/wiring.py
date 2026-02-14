@@ -24,6 +24,7 @@ Related:
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import logging
 from typing import TYPE_CHECKING
@@ -80,7 +81,7 @@ async def wire_memory_handlers(
 
     for module_path, attr_name, is_class in _HANDLER_SPECS:
         try:
-            mod = importlib.import_module(module_path)
+            mod = await asyncio.to_thread(importlib.import_module, module_path)
         except ModuleNotFoundError as e:
             raise ImportError(
                 f"Failed to import handler module '{module_path}' "

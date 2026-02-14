@@ -296,7 +296,7 @@ class TestPublishMemoryIntrospection:
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
-        reset_introspection_guard()
+        await reset_introspection_guard()
         # Should not raise
         result = await publish_memory_introspection(
             event_bus=bus,  # type: ignore[arg-type]
@@ -470,7 +470,7 @@ class TestResetIntrospectionGuard:
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
-        reset_introspection_guard()
+        await reset_introspection_guard()
         # Should not raise
         result = await publish_memory_introspection(
             event_bus=bus,  # type: ignore[arg-type]
@@ -479,10 +479,11 @@ class TestResetIntrospectionGuard:
         assert len(result.registered_nodes) == len(MEMORY_NODES)
 
     @pytest.mark.unit
-    def test_multiple_resets_are_safe(self) -> None:
+    @pytest.mark.asyncio
+    async def test_multiple_resets_are_safe(self) -> None:
         """Calling reset_introspection_guard multiple times should not raise."""
         for _ in range(10):
-            reset_introspection_guard()
+            await reset_introspection_guard()
 
 
 # =============================================================================
