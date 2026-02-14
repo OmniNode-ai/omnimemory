@@ -3,19 +3,19 @@
 This module provides the core subscription management functionality:
 - subscribe(): Register agent subscriptions to memory topics
 - unsubscribe(): Remove agent subscriptions
-- notify(): Publish notification events to Kafka for subscriber consumption
+- notify(): Publish notification events to the event bus for subscriber consumption
 - list_subscriptions(): Get subscriptions for an agent (with optional pagination)
 
 Architecture:
 - Persistence: Valkey (fast lookups) + PostgreSQL (source of truth)
-- Delivery: Kafka event bus (agents consume directly)
+- Delivery: Event bus (agents consume directly)
 - Topic naming: memory.<entity>.<event> convention
 
 Event Bus Strategy:
-    Notifications are published to Kafka topics. Internal agents consume
-    events directly via consumer groups. If external (non-Kafka) delivery
-    is needed in the future, implement a WebhookEmitterEffect node that
-    consumes bus events and handles HTTP delivery separately.
+    Notifications are published to event bus topics. Internal agents consume
+    events directly via consumer groups. If external delivery is needed in
+    the future, implement a WebhookEmitterEffect node that consumes bus
+    events and handles HTTP delivery separately.
 
 Known Limitations:
     Transaction Boundaries:
@@ -70,7 +70,7 @@ Example::
         topic="memory.item.created",
     )
 
-    # Notify all subscribers (publishes to Kafka)
+    # Notify all subscribers (publishes to event bus)
     event = ModelNotificationEvent(
         event_id="evt_456",
         topic="memory.item.created",
@@ -88,7 +88,7 @@ Example::
     Initial implementation for OMN-1393.
 
 .. versionchanged:: 0.2.0
-    Removed webhook delivery in favor of Kafka event bus.
+    Removed webhook delivery in favor of event bus.
     Webhook delivery moved to optional WebhookEmitterEffect node.
 """
 
@@ -102,7 +102,6 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
-from omnibase_infra.event_bus.event_bus_kafka import EventBusKafka
 from omnibase_infra.handlers.handler_db import HandlerDb
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
@@ -116,6 +115,13 @@ from omnimemory.models.subscription import (
     ModelSubscription,
 )
 from omnimemory.models.subscription.constants import TOPIC_PATTERN
+from omnimemory.runtime.adapters import (
+    AdapterKafkaPublisher,
+    ProtocolEventBusHealthCheck,
+    ProtocolEventBusLifecycle,
+    ProtocolEventBusPublish,
+    create_default_event_bus,
+)
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
@@ -199,9 +205,9 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
         valkey_port: Valkey server port.
         valkey_db: Valkey database index.
         valkey_password: Optional Valkey password.
-        kafka_bootstrap_servers: Kafka bootstrap servers.
+        kafka_bootstrap_servers: Event bus bootstrap servers (Kafka endpoint).
         cache_ttl_seconds: TTL for cached subscription data.
-        kafka_notification_topic: Kafka topic for memory notification events.
+        kafka_notification_topic: Event bus topic for memory notification events.
         pagination_max_limit: Maximum allowed limit for pagination queries.
         cache_rebuild_batch_size: Batch size for cache rebuild operations.
     """
@@ -238,7 +244,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
     )
     kafka_bootstrap_servers: str = Field(
         default="localhost:9092",
-        description="Kafka bootstrap servers (comma-separated)",
+        description="Event bus bootstrap servers, comma-separated (Kafka endpoint)",
     )
     cache_ttl_seconds: int = Field(
         default=3600,
@@ -248,7 +254,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
     )
     kafka_notification_topic: str = Field(
         default="omnimemory.memory.notification.v1",
-        description="Kafka topic for memory notification events",
+        description="Event bus topic for memory notification events (Kafka topic name)",
     )
     pagination_max_limit: int = Field(
         default=1000,
@@ -273,7 +279,7 @@ class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler internal
     and observability.
 
     Attributes:
-        notifications_published: Count of notifications published to Kafka.
+        notifications_published: Count of notifications published to event bus.
         subscriptions_created: Count of new subscriptions created.
         subscriptions_updated: Count of existing subscriptions updated (re-subscriptions).
         subscriptions_deleted: Count of subscriptions deleted.
@@ -288,7 +294,7 @@ class ModelSubscriptionMetrics(  # omnimemory-model-exempt: handler internal
     notifications_published: int = Field(
         default=0,
         ge=0,
-        description="Count of notifications published to Kafka",
+        description="Count of notifications published to event bus",
     )
     subscriptions_created: int = Field(
         default=0,
@@ -317,7 +323,7 @@ class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler health
         initialized: Whether the handler has been initialized.
         db_healthy: Database connection health.
         valkey_healthy: Valkey connection health.
-        kafka_healthy: Kafka connection health.
+        event_bus_healthy: Event bus connection health.
         error_message: Error details if unhealthy.
         metrics: Optional metrics for observability.
     """
@@ -344,9 +350,9 @@ class ModelSubscriptionHealth(  # omnimemory-model-exempt: handler health
         default=None,
         description="Valkey connection health",
     )
-    kafka_healthy: bool | None = Field(
+    event_bus_healthy: bool | None = Field(
         default=None,
-        description="Kafka connection health",
+        description="Event bus connection health",
     )
     error_message: str | None = Field(
         default=None,
@@ -433,17 +439,17 @@ class HandlerSubscription:
     """Handler for agent subscriptions and memory change notifications.
 
     Manages the lifecycle of subscriptions and publishes notification events
-    to Kafka for consumption by subscribing agents.
+    to the event bus for consumption by subscribing agents.
 
     Architecture:
         - Subscription store: PostgreSQL (source of truth) + Valkey (cache)
-        - Notification delivery: Kafka event bus
+        - Notification delivery: Event bus
         - Agents consume events directly via consumer groups
 
     Note on External Delivery:
         If webhook delivery to external systems is needed, implement a
-        WebhookEmitterEffect node that consumes Kafka events and handles
-        HTTP delivery with its own retry/circuit breaker logic.
+        WebhookEmitterEffect node that consumes event bus messages and
+        handles HTTP delivery with its own retry/circuit breaker logic.
 
     ONEX Container Pattern:
         This handler follows the ONEX container-driven pattern:
@@ -471,7 +477,10 @@ class HandlerSubscription:
         self._container = container
         self._config: ModelHandlerSubscriptionConfig | None = None
         self._db_handler: HandlerDb | None = None
-        self._kafka_handler: EventBusKafka | None = None
+        self._event_bus: ProtocolEventBusPublish | None = None
+        self._event_bus_lifecycle: ProtocolEventBusLifecycle | None = None
+        self._event_bus_health: ProtocolEventBusHealthCheck | None = None
+        self._publisher: AdapterKafkaPublisher | None = None
         self._valkey: AdapterValkey | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
@@ -510,15 +519,28 @@ class HandlerSubscription:
         """Check if the handler has been initialized."""
         return self._initialized
 
-    async def initialize(self, config: ModelHandlerSubscriptionConfig) -> None:
-        """Initialize DB, Valkey, and Kafka handlers.
+    async def initialize(
+        self,
+        config: ModelHandlerSubscriptionConfig,
+        event_bus: ProtocolEventBusPublish | None = None,
+    ) -> None:
+        """Initialize DB, Valkey, and event bus handlers.
 
         Creates connections to all required services and optionally
         rebuilds the Valkey cache from PostgreSQL on cold start.
 
+        ARCH-002 Compliance:
+            The event_bus parameter accepts any ProtocolEventBusPublish-conforming
+            object. If not provided, a default EventBusKafka is constructed via
+            the runtime factory (``create_default_event_bus``). Handlers never
+            import transport modules directly.
+
         Args:
             config: The handler configuration specifying database, Valkey,
-                and Kafka connection details.
+                and event bus connection details.
+            event_bus: Optional pre-configured event bus. If None, a default
+                EventBusKafka is created from config.kafka_bootstrap_servers
+                via the runtime adapter factory.
 
         Raises:
             RuntimeError: If initialization fails.
@@ -552,14 +574,31 @@ class HandlerSubscription:
                 )
                 logger.info("Database handler initialized")
 
-                # Initialize Kafka handler
-                self._kafka_handler = EventBusKafka()
-                await self._kafka_handler.initialize(
-                    {
-                        "bootstrap_servers": self._config.kafka_bootstrap_servers,
-                    }
+                # Initialize event bus (ARCH-002 compliant)
+                # Handler depends on protocol, not concrete transport.
+                if event_bus is None:
+                    event_bus = await create_default_event_bus(
+                        bootstrap_servers=self._config.kafka_bootstrap_servers,
+                    )
+                self._event_bus = event_bus
+                # Store lifecycle/health references if the bus supports them
+                self._event_bus_lifecycle = (
+                    event_bus
+                    if isinstance(event_bus, ProtocolEventBusLifecycle)
+                    else None
                 )
-                logger.info("Kafka handler initialized")
+                self._event_bus_health = (
+                    event_bus
+                    if isinstance(event_bus, ProtocolEventBusHealthCheck)
+                    else None
+                )
+                if self._event_bus_health is None:
+                    logger.warning(
+                        "Event bus does not implement ProtocolEventBusHealthCheck; "
+                        "health status will be unknown"
+                    )
+                self._publisher = AdapterKafkaPublisher(event_bus)
+                logger.info("Event bus initialized (via protocol adapter)")
 
                 # Rebuild cache from DB on cold start
                 await self._rebuild_cache_from_db()
@@ -588,12 +627,16 @@ class HandlerSubscription:
                 logger.warning("Failed to shutdown DB handler during cleanup: %s", e)
             self._db_handler = None
 
-        if self._kafka_handler:
+        if self._event_bus_lifecycle:
             try:
-                await self._kafka_handler.shutdown()
+                await self._event_bus_lifecycle.shutdown()
             except Exception as e:
-                logger.warning("Failed to shutdown Kafka handler during cleanup: %s", e)
-            self._kafka_handler = None
+                logger.warning("Failed to shutdown event bus during cleanup: %s", e)
+        # Always clear references, even if lifecycle protocol is unsupported
+        self._event_bus = None
+        self._event_bus_lifecycle = None
+        self._event_bus_health = None
+        self._publisher = None
 
     async def shutdown(self) -> None:
         """Cleanup all resources."""
@@ -609,20 +652,26 @@ class HandlerSubscription:
                 await self._db_handler.shutdown()
                 self._db_handler = None
 
-            if self._kafka_handler:
-                await self._kafka_handler.shutdown()
-                self._kafka_handler = None
+            if self._event_bus_lifecycle:
+                await self._event_bus_lifecycle.shutdown()
+            # Always clear references, even if lifecycle protocol is unsupported
+            self._event_bus = None
+            self._event_bus_lifecycle = None
+            self._event_bus_health = None
+            self._publisher = None
 
             self._initialized = False
             logger.info("HandlerSubscription shutdown complete")
 
     def _ensure_initialized(
         self,
-    ) -> tuple[AdapterValkey, HandlerDb, EventBusKafka, ModelHandlerSubscriptionConfig]:
+    ) -> tuple[
+        AdapterValkey, HandlerDb, AdapterKafkaPublisher, ModelHandlerSubscriptionConfig
+    ]:
         """Ensure handler is initialized and return components.
 
         Returns:
-            Tuple of (valkey, db_handler, kafka_handler, config).
+            Tuple of (valkey, db_handler, publisher, config).
 
         Raises:
             RuntimeError: If handler is not initialized.
@@ -631,13 +680,14 @@ class HandlerSubscription:
             not self._initialized
             or self._valkey is None
             or self._db_handler is None
-            or self._kafka_handler is None
+            or self._event_bus is None
+            or self._publisher is None
             or self._config is None
         ):
             raise RuntimeError(
                 "HandlerSubscription not initialized. Call initialize(config) first."
             )
-        return self._valkey, self._db_handler, self._kafka_handler, self._config
+        return self._valkey, self._db_handler, self._publisher, self._config
 
     # =========================================================================
     # Core Operations
@@ -825,11 +875,18 @@ class HandlerSubscription:
         topic: str,
         event: ModelNotificationEvent,
     ) -> int:
-        """Publish notification event to Kafka for subscriber consumption.
+        """Publish notification event to the event bus for subscriber consumption.
 
-        Agents subscribe to Kafka topics and consume events via consumer groups.
-        This method publishes the event to the event bus - actual delivery to
-        agents happens through their Kafka consumers.
+        Agents subscribe to event bus topics and consume events via consumer
+        groups. This method publishes the event to the event bus - actual
+        delivery to agents happens through their event bus consumers.
+
+        Error Propagation:
+            Publish failures are propagated to callers rather than silently
+            swallowed. This is intentional -- silent failures masked delivery
+            problems and violated the principle of least surprise. Callers
+            that need fire-and-forget semantics should catch exceptions at
+            their own level.
 
         Args:
             topic: The topic to notify (format: memory.<entity>.<event>).
@@ -841,8 +898,10 @@ class HandlerSubscription:
         Raises:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
+            Exception: If the event bus publish operation fails (propagated
+                intentionally; see Error Propagation above).
         """
-        _, _, kafka_handler, config = self._ensure_initialized()
+        _, _, publisher, config = self._ensure_initialized()
 
         # Validate that event topic matches the topic argument
         if event.topic != topic:
@@ -860,38 +919,25 @@ class HandlerSubscription:
             logger.debug("No subscribers for topic %s", topic)
             return 0
 
-        # Publish event to Kafka
+        # Publish event via protocol adapter (ARCH-002 compliant)
         # Agents consume from this topic via consumer groups keyed by agent_id
         kafka_topic = config.kafka_notification_topic
-        envelope = {
-            "operation": "kafka.produce",
-            "payload": {
-                "topic": kafka_topic,
-                "key": topic,  # Partition by topic for ordering
-                "value": event.model_dump_json(),
-                "headers": {
-                    "event_id": event.event_id,
-                    "topic": topic,
-                    "subscriber_count": str(subscriber_count),
-                },
-            },
-        }
-        result = await kafka_handler.execute(envelope)
-
-        # Validate Kafka publish succeeded
-        if result is None:
+        event_payload = cast(dict[str, object], event.model_dump(mode="json"))
+        try:
+            await publisher.publish(
+                topic=kafka_topic,
+                key=topic,  # Partition by topic for ordering
+                value=event_payload,
+            )
+        except Exception as exc:
             logger.warning(
-                "Kafka publish returned None for topic %s, event %s",
+                "Failed to publish notification to topic %s for event %s: %s",
                 kafka_topic,
                 event.event_id,
+                exc,
             )
-        elif hasattr(result, "result") and not result.result.get("success", True):
-            logger.warning(
-                "Kafka publish may have failed for topic %s, event %s: %s",
-                kafka_topic,
-                event.event_id,
-                result.result.get("error", "unknown error"),
-            )
+            # Intentionally propagate: silent failures were a bug, not a feature.
+            raise
 
         await self._increment_metric("notifications_published")
 
@@ -1704,12 +1750,23 @@ class HandlerSubscription:
     async def health_check(self) -> ModelSubscriptionHealth:
         """Check if all handler components are healthy.
 
-        Performs health checks on Valkey, database, and Kafka handlers.
+        Performs health checks on Valkey, database, and event bus handlers.
         Component health is reported as:
+
         - True: Component is healthy and responding
         - False: Component is unhealthy or failed health check
+        - None (event bus only): Event bus does not implement
+          ``ProtocolEventBusHealthCheck``; treated as non-failure so that
+          adapters without health-check support do not block overall health.
 
-        The overall is_healthy is True when ALL components are healthy.
+        The overall ``is_healthy`` is True when Valkey and DB are True **and**
+        event bus is not explicitly False (None is acceptable).
+
+        .. versionchanged:: 0.3.0
+            Event bus health uses ``is not False`` instead of ``is True``,
+            so ``None`` (health check not supported) is no longer treated
+            as unhealthy. This accommodates event bus adapters that do not
+            implement ``ProtocolEventBusHealthCheck``.
 
         Returns:
             ModelSubscriptionHealth with detailed status for each component.
@@ -1750,51 +1807,58 @@ class HandlerSubscription:
             except Exception as e:
                 errors.append(f"Database check failed: {e}")
 
-        # Check Kafka with robust type handling
-        # EventBusKafka.health_check() may return:
-        #   - dict: {"healthy": bool, "circuit_state": str, ...}
-        #   - bool: Direct healthy status
-        #   - Pydantic model: Object with is_healthy attribute
-        kafka_healthy = False
-        if self._kafka_handler:
+        # Check event bus health via protocol
+        # None = unknown (bus does not implement health check protocol)
+        event_bus_healthy: bool | None = None
+        if self._event_bus_health:
             try:
-                health_result = await self._kafka_handler.health_check()
-                # Handle different return types from EventBusKafka
+                health_result = await self._event_bus_health.health_check()
+                # ProtocolEventBusHealthCheck returns dict[str, object]
                 if isinstance(health_result, dict):
-                    kafka_healthy = bool(health_result.get("healthy", False))
-                    if not kafka_healthy:
+                    event_bus_healthy = bool(health_result.get("healthy", False))
+                    if not event_bus_healthy:
                         circuit_state = health_result.get("circuit_state", "unknown")
                         errors.append(
-                            f"Kafka: unhealthy (circuit_state={circuit_state})"
+                            f"Event bus: unhealthy (circuit_state={circuit_state})"
                         )
                 elif isinstance(health_result, bool):
-                    kafka_healthy = health_result
-                    if not kafka_healthy:
-                        errors.append("Kafka: unhealthy (returned False)")
+                    event_bus_healthy = health_result
+                    if not event_bus_healthy:
+                        errors.append("Event bus: unhealthy (returned False)")
                 elif hasattr(health_result, "is_healthy"):
-                    # Handle Pydantic model response (e.g., ModelHealthStatus)
-                    kafka_healthy = bool(health_result.is_healthy)
-                    if not kafka_healthy:
+                    # Handle Pydantic model response
+                    event_bus_healthy = bool(health_result.is_healthy)
+                    if not event_bus_healthy:
                         error_detail = getattr(health_result, "error", None) or getattr(
                             health_result, "error_message", "unknown"
                         )
-                        errors.append(f"Kafka: unhealthy ({error_detail})")
+                        errors.append(f"Event bus: unhealthy ({error_detail})")
                 else:
-                    # Unexpected return type - log warning and treat as unhealthy
                     logger.warning(
-                        "Unexpected Kafka health_check return type: %s, treating as unhealthy",
+                        "Unexpected event bus health_check return type: %s, treating as unhealthy",
                         type(health_result).__name__,
                     )
                     errors.append(
-                        f"Kafka: unexpected health_check return type "
+                        f"Event bus: unexpected health_check return type "
                         f"({type(health_result).__name__})"
                     )
             except Exception as e:
-                errors.append(f"Kafka check failed: {e}")
+                event_bus_healthy = False
+                errors.append(f"Event bus check failed: {e}")
 
-        # Only fully healthy if all components are explicitly True
+        # Healthy when all known components report True.
+        # event_bus_healthy semantics (uses ``is not False`` deliberately):
+        #   True  -> bus is healthy
+        #   False -> bus is unhealthy (explicit failure)
+        #   None  -> bus does not implement ProtocolEventBusHealthCheck;
+        #            treated as non-failure for backwards compatibility with
+        #            adapters that don't support health checks. This means
+        #            None (unknown) does NOT block overall health, unlike the
+        #            prior Kafka-specific check which required ``is True``.
         is_healthy = (
-            valkey_healthy is True and db_healthy is True and kafka_healthy is True
+            valkey_healthy is True
+            and db_healthy is True
+            and event_bus_healthy is not False
         )
 
         return ModelSubscriptionHealth(
@@ -1802,7 +1866,7 @@ class HandlerSubscription:
             initialized=True,
             db_healthy=db_healthy,
             valkey_healthy=valkey_healthy,
-            kafka_healthy=kafka_healthy,
+            event_bus_healthy=event_bus_healthy,
             error_message="; ".join(errors) if errors else None,
             metrics=await self.get_metrics(),
         )
@@ -1827,7 +1891,7 @@ class HandlerSubscription:
             "pagination",
             "metrics",
             "health_check",
-            "kafka_delivery",
+            "event_bus_delivery",
             "valkey_caching",
             "postgresql_persistence",
         ]

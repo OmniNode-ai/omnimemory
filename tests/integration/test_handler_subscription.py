@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 OmniNode Team
-"""Integration tests for HandlerSubscription with Kafka-based notification.
+"""Integration tests for HandlerSubscription with event bus notification.
 
 This module tests the subscription handler which manages agent subscriptions
-and publishes notification events to Kafka for subscriber consumption.
+and publishes notification events via the event bus for subscriber consumption.
 
 Test Categories:
     - TestSubscribe: Create subscription, topic validation, idempotency, metadata
@@ -17,7 +17,7 @@ Test Categories:
 Prerequisites:
     - PostgreSQL running at TEST_DB_DSN
     - Valkey running at TEST_VALKEY_HOST:TEST_VALKEY_PORT
-    - Kafka running for notify tests (graceful skip if unavailable)
+    - Event bus running for notify tests (graceful skip if unavailable)
     - omnibase_infra installed (dev dependency)
 
 Usage:
@@ -31,10 +31,10 @@ Environment Variables:
     TEST_DB_DSN: PostgreSQL connection string
     TEST_VALKEY_HOST: Valkey hostname (default: localhost)
     TEST_VALKEY_PORT: Valkey port (default: 6379)
-    TEST_KAFKA_BOOTSTRAP_SERVERS: Kafka servers (default: localhost:9092)
+    TEST_KAFKA_BOOTSTRAP_SERVERS: Event bus servers (default: localhost:9092)
 
 .. versionadded:: 0.2.0
-    Refactored for Kafka-based notification (OMN-1393).
+    Refactored for event bus notification (OMN-1393).
 """
 
 from __future__ import annotations
@@ -89,18 +89,18 @@ pytestmark = [
 # Test Configuration
 # =============================================================================
 
-DEFAULT_KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+DEFAULT_EVENT_BUS_BOOTSTRAP_SERVERS = "localhost:9092"
 
 
-def get_test_kafka_bootstrap_servers() -> str:
-    """Get Kafka bootstrap servers from environment or default.
+def get_test_event_bus_bootstrap_servers() -> str:
+    """Get event bus bootstrap servers from environment or default.
 
     Returns:
-        Kafka bootstrap servers string.
+        Event bus bootstrap servers string.
     """
     return os.environ.get(
         "TEST_KAFKA_BOOTSTRAP_SERVERS",
-        DEFAULT_KAFKA_BOOTSTRAP_SERVERS,
+        DEFAULT_EVENT_BUS_BOOTSTRAP_SERVERS,
     )
 
 
@@ -131,7 +131,7 @@ async def subscription_handler(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
-        kafka_bootstrap_servers=get_test_kafka_bootstrap_servers(),
+        kafka_bootstrap_servers=get_test_event_bus_bootstrap_servers(),
     )
     handler = HandlerSubscription(container)
 
@@ -160,7 +160,7 @@ def handler_config(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
-        kafka_bootstrap_servers=get_test_kafka_bootstrap_servers(),
+        kafka_bootstrap_servers=get_test_event_bus_bootstrap_servers(),
     )
 
 
@@ -462,9 +462,10 @@ class TestNotify:
             )
             assert count == 1
         except RuntimeError as e:
-            # Kafka may not be available - skip gracefully
+            # NOTE: Error message matching is coupled to EventBusKafka's exception text.
+            # If the event bus adapter changes error messages, update these skip guards.
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
     @pytest.mark.asyncio
@@ -489,7 +490,7 @@ class TestNotify:
             assert count == 0
         except RuntimeError as e:
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
     @pytest.mark.asyncio
@@ -542,7 +543,7 @@ class TestNotify:
             assert count == 3
         except RuntimeError as e:
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
 
@@ -660,7 +661,7 @@ class TestHealthCheck:
         assert health.initialized is True
         assert health.db_healthy is not None
         assert health.valkey_healthy is not None
-        assert health.kafka_healthy is not None
+        assert health.event_bus_healthy is not None
 
     @pytest.mark.asyncio
     async def test_health_check_before_initialize(
@@ -782,7 +783,7 @@ class TestMetrics:
             )
         except RuntimeError as e:
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
         final_metrics = await subscription_handler.get_metrics()
@@ -1139,9 +1140,9 @@ class TestLargeBatch:
             subscriber_count = await subscription_handler.notify(topic, event)
             assert subscriber_count == 100
         except RuntimeError as e:
-            # Kafka may not be available - skip gracefully
+            # Event bus may not be available - skip gracefully
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
     @pytest.mark.asyncio
@@ -1232,29 +1233,29 @@ class TestLargeBatch:
 
 
 # =============================================================================
-# TestKafkaFailureHandling
+# TestEventBusFailureHandling
 # =============================================================================
 
 
-class TestKafkaFailureHandling:
-    """Tests for Kafka failure scenarios.
+class TestEventBusFailureHandling:
+    """Tests for event bus failure scenarios.
 
     These tests verify that the subscription handler behaves correctly
-    when Kafka operations fail, including proper error propagation
+    when event bus operations fail, including proper error propagation
     and graceful degradation.
     """
 
     @pytest.mark.asyncio
-    async def test_notify_returns_subscriber_count_even_with_kafka_issues(
+    async def test_notify_returns_subscriber_count_even_with_bus_issues(
         self,
         subscription_handler: HandlerSubscription,
         unique_agent_id: str,
         unique_topic: str,
     ) -> None:
-        """Notify correctly counts subscribers regardless of Kafka status.
+        """Notify correctly counts subscribers regardless of event bus status.
 
         The subscriber count is determined from the database/cache before
-        Kafka publish, so it should be accurate even if Kafka has issues.
+        event bus publish, so it should be accurate even if the bus has issues.
         """
         # Subscribe an agent
         await subscription_handler.subscribe(
@@ -1280,20 +1281,20 @@ class TestKafkaFailureHandling:
             # Count should reflect actual subscribers
             assert count == 1
         except RuntimeError as e:
-            # If Kafka is unavailable, the test demonstrates the handler's
-            # behavior - it requires Kafka for notify operations
+            # If the event bus is unavailable, the test demonstrates the
+            # handler's behavior - it requires an event bus for notify operations
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
     @pytest.mark.asyncio
-    async def test_notify_handles_kafka_timeout_gracefully(
+    async def test_notify_handles_event_bus_timeout_gracefully(
         self,
         subscription_handler: HandlerSubscription,
     ) -> None:
-        """Notify operation handles potential Kafka timeouts.
+        """Notify operation handles potential event bus timeouts.
 
-        Verifies that the system properly handles slow Kafka responses
+        Verifies that the system properly handles slow event bus responses
         without hanging indefinitely or corrupting state.
         """
         topic = f"memory.timeout_test_{uuid4().hex[:8]}.created"
@@ -1323,7 +1324,7 @@ class TestKafkaFailureHandling:
             pytest.fail("Notify operation timed out after 30 seconds")
         except RuntimeError as e:
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
     @pytest.mark.asyncio
@@ -1355,7 +1356,7 @@ class TestKafkaFailureHandling:
             )
         except RuntimeError as e:
             if "Kafka" in str(e) or "kafka" in str(e).lower():
-                pytest.skip(f"Kafka not available: {e}")
+                pytest.skip(f"Event bus not available: {e}")
             raise
 
         final_metrics = await subscription_handler.get_metrics()
