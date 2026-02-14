@@ -46,9 +46,10 @@ Example::
             storage_adapter=storage_adapter,
         )
 
-        # Initialize with Kafka subscription callback
+        # Initialize with event bus subscription callback
+        # (event_bus.subscribe is injected by the runtime layer)
         await consumer.initialize(
-            subscribe_callback=kafka_bus.subscribe,
+            subscribe_callback=event_bus.subscribe,
             env_prefix="dev",
         )
 
@@ -122,7 +123,7 @@ class HandlerIntentEventConsumer:
         await storage.initialize(connection_uri="bolt://localhost:7687")
 
         consumer = HandlerIntentEventConsumer(config, storage)
-        await consumer.initialize(kafka_subscribe, "dev")
+        await consumer.initialize(event_bus_subscribe, "dev")
     """
 
     def __init__(
@@ -194,11 +195,12 @@ class HandlerIntentEventConsumer:
         env_prefix: str = "dev",
         publish_callback: Callable[[str, dict[str, object]], None] | None = None,
     ) -> None:
-        """Initialize Kafka subscription.
+        """Initialize event bus subscription.
 
         Args:
-            subscribe_callback: Function to subscribe to Kafka topic.
-                Signature: (topic, handler) -> unsubscribe_fn
+            subscribe_callback: Function to subscribe to an event bus topic.
+                Signature: (topic, handler) -> unsubscribe_fn.
+                Injected by the runtime layer (e.g., EventBusKafka.subscribe).
             env_prefix: Environment prefix for topic names (e.g., "dev", "staging").
             publish_callback: Optional callback for publishing events.
                 Signature: (topic, message_dict) -> None
@@ -219,7 +221,7 @@ class HandlerIntentEventConsumer:
         self._initialized = True
 
         logger.info(
-            "Kafka subscription initialized",
+            "Event bus subscription initialized",
             extra={
                 "handler": HANDLER_ID_INTENT_CONSUMER,
                 "topic": full_topic,
@@ -228,29 +230,29 @@ class HandlerIntentEventConsumer:
         )
 
     def _handle_message_sync(self, message: dict[str, object]) -> None:
-        """Synchronous message handler wrapper for Kafka callback.
+        """Synchronous message handler wrapper for event bus callback.
 
-        Kafka callbacks are typically synchronous, so this wraps the
+        Event bus callbacks are typically synchronous, so this wraps the
         async handler. In production, use an event loop runner.
 
         Threading Model:
             This method handles two scenarios:
 
-            1. **No running event loop** (e.g., called from a synchronous Kafka
+            1. **No running event loop** (e.g., called from a synchronous
                consumer thread): Creates a new event loop via ``asyncio.run()``.
                Note: In high-throughput scenarios, consider using a dedicated
                event loop thread to avoid per-message loop creation overhead.
 
             2. **Existing event loop** (e.g., called from an async context or
-               when the consumer is integrated with an async Kafka client):
+               when the consumer is integrated with an async event bus client):
                Schedules the handler as a task in the existing loop.
 
-            For production deployments, prefer using an async Kafka client
-            (e.g., aiokafka) that provides native async message handling,
-            avoiding the need for this synchronous wrapper.
+            For production deployments, prefer using an async event bus client
+            that provides native async message handling, avoiding the need for
+            this synchronous wrapper.
 
         Args:
-            message: Raw Kafka message payload.
+            message: Raw event bus message payload.
         """
         try:
             loop = asyncio.get_running_loop()
@@ -269,13 +271,13 @@ class HandlerIntentEventConsumer:
     async def _handle_message(
         self, message: dict[str, object], *, retry_count: int = 0
     ) -> None:
-        """Process a single Kafka message with retry support.
+        """Process a single event bus message with retry support.
 
         On storage failures (not validation errors), retries with exponential
         backoff up to retry_max_attempts times before routing to DLQ.
 
         Args:
-            message: Raw Kafka message payload.
+            message: Raw event bus message payload.
             retry_count: Current retry attempt (0 = first attempt).
         """
         correlation_id: UUID | None = None
@@ -657,9 +659,9 @@ class HandlerIntentEventConsumer:
     async def stop(self) -> None:
         """Graceful shutdown.
 
-        Unsubscribes from Kafka topic, cancels pending message processing tasks,
-        and resets initialization state. Does not shutdown the storage adapter
-        (caller's responsibility).
+        Unsubscribes from event bus topic, cancels pending message processing
+        tasks, and resets initialization state. Does not shutdown the storage
+        adapter (caller's responsibility).
         """
         # Unsubscribe FIRST to prevent new messages during shutdown
         if self._unsubscribe:
@@ -667,7 +669,7 @@ class HandlerIntentEventConsumer:
                 self._unsubscribe()
             except Exception as e:
                 logger.warning(
-                    "Error during Kafka unsubscribe",
+                    "Error during event bus unsubscribe",
                     extra={
                         "handler": HANDLER_ID_INTENT_CONSUMER,
                         "error": str(e),
