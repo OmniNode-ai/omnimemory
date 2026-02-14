@@ -199,6 +199,11 @@ def create_intent_query_dispatch_handler(
 
     Returns:
         Async handler function with signature (envelope, context) -> str.
+
+    Note:
+        Response publishing is best-effort; publish failures are logged but do
+        not cause the handler to fail. The query is considered successful if
+        execute() completes without error.
     """
 
     async def _handle(
@@ -352,7 +357,7 @@ def create_memory_dispatch_engine(
     Creates the engine, registers all omnimemory domain handlers and routes,
     and freezes it. The engine is ready for dispatch after this call.
 
-    Registers 4 handlers covering 5 routes:
+    Registers 3 handlers covering 5 routes:
         1. intent-classified handler (1 route: intent-classified.v1 events)
         2. intent-query handler (1 route: intent-query-requested.v1 commands)
         3. lifecycle handler (3 routes: runtime-tick, archive, expire -- fail-fast)
