@@ -33,9 +33,8 @@ class TestMapEventToStorageRequest:
         assert result.intent_data is not None
         assert result.intent_data.intent_category == "debugging"
         assert result.intent_data.confidence == 0.85
-        assert (
-            result.intent_data.keywords == []
-        )  # Default empty tuple coerced to list by downstream model
+        assert isinstance(result.intent_data.keywords, list)
+        assert result.intent_data.keywords == []
 
     def test_maps_event_with_keywords_forward_compat(self) -> None:
         """Test mapping event with keywords (OMN-1626 forward compatibility)."""
@@ -52,6 +51,7 @@ class TestMapEventToStorageRequest:
         result = map_event_to_storage_request(event)
 
         assert result.intent_data is not None
+        assert isinstance(result.intent_data.keywords, list)
         assert result.intent_data.keywords == ["pull", "request", "review"]
 
     def test_preserves_all_fields(self) -> None:

@@ -34,7 +34,7 @@ def map_event_to_storage_request(
             success=True,
             intent_category=intent_category,
             confidence=event.confidence,
-            keywords=event.keywords,
+            keywords=list(event.keywords),
         ),
         correlation_id=event.correlation_id,
     )

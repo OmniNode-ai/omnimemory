@@ -415,7 +415,7 @@ class HandlerIntentEventConsumer:
                     intent_category=event.intent_category,
                     intent_id=result.intent_id,
                     confidence=event.confidence,
-                    keywords=event.keywords,
+                    keywords=list(event.keywords),
                     created=result.created,
                     execution_time_ms=storage_latency_ms,
                     correlation_id=event.correlation_id,

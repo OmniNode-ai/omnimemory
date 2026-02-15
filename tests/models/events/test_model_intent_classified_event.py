@@ -15,6 +15,7 @@ from omnimemory.models.events.model_intent_classified_event import (
 )
 
 
+@pytest.mark.unit
 class TestModelIntentClassifiedEventJsonDeserialization:
     """Tests for JSON deserialization behavior (the Kafka use case)."""
 
@@ -97,6 +98,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
         assert event.keywords == ()
 
 
+@pytest.mark.unit
 class TestModelIntentClassifiedEventValidation:
     """Tests for validation constraints."""
 
