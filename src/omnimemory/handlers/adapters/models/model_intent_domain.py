@@ -249,8 +249,8 @@ class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter int
     (``"success"``, ``"error"``, ``"not_found"``, ``"no_results"``) to give
     callers more granular outcome information without depending on core types.
 
-    Returned by AdapterIntentGraph.get_session_intents() to provide the
-    list of intents associated with a session.
+    Returned by ``HandlerIntent.query_session()`` to provide the list of
+    intents associated with a session.
 
     Attributes:
         status: Query status indicating the outcome:

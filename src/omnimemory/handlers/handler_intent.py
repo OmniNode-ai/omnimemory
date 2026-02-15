@@ -847,9 +847,12 @@ class HandlerIntent:
             result = await adapter.get_intent_distribution(
                 time_range_hours=time_range_hours,
             )
-            # Record success if operation completed without exception
+            # Record success/failure based on adapter result, consistent
+            # with store_intent and query_session behaviour.
             if result.status == "success":
                 circuit_breaker.record_success()
+            else:
+                circuit_breaker.record_failure()
             return result
         except Exception as e:
             circuit_breaker.record_failure()
