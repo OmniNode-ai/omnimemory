@@ -22,6 +22,13 @@ Observability:
     - ``_registered_count`` / ``_registration_failure_count`` track metrics
     - ``is_registry_ready()`` exposes readiness for health checks
 
+Thread-safety:
+    This module is designed to be called **once** during single-threaded plugin
+    startup.  The ``_registry_lock`` protects individual reads and writes to
+    the module-level observability globals, but it does NOT serialize the entire
+    ``register_memory_message_types`` operation.  Concurrent calls from
+    multiple threads are **not supported** and will produce undefined results.
+
 Related:
     - OMN-2217: Phase 6 -- Wire model registration & entry point declaration
     - OMN-937: Central Message Type Registry implementation
@@ -36,6 +43,9 @@ from typing import TYPE_CHECKING
 from omnibase_infra.enums import EnumMessageCategory
 
 if TYPE_CHECKING:
+    # Annotation-only import: the concrete RegistryMessageType instance is
+    # passed in at runtime by the caller (plugin.py), so no runtime import
+    # is needed here.
     from omnibase_infra.runtime.registry import RegistryMessageType
 
 logger = logging.getLogger(__name__)
@@ -105,6 +115,9 @@ def register_memory_message_types(
 
     The registry is NOT frozen by this function.  The caller is responsible
     for calling ``registry.freeze()`` after all domains have registered.
+
+    .. note:: This function is **not thread-safe** for concurrent callers.
+       It is designed to be invoked once during single-threaded plugin startup.
 
     On success the module-level readiness flag is set to ``True`` and the
     ``_registered_count`` counter is updated.  On failure the readiness flag
