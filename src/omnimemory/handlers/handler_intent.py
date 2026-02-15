@@ -724,11 +724,13 @@ class HandlerIntent:
                 min_confidence=min_confidence if min_confidence is not None else 0.0,
                 limit=limit,
             )
-            # Record success if operation completed without exception
+            # Record success/failure based on adapter result.
             # The core ModelIntentQueryResult uses success: bool, so we
             # treat any non-error result as a healthy adapter response.
             if core_result.success:
                 circuit_breaker.record_success()
+            else:
+                circuit_breaker.record_failure()
             # Convert omnibase_core ModelIntentQueryResult to local ModelIntentQueryResult
             has_intents = len(core_result.intents) > 0
             if core_result.success:
