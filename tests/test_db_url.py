@@ -145,6 +145,16 @@ class TestSafeDbUrlDisplay:
         assert "appuser" not in result
         assert "dbpass" not in result
 
+    def test_query_params_stripped(self) -> None:
+        """Test that query parameters (which may contain credentials) are stripped."""
+        url = "postgresql://appuser:dbpass@db.example.com:5432/myapp?sslpassword=secret&sslmode=require"
+        result = safe_db_url_display(url)
+        assert result == "db.example.com:5432/myapp"
+        assert "sslpassword" not in result
+        assert "secret" not in result
+        assert "appuser" not in result
+        assert "dbpass" not in result
+
     def test_import_from_utils_package(self) -> None:
         """Test that safe_db_url_display is importable from utils package."""
         from omnimemory.utils import safe_db_url_display as imported_fn
