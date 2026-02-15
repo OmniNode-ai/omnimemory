@@ -102,6 +102,30 @@ class TestSafeDbUrlDisplay:
         assert result == "dbhost:5432/mydb"
         assert "p%40ss" not in result
 
+    def test_ipv6_host_url(self) -> None:
+        """Test URL with IPv6 host preserves brackets for unambiguous output."""
+        url = "postgresql://user:pass@[::1]:5432/mydb"
+        result = safe_db_url_display(url)
+        assert result == "[::1]:5432/mydb"
+        assert "user" not in result
+        assert "pass" not in result
+
+    def test_ipv6_host_without_port(self) -> None:
+        """Test IPv6 URL without port."""
+        url = "postgresql://user:pass@[::1]/mydb"
+        result = safe_db_url_display(url)
+        assert result == "[::1]/mydb"
+
+    def test_non_postgres_url_logs_warning(self) -> None:
+        """Test that non-PostgreSQL URLs emit a structured warning."""
+        from unittest.mock import patch
+
+        with patch("omnimemory.utils.db_url.logger") as mock_logger:
+            result = safe_db_url_display("https://example.com/path")
+            assert result == "(unparseable URL)"
+            mock_logger.warning.assert_called_once()
+            assert "scheme" in str(mock_logger.warning.call_args)
+
     def test_import_from_utils_package(self) -> None:
         """Test that safe_db_url_display is importable from utils package."""
         from omnimemory.utils import safe_db_url_display as imported_fn

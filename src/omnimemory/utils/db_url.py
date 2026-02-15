@@ -12,7 +12,12 @@ credential masking across all omni repositories.
 
 from __future__ import annotations
 
+import logging
 import urllib.parse
+
+logger = logging.getLogger(__name__)
+
+_FALLBACK = "(unparseable URL)"
 
 
 def safe_db_url_display(url: str) -> str:
@@ -37,9 +42,17 @@ def safe_db_url_display(url: str) -> str:
         # A valid database URL must have a scheme starting with "postgres"
         # (covers both "postgresql" and "postgres").
         if not parsed.scheme.startswith("postgres"):
-            return "(unparseable URL)"
+            logger.warning(
+                "Rejected non-PostgreSQL DB URL scheme",
+                extra={"scheme": parsed.scheme},
+            )
+            return _FALLBACK
 
         host = parsed.hostname or "unknown"
+        # Wrap IPv6 addresses in brackets to avoid ambiguous host:port output
+        # (e.g. "::1:5432/db" is ambiguous without brackets).
+        if ":" in host:
+            host = f"[{host}]"
         port = parsed.port
         database = (parsed.path or "").lstrip("/")
         if port and database:
@@ -50,7 +63,8 @@ def safe_db_url_display(url: str) -> str:
             return f"{host}/{database}"
         return host
     except Exception:
-        return "(unparseable URL)"
+        logger.exception("Failed to parse DB URL for display")
+        return _FALLBACK
 
 
 __all__ = ["safe_db_url_display"]
