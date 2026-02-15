@@ -377,7 +377,7 @@ jobs:
 
       - name: Find and validate contract YAML files
         run: |
-          contracts=$(find src/omnimemory/nodes -name "contract.yaml" -type f)
+          contracts=$(find src/omnimemory/nodes src/omnimemory/handlers -name "contract.yaml" -type f 2>/dev/null)
           if [ -z "$contracts" ]; then
             echo "No contract files found - skipping validation"
             exit 0

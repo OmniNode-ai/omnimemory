@@ -339,7 +339,7 @@ repos:
         entry: poetry run python -m omnimemory.tools.contract_linter
         language: system
         pass_filenames: true
-        files: ^src/omnimemory/nodes/.*/contract\.yaml$
+        files: ^src/omnimemory/(nodes|handlers)/.*/contract\.yaml$
         stages: [pre-commit]
 
       # --------------------------------------------------------------------------

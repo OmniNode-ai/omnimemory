@@ -531,8 +531,8 @@ def load_whitelist(path: Path) -> ModelWhitelistConfig:
     if not path.exists():
         return ModelWhitelistConfig()
 
-    with path.open() as f:
-        data = yaml.safe_load(f) or {}
+    content = path.read_text(encoding="utf-8")
+    data = yaml.safe_load(content) or {}
 
     files: list[ModelWhitelistEntry] = []
     for entry in data.get("files") or []:
