@@ -67,7 +67,10 @@ _registered_count: int = 0
 """Number of message types successfully registered in the last call."""
 
 _registration_failure_count: int = 0
-"""Number of registration failures encountered in the last call."""
+"""Count of failed calls to register_memory_message_types (call-level, not per-type).
+
+Incremented once per failed invocation of the function, regardless of how many
+individual type registrations succeeded before the error."""
 
 _registry_lock = threading.Lock()
 """Guards concurrent access to _registry_ready, _registered_count,
@@ -121,8 +124,8 @@ def register_memory_message_types(
 
     On success the module-level readiness flag is set to ``True`` and the
     ``_registered_count`` counter is updated.  On failure the readiness flag
-    is set to ``False``, ``_registration_failure_count`` is incremented, and
-    the exception is re-raised.
+    is set to ``False``, ``_registration_failure_count`` is incremented once
+    per failed call (call-level, not per-type), and the exception is re-raised.
 
     Args:
         registry: An unfrozen RegistryMessageType instance.
