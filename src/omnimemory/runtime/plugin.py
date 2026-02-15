@@ -207,10 +207,9 @@ class PluginMemory:
             resources_created: list[str] = []
 
             # Register memory message types (OMN-2217)
-            # NOTE: This creates a plugin-local registry for the memory
-            # domain only.  Cross-domain validation requires a kernel-level
-            # shared registry (future enhancement).
-            # NOTE: Cross-domain duplicate detection requires a kernel-level shared registry (future enhancement).
+            # NOTE: This creates a plugin-local registry for the memory domain
+            # only.  Cross-domain validation and duplicate detection require a
+            # kernel-level shared registry (future enhancement).
             from omnibase_infra.runtime.registry import RegistryMessageType
 
             from omnimemory.runtime.message_type_registration import (
