@@ -41,6 +41,9 @@
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
 # validate-kafka-imports            | onex-validation          | python scripts/validation/validate_kafka_imports.py src/
 # validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
+# validate-no-transport-imports     | transport-import-guard   | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime
+# contract-linter                   | contract-validation      | python -m omnimemory.tools.contract_linter <contracts>
+# io-audit                          | io-audit                 | python -m omnimemory.audit
 #
 # IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
 #
@@ -78,7 +81,7 @@ repos:
 
   # Essential file formatting (standard across ecosystem)
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
@@ -297,6 +300,55 @@ repos:
         pass_filenames: false
         files: ^src/.*\.py$
         exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # --------------------------------------------------------------------------
+      # Transport Import Validator - ARCH-002 enforcement (AST-based)
+      # Validates: Nodes do not import transport/I/O libraries at runtime
+      # Scope: Node source files (where ARCH-002 applies)
+      # Purpose: Enforces "Nodes never touch Kafka directly. Runtime owns all
+      #          Kafka plumbing." TYPE_CHECKING imports are allowed.
+      # Banned: aiohttp, httpx, asyncpg, aiokafka, redis, grpc, etc.
+      # Added: OMN-2218
+      # --------------------------------------------------------------------------
+      - id: validate-no-transport-imports
+        name: ARCH-002 Transport Import Guard (AST-based)
+        entry: python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime
+        language: python
+        pass_filenames: false
+        types: [python]
+        files: ^src/omnimemory/nodes/
+        stages: [pre-commit]
+        additional_dependencies: []
+
+      # --------------------------------------------------------------------------
+      # Contract Linter - ONEX contract YAML validation
+      # Validates: Node contracts against structural rules
+      # Scope: Contract YAML files in node directories
+      # Added: OMN-2218
+      # --------------------------------------------------------------------------
+      - id: contract-linter
+        name: ONEX Contract Linter
+        entry: poetry run python -m omnimemory.tools.contract_linter
+        language: system
+        pass_filenames: true
+        files: ^src/omnimemory/nodes/.*/contract\.yaml$
+        stages: [pre-commit]
+
+      # --------------------------------------------------------------------------
+      # I/O Audit - ONEX node purity enforcement
+      # Validates: Compute nodes do not have forbidden I/O patterns
+      # Scope: Node source files and audit module changes
+      # Purpose: Enforces architectural boundary between pure compute and effect nodes
+      # Added: OMN-2218
+      # --------------------------------------------------------------------------
+      - id: io-audit
+        name: I/O Audit (ONEX node purity)
+        entry: poetry run python -m omnimemory.audit
+        language: system
+        pass_filenames: false
+        types: [python]
+        files: ^(src/omnimemory/nodes/|src/omnimemory/audit/)
         stages: [pre-commit]
 
 # Configuration

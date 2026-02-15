@@ -222,6 +222,22 @@ known-first-party = ["omnimemory"]
     "N802",  # AST visitor methods must use CamelCase names (visit_Import, visit_ClassDef)
     "ERA001",  # Commented-out code (validation scripts document code patterns in comments)
 ]
+# Transport import guard uses AST visitor methods (visit_Import, visit_ImportFrom, visit_If)
+"scripts/validate_no_transport_imports.py" = [
+    "N802",  # AST visitor methods use CamelCase (visit_Import, visit_If)
+]
+# CI alignment script uses simple file parsing
+"scripts/validate_ci_precommit_alignment.py" = [
+    "ERA001",  # Commented-out code in examples
+]
+# Tools and audit modules use AST visitors for analysis
+"src/omnimemory/tools/*" = [
+    "N802",  # AST visitor methods use CamelCase
+    "ERA001",  # Documented code patterns in comments
+]
+"src/omnimemory/audit/*" = [
+    "N802",  # AST visitor methods use CamelCase (visit_Import, visit_Call, etc.)
+]
 # Test-only rules - acceptable in test files
 "tests/**/*" = [
     "SLF001",  # Private member accessed (tests need to verify internals)

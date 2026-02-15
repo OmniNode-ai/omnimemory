@@ -1,0 +1,83 @@
+---
+# Required Status Checks for `main` Branch Protection
+#
+# This manifest documents the canonical list of required checks.
+# If you rename a CI job, you MUST update both this file and the
+# branch protection settings (Settings > Branches > main).
+#
+# Added: OMN-2218 (subsuming OMN-2186)
+# Last verified: 2026-02-15
+# Pattern: OMN-1876 (omniclaude PR #137)
+
+required_checks:
+  # -- Phase 1: Quick Validation (parallel, ~2-5 min) -------------------------
+
+  - name: "Migration Freeze Check"
+    workflow: test.yml
+    job_id: migration-freeze
+    conditional: false
+    rationale: "Blocks new migrations during DB-per-repo refactor (OMN-2055)"
+
+  - name: "Code Quality"
+    workflow: test.yml
+    job_id: lint
+    conditional: false
+    rationale: "Comprehensive code quality validation (ruff format, ruff check, mypy strict)"
+
+  - name: "Pyright Type Checking"
+    workflow: test.yml
+    job_id: pyright
+    conditional: false
+    rationale: "Complementary type checking to mypy (basic mode)"
+
+  - name: "ONEX Validation"
+    workflow: test.yml
+    job_id: onex-validation
+    conditional: false
+    rationale: "ONEX pattern validation (pydantic, naming, enums, secrets, imports, model locations)"
+
+  - name: "Contract Validation"
+    workflow: test.yml
+    job_id: contract-validation
+    conditional: false
+    rationale: "Validates ONEX contract YAML files - structural correctness of node contracts"
+
+  - name: "I/O Audit"
+    workflow: test.yml
+    job_id: io-audit
+    conditional: false
+    rationale: "ONEX node purity enforcement - compute nodes must not contain forbidden I/O patterns"
+
+  - name: "Transport Import Guard"
+    workflow: test.yml
+    job_id: transport-import-guard
+    conditional: false
+    rationale: "ARCH-002: no direct transport/I/O imports in nodes/ (must use Protocol abstractions)"
+
+  - name: "Verify Architecture Handshake"
+    workflow: test.yml
+    job_id: check-handshake
+    conditional: true
+    condition: "Skipped on fork PRs (forks may not have access to cross-repo checkout)"
+    rationale: "Cross-repo architecture handshake with omnibase_core is current"
+
+  # -- Phase 2: Full Test Suite ------------------------------------------------
+
+  - name: "Tests"
+    workflow: test.yml
+    job_id: test
+    conditional: false
+    rationale: "Full test suite (depends on lint, pyright, onex-validation)"
+
+  # -- Phase 3: Aggregation ----------------------------------------------------
+
+  - name: "Test Summary"
+    workflow: test.yml
+    job_id: test-summary
+    conditional: false  # uses if: always() so it always runs
+    rationale: "Aggregator for all CI jobs. Treats check-handshake skipped as acceptable for fork PRs."
+
+# -- Explicitly excluded from required checks --------------------------------
+excluded_checks:
+  - name: "pre-commit"
+    reason: "pre-commit.ci runs independently. Local pre-commit hooks mirror CI jobs."

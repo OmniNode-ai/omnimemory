@@ -1,0 +1,36 @@
+---
+# I/O Audit Whitelist for omnimemory
+#
+# This file defines exceptions for the I/O audit (ONEX node purity enforcement).
+# Files listed here may contain specific I/O patterns that would otherwise be flagged.
+#
+# IMPORTANT: This is the primary source of truth for I/O exceptions.
+# Inline pragmas (# io-audit: ignore-next-line <rule>) ONLY work for files
+# that are listed in this whitelist.
+#
+# Valid rule IDs: net-client, env-access, file-io
+#
+# See src/omnimemory/audit/io_audit.py for full documentation.
+
+schema_version: "1.0.0"
+
+files:
+  # Effect nodes are allowed to have I/O - they are the designated I/O boundary
+  # Add entries here as effect nodes are implemented that require specific I/O
+
+  # Pre-existing violations from Phase 2 handlers (Phase 3 will refactor these)
+  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_archive.py"
+    reason: "Pre-existing handler uses asyncpg and os.environ directly; Phase 3 will inject via DI"
+    allowed_rules:
+      - "net-client"
+      - "env-access"
+
+  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_expire.py"
+    reason: "Pre-existing handler uses asyncpg directly; Phase 3 will inject via DI"
+    allowed_rules:
+      - "net-client"
+
+  - path: "src/omnimemory/nodes/memory_retrieval_effect/clients/embedding_client.py"
+    reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
+    allowed_rules:
+      - "net-client"
