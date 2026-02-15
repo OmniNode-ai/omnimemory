@@ -214,10 +214,14 @@ def _format_text_output(
             lines.append(f"[{status}] {file_path}")
         elif verbose:
             lines.append(f"[{status}] {file_path}")
-            for error in result.get("errors", []):
+            errors_raw = result.get("errors", [])
+            errors_list = list(errors_raw) if isinstance(errors_raw, list) else []
+            for error in errors_list:
                 lines.append(f"  - {error}")
         else:
-            error_count = len(result.get("errors", []))
+            errors_raw = result.get("errors", [])
+            errors_list = list(errors_raw) if isinstance(errors_raw, list) else []
+            error_count = len(errors_list)
             lines.append(f"[{status}] {file_path} ({error_count} error(s))")
 
     total = len(results)
