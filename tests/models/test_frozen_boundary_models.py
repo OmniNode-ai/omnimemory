@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
+from omnibase_core.models.primitives import ModelSemVer
 from pydantic import ValidationError
 
 from omnimemory.models.events.model_intent_classified_event import (
@@ -304,3 +305,80 @@ class TestModelEventCollectionMutable:
         )
         with pytest.raises(ValidationError):
             collection.events[0].message = "changed"  # type: ignore[misc]
+
+
+@pytest.mark.unit
+class TestModelNotificationEventVersionSemVer:
+    """Verify ModelNotificationEvent.version is ModelSemVer with round-trip fidelity."""
+
+    def test_version_is_model_semver(self) -> None:
+        """Assert the version field is an instance of ModelSemVer."""
+        event = ModelNotificationEvent(
+            event_id="evt-ver-001",
+            topic="memory.item.created",
+            payload=ModelNotificationEventPayload(
+                entity_type="item",
+                entity_id="item-001",
+                action="created",
+            ),
+        )
+        assert isinstance(event.version, ModelSemVer)
+
+    def test_version_round_trip_serialization(self) -> None:
+        """Serialize to JSON, verify version structure, round-trip back.
+
+        Uses model_dump_json / model_validate_json because
+        ModelNotificationEvent has strict=True, which rejects coerced
+        types (e.g. datetime from string) through model_validate(dict).
+        """
+        event = ModelNotificationEvent(
+            event_id="evt-ver-002",
+            topic="memory.item.updated",
+            payload=ModelNotificationEventPayload(
+                entity_type="item",
+                entity_id="item-002",
+                action="updated",
+            ),
+            version=ModelSemVer(major=2, minor=3, patch=4),
+        )
+
+        # Verify the dict representation has the expected semver structure
+        serialized = event.model_dump(mode="json")
+        assert isinstance(serialized["version"], dict)
+        assert serialized["version"]["major"] == 2
+        assert serialized["version"]["minor"] == 3
+        assert serialized["version"]["patch"] == 4
+
+        # Round-trip through JSON string to honour strict=True on the model
+        json_str = event.model_dump_json()
+        restored = ModelNotificationEvent.model_validate_json(json_str)
+        assert isinstance(restored.version, ModelSemVer)
+        assert restored.version.major == 2
+        assert restored.version.minor == 3
+        assert restored.version.patch == 4
+
+
+@pytest.mark.unit
+class TestFrozenBoundaryModelConfigGuardRails:
+    """Guard-rail: introspect model_config to assert frozen=True on boundary models.
+
+    This prevents accidental regression where frozen=True is removed from a
+    boundary-crossing model's ConfigDict.  Mirrors the inverse test
+    ``TestModelEventCollectionMutable.test_config_not_frozen`` which guards
+    that the builder model stays mutable.
+    """
+
+    def test_model_intent_classified_event_config_frozen(self) -> None:
+        assert ModelIntentClassifiedEvent.model_config.get("frozen") is True
+
+    def test_audit_event_details_config_frozen(self) -> None:
+        assert AuditEventDetails.model_config.get("frozen") is True
+
+    def test_model_event_data_config_frozen(self) -> None:
+        assert ModelEventData.model_config.get("frozen") is True
+
+    def test_model_notification_event_config_frozen(self) -> None:
+        assert ModelNotificationEvent.model_config.get("frozen") is True
+
+    def test_model_notification_event_payload_config_frozen(self) -> None:
+        assert ModelNotificationEventPayload.model_config.get("frozen") is True

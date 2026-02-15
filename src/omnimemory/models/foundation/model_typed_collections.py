@@ -380,6 +380,12 @@ class ModelConfiguration(BaseModel):
 class ModelEventData(BaseModel):
     """Strongly typed event data for system events."""
 
+    # validate_assignment=True is intentionally retained alongside frozen=True:
+    # frozen=True raises FrozenInstanceError (a TypeError) on assignment attempts,
+    # but validate_assignment=True ensures that any mutation path that bypasses
+    # the frozen guard (e.g., object.__setattr__) would still raise a
+    # ValidationError rather than silently accepting invalid data. This is a
+    # defense-in-depth measure to guarantee schema-validated rejection.
     model_config = ConfigDict(
         frozen=True, validate_assignment=True, str_strip_whitespace=True, extra="forbid"
     )
