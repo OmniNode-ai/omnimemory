@@ -92,6 +92,7 @@ class ModelAuditEvent(BaseModel):
     sanitized: bool = Field(default=False, description="Whether data was sanitized")
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
         validate_default=True,
         str_strip_whitespace=True,

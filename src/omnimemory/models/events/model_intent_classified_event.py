@@ -16,7 +16,7 @@ class ModelIntentClassifiedEvent(BaseModel):
     an omniintelligence-owned event; omnimemory is a consumer.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore")
 
     event_type: Literal["IntentClassified"] = Field(
         "IntentClassified", description="Event type discriminator for message routing"
