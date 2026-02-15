@@ -8,11 +8,33 @@ types used across plugin and wiring tests.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
 from uuid import uuid4
 
 import pytest
+
+import omnimemory.runtime.message_type_registration as _mtr_module
+
+
+@pytest.fixture(autouse=True)
+def _reset_observability_globals() -> Iterator[None]:
+    """Reset module-level observability state before each test.
+
+    Without this reset the globals (_registry_ready, _registered_count,
+    _registration_failure_count) persist across tests.  Under parallel
+    execution (pytest-xdist) or reordered collection this causes flaky
+    assertions that depend on "clean slate" state.
+    """
+    with _mtr_module._registry_lock:
+        _mtr_module._registry_ready = False
+        _mtr_module._registered_count = 0
+        _mtr_module._registration_failure_count = 0
+    yield
+    with _mtr_module._registry_lock:
+        _mtr_module._registry_ready = False
+        _mtr_module._registered_count = 0
+        _mtr_module._registration_failure_count = 0
 
 
 @pytest.fixture(autouse=True)

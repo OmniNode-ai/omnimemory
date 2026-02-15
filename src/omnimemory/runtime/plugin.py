@@ -210,6 +210,7 @@ class PluginMemory:
             # NOTE: This creates a plugin-local registry for the memory
             # domain only.  Cross-domain validation requires a kernel-level
             # shared registry (future enhancement).
+            # TODO(OMN-2217): Track kernel-level shared registry for cross-domain validation
             from omnibase_infra.runtime.registry import RegistryMessageType
 
             from omnimemory.runtime.message_type_registration import (

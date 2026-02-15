@@ -139,6 +139,9 @@ def register_memory_message_types(
     # Reset readiness and failure counter at the start of each registration
     # attempt so that metrics reflect the last call only, and a retry after
     # a previous failure does not report stale readiness.
+    # Lock protects reader functions (is_registry_ready, get_registered_count,
+    # etc.) from seeing partially-written globals.  This does NOT make the
+    # function safe for concurrent callers -- see module docstring.
     with _registry_lock:
         _registry_ready = False
         _registered_count = 0
