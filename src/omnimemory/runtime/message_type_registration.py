@@ -64,13 +64,20 @@ _registry_ready: bool = False
 """Module-level readiness flag.  True after successful registration."""
 
 _registered_count: int = 0
-"""Number of message types successfully registered in the last call."""
+"""Number of message types successfully registered in the most recent call.
+
+Reset to ``0`` at the start of each invocation of
+``register_memory_message_types``, so this reflects only the most recent
+call, not a cumulative total across multiple invocations.
+"""
 
 _registration_failure_count: int = 0
-"""Count of failed calls to register_memory_message_types (call-level, not per-type).
+"""Failure indicator for the most recent call to ``register_memory_message_types``.
 
-Incremented once per failed invocation of the function, regardless of how many
-individual type registrations succeeded before the error."""
+Set to ``1`` if the last call failed, ``0`` if it succeeded (or if no call
+has been made yet).  Reset at the start of each invocation, so this reflects
+only the most recent call, not a cumulative total.
+"""
 
 _registry_lock = threading.Lock()
 """Guards concurrent access to _registry_ready, _registered_count,
@@ -122,10 +129,12 @@ def register_memory_message_types(
     .. note:: This function is **not thread-safe** for concurrent callers.
        It is designed to be invoked once during single-threaded plugin startup.
 
-    On success the module-level readiness flag is set to ``True`` and the
-    ``_registered_count`` counter is updated.  On failure the readiness flag
-    is set to ``False``, ``_registration_failure_count`` is incremented once
-    per failed call (call-level, not per-type), and the exception is re-raised.
+    On success the module-level readiness flag is set to ``True`` and
+    ``_registered_count`` is set to the number of types registered.  On
+    failure the readiness flag is set to ``False`` and
+    ``_registration_failure_count`` is set to ``1``.  Both counters are
+    reset at the start of each invocation, so they always reflect the
+    outcome of the most recent call only.
 
     Args:
         registry: An unfrozen RegistryMessageType instance.
