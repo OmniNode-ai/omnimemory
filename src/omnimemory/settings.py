@@ -14,7 +14,6 @@ Example environment variables:
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from pydantic import Field, HttpUrl, PostgresDsn, SecretStr
@@ -117,6 +116,15 @@ class PostgresSettings(BaseSettings):
         extra="forbid",
     )
 
+    omnimemory_db_url: PostgresDsn = Field(
+        ...,
+        validation_alias="OMNIMEMORY_DB_URL",
+        description=(
+            "Full PostgreSQL connection URL with credentials "
+            "(e.g., postgresql://user:pass@localhost:5432/omnimemory)"
+        ),
+    )
+
     pool_size: int = Field(
         default=5,
         ge=1,
@@ -160,26 +168,16 @@ class PostgresSettings(BaseSettings):
     def to_config(self) -> ModelPostgresConfig:
         """Convert settings to config model.
 
-        Reads OMNIMEMORY_DB_URL from the environment for the connection DSN.
-        Fails fast with a clear error if OMNIMEMORY_DB_URL is not set.
+        Uses the omnimemory_db_url field (loaded from OMNIMEMORY_DB_URL env var)
+        as the connection DSN. Pydantic-settings validates the field at
+        construction time, so a missing or invalid URL raises
+        ``pydantic.ValidationError`` rather than a late ``RuntimeError``.
 
         Returns:
             ModelPostgresConfig with validated configuration
-
-        Raises:
-            RuntimeError: If OMNIMEMORY_DB_URL is not set.
         """
-        db_url = os.environ.get("OMNIMEMORY_DB_URL")
-        if not db_url:
-            raise RuntimeError(
-                "OMNIMEMORY_DB_URL is not set. "
-                "Set this environment variable to a PostgreSQL connection URL "
-                "(e.g., postgresql://user:pass@localhost:5432/omnimemory). "
-                "No silent fallback to shared databases is allowed."
-            )
-
         return ModelPostgresConfig(
-            dsn=PostgresDsn(db_url),
+            dsn=self.omnimemory_db_url,
             pool_size=self.pool_size,
             pool_timeout_seconds=self.pool_timeout_seconds,
             pool_recycle_seconds=self.pool_recycle_seconds,

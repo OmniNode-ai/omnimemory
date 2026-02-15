@@ -113,16 +113,15 @@ class TestPostgresSettings:
         assert isinstance(config, ModelPostgresConfig)
         assert str(config.dsn).startswith("postgresql://")
 
-    def test_to_config_fails_fast_without_omnimemory_db_url(
+    def test_construction_fails_fast_without_omnimemory_db_url(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test to_config() fails fast when OMNIMEMORY_DB_URL is not set."""
+        """Test PostgresSettings raises ValidationError when OMNIMEMORY_DB_URL is not set."""
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.delenv("OMNIMEMORY_DB_URL", raising=False)
 
-        settings = PostgresSettings()
-        with pytest.raises(RuntimeError, match="OMNIMEMORY_DB_URL is not set"):
-            settings.to_config()
+        with pytest.raises(ValidationError):
+            PostgresSettings()
 
 
 class TestQdrantSettings:
@@ -198,8 +197,9 @@ class TestMemoryServiceSettings:
         settings = MemoryServiceSettings()
         assert settings.postgres_enabled is True
 
-        # to_config() should fail because OMNIMEMORY_DB_URL is missing
-        with pytest.raises(RuntimeError, match="OMNIMEMORY_DB_URL is not set"):
+        # to_config() should fail because OMNIMEMORY_DB_URL is missing,
+        # raising ValidationError from PostgresSettings construction
+        with pytest.raises(ValidationError):
             settings.to_config()
 
     def test_postgres_enabled_with_omnimemory_db_url(

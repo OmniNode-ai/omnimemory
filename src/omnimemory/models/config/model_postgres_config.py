@@ -5,6 +5,7 @@ PostgreSQL storage configuration model following ONEX standards.
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse, urlunparse
 
 from pydantic import (
     BaseModel,
@@ -13,6 +14,8 @@ from pydantic import (
     PostgresDsn,
     field_validator,
 )
+
+_REDACTED = "***"
 
 # PostgreSQL identifier maximum length per SQL standard
 POSTGRES_IDENTIFIER_MAX_LENGTH = 63
@@ -31,6 +34,7 @@ class ModelPostgresConfig(BaseModel):
     # Connection configuration
     dsn: PostgresDsn = Field(
         description="PostgreSQL connection URL (e.g., postgresql://user:pass@host:port/db)",
+        repr=False,
     )
 
     # Connection pool settings
@@ -125,3 +129,31 @@ class ModelPostgresConfig(BaseModel):
                 "only letters, digits, and underscores"
             )
         return v
+
+    def _redacted_dsn(self) -> str:
+        """Return the DSN string with password replaced by a redaction marker."""
+        parsed = urlparse(str(self.dsn))
+        if parsed.password:
+            # Replace password while preserving user and other components
+            netloc = parsed.hostname or ""
+            if parsed.port:
+                netloc = f"{netloc}:{parsed.port}"
+            if parsed.username:
+                netloc = f"{parsed.username}:{_REDACTED}@{netloc}"
+            redacted = urlunparse(parsed._replace(netloc=netloc))
+            return redacted
+        return str(self.dsn)
+
+    def __repr__(self) -> str:
+        """Redact credentials from repr to prevent password leakage in logs."""
+        fields = []
+        for name in self.__class__.model_fields:
+            if name == "dsn":
+                fields.append(f"dsn={self._redacted_dsn()!r}")
+            else:
+                fields.append(f"{name}={getattr(self, name)!r}")
+        return f"{self.__class__.__name__}({', '.join(fields)})"
+
+    def __str__(self) -> str:
+        """Redact credentials from str to prevent password leakage in logs."""
+        return self.__repr__()

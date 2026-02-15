@@ -225,6 +225,35 @@ class TestModelPostgresConfig:
                     schema_name=name,
                 )
 
+    def test_password_redacted_in_str_and_repr(self) -> None:
+        """Test that DSN password is redacted in str() and repr() output."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://dbuser:s3cret_passw0rd@localhost:5432/mydb",
+        )
+        config_str = str(config)
+        config_repr = repr(config)
+
+        # Password must not appear in any string representation
+        assert "s3cret_passw0rd" not in config_str
+        assert "s3cret_passw0rd" not in config_repr
+
+        # Username and host should still be visible for debugging
+        assert "dbuser" in config_str
+        assert "localhost" in config_str
+
+        # Redaction marker should appear
+        assert "***" in config_str
+        assert "***" in config_repr
+
+    def test_dsn_without_password_not_mangled(self) -> None:
+        """Test that a DSN without a password is not altered in repr."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://localhost:5432/mydb",
+        )
+        config_repr = repr(config)
+        # Should contain the DSN without any redaction marker
+        assert "localhost" in config_repr
+
 
 class TestModelQdrantConfig:
     """Tests for Qdrant configuration model."""
@@ -424,3 +453,7 @@ class TestModelMemoryServiceConfig:
         # Secrets should not appear
         assert "qdrant_secret_key" not in config_str
         assert "qdrant_secret_key" not in config_repr
+
+        # Postgres password in DSN must also be redacted
+        assert ":pass@" not in config_str
+        assert ":pass@" not in config_repr
