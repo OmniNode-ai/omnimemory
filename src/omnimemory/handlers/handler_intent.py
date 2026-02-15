@@ -616,10 +616,13 @@ class HandlerIntent:
                 intent_data=intent_data,
                 correlation_id=correlation_id,
             )
-            # Record success if operation completed without exception
-            # Business errors (e.g., validation) are not circuit breaker failures
+            # Record success/failure based on adapter result.
+            # Adapter-level errors (timeouts, connection failures) should trip
+            # the circuit breaker, consistent with query_session behaviour.
             if result.success:
                 circuit_breaker.record_success()
+            else:
+                circuit_breaker.record_failure()
             # Convert omnibase_core ModelIntentStorageResult to local ModelIntentStorageResult
             return ModelIntentStorageResult(
                 status="success" if result.success else "error",

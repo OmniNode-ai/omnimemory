@@ -182,7 +182,7 @@ class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
     This is the handler-local version, distinct from the identically-named
     ``ModelIntentRecord`` in ``omnibase_core.models.intelligence``.  The core
     model is used by the adapter/protocol layer and carries richer typing
-    (e.g., ``ModelIntentCategory`` enum values).  This local version serves
+    (e.g., ``EnumIntentCategory`` enum values).  This local version serves
     the handler's public API surface, exposing simplified string-based fields
     that are easier for callers to consume without depending on core enums.
 
