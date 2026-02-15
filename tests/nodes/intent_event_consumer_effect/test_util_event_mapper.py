@@ -11,6 +11,7 @@ from omnimemory.nodes.intent_event_consumer_effect.utils import (
 )
 
 
+@pytest.mark.unit
 class TestMapEventToStorageRequest:
     """Tests for map_event_to_storage_request function."""
 
@@ -97,6 +98,7 @@ class TestMapEventToStorageRequest:
         assert isinstance(result.intent_data.keywords, list)
 
 
+@pytest.mark.unit
 class TestModelIntentClassifiedEvent:
     """Tests for the ModelIntentClassifiedEvent model."""
 
