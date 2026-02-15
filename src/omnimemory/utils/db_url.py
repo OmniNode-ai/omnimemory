@@ -63,7 +63,7 @@ def safe_db_url_display(url: str) -> str:
             return f"{host}/{database}"
         return host
     except Exception:
-        logger.exception("Failed to parse DB URL for display")
+        logger.warning("Failed to parse DB URL for display")
         return _FALLBACK
 
 

@@ -9,9 +9,12 @@ information for safe logging and error messages.
 
 from __future__ import annotations
 
+import pytest
+
 from omnimemory.utils.db_url import safe_db_url_display
 
 
+@pytest.mark.unit
 class TestSafeDbUrlDisplay:
     """Tests for safe_db_url_display()."""
 
@@ -89,11 +92,11 @@ class TestSafeDbUrlDisplay:
 
     def test_ip_address_url(self) -> None:
         """Test URL with IP address host."""
-        url = "postgresql://postgres:s3cret@192.168.86.200:5436/omninode_bridge"
+        url = "postgresql://dbadmin:secretpass@192.168.86.200:5436/omninode_bridge"
         result = safe_db_url_display(url)
         assert result == "192.168.86.200:5436/omninode_bridge"
-        assert "s3cret" not in result
-        assert "postgres" not in result
+        assert "secretpass" not in result
+        assert "dbadmin" not in result
 
     def test_special_characters_in_password(self) -> None:
         """Test URL with special characters in password."""
