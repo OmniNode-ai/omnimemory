@@ -245,6 +245,34 @@ class TestModelPostgresConfig:
         assert "***" in config_str
         assert "***" in config_repr
 
+    def test_password_redacted_in_model_dump(self) -> None:
+        """Test that model_dump() does NOT contain the raw password in dsn."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://dbuser:s3cret_passw0rd@localhost:5432/mydb",
+        )
+        dumped = config.model_dump()
+        dsn_value = dumped["dsn"]
+
+        # Raw password must never appear in serialized output
+        assert "s3cret_passw0rd" not in dsn_value
+
+        # Redaction marker should be present instead
+        assert "***" in dsn_value
+
+        # Username and host should survive redaction for debuggability
+        assert "dbuser" in dsn_value
+        assert "localhost" in dsn_value
+
+    def test_password_redacted_in_model_dump_json(self) -> None:
+        """Test that model_dump_json() does NOT contain the raw password."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://dbuser:s3cret_passw0rd@localhost:5432/mydb",
+        )
+        json_str = config.model_dump_json()
+
+        assert "s3cret_passw0rd" not in json_str
+        assert "***" in json_str
+
     def test_dsn_without_password_not_mangled(self) -> None:
         """Test that a DSN without a password is not altered in repr."""
         config = ModelPostgresConfig(

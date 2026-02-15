@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     Field,
     PostgresDsn,
+    field_serializer,
     field_validator,
 )
 
@@ -131,7 +132,11 @@ class ModelPostgresConfig(BaseModel):
         return v
 
     def _redacted_dsn(self) -> str:
-        """Return the DSN string with password replaced by a redaction marker."""
+        """Return the DSN string with password replaced by a redaction marker.
+
+        DSNs without a password component are returned unmodified since there
+        is nothing sensitive to redact.
+        """
         parsed = urlparse(str(self.dsn))
         if parsed.password:
             # Replace password while preserving user and other components
@@ -142,7 +147,13 @@ class ModelPostgresConfig(BaseModel):
                 netloc = f"{parsed.username}:{_REDACTED}@{netloc}"
             redacted = urlunparse(parsed._replace(netloc=netloc))
             return redacted
+        # No password present — nothing to redact
         return str(self.dsn)
+
+    @field_serializer("dsn")
+    def _serialize_dsn(self, dsn: PostgresDsn, _info: object) -> str:
+        """Redact password when serializing via model_dump() / model_dump_json()."""
+        return self._redacted_dsn()
 
     def __repr__(self) -> str:
         """Redact credentials from repr to prevent password leakage in logs."""
