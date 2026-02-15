@@ -44,6 +44,7 @@ from omnimemory.models.utils.model_audit import (
 )
 
 
+@pytest.mark.unit
 class TestModelNotificationEventFrozen:
     """Verify ModelNotificationEvent is frozen and rejects mutation."""
 
@@ -88,6 +89,7 @@ class TestModelNotificationEventFrozen:
         assert event.payload.entity_type == "item"
 
 
+@pytest.mark.unit
 class TestModelNotificationEventPayloadFrozen:
     """Verify ModelNotificationEventPayload is frozen."""
 
@@ -110,6 +112,7 @@ class TestModelNotificationEventPayloadFrozen:
             )
 
 
+@pytest.mark.unit
 class TestModelIntentClassifiedEventFrozen:
     """Verify ModelIntentClassifiedEvent is frozen with extra=ignore."""
 
@@ -152,6 +155,7 @@ class TestModelIntentClassifiedEventFrozen:
         assert event.intent_category == "debugging"
 
 
+@pytest.mark.unit
 class TestModelAuditEventFrozen:
     """Verify ModelAuditEvent is frozen."""
 
@@ -195,6 +199,7 @@ class TestModelAuditEventFrozen:
         assert event.event_type == AuditEventType.MEMORY_STORE
 
 
+@pytest.mark.unit
 class TestAuditMetadataModelsFrozen:
     """Verify audit metadata sub-models are frozen."""
 
@@ -219,6 +224,7 @@ class TestAuditMetadataModelsFrozen:
             perf.operation_latency_ms = 999.0  # type: ignore[misc]
 
 
+@pytest.mark.unit
 class TestModelEventDataFrozen:
     """Verify ModelEventData is frozen."""
 
@@ -251,6 +257,7 @@ class TestModelEventDataFrozen:
         assert data.source == "test"
 
 
+@pytest.mark.unit
 class TestModelEventCollectionMutable:
     """Verify ModelEventCollection remains mutable (builder pattern)."""
 
@@ -281,6 +288,10 @@ class TestModelEventCollectionMutable:
             message="Second",
         )
         assert len(collection.events) == 2
+
+    def test_config_not_frozen(self) -> None:
+        """Guard-rail: ModelEventCollection must NOT be frozen (it's a builder)."""
+        assert ModelEventCollection.model_config.get("frozen") is not True
 
     def test_individual_events_in_collection_are_frozen(self) -> None:
         """Even though the collection is mutable, the events inside are frozen."""

@@ -9,6 +9,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..foundation.model_semver import ModelSemVer
 from .constants import TOPIC_PATTERN, TOPIC_VALIDATION_ERROR
 from .model_notification_event_payload import (
     ModelNotificationEventPayload,  # noqa: TC001 - runtime import for Pydantic field type
@@ -41,8 +42,8 @@ class ModelNotificationEvent(BaseModel):
         default=None,
         description="Source system or service that generated this event",
     )
-    version: str = Field(
-        default="1.0",
+    version: ModelSemVer = Field(
+        default_factory=lambda: ModelSemVer(major=1, minor=0, patch=0),
         description="Event schema version for forward compatibility",
     )
 

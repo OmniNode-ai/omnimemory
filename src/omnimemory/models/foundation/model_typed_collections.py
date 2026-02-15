@@ -380,7 +380,9 @@ class ModelConfiguration(BaseModel):
 class ModelEventData(BaseModel):
     """Strongly typed event data for system events."""
 
-    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(
+        frozen=True, validate_assignment=True, str_strip_whitespace=True, extra="forbid"
+    )
 
     event_type: str = Field(
         description="Type of event (creation, update, deletion, etc.)"
