@@ -17,7 +17,6 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
 
 from omnimemory.bootstrap import (
     BootstrapError,
@@ -132,8 +131,7 @@ class TestBootstrapSuccess:
         config = ModelMemoryServiceConfig(
             filesystem=ModelFilesystemConfig(base_path=tmp_path),
             postgres=ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
             ),
         )
 
@@ -167,8 +165,7 @@ class TestBootstrapSuccess:
         config = ModelMemoryServiceConfig(
             filesystem=ModelFilesystemConfig(base_path=tmp_path),
             postgres=ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
             ),
             qdrant=ModelQdrantConfig(url="http://localhost:6333"),
         )

@@ -199,7 +199,7 @@ class ProtocolIntentGraphAdapter(Protocol):
                 Defaults to implementation-specific maximum.
 
         Returns:
-            ModelIntentQueryResult with the list of intents or error status.
+            Local ``ModelIntentQueryResult`` with string-based status.
             Possible status values:
             - "success": Query completed with results
             - "no_results": Session exists but has no intents matching criteria
@@ -208,7 +208,10 @@ class ProtocolIntentGraphAdapter(Protocol):
 
         Note:
             This method never raises on business errors - it returns
-            an error status in the result model instead.
+            an error status in the result model instead.  The local
+            ``ModelIntentQueryResult`` (string ``status``) is distinct
+            from the core ``ModelIntentQueryResult`` (boolean ``success``)
+            returned by ``ProtocolIntentGraph`` from ``omnibase_spi``.
         """
         ...
 

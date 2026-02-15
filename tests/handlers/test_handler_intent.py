@@ -32,14 +32,18 @@ import pytest
 from omnibase_core.enums.intelligence import EnumIntentCategory
 from omnibase_core.models.intelligence import ModelIntentClassificationOutput
 from omnibase_core.models.intelligence import (
+    ModelIntentQueryResult as CoreIntentQueryResult,
+)
+from omnibase_core.models.intelligence import (
+    ModelIntentRecord as CoreIntentRecord,
+)
+from omnibase_core.models.intelligence import (
     ModelIntentStorageResult as CoreIntentStorageResult,
 )
 
 from omnimemory.handlers.adapters.models import (
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
-    ModelIntentQueryResult,
-    ModelIntentRecord,
 )
 from omnimemory.handlers.handler_intent import (
     CircuitBreakerOpenError,
@@ -73,7 +77,7 @@ class MockAdapterIntentGraph:
         self,
         *,
         store_result: CoreIntentStorageResult | None = None,
-        query_result: ModelIntentQueryResult | None = None,
+        query_result: CoreIntentQueryResult | None = None,
         distribution_result: ModelIntentDistributionResult | None = None,
         health_result: ModelIntentGraphHealth | None = None,
         fail_on_store: bool = False,
@@ -144,7 +148,7 @@ class MockAdapterIntentGraph:
         session_id: str,
         min_confidence: float = 0.0,
         limit: int | None = None,
-    ) -> ModelIntentQueryResult:
+    ) -> CoreIntentQueryResult:
         self.get_session_intents_calls.append(
             {
                 "session_id": session_id,
@@ -159,8 +163,8 @@ class MockAdapterIntentGraph:
         if self._query_result:
             return self._query_result
 
-        return ModelIntentQueryResult(
-            status="success",
+        return CoreIntentQueryResult(
+            success=True,
             intents=[],
         )
 
@@ -605,19 +609,19 @@ class TestOperations:
         self, handler: HandlerIntent, mock_adapter: MockAdapterIntentGraph
     ) -> None:
         """query_session should delegate to adapter correctly."""
-        # Set up expected result
+        # Set up expected result using core models (adapter returns core types)
         expected_intents = [
-            ModelIntentRecord(
+            CoreIntentRecord(
                 intent_id=uuid4(),
-                session_ref="session_123",
-                intent_category="debugging",
+                session_id="session_123",
+                intent_category=EnumIntentCategory.DEBUGGING,
                 confidence=0.92,
                 keywords=["error"],
-                created_at_utc=datetime.now(UTC),
+                created_at=datetime.now(UTC),
             )
         ]
-        mock_adapter._query_result = ModelIntentQueryResult(
-            status="success",
+        mock_adapter._query_result = CoreIntentQueryResult(
+            success=True,
             intents=expected_intents,
         )
 
@@ -986,18 +990,18 @@ class TestIntegration:
         correlation_id: str,
     ) -> None:
         """Test storing intent then querying it back."""
-        # Set up query to return the stored intent
-        stored_intent = ModelIntentRecord(
+        # Set up query to return the stored intent (using core models)
+        stored_intent = CoreIntentRecord(
             intent_id=uuid4(),
-            session_ref="session_123",
-            intent_category=intent_data.intent_category.value,
+            session_id="session_123",
+            intent_category=intent_data.intent_category,
             confidence=intent_data.confidence,
             keywords=intent_data.keywords,
-            created_at_utc=datetime.now(UTC),
+            created_at=datetime.now(UTC),
             correlation_id=UUID(correlation_id),
         )
-        mock_adapter._query_result = ModelIntentQueryResult(
-            status="success",
+        mock_adapter._query_result = CoreIntentQueryResult(
+            success=True,
             intents=[stored_intent],
         )
 

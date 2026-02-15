@@ -127,8 +127,7 @@ class TestModelPostgresConfig:
     def test_valid_config_with_proper_dsn_type(self) -> None:
         """Test valid postgres config with proper PostgresDsn type."""
         config = ModelPostgresConfig(
-            dsn="postgresql://user@localhost:5432/db",
-            password=SecretStr("secret"),
+            dsn="postgresql://user:pass@localhost:5432/db",
         )
         # Verify DSN is proper PostgresDsn type, not a plain string
         assert isinstance(config.dsn, PostgresDsn)
@@ -139,54 +138,18 @@ class TestModelPostgresConfig:
         assert hosts[0].get("host") == "localhost"
         assert hosts[0].get("port") == 5432
 
-    def test_password_is_secret_str(self) -> None:
-        """Test password uses SecretStr type."""
-        config = ModelPostgresConfig(
-            dsn="postgresql://user@localhost/db",
-            password=SecretStr("supersecret"),
-        )
-        assert isinstance(config.password, SecretStr)
-
-    def test_password_not_leaked_in_str(self) -> None:
-        """Test password does NOT appear in string representation."""
-        config = ModelPostgresConfig(
-            dsn="postgresql://user@localhost/db",
-            password=SecretStr("supersecret123"),
-        )
-        # Should NOT appear in str() or repr()
-        assert "supersecret123" not in str(config)
-        assert "supersecret123" not in repr(config)
-
-    def test_password_not_leaked_in_model_dump(self) -> None:
-        """Test password is excluded from model_dump() by default."""
-        config = ModelPostgresConfig(
-            dsn="postgresql://user@localhost/db",
-            password=SecretStr("topsecret"),
-        )
-        # Password field has exclude=True
-        dumped = config.model_dump()
-        assert "password" not in dumped
-
     def test_invalid_dsn_rejected(self) -> None:
         """Test invalid DSN is rejected with ValidationError."""
         with pytest.raises(ValidationError):
             ModelPostgresConfig(
                 dsn="not-a-valid-dsn",
-                password=SecretStr("secret"),
             )
-
-    def test_missing_password_rejected(self) -> None:
-        """Test missing password is rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            ModelPostgresConfig(dsn="postgresql://user@localhost/db")
-        assert "password" in str(exc_info.value).lower()
 
     def test_pool_size_bounds(self) -> None:
         """Test pool_size bounds (1-50)."""
         # Valid
         config = ModelPostgresConfig(
-            dsn="postgresql://user@localhost/db",
-            password=SecretStr("secret"),
+            dsn="postgresql://user:pass@localhost/db",
             pool_size=20,
         )
         assert config.pool_size == 20
@@ -194,16 +157,14 @@ class TestModelPostgresConfig:
         # Too low
         with pytest.raises(ValidationError):
             ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
                 pool_size=0,
             )
 
         # Too high
         with pytest.raises(ValidationError):
             ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
                 pool_size=100,
             )
 
@@ -219,8 +180,7 @@ class TestModelPostgresConfig:
             "verify-full",
         ]:
             config = ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
                 ssl_mode=mode,
             )
             assert config.ssl_mode == mode
@@ -228,8 +188,7 @@ class TestModelPostgresConfig:
         # Invalid mode
         with pytest.raises(ValidationError) as exc_info:
             ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
                 ssl_mode="invalid",
             )
         assert "ssl_mode" in str(exc_info.value)
@@ -245,8 +204,7 @@ class TestModelPostgresConfig:
         ]
         for name in valid_names:
             config = ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
                 schema_name=name,
             )
             assert config.schema_name == name
@@ -263,10 +221,66 @@ class TestModelPostgresConfig:
         for name in invalid_names:
             with pytest.raises(ValidationError):
                 ModelPostgresConfig(
-                    dsn="postgresql://user@localhost/db",
-                    password=SecretStr("secret"),
+                    dsn="postgresql://user:pass@localhost/db",
                     schema_name=name,
                 )
+
+    def test_password_redacted_in_str_and_repr(self) -> None:
+        """Test that DSN password is redacted in str() and repr() output."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://dbuser:s3cret_passw0rd@localhost:5432/mydb",
+        )
+        config_str = str(config)
+        config_repr = repr(config)
+
+        # Password must not appear in any string representation
+        assert "s3cret_passw0rd" not in config_str
+        assert "s3cret_passw0rd" not in config_repr
+
+        # Username and host should still be visible for debugging
+        assert "dbuser" in config_str
+        assert "localhost" in config_str
+
+        # Redaction marker should appear
+        assert "***" in config_str
+        assert "***" in config_repr
+
+    def test_password_redacted_in_model_dump(self) -> None:
+        """Test that model_dump() does NOT contain the raw password in dsn."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://dbuser:s3cret_passw0rd@localhost:5432/mydb",
+        )
+        dumped = config.model_dump()
+        dsn_value = dumped["dsn"]
+
+        # Raw password must never appear in serialized output
+        assert "s3cret_passw0rd" not in dsn_value
+
+        # Redaction marker should be present instead
+        assert "***" in dsn_value
+
+        # Username and host should survive redaction for debuggability
+        assert "dbuser" in dsn_value
+        assert "localhost" in dsn_value
+
+    def test_password_redacted_in_model_dump_json(self) -> None:
+        """Test that model_dump_json() does NOT contain the raw password."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://dbuser:s3cret_passw0rd@localhost:5432/mydb",
+        )
+        json_str = config.model_dump_json()
+
+        assert "s3cret_passw0rd" not in json_str
+        assert "***" in json_str
+
+    def test_dsn_without_password_not_mangled(self) -> None:
+        """Test that a DSN without a password is not altered in repr."""
+        config = ModelPostgresConfig(
+            dsn="postgresql://localhost:5432/mydb",
+        )
+        config_repr = repr(config)
+        # Should contain the DSN without any redaction marker
+        assert "localhost" in config_repr
 
 
 class TestModelQdrantConfig:
@@ -395,8 +409,7 @@ class TestModelMemoryServiceConfig:
         config = ModelMemoryServiceConfig(
             filesystem=ModelFilesystemConfig(base_path=tmp_path),
             postgres=ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("secret"),
+                dsn="postgresql://user:pass@localhost/db",
             ),
             qdrant=ModelQdrantConfig(url="http://localhost:6333"),
         )
@@ -455,8 +468,7 @@ class TestModelMemoryServiceConfig:
         config = ModelMemoryServiceConfig(
             filesystem=ModelFilesystemConfig(base_path=tmp_path),
             postgres=ModelPostgresConfig(
-                dsn="postgresql://user@localhost/db",
-                password=SecretStr("db_secret_password"),
+                dsn="postgresql://user:pass@localhost/db",
             ),
             qdrant=ModelQdrantConfig(
                 url="http://localhost:6333",
@@ -467,7 +479,9 @@ class TestModelMemoryServiceConfig:
         config_repr = repr(config)
 
         # Secrets should not appear
-        assert "db_secret_password" not in config_str
-        assert "db_secret_password" not in config_repr
         assert "qdrant_secret_key" not in config_str
         assert "qdrant_secret_key" not in config_repr
+
+        # Postgres password in DSN must also be redacted
+        assert ":pass@" not in config_str
+        assert ":pass@" not in config_repr

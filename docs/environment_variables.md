@@ -28,8 +28,7 @@ MemoryServiceSettings (top-level)
 |   +-- buffer_size_bytes
 |
 |-- postgres (optional, requires postgres_enabled=true)
-|   |-- dsn (required if enabled)
-|   |-- password (required if enabled)
+|   |-- OMNIMEMORY_DB_URL (required if enabled, top-level env var)
 |   |-- pool_size
 |   |-- pool_timeout_seconds
 |   |-- pool_recycle_seconds
@@ -97,10 +96,20 @@ Filesystem backend is **required** for Phase 1. All memory operations use filesy
 
 Set `OMNIMEMORY__POSTGRES_ENABLED=true` to enable PostgreSQL backend for persistent memory storage.
 
+**Connection URL** (required when enabled):
+
 | Variable | Type | Default | Constraints | Description |
 |----------|------|---------|-------------|-------------|
-| `OMNIMEMORY__POSTGRES__DSN` | PostgresDsn | **required if enabled** | Valid PostgreSQL DSN | PostgreSQL connection DSN |
-| `OMNIMEMORY__POSTGRES__PASSWORD` | SecretStr | **required if enabled** | - | Database password (stored securely) |
+| `OMNIMEMORY_DB_URL` | str | **required if enabled** | Valid PostgreSQL URL | Full PostgreSQL connection URL with credentials |
+
+The service fails fast on startup if `OMNIMEMORY_DB_URL` is not set when postgres is enabled. No silent fallback to shared databases.
+
+**URL Format**: `postgresql://user:password@host:port/database`
+
+**Tuning variables** (prefix: `OMNIMEMORY__POSTGRES__`):
+
+| Variable | Type | Default | Constraints | Description |
+|----------|------|---------|-------------|-------------|
 | `OMNIMEMORY__POSTGRES__POOL_SIZE` | int | `5` | 1 - 50 | Connection pool size |
 | `OMNIMEMORY__POSTGRES__POOL_TIMEOUT_SECONDS` | int | `30` | 1 - 300 | Pool connection acquisition timeout |
 | `OMNIMEMORY__POSTGRES__POOL_RECYCLE_SECONDS` | int | `3600` | 60 - 86400 | Connection recycle time in seconds |
@@ -108,10 +117,6 @@ Set `OMNIMEMORY__POSTGRES_ENABLED=true` to enable PostgreSQL backend for persist
 | `OMNIMEMORY__POSTGRES__LOCK_TIMEOUT_SECONDS` | int | `10` | 1 - 60 | Maximum time to wait for locks |
 | `OMNIMEMORY__POSTGRES__SSL_MODE` | str | `prefer` | Valid SSL mode | SSL mode (disable, allow, prefer, require, verify-ca, verify-full) |
 | `OMNIMEMORY__POSTGRES__SCHEMA_NAME` | str | `omnimemory` | - | PostgreSQL schema name for memory tables |
-
-**DSN Format**: `postgresql://user@host:port/database`
-
-Note: The password is specified separately via `OMNIMEMORY__POSTGRES__PASSWORD` and not included in the DSN for security.
 
 ## Qdrant Configuration (Optional)
 
@@ -176,8 +181,7 @@ OMNIMEMORY__DEBUG_MODE=true
 
 # PostgreSQL
 OMNIMEMORY__POSTGRES_ENABLED=true
-OMNIMEMORY__POSTGRES__DSN=postgresql://omnimemory@localhost:5432/omnimemory_dev
-OMNIMEMORY__POSTGRES__PASSWORD=dev_password
+OMNIMEMORY_DB_URL=postgresql://omnimemory:dev_password@localhost:5432/omnimemory_dev
 OMNIMEMORY__POSTGRES__POOL_SIZE=3
 OMNIMEMORY__POSTGRES__SCHEMA_NAME=omnimemory_dev
 
@@ -210,8 +214,7 @@ OMNIMEMORY__DEBUG_MODE=false
 
 # PostgreSQL (credentials via Vault in production - see Secrets Management)
 OMNIMEMORY__POSTGRES_ENABLED=true
-OMNIMEMORY__POSTGRES__DSN=postgresql://omnimemory@db.prod.internal:5432/omnimemory
-OMNIMEMORY__POSTGRES__PASSWORD=<from-vault>
+OMNIMEMORY_DB_URL=postgresql://omnimemory:<from-vault>@db.prod.internal:5432/omnimemory
 OMNIMEMORY__POSTGRES__POOL_SIZE=20
 OMNIMEMORY__POSTGRES__POOL_TIMEOUT_SECONDS=10
 OMNIMEMORY__POSTGRES__POOL_RECYCLE_SECONDS=1800
@@ -236,7 +239,7 @@ OMNIMEMORY__QDRANT__ON_DISK=true
 | Type | Description | Example |
 |------|-------------|---------|
 | `Path` | Filesystem path (must be absolute) | `/data/omnimemory` |
-| `PostgresDsn` | PostgreSQL connection string | `postgresql://user@host:5432/db` |
+| `PostgresDsn` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
 | `HttpUrl` | HTTP(S) URL | `http://localhost:6333` |
 | `SecretStr` | Sensitive string (not logged) | Password, API key |
 | `bool` | Boolean (`true`/`false`, `1`/`0`, `yes`/`no`) | `true` |
@@ -261,12 +264,12 @@ export OMNIMEMORY__FILESYSTEM__ALLOWED_EXTENSIONS=".json,.txt,.md"
 
 ### Phase 1: Environment Variables
 
-Secrets are loaded from environment variables with `SecretStr` type to prevent accidental logging.
+Database credentials are embedded in the `OMNIMEMORY_DB_URL` connection URL. Other secrets (e.g., Qdrant API keys) use `SecretStr` to prevent accidental logging.
 
 ```python
-# In code - password is never exposed
-config.postgres.password  # SecretStr('**********')
-config.postgres.password.get_secret_value()  # Only way to access raw value
+# Qdrant API key - password is never exposed
+config.qdrant.api_key  # SecretStr('**********')
+config.qdrant.api_key.get_secret_value()  # Only way to access raw value
 ```
 
 The `SecretStr` type ensures that:
@@ -486,8 +489,7 @@ export OMNIMEMORY__FILESYSTEM__BASE_PATH=/tmp/omnimemory
 ```bash
 export OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
 export OMNIMEMORY__POSTGRES_ENABLED=true
-export OMNIMEMORY__POSTGRES__DSN=postgresql://user@localhost:5432/db
-export OMNIMEMORY__POSTGRES__PASSWORD=secret
+export OMNIMEMORY_DB_URL=postgresql://user:secret@localhost:5432/omnimemory
 export OMNIMEMORY__QDRANT_ENABLED=true
 ```
 

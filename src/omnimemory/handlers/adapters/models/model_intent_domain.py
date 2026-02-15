@@ -179,6 +179,13 @@ class ModelIntentStorageResult(BaseModel):  # omnimemory-model-exempt: adapter i
 class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
     """A single intent record returned from query operations.
 
+    This is the handler-local version, distinct from the identically-named
+    ``ModelIntentRecord`` in ``omnibase_core.models.intelligence``.  The core
+    model is used by the adapter/protocol layer and carries richer typing
+    (e.g., ``EnumIntentCategory`` enum values).  This local version serves
+    the handler's public API surface, exposing simplified string-based fields
+    that are easier for callers to consume without depending on core enums.
+
     Represents an intent classification that was previously stored in the
     graph database, including its metadata and timestamps.
 
@@ -234,8 +241,16 @@ class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
 class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter internal
     """Result of an intent query operation.
 
-    Returned by AdapterIntentGraph.get_session_intents() to provide the
-    list of intents associated with a session.
+    This is the handler-local version, distinct from the identically-named
+    ``ModelIntentQueryResult`` in ``omnibase_core.models.intelligence``.  The
+    core model is used by the adapter/protocol layer and carries a boolean
+    ``success`` field plus typed intent records.  This local version serves
+    the handler's public API surface, using a string ``status`` literal
+    (``"success"``, ``"error"``, ``"not_found"``, ``"no_results"``) to give
+    callers more granular outcome information without depending on core types.
+
+    Returned by ``HandlerIntent.query_session()`` to provide the list of
+    intents associated with a session.
 
     Attributes:
         status: Query status indicating the outcome:

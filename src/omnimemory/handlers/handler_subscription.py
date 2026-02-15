@@ -56,7 +56,7 @@ Example::
 
     container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
-        db_dsn="postgresql://user:pass@localhost:5432/omnimemory",
+        db_dsn=os.environ["OMNIMEMORY_DB_URL"],
         valkey_host="localhost",
         valkey_port=6379,
         kafka_bootstrap_servers="localhost:9092",

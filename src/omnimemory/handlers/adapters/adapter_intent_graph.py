@@ -2,7 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Adapter for storing intent classifications in Memgraph.
 
-This adapter structurally conforms to ProtocolIntentGraph from omnibase_spi,
+This adapter implements ProtocolIntentGraph from omnibase_spi,
 providing a Memgraph-backed implementation for storing and retrieving intent
 classifications.
 
@@ -56,7 +56,7 @@ Example::
     Initial implementation for OMN-1457.
 
 .. versionchanged:: 0.2.0
-    Structurally conforms to ProtocolIntentGraph from omnibase_spi (OMN-1476).
+    Implements ProtocolIntentGraph from omnibase_spi (OMN-1476).
 """
 
 from __future__ import annotations
@@ -79,17 +79,18 @@ from omnibase_core.container import ModelONEXContainer
 from omnibase_core.enums.intelligence import EnumIntentCategory
 from omnibase_core.models.intelligence import (
     ModelIntentClassificationOutput,
+    ModelIntentQueryResult,
+    ModelIntentRecord,
     ModelIntentStorageResult,
 )
 from omnibase_core.types.type_json import JsonType
 from omnibase_infra.handlers.handler_graph import HandlerGraph
+from omnibase_spi.protocols import ProtocolIntentGraph
 
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
-    ModelIntentQueryResult,
-    ModelIntentRecord,
 )
 
 __all__ = ["AdapterIntentGraph", "IntentCypherTemplates"]
@@ -245,10 +246,10 @@ class IntentCypherTemplates:
         """
 
 
-class AdapterIntentGraph:
+class AdapterIntentGraph(ProtocolIntentGraph):
     """Adapter that wraps HandlerGraph for intent classification storage.
 
-    Structurally conforms to the ProtocolIntentGraph protocol from omnibase_spi,
+    Implements the ProtocolIntentGraph protocol from omnibase_spi,
     providing a Memgraph-backed implementation for storing and retrieving intent
     classifications.
 
@@ -572,7 +573,7 @@ class AdapterIntentGraph:
     ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
-        Structurally conforms to ProtocolIntentGraph.store_intent.
+        Implements ProtocolIntentGraph.store_intent.
 
         Uses MERGE semantics to create or update the session and intent
         nodes. If an intent with the same category already exists for
@@ -745,7 +746,7 @@ class AdapterIntentGraph:
     ) -> ModelIntentQueryResult:
         """Get intents for a session with optional filtering.
 
-        Structurally conforms to ProtocolIntentGraph.get_session_intents.
+        Implements ProtocolIntentGraph.get_session_intents.
 
         Retrieves intent classifications associated with the specified
         session, ordered by creation time (most recent first).
@@ -767,7 +768,7 @@ class AdapterIntentGraph:
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=str(e),
             )
 
@@ -816,7 +817,7 @@ class AdapterIntentGraph:
                         execution_time_ms,
                     )
                     return ModelIntentQueryResult(
-                        status="no_results",
+                        success=True,
                     )
 
                 # Convert records to intent models
@@ -892,11 +893,11 @@ class AdapterIntentGraph:
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
-                            session_ref=session_id,
-                            intent_category=intent_category.value,
+                            session_id=session_id,
+                            intent_category=intent_category,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at_utc=created_at,
+                            created_at=created_at,
                             correlation_id=correlation_id,
                         )
                     )
@@ -908,8 +909,9 @@ class AdapterIntentGraph:
                     execution_time_ms,
                 )
                 return ModelIntentQueryResult(
-                    status="success" if intents else "no_results",
+                    success=True,
                     intents=intents,
+                    total_count=len(intents),
                 )
 
         except TimeoutError:
@@ -921,7 +923,7 @@ class AdapterIntentGraph:
                 execution_time_ms,
             )
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
@@ -934,7 +936,7 @@ class AdapterIntentGraph:
                 e,
             )
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=f"Query failed: {e}",
             )
 
@@ -1065,7 +1067,7 @@ class AdapterIntentGraph:
         Retrieves intent classifications created within the specified time
         range, optionally filtered by confidence threshold. Results are
         ordered by creation time (most recent first) and include the
-        associated session reference.
+        associated session ID.
 
         Args:
             time_range_hours: Number of hours to look back from now.
@@ -1079,13 +1081,8 @@ class AdapterIntentGraph:
 
         Returns:
             ModelIntentQueryResult with the list of intents or error status.
-            Each intent record includes session_ref populated with the
-            session_id it belongs to.
-
-            Possible status values:
-            - "success": Query completed with results
-            - "no_results": No intents found matching criteria
-            - "error": Query failed
+            Each intent record includes session_id populated with the
+            session it belongs to.
 
         Example::
 
@@ -1095,9 +1092,9 @@ class AdapterIntentGraph:
                 min_confidence=0.8,
                 limit=100,
             )
-            if result.status == "success":
+            if result.success:
                 for intent in result.intents:
-                    print(f"Session {intent.session_ref}: {intent.intent_category}")
+                    print(f"Session {intent.session_id}: {intent.intent_category}")
 
         Note:
             This method never raises on business errors - it returns
@@ -1110,7 +1107,7 @@ class AdapterIntentGraph:
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=str(e),
             )
 
@@ -1161,7 +1158,7 @@ class AdapterIntentGraph:
                         effective_time_range,
                     )
                     return ModelIntentQueryResult(
-                        status="no_results",
+                        success=True,
                     )
 
                 # Convert records to intent models
@@ -1243,11 +1240,11 @@ class AdapterIntentGraph:
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
-                            session_ref=record_session_id,
-                            intent_category=intent_category.value,
+                            session_id=record_session_id,
+                            intent_category=intent_category,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at_utc=created_at,
+                            created_at=created_at,
                             correlation_id=correlation_id,
                         )
                     )
@@ -1259,8 +1256,9 @@ class AdapterIntentGraph:
                 )
 
                 return ModelIntentQueryResult(
-                    status="success" if intents else "no_results",
+                    success=True,
                     intents=intents,
+                    total_count=len(intents),
                 )
 
         except TimeoutError:
@@ -1269,7 +1267,7 @@ class AdapterIntentGraph:
                 self._config.timeout_seconds,
             )
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
@@ -1279,14 +1277,14 @@ class AdapterIntentGraph:
                 e,
             )
             return ModelIntentQueryResult(
-                status="error",
+                success=False,
                 error_message=f"Query failed: {e}",
             )
 
     async def health_check(self) -> bool:
         """Check if the intent graph storage is healthy and accessible.
 
-        Structurally conforms to ProtocolIntentGraph.health_check.
+        Implements ProtocolIntentGraph.health_check.
 
         Returns:
             True if the storage is healthy, False otherwise.

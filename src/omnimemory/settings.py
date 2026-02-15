@@ -6,8 +6,7 @@ variables with the OMNIMEMORY__ prefix and __ nested delimiter.
 Example environment variables:
     OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
     OMNIMEMORY__FILESYSTEM__MAX_FILE_SIZE_BYTES=20971520
-    OMNIMEMORY__POSTGRES__DSN=postgresql://user@localhost/db
-    OMNIMEMORY__POSTGRES__PASSWORD=secret
+    OMNIMEMORY_DB_URL=postgresql://user:pass@localhost:5432/omnimemory
     OMNIMEMORY__QDRANT__URL=http://localhost:6333
     OMNIMEMORY__POSTGRES_ENABLED=true
     OMNIMEMORY__QDRANT_ENABLED=true
@@ -97,9 +96,12 @@ class PostgresSettings(BaseSettings):
 
     Optional backend for persistent memory storage.
 
-    Environment variables (prefix: OMNIMEMORY__POSTGRES__):
-        DSN: PostgreSQL connection DSN (required when enabled)
-        PASSWORD: Database password (required when enabled)
+    Connection URL:
+        OMNIMEMORY_DB_URL: Full PostgreSQL connection URL with credentials
+            (required when postgres is enabled). Fail-fast if not set.
+            Example: postgresql://user:pass@localhost:5432/omnimemory
+
+    Tuning variables (prefix: OMNIMEMORY__POSTGRES__):
         POOL_SIZE: Connection pool size (default: 5)
         POOL_TIMEOUT_SECONDS: Pool acquisition timeout (default: 30)
         POOL_RECYCLE_SECONDS: Connection recycle time (default: 3600)
@@ -114,14 +116,15 @@ class PostgresSettings(BaseSettings):
         extra="forbid",
     )
 
-    dsn: PostgresDsn = Field(
+    omnimemory_db_url: PostgresDsn = Field(
         ...,
-        description="PostgreSQL connection DSN",
+        validation_alias="OMNIMEMORY_DB_URL",
+        description=(
+            "Full PostgreSQL connection URL with credentials "
+            "(e.g., postgresql://user:pass@localhost:5432/omnimemory)"
+        ),
     )
-    password: SecretStr = Field(
-        ...,
-        description="Database password (stored securely)",
-    )
+
     pool_size: int = Field(
         default=5,
         ge=1,
@@ -165,12 +168,16 @@ class PostgresSettings(BaseSettings):
     def to_config(self) -> ModelPostgresConfig:
         """Convert settings to config model.
 
+        Uses the omnimemory_db_url field (loaded from OMNIMEMORY_DB_URL env var)
+        as the connection DSN. Pydantic-settings validates the field at
+        construction time, so a missing or invalid URL raises
+        ``pydantic.ValidationError`` rather than a late ``RuntimeError``.
+
         Returns:
             ModelPostgresConfig with validated configuration
         """
         return ModelPostgresConfig(
-            dsn=self.dsn,
-            password=self.password,
+            dsn=self.omnimemory_db_url,
             pool_size=self.pool_size,
             pool_timeout_seconds=self.pool_timeout_seconds,
             pool_recycle_seconds=self.pool_recycle_seconds,
@@ -332,7 +339,7 @@ class MemoryServiceSettings(BaseSettings):
         - OMNIMEMORY__FILESYSTEM__BASE_PATH (absolute path)
 
     Optional backend enablement:
-        - OMNIMEMORY__POSTGRES_ENABLED=true (then set OMNIMEMORY__POSTGRES__* vars)
+        - OMNIMEMORY__POSTGRES_ENABLED=true (then set OMNIMEMORY_DB_URL)
         - OMNIMEMORY__QDRANT_ENABLED=true (then set OMNIMEMORY__QDRANT__* vars)
 
     Embedding server (required when use_real_embeddings=True):

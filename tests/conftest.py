@@ -39,7 +39,10 @@ what implementations are pending.
 
 Integration Test Environment Variables
 --------------------------------------
-- TEST_DB_DSN: PostgreSQL connection string for subscription tests
+- TEST_DB_DSN: PostgreSQL connection string for integration tests.
+  Always set this explicitly in CI/CD. If unset, get_test_db_dsn()
+  falls back to OMNIMEMORY_DB_URL, which may point to a staging or
+  production database in non-local environments.
 - TEST_VALKEY_HOST: Valkey hostname (default: localhost)
 - TEST_VALKEY_PORT: Valkey port (default: 6379)
 """
@@ -269,10 +272,35 @@ DEFAULT_VALKEY_PORT = 6379
 def get_test_db_dsn() -> str:
     """Get PostgreSQL DSN from environment or default.
 
+    Fallback chain: TEST_DB_DSN -> OMNIMEMORY_DB_URL -> DEFAULT_DB_DSN.
+
+    Checks TEST_DB_DSN first (test-specific override), then
+    OMNIMEMORY_DB_URL (service connection), then falls back to
+    DEFAULT_DB_DSN (localhost).
+
+    WARNING -- OMNIMEMORY_DB_URL fallback risk:
+        In CI/CD or shared environments, OMNIMEMORY_DB_URL is typically
+        set to the application's primary database connection string,
+        which may point to a staging or production database. If
+        TEST_DB_DSN is not explicitly set in those environments, this
+        function will silently fall back to OMNIMEMORY_DB_URL and
+        integration tests will run against a non-test database.
+
+        To avoid this, always set TEST_DB_DSN explicitly in CI/CD
+        pipelines. The OMNIMEMORY_DB_URL fallback exists only as a
+        convenience for local development where the developer's
+        .env typically points to a local or dedicated test instance.
+
     Returns:
         PostgreSQL connection string for tests.
     """
-    return os.environ.get("TEST_DB_DSN", DEFAULT_DB_DSN)
+    # OMNIMEMORY_DB_URL fallback: convenient for local dev, but risky in
+    # CI/CD where it may resolve to staging/production. Always prefer
+    # setting TEST_DB_DSN explicitly in non-local environments.
+    return os.environ.get(
+        "TEST_DB_DSN",
+        os.environ.get("OMNIMEMORY_DB_URL", DEFAULT_DB_DSN),
+    )
 
 
 def get_test_valkey_host() -> str:

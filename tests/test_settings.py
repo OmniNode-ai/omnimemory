@@ -100,30 +100,28 @@ class TestFilesystemSettings:
 class TestPostgresSettings:
     """Tests for postgres settings loading."""
 
-    def test_loads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test postgres settings load from environment."""
+    def test_to_config_reads_omnimemory_db_url(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test to_config() reads OMNIMEMORY_DB_URL from environment."""
         _clear_omnimemory_env_vars(monkeypatch)
-        monkeypatch.setenv(
-            "OMNIMEMORY__POSTGRES__DSN", "postgresql://user@localhost/db"
-        )
-        monkeypatch.setenv("OMNIMEMORY__POSTGRES__PASSWORD", "secret")
-
-        settings = PostgresSettings()
-        assert str(settings.dsn).startswith("postgresql://")
-        assert settings.password.get_secret_value() == "secret"
-
-    def test_to_config_converts_properly(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test to_config() produces ModelPostgresConfig."""
-        _clear_omnimemory_env_vars(monkeypatch)
-        monkeypatch.setenv(
-            "OMNIMEMORY__POSTGRES__DSN", "postgresql://user@localhost/db"
-        )
-        monkeypatch.setenv("OMNIMEMORY__POSTGRES__PASSWORD", "secret")
+        monkeypatch.setenv("OMNIMEMORY_DB_URL", "postgresql://user:pass@localhost/db")
 
         settings = PostgresSettings()
         config = settings.to_config()
 
         assert isinstance(config, ModelPostgresConfig)
+        assert str(config.dsn).startswith("postgresql://")
+
+    def test_construction_fails_fast_without_omnimemory_db_url(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test PostgresSettings raises ValidationError when OMNIMEMORY_DB_URL is not set."""
+        _clear_omnimemory_env_vars(monkeypatch)
+        monkeypatch.delenv("OMNIMEMORY_DB_URL", raising=False)
+
+        with pytest.raises(ValidationError):
+            PostgresSettings()
 
 
 class TestQdrantSettings:
@@ -187,33 +185,31 @@ class TestMemoryServiceSettings:
         assert isinstance(config, ModelMemoryServiceConfig)
         assert config.filesystem.base_path == tmp_path
 
-    def test_postgres_enabled_requires_postgres_settings(
+    def test_postgres_enabled_requires_omnimemory_db_url(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test postgres_enabled=true requires postgres settings."""
+        """Test postgres_enabled=true requires OMNIMEMORY_DB_URL."""
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
-        # Note: Missing OMNIMEMORY__POSTGRES__DSN and PASSWORD
+        monkeypatch.delenv("OMNIMEMORY_DB_URL", raising=False)
 
         settings = MemoryServiceSettings()
         assert settings.postgres_enabled is True
 
-        # to_config() should fail because postgres settings are missing
+        # to_config() should fail because OMNIMEMORY_DB_URL is missing,
+        # raising ValidationError from PostgresSettings construction
         with pytest.raises(ValidationError):
             settings.to_config()
 
-    def test_postgres_enabled_with_settings(
+    def test_postgres_enabled_with_omnimemory_db_url(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test postgres_enabled=true with full settings."""
+        """Test postgres_enabled=true with OMNIMEMORY_DB_URL set."""
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
-        monkeypatch.setenv(
-            "OMNIMEMORY__POSTGRES__DSN", "postgresql://user@localhost/db"
-        )
-        monkeypatch.setenv("OMNIMEMORY__POSTGRES__PASSWORD", "secret")
+        monkeypatch.setenv("OMNIMEMORY_DB_URL", "postgresql://user:pass@localhost/db")
 
         settings = MemoryServiceSettings()
         config = settings.to_config()
@@ -319,12 +315,9 @@ class TestLoadSettings:
         # Filesystem - required
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
 
-        # Postgres - optional but enabled
+        # Postgres - optional but enabled (uses OMNIMEMORY_DB_URL)
         monkeypatch.setenv("OMNIMEMORY__POSTGRES_ENABLED", "true")
-        monkeypatch.setenv(
-            "OMNIMEMORY__POSTGRES__DSN", "postgresql://user@localhost/db"
-        )
-        monkeypatch.setenv("OMNIMEMORY__POSTGRES__PASSWORD", "dbpass")
+        monkeypatch.setenv("OMNIMEMORY_DB_URL", "postgresql://user:dbpass@localhost/db")
         monkeypatch.setenv("OMNIMEMORY__POSTGRES__POOL_SIZE", "10")
 
         # Qdrant (optional but enabled)
