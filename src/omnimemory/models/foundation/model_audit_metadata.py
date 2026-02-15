@@ -31,6 +31,10 @@ class AuditEventDetails(BaseModel):
 
     new_value: str | None = Field(default=None, description="New value after change")
 
+    # NOTE: dict contents remain mutable even on frozen models; this is a known
+    # Pydantic v2 limitation.  frozen=True prevents field *reassignment* but not
+    # in-place mutation of mutable containers.  A MappingProxyType wrapper is not
+    # Pydantic-friendly, so we accept this trade-off and rely on convention.
     request_parameters: dict[str, str] | None = Field(
         default=None, description="Parameters passed with the request"
     )
@@ -114,7 +118,7 @@ class SecurityAuditDetails(BaseModel):
         default=False, description="Whether permission was granted"
     )
 
-    security_scan_results: list[str] | None = Field(
+    security_scan_results: tuple[str, ...] | None = Field(
         default=None, description="Results of security scanning"
     )
 

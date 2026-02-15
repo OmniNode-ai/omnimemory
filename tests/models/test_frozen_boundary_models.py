@@ -394,3 +394,42 @@ class TestFrozenBoundaryModelConfigGuardRails:
 
     def test_performance_audit_details_config_frozen(self) -> None:
         assert PerformanceAuditDetails.model_config.get("frozen") is True
+
+
+@pytest.mark.unit
+class TestFrozenModelMutableContainerLimitation:
+    """Document known Pydantic v2 limitation: frozen prevents field reassignment but not container mutation.
+
+    These tests exist to *document* the behaviour, not endorse it.
+    See inline comments on dict fields in the model modules for the rationale.
+    """
+
+    def test_frozen_model_dict_contents_remain_mutable(self) -> None:
+        """Dict values inside a frozen model can still be mutated in-place."""
+        event = ModelNotificationEvent(
+            event_id="evt-mut-001",
+            topic="memory.item.created",
+            payload=ModelNotificationEventPayload(
+                entity_type="item",
+                entity_id="item-001",
+                action="created",
+            ),
+            metadata={"key": "value"},
+        )
+        # frozen=True prevents field reassignment
+        with pytest.raises(ValidationError):
+            event.metadata = {"new": "dict"}  # type: ignore[misc]
+        # But dict contents are still mutable (known Pydantic v2 limitation)
+        assert event.metadata is not None
+        event.metadata["key"] = "mutated"
+        assert event.metadata["key"] == "mutated"
+
+    def test_frozen_model_tuple_contents_are_immutable(self) -> None:
+        """Tuple fields (e.g. security_scan_results) are truly immutable."""
+        details = SecurityAuditDetails(
+            security_scan_results=("clean", "no_issues"),
+        )
+        with pytest.raises(ValidationError):
+            details.security_scan_results = ("replaced",)  # type: ignore[misc]
+        # Tuple contents cannot be mutated -- this is the safer pattern
+        assert details.security_scan_results == ("clean", "no_issues")

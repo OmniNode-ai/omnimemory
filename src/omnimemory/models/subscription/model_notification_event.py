@@ -34,6 +34,9 @@ class ModelNotificationEvent(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         description="When the event was created",
     )
+    # NOTE: dict contents remain mutable even on frozen models; this is a known
+    # Pydantic v2 limitation.  frozen=True prevents field *reassignment* but not
+    # in-place mutation of mutable containers.
     metadata: dict[str, str] | None = Field(
         default=None,
         description="Optional event metadata for routing or filtering",

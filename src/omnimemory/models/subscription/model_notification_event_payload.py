@@ -21,6 +21,9 @@ class ModelNotificationEventPayload(BaseModel):
     action: str = Field(
         description="Action that occurred (e.g., 'created', 'updated', 'deleted')",
     )
+    # NOTE: dict contents remain mutable even on frozen models; this is a known
+    # Pydantic v2 limitation.  frozen=True prevents field *reassignment* but not
+    # in-place mutation of mutable containers.
     changes: dict[str, str] | None = Field(
         default=None,
         description="Key-value pairs of fields that changed (for updates)",
