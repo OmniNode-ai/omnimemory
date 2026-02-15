@@ -110,6 +110,24 @@ def get_registration_metrics() -> dict[str, int]:
         }
 
 
+def _reset_for_testing() -> None:
+    """Reset all module-level observability globals to their initial state.
+
+    This function is intended **exclusively for test fixtures** that need a
+    clean slate between test cases.  It acquires ``_registry_lock`` and
+    resets ``_registry_ready``, ``_registered_count``, and
+    ``_registration_failure_count`` to their default values.
+
+    Production code should never call this function.
+    """
+    global _registry_ready, _registered_count, _registration_failure_count  # noqa: PLW0603
+
+    with _registry_lock:
+        _registry_ready = False
+        _registered_count = 0
+        _registration_failure_count = 0
+
+
 def register_memory_message_types(
     registry: RegistryMessageType,
 ) -> list[str]:
@@ -293,7 +311,7 @@ def register_memory_message_types(
 
     except Exception:
         with _registry_lock:
-            _registration_failure_count += 1
+            _registration_failure_count = 1
             _registry_ready = False
             failure_count_snapshot = _registration_failure_count
         logger.exception(
@@ -325,6 +343,7 @@ def register_memory_message_types(
 __all__ = [
     "EXPECTED_MESSAGE_TYPE_COUNT",
     "MEMORY_DOMAIN",
+    "_reset_for_testing",
     "get_registration_metrics",
     "is_registry_ready",
     "register_memory_message_types",

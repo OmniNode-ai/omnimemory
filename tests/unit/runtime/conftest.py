@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import pytest
 
-import omnimemory.runtime.message_type_registration as _mtr_module
+from omnimemory.runtime.message_type_registration import _reset_for_testing
 
 
 @pytest.fixture(autouse=True)
@@ -26,15 +26,9 @@ def _reset_observability_globals() -> Iterator[None]:
     execution (pytest-xdist) or reordered collection this causes flaky
     assertions that depend on "clean slate" state.
     """
-    with _mtr_module._registry_lock:
-        _mtr_module._registry_ready = False
-        _mtr_module._registered_count = 0
-        _mtr_module._registration_failure_count = 0
+    _reset_for_testing()
     yield
-    with _mtr_module._registry_lock:
-        _mtr_module._registry_ready = False
-        _mtr_module._registered_count = 0
-        _mtr_module._registration_failure_count = 0
+    _reset_for_testing()
 
 
 @pytest.fixture(autouse=True)
