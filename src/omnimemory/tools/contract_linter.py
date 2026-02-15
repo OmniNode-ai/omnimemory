@@ -165,7 +165,7 @@ def validate_contract(file_path: str | Path) -> dict[str, object]:
             return {
                 "file_path": str(path),
                 "is_valid": result.is_valid,
-                "errors": errors if errors else result.violations,
+                "errors": errors,
                 "contract_type": contract_type,
             }
     elif contract_type == "unknown":

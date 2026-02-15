@@ -231,6 +231,9 @@ class IOAuditVisitor(ast.NodeVisitor):
         self._honor_inline_pragmas = honor_inline_pragmas
         self._pragmas: dict[int, ModelInlinePragma] = {}
         self._imported_names: dict[str, str] = {}
+        self._in_type_checking_block: bool = False
+        self._type_checking_module_aliases: set[str] = set()
+        self._type_checking_constant_aliases: set[str] = set()
 
         self._parse_pragmas()
 
@@ -271,11 +274,59 @@ class IOAuditVisitor(ast.NodeVisitor):
             )
         )
 
+    def _is_type_checking_guard(self, node: ast.If) -> bool:
+        """Detect if an If node is a TYPE_CHECKING guard.
+
+        Handles:
+        - ``if TYPE_CHECKING:`` (direct import)
+        - ``if TC:`` (when ``from typing import TYPE_CHECKING as TC``)
+        - ``if typing.TYPE_CHECKING:`` (module-qualified)
+        - ``if t.TYPE_CHECKING:`` (when ``import typing as t``)
+        """
+        test = node.test
+
+        if isinstance(test, ast.Name) and (
+            test.id == "TYPE_CHECKING"
+            or test.id in self._type_checking_constant_aliases
+        ):
+            return True
+
+        if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+            if isinstance(test.value, ast.Name):
+                if (
+                    test.value.id == "typing"
+                    or test.value.id in self._type_checking_module_aliases
+                ):
+                    return True
+            return False
+
+        return False
+
+    def visit_If(self, node: ast.If) -> None:
+        """Handle If statements, detecting TYPE_CHECKING guards."""
+        if self._is_type_checking_guard(node):
+            old_state = self._in_type_checking_block
+            self._in_type_checking_block = True
+            for child in node.body:
+                self.visit(child)
+            self._in_type_checking_block = old_state
+            for child in node.orelse:
+                self.visit(child)
+        else:
+            self.generic_visit(node)
+
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             module = alias.name
             asname = alias.asname or alias.name
             self._imported_names[asname] = module
+
+            # Track typing module aliases for TYPE_CHECKING detection
+            if module == "typing" and alias.asname:
+                self._type_checking_module_aliases.add(alias.asname)
+
+            if self._in_type_checking_block:
+                continue
 
             for forbidden in FORBIDDEN_IMPORTS:
                 if module == forbidden or module.startswith(f"{forbidden}."):
@@ -295,6 +346,15 @@ class IOAuditVisitor(ast.NodeVisitor):
             asname = alias.asname or alias.name
             self._imported_names[asname] = f"{module}.{alias.name}"
 
+            # Track TYPE_CHECKING constant aliases (e.g., from typing import TYPE_CHECKING as TC)
+            if alias.name == "TYPE_CHECKING" and alias.asname:
+                self._type_checking_constant_aliases.add(alias.asname)
+
+        # Skip violation reporting inside TYPE_CHECKING blocks
+        if self._in_type_checking_block:
+            self.generic_visit(node)
+            return
+
         for forbidden in FORBIDDEN_IMPORTS:
             if module == forbidden or module.startswith(f"{forbidden}."):
                 self._add_violation(
@@ -302,6 +362,7 @@ class IOAuditVisitor(ast.NodeVisitor):
                     EnumIOAuditRule.NET_CLIENT,
                     f"Forbidden import: from {module}",
                 )
+                self.generic_visit(node)
                 return
 
         if module in ("logging", "logging.handlers"):

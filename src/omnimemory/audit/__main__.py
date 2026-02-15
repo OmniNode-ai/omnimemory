@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import traceback
 from pathlib import Path
 
 from omnimemory.audit.io_audit import (
@@ -172,6 +173,8 @@ def main(args: list[str] | None = None) -> int:
             print(json.dumps({"error": error_msg}, indent=JSON_INDENT_SPACES))
         else:
             print(error_msg, file=sys.stderr)
+            if parsed_args.verbose:
+                traceback.print_exc(file=sys.stderr)
         return 2
 
 

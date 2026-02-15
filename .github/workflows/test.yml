@@ -66,7 +66,7 @@ jobs:
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
   # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
   # onex-validation | validate-model-locations          | python scripts/validation/validate_model_locations.py src/
-  # transport-import-guard | validate-no-transport-imports | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
+  # transport-import-guard | validate-no-transport-imports | python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
   # contract-validation | contract-linter                | python -m omnimemory.tools.contract_linter <contracts>
   # io-audit        | io-audit                          | python -m omnimemory.audit
   #
@@ -483,7 +483,7 @@ jobs:
   # Phase 2 - Test Suite
   test:
     name: Tests
-    needs: [lint, pyright, onex-validation]
+    needs: [lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

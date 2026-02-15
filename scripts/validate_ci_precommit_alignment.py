@@ -30,6 +30,8 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 # Expected hook-to-CI alignment pairs
 # Format: (pre-commit hook id, CI job name, CI step/command description)
 EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
@@ -90,29 +92,14 @@ def extract_hook_ids(precommit_content: str) -> set[str]:
 
 
 def extract_ci_job_ids(ci_content: str) -> set[str]:
-    """Extract job IDs from CI workflow."""
-    job_ids: set[str] = set()
-    # Match top-level job definitions (not indented under steps)
-    for match in re.finditer(r"^  (\S+):", ci_content, re.MULTILINE):
-        job_id = match.group(1)
-        # Filter out common non-job keys
-        if job_id not in {
-            "name",
-            "runs-on",
-            "timeout-minutes",
-            "needs",
-            "if",
-            "steps",
-            "env",
-            "outputs",
-            "permissions",
-            "strategy",
-            "services",
-            "container",
-            "defaults",
-        }:
-            job_ids.add(job_id)
-    return job_ids
+    """Extract job IDs from CI workflow using YAML parser."""
+    data = yaml.safe_load(ci_content)
+    if not isinstance(data, dict):
+        return set()
+    jobs = data.get("jobs")
+    if not isinstance(jobs, dict):
+        return set()
+    return set(jobs.keys())
 
 
 def check_ci_contains(ci_content: str, search_term: str) -> bool:

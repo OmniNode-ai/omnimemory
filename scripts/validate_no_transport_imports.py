@@ -245,8 +245,9 @@ class TransportImportChecker(ast.NodeVisitor):
     3. All import statements, flagging those importing banned modules at runtime
     """
 
-    def __init__(self, source_code: str) -> None:
+    def __init__(self, source_code: str, file_path: Path) -> None:
         self.source_lines = source_code.splitlines()
+        self.file_path = file_path
         self.violations: list[Violation] = []
         self._in_type_checking_block = False
         self._type_checking_module_aliases: set[str] = set()
@@ -302,7 +303,7 @@ class TransportImportChecker(ast.NodeVisitor):
                 if root_module in BANNED_MODULES:
                     self.violations.append(
                         Violation(
-                            file_path=Path(),  # Will be set by caller
+                            file_path=self.file_path,
                             line_number=node.lineno,
                             module_name=root_module,
                             import_statement=self._get_source_line(node.lineno),
@@ -331,7 +332,7 @@ class TransportImportChecker(ast.NodeVisitor):
             if root_module in BANNED_MODULES:
                 self.violations.append(
                     Violation(
-                        file_path=Path(),  # Will be set by caller
+                        file_path=self.file_path,
                         line_number=node.lineno,
                         module_name=root_module,
                         import_statement=self._get_source_line(node.lineno),
@@ -449,18 +450,10 @@ def check_file(
         )
         return violations, errors
 
-    checker = TransportImportChecker(source_code)
+    checker = TransportImportChecker(source_code, file_path)
     checker.visit(tree)
 
-    for v in checker.violations:
-        violations.append(
-            Violation(
-                file_path=file_path,
-                line_number=v.line_number,
-                module_name=v.module_name,
-                import_statement=v.import_statement,
-            )
-        )
+    violations.extend(checker.violations)
 
     return violations, errors
 

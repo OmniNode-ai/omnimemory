@@ -20,8 +20,11 @@
 # This ensures hooks work in CI environments where Poetry may not be installed.
 # Pre-commit manages isolated Python environments for each hook.
 #
-# Exception: clean-tmp-directory uses language: system (bash script only,
-# no Python dependencies, safe for CI).
+# Exceptions using language: system:
+#   - clean-tmp-directory: bash script only, no Python dependencies, safe for CI
+#   - contract-linter, io-audit: require Poetry (uses `poetry run`). CI installs
+#     Poetry explicitly. Locally, `poetry install` must be run first.
+#   - mypy: uses `poetry run` for exact dependency match with CI.
 #
 # HOOK-TO-CI SYNCHRONIZATION MAP:
 # ====================================
@@ -41,7 +44,7 @@
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
 # validate-kafka-imports            | onex-validation          | python scripts/validation/validate_kafka_imports.py src/
 # validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
-# validate-no-transport-imports     | transport-import-guard   | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
+# validate-no-transport-imports     | transport-import-guard   | python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
 # contract-linter                   | contract-validation      | python -m omnimemory.tools.contract_linter <contracts>
 # io-audit                          | io-audit                 | python -m omnimemory.audit
 #
@@ -314,8 +317,8 @@ repos:
       # --------------------------------------------------------------------------
       - id: validate-no-transport-imports
         name: ARCH-002 Transport Import Guard (AST-based)
-        entry: python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime --whitelist
-          tests/audit/transport_import_whitelist.yaml
+        entry: python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime
+          --whitelist tests/audit/transport_import_whitelist.yaml
         language: python
         pass_filenames: false
         types: [python]
@@ -327,10 +330,12 @@ repos:
       # Contract Linter - ONEX contract YAML validation
       # Validates: Node contracts against structural rules
       # Scope: Contract YAML files in node directories
+      # Requires: poetry install (language: system, uses Poetry environment)
       # Added: OMN-2218
       # --------------------------------------------------------------------------
       - id: contract-linter
         name: ONEX Contract Linter
+        description: Validates node contract YAML files. Requires Poetry (poetry install).
         entry: poetry run python -m omnimemory.tools.contract_linter
         language: system
         pass_filenames: true
@@ -342,10 +347,12 @@ repos:
       # Validates: Compute nodes do not have forbidden I/O patterns
       # Scope: Node source files and audit module changes
       # Purpose: Enforces architectural boundary between pure compute and effect nodes
+      # Requires: poetry install (language: system, uses Poetry environment)
       # Added: OMN-2218
       # --------------------------------------------------------------------------
       - id: io-audit
         name: I/O Audit (ONEX node purity)
+        description: Audits node purity for forbidden I/O. Requires Poetry (poetry install).
         entry: poetry run python -m omnimemory.audit
         language: system
         pass_filenames: false
