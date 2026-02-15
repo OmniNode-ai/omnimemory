@@ -382,3 +382,15 @@ class TestFrozenBoundaryModelConfigGuardRails:
 
     def test_model_notification_event_payload_config_frozen(self) -> None:
         assert ModelNotificationEventPayload.model_config.get("frozen") is True
+
+    def test_model_audit_event_config_frozen(self) -> None:
+        assert ModelAuditEvent.model_config.get("frozen") is True
+
+    def test_resource_usage_metadata_config_frozen(self) -> None:
+        assert ResourceUsageMetadata.model_config.get("frozen") is True
+
+    def test_security_audit_details_config_frozen(self) -> None:
+        assert SecurityAuditDetails.model_config.get("frozen") is True
+
+    def test_performance_audit_details_config_frozen(self) -> None:
+        assert PerformanceAuditDetails.model_config.get("frozen") is True
