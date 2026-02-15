@@ -239,7 +239,7 @@ OMNIMEMORY__QDRANT__ON_DISK=true
 | Type | Description | Example |
 |------|-------------|---------|
 | `Path` | Filesystem path (must be absolute) | `/data/omnimemory` |
-| `PostgresDsn` | PostgreSQL connection string | `postgresql://user@host:5432/db` |
+| `PostgresDsn` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
 | `HttpUrl` | HTTP(S) URL | `http://localhost:6333` |
 | `SecretStr` | Sensitive string (not logged) | Password, API key |
 | `bool` | Boolean (`true`/`false`, `1`/`0`, `yes`/`no`) | `true` |
