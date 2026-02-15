@@ -5,9 +5,14 @@
 # If you rename a CI job, you MUST update both this file and the
 # branch protection settings (Settings > Branches > main).
 #
-# Added: OMN-2218 (subsuming OMN-2186)
+# Manifest added: OMN-2218
+# Branch protection applied: OMN-2186
 # Last verified: 2026-02-15
 # Pattern: OMN-1876 (omniclaude PR #137)
+#
+# Applied via: gh api repos/OmniNode-ai/omnimemory/branches/main/protection -X PUT
+# Mode: strict (branch must be up-to-date before merging)
+# Total required checks: 10
 
 required_checks:
   # -- Phase 1: Quick Validation (parallel, ~2-5 min) -------------------------
