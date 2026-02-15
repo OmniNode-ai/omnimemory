@@ -53,6 +53,7 @@ def frozen_registry(registry: RegistryMessageType) -> RegistryMessageType:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestRegistrationCount:
     """Verify correct number of message types registered."""
 
@@ -79,6 +80,7 @@ class TestRegistrationCount:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestHasMessageType:
     """Verify all registered types are discoverable via has_message_type."""
 
@@ -121,6 +123,7 @@ class TestHasMessageType:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestGetEntry:
     """Verify entry details are correct for all registered types."""
 
@@ -158,6 +161,7 @@ class TestGetEntry:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestCategoryAssignment:
     """Verify correct EnumMessageCategory assignment per type."""
 
@@ -201,6 +205,7 @@ class TestCategoryAssignment:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestHandlerIds:
     """Verify handler_id assignments match node directory names."""
 
@@ -241,6 +246,7 @@ class TestHandlerIds:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestFreezeEnforcement:
     """Verify registration after freeze raises ModelOnexError."""
 
@@ -269,6 +275,7 @@ class TestFreezeEnforcement:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestStartupValidation:
     """Verify validate_startup() on a clean memory registry."""
 
@@ -309,6 +316,7 @@ class TestStartupValidation:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestRegistryProperties:
     """Verify registry metadata after memory registration."""
 
@@ -335,6 +343,7 @@ class TestRegistryProperties:
 # =============================================================================
 
 
+@pytest.mark.unit
 class TestRegistrationObservability:
     """Verify readiness flag and metric counters after registration."""
 
@@ -349,9 +358,9 @@ class TestRegistrationObservability:
         metrics = get_registration_metrics()
         assert metrics["registered_count"] == EXPECTED_MESSAGE_TYPE_COUNT
         assert metrics["expected_count"] == EXPECTED_MESSAGE_TYPE_COUNT
-        # failure_count is cumulative across the process so we only check
-        # it is non-negative (other tests may have triggered failures).
-        assert metrics["failure_count"] >= 0
+        # failure_count is reset at the start of each call, so a successful
+        # registration always reports zero failures.
+        assert metrics["failure_count"] == 0
 
     def test_readiness_false_after_failure(
         self, frozen_registry: RegistryMessageType
@@ -364,9 +373,8 @@ class TestRegistrationObservability:
     def test_failure_count_increments(
         self, frozen_registry: RegistryMessageType
     ) -> None:
-        """Failure counter increments on registration error."""
-        before = get_registration_metrics()["failure_count"]
+        """Failure counter is 1 after a single failed registration call."""
         with pytest.raises(ModelOnexError):
             register_memory_message_types(frozen_registry)
         after = get_registration_metrics()["failure_count"]
-        assert after == before + 1
+        assert after == 1

@@ -30,6 +30,7 @@ Related:
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from omnibase_infra.enums import EnumMessageCategory
@@ -58,6 +59,10 @@ _registered_count: int = 0
 _registration_failure_count: int = 0
 """Number of registration failures encountered in the last call."""
 
+_registry_lock = threading.Lock()
+"""Guards concurrent access to _registry_ready, _registered_count,
+and _registration_failure_count."""
+
 
 def is_registry_ready() -> bool:
     """Return whether the memory message type registry is ready.
@@ -66,7 +71,8 @@ def is_registry_ready() -> bool:
     ``True`` only after ``register_memory_message_types`` has completed
     successfully (i.e., all expected types registered without error).
     """
-    return _registry_ready
+    with _registry_lock:
+        return _registry_ready
 
 
 def get_registration_metrics() -> dict[str, int]:
@@ -76,11 +82,12 @@ def get_registration_metrics() -> dict[str, int]:
         Dict with ``registered_count``, ``failure_count``, and
         ``expected_count`` keys.
     """
-    return {
-        "registered_count": _registered_count,
-        "failure_count": _registration_failure_count,
-        "expected_count": EXPECTED_MESSAGE_TYPE_COUNT,
-    }
+    with _registry_lock:
+        return {
+            "registered_count": _registered_count,
+            "failure_count": _registration_failure_count,
+            "expected_count": EXPECTED_MESSAGE_TYPE_COUNT,
+        }
 
 
 def register_memory_message_types(
@@ -116,9 +123,12 @@ def register_memory_message_types(
     """
     global _registry_ready, _registered_count, _registration_failure_count  # noqa: PLW0603
 
-    # Reset readiness at the start of each registration attempt so that a
-    # retry after a previous failure does not report stale readiness.
-    _registry_ready = False
+    # Reset readiness and failure counter at the start of each registration
+    # attempt so that metrics reflect the last call only, and a retry after
+    # a previous failure does not report stale readiness.
+    with _registry_lock:
+        _registry_ready = False
+        _registration_failure_count = 0
 
     registered: list[str] = []
 
@@ -253,25 +263,31 @@ def register_memory_message_types(
         registered.append("ModelNotificationEvent")
 
     except Exception:
-        _registration_failure_count += 1
-        _registry_ready = False
+        with _registry_lock:
+            _registration_failure_count += 1
+            _registry_ready = False
+            failure_count_snapshot = _registration_failure_count
         logger.exception(
             "Memory message type registration failed " "(registered=%d, failures=%d)",
             len(registered),
-            _registration_failure_count,
+            failure_count_snapshot,
         )
         raise
 
     # Update metrics on success
-    _registered_count = len(registered)
-    _registry_ready = True
+    with _registry_lock:
+        _registered_count = len(registered)
+        _registry_ready = True
+        count_snapshot = _registered_count
+        ready_snapshot = _registry_ready
+        failure_snapshot = _registration_failure_count
 
     logger.info(
         "Registered %d memory message types with RegistryMessageType "
         "(ready=%s, failures=%d)",
-        _registered_count,
-        _registry_ready,
-        _registration_failure_count,
+        count_snapshot,
+        ready_snapshot,
+        failure_snapshot,
     )
 
     return registered
