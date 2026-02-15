@@ -65,6 +65,10 @@ jobs:
   # onex-validation | validate-naming-conventions       | python scripts/validation/validate_naming.py src/
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
   # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
+  # onex-validation | validate-model-locations          | python scripts/validation/validate_model_locations.py src/
+  # transport-import-guard | validate-no-transport-imports | python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
+  # contract-validation | contract-linter                | python -m omnimemory.tools.contract_linter <contracts>
+  # io-audit        | io-audit                          | python -m omnimemory.audit
   #
   # IMPORTANT: When modifying any CI step, update the corresponding hook in .pre-commit-config.yaml
   #
@@ -300,6 +304,136 @@ jobs:
           echo "- Naming conventions" >> $GITHUB_STEP_SUMMARY
           echo "- HTTP import boundary enforcement" >> $GITHUB_STEP_SUMMARY
           echo "- Kafka import boundary enforcement (ARCH-002)" >> $GITHUB_STEP_SUMMARY
+          echo "- Pydantic model location enforcement" >> $GITHUB_STEP_SUMMARY
+
+  # Phase 1 - Transport Import Guard (ARCH-002)
+  # SYNC: Pre-commit hook 'validate-no-transport-imports' at pre-commit stage
+  # Added: OMN-2218
+  transport-import-guard:
+    name: Transport Import Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install PyYAML for transport import guard
+        run: pip install pyyaml
+
+      - name: Validate no transport imports in nodes (ARCH-002)
+        run: python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
+
+  # Phase 1 - Contract Validation
+  # SYNC: Pre-commit hook 'contract-linter' at pre-commit stage
+  # Added: OMN-2218
+  contract-validation:
+    name: Contract Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            ${{ hashFiles('**/poetry.lock') }}-
+            ${{ env.CACHE_VERSION }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      - name: Find and validate contract YAML files
+        run: |
+          contracts=$(find src/omnimemory/nodes src/omnimemory/handlers -name "contract.yaml" -type f 2>/dev/null)
+          if [ -z "$contracts" ]; then
+            echo "No contract files found - skipping validation"
+            exit 0
+          fi
+          echo "Found contract files:"
+          echo "$contracts"
+          echo ""
+          poetry run python -m omnimemory.tools.contract_linter --verbose $contracts
+
+  # Phase 1 - I/O Audit
+  # SYNC: Pre-commit hook 'io-audit' at pre-commit stage
+  # Added: OMN-2218
+  io-audit:
+    name: I/O Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            ${{ hashFiles('**/poetry.lock') }}-
+            ${{ env.CACHE_VERSION }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      - name: Run I/O audit
+        run: poetry run python -m omnimemory.audit
 
   # Phase 1 - Architecture Handshake Verification
   check-handshake:
@@ -349,7 +483,7 @@ jobs:
   # Phase 2 - Test Suite
   test:
     name: Tests
-    needs: [lint, pyright, onex-validation]
+    needs: [lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -430,7 +564,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, check-handshake, test]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test]
     if: always()
 
     steps:
@@ -440,6 +574,9 @@ jobs:
           lint="${{ needs.lint.result }}"
           pyright="${{ needs.pyright.result }}"
           onex="${{ needs.onex-validation.result }}"
+          transport="${{ needs.transport-import-guard.result }}"
+          contracts="${{ needs.contract-validation.result }}"
+          io_audit="${{ needs.io-audit.result }}"
           handshake="${{ needs.check-handshake.result }}"
           test="${{ needs.test.result }}"
 
@@ -447,6 +584,9 @@ jobs:
              [[ "$lint" == "success" ]] && \
              [[ "$pyright" == "success" ]] && \
              [[ "$onex" == "success" ]] && \
+             [[ "$transport" == "success" ]] && \
+             [[ "$contracts" == "success" ]] && \
+             [[ "$io_audit" == "success" ]] && \
              [[ "$handshake" == "success" || "$handshake" == "skipped" ]] && \
              [[ "$test" == "success" ]]; then
             echo "All tests passed successfully"
@@ -454,6 +594,9 @@ jobs:
             echo "Code Quality: Passed"
             echo "Pyright Type Checking: Passed"
             echo "ONEX Validation: Passed"
+            echo "Transport Import Guard: Passed"
+            echo "Contract Validation: Passed"
+            echo "I/O Audit: Passed"
             echo "Architecture Handshake: $handshake"
             echo "Tests: Passed"
             exit 0
@@ -463,6 +606,9 @@ jobs:
             echo "Lint: $lint"
             echo "Pyright: $pyright"
             echo "ONEX Validation: $onex"
+            echo "Transport Import Guard: $transport"
+            echo "Contract Validation: $contracts"
+            echo "I/O Audit: $io_audit"
             echo "Architecture Handshake: $handshake"
             echo "Tests: $test"
             exit 1

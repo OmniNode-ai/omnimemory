@@ -20,8 +20,11 @@
 # This ensures hooks work in CI environments where Poetry may not be installed.
 # Pre-commit manages isolated Python environments for each hook.
 #
-# Exception: clean-tmp-directory uses language: system (bash script only,
-# no Python dependencies, safe for CI).
+# Exceptions using language: system:
+#   - clean-tmp-directory: bash script only, no Python dependencies, safe for CI
+#   - contract-linter, io-audit: require Poetry (uses `poetry run`). CI installs
+#     Poetry explicitly. Locally, `poetry install` must be run first.
+#   - mypy: uses `poetry run` for exact dependency match with CI.
 #
 # HOOK-TO-CI SYNCHRONIZATION MAP:
 # ====================================
@@ -41,6 +44,9 @@
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
 # validate-kafka-imports            | onex-validation          | python scripts/validation/validate_kafka_imports.py src/
 # validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
+# validate-no-transport-imports     | transport-import-guard   | python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
+# contract-linter                   | contract-validation      | python -m omnimemory.tools.contract_linter <contracts>
+# io-audit                          | io-audit                 | python -m omnimemory.audit
 #
 # IMPORTANT: When modifying any hook, update the corresponding CI job in .github/workflows/test.yml
 #
@@ -78,7 +84,7 @@ repos:
 
   # Essential file formatting (standard across ecosystem)
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
@@ -297,6 +303,64 @@ repos:
         pass_filenames: false
         files: ^src/.*\.py$
         exclude: ^tests/.*\.py$
+        stages: [pre-commit]
+
+      # --------------------------------------------------------------------------
+      # Transport Import Validator - ARCH-002 enforcement (AST-based)
+      # Validates: Nodes do not import transport/I/O libraries at runtime
+      # Scope: All source files (ARCH-002 applies broadly; runtime excluded)
+      # Purpose: Enforces "Nodes never touch Kafka directly. Runtime owns all
+      #          Kafka plumbing." TYPE_CHECKING imports are allowed.
+      # Whitelist: Pre-existing violations in tests/audit/transport_import_whitelist.yaml
+      # Banned: aiohttp, httpx, asyncpg, aiokafka, redis, grpc, etc.
+      # Added: OMN-2218
+      # --------------------------------------------------------------------------
+      - id: validate-no-transport-imports
+        name: ARCH-002 Transport Import Guard (AST-based)
+        entry: python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime
+          --whitelist tests/audit/transport_import_whitelist.yaml
+        language: python
+        pass_filenames: false
+        types: [python]
+        files: ^src/omnimemory/
+        stages: [pre-commit]
+        additional_dependencies: [pyyaml]
+
+      # --------------------------------------------------------------------------
+      # Contract Linter - ONEX contract YAML validation
+      # Validates: Node contracts against structural rules
+      # Scope: Contract YAML files in node directories
+      # Requires: poetry install (language: system, uses Poetry environment)
+      # Added: OMN-2218
+      # --------------------------------------------------------------------------
+      - id: contract-linter
+        name: ONEX Contract Linter
+        description: Validates node contract YAML files. Requires Poetry (poetry install).
+        entry: poetry run python -m omnimemory.tools.contract_linter
+        language: system
+        pass_filenames: true
+        # SYNC: CI uses `find src/omnimemory -name contract.yaml` with graceful
+        # skip in .github/workflows/test.yml contract-validation job. This regex
+        # scopes the pre-commit hook; the CI job discovers files independently.
+        files: ^src/omnimemory/(nodes|handlers)/.*/contract\.yaml$
+        stages: [pre-commit]
+
+      # --------------------------------------------------------------------------
+      # I/O Audit - ONEX node purity enforcement
+      # Validates: Compute nodes do not have forbidden I/O patterns
+      # Scope: Node source files and audit module changes
+      # Purpose: Enforces architectural boundary between pure compute and effect nodes
+      # Requires: poetry install (language: system, uses Poetry environment)
+      # Added: OMN-2218
+      # --------------------------------------------------------------------------
+      - id: io-audit
+        name: I/O Audit (ONEX node purity)
+        description: Audits node purity for forbidden I/O. Requires Poetry (poetry install).
+        entry: poetry run python -m omnimemory.audit
+        language: system
+        pass_filenames: false
+        types: [python]
+        files: ^(src/omnimemory/nodes/|src/omnimemory/audit/)
         stages: [pre-commit]
 
 # Configuration

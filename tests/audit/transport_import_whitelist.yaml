@@ -1,0 +1,51 @@
+---
+# Transport Import Whitelist for omnimemory
+#
+# This file defines exceptions for the ARCH-002 transport import guard
+# (scripts/validate_no_transport_imports.py). Files listed here may import
+# specific transport/I/O libraries that would otherwise be banned.
+#
+# IMPORTANT: This whitelist is for pre-existing violations that will be
+# refactored in future phases. New code should NOT be added here without
+# architectural review.
+#
+# Each entry specifies:
+#   path:            Relative file path (matched as suffix)
+#   reason:          Why this file needs the transport import
+#   allowed_modules: Which banned modules are permitted (empty = all)
+#
+# See scripts/validate_no_transport_imports.py for the full banned module list.
+
+schema_version: "1.0.0"
+
+files:
+  # Infrastructure utilities - health checks require direct connectivity probes
+  - path: "src/omnimemory/utils/health_manager.py"
+    reason: "Health manager probes asyncpg and redis connectivity directly; Phase 3 will abstract behind
+      protocol"
+    allowed_modules:
+      - asyncpg
+      - redis
+
+  # Adapter layer - adapters are the designated transport boundary
+  - path: "src/omnimemory/handlers/adapters/adapter_valkey.py"
+    reason: "Valkey adapter is the designated redis transport boundary (adapter pattern)"
+    allowed_modules:
+      - redis
+
+  # Pre-existing handler violations (Phase 3 will refactor to DI)
+  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_archive.py"
+    reason: "Pre-existing handler uses asyncpg directly; Phase 3 will inject via DI"
+    allowed_modules:
+      - asyncpg
+
+  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_expire.py"
+    reason: "Pre-existing handler uses asyncpg directly; Phase 3 will inject via DI"
+    allowed_modules:
+      - asyncpg
+
+  # Effect node client - effect nodes are the designated I/O boundary
+  - path: "src/omnimemory/nodes/memory_retrieval_effect/clients/embedding_client.py"
+    reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
+    allowed_modules:
+      - httpx
