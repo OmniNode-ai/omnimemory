@@ -128,6 +128,7 @@ def register_memory_message_types(
     # a previous failure does not report stale readiness.
     with _registry_lock:
         _registry_ready = False
+        _registered_count = 0
         _registration_failure_count = 0
 
     registered: list[str] = []

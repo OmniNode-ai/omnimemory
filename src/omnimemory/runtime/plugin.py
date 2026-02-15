@@ -632,7 +632,7 @@ class PluginMemory:
         Returns:
             Result indicating cleanup success/failure.
         """
-        # Guard against concurrent shutdown calls
+        # Re-entrancy guard (not concurrency-safe; class is single-threaded per docstring)
         if self._shutdown_in_progress:
             return ModelDomainPluginResult.skipped(
                 plugin_id=self.plugin_id,
