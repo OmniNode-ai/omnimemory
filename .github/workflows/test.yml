@@ -66,7 +66,7 @@ jobs:
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
   # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
   # onex-validation | validate-model-locations          | python scripts/validation/validate_model_locations.py src/
-  # transport-import-guard | validate-no-transport-imports | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime
+  # transport-import-guard | validate-no-transport-imports | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
   # contract-validation | contract-linter                | python -m omnimemory.tools.contract_linter <contracts>
   # io-audit        | io-audit                          | python -m omnimemory.audit
   #
@@ -324,8 +324,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
+      - name: Install PyYAML for transport import guard
+        run: pip install pyyaml
+
       - name: Validate no transport imports in nodes (ARCH-002)
-        run: python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime
+        run: python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
 
   # Phase 1 - Contract Validation
   # SYNC: Pre-commit hook 'contract-linter' at pre-commit stage

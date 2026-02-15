@@ -13,10 +13,28 @@ This is the AST-based counterpart to validate_kafka_imports.py which uses
 regex patterns. Both enforce ARCH-002 but this script provides more accurate
 detection by parsing the actual Python syntax tree.
 
+Whitelist Support
+-----------------
+Pre-existing violations can be whitelisted via a YAML file (``--whitelist``).
+The whitelist format is intentionally compatible with the I/O audit whitelist
+(``tests/audit/io_audit_whitelist.yaml``). Each entry specifies a file path
+and reason for the exemption.
+
+Example whitelist YAML::
+
+    schema_version: "1.0.0"
+    files:
+      - path: "src/omnimemory/utils/health_manager.py"
+        reason: "Health checks require direct asyncpg/redis connectivity probes"
+        allowed_modules:
+          - asyncpg
+          - redis
+
 Usage:
     python scripts/validate_no_transport_imports.py
     python scripts/validate_no_transport_imports.py --verbose
     python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime
+    python scripts/validate_no_transport_imports.py --whitelist tests/audit/transport_import_whitelist.yaml
 
 Exit codes:
     0 = no violations
@@ -32,8 +50,10 @@ import argparse
 import ast
 import sys
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+import yaml
 
 # Banned transport/I/O modules that cannot be imported at runtime in omnimemory nodes
 # These create runtime dependencies on external I/O libraries
@@ -95,6 +115,96 @@ SKIP_DIRECTORY_SUFFIXES: frozenset[str] = frozenset(
         ".egg-info",
     }
 )
+
+# Default whitelist path (relative to repository root)
+DEFAULT_WHITELIST_PATH: str = "tests/audit/transport_import_whitelist.yaml"
+
+
+@dataclass
+class WhitelistEntry:
+    """A single whitelist entry for a file."""
+
+    path: str
+    reason: str
+    allowed_modules: list[str] = field(default_factory=list)
+
+
+@dataclass
+class WhitelistConfig:
+    """Complete whitelist configuration."""
+
+    files: list[WhitelistEntry] = field(default_factory=list)
+    schema_version: str = "1.0.0"
+
+
+def load_whitelist(whitelist_path: Path) -> WhitelistConfig:
+    """Load and parse a transport import whitelist YAML file.
+
+    Args:
+        whitelist_path: Path to the YAML whitelist file.
+
+    Returns:
+        Parsed whitelist configuration. Returns empty config if file
+        does not exist.
+    """
+    if not whitelist_path.exists():
+        return WhitelistConfig()
+
+    content = whitelist_path.read_text(encoding="utf-8")
+    data = yaml.safe_load(content)
+
+    if not isinstance(data, dict):
+        return WhitelistConfig()
+
+    config = WhitelistConfig(
+        schema_version=data.get("schema_version", "1.0.0"),
+    )
+
+    for entry_data in data.get("files", []):
+        if not isinstance(entry_data, dict):
+            continue
+        entry = WhitelistEntry(
+            path=entry_data.get("path", ""),
+            reason=entry_data.get("reason", ""),
+            allowed_modules=entry_data.get("allowed_modules", []),
+        )
+        config.files.append(entry)
+
+    return config
+
+
+def is_whitelisted(
+    file_path: Path,
+    module_name: str,
+    whitelist: WhitelistConfig,
+) -> bool:
+    """Check whether a violation is whitelisted.
+
+    A violation is whitelisted if the file path matches a whitelist entry
+    AND either:
+    - The entry has no ``allowed_modules`` (all modules whitelisted), or
+    - The violating module is in the entry's ``allowed_modules`` list.
+
+    Args:
+        file_path: Path of the file with the violation.
+        module_name: The banned module that was imported.
+        whitelist: The loaded whitelist configuration.
+
+    Returns:
+        True if the violation should be suppressed.
+    """
+    file_str = str(file_path)
+
+    for entry in whitelist.files:
+        # Match if the file path ends with the whitelist path
+        # This supports both relative paths and partial paths
+        if file_str.endswith(entry.path) or file_str == entry.path:
+            if not entry.allowed_modules:
+                return True
+            if module_name in entry.allowed_modules:
+                return True
+
+    return False
 
 
 @dataclass(frozen=True)
@@ -371,6 +481,7 @@ Banned modules:
   WebSocket: websockets, wsproto
 
 TYPE_CHECKING guarded imports are allowed.
+Pre-existing violations can be whitelisted via --whitelist YAML file.
 
 Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
 """,
@@ -391,6 +502,14 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         help="Exclude a file or directory (can be specified multiple times)",
     )
     parser.add_argument(
+        "--whitelist",
+        "-w",
+        type=Path,
+        default=Path(DEFAULT_WHITELIST_PATH),
+        metavar="PATH",
+        help=f"Path to whitelist YAML file (default: {DEFAULT_WHITELIST_PATH})",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -408,9 +527,15 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         print(f"Error: Source path is not a directory: {src_dir}", file=sys.stderr)
         return 1
 
+    # Load whitelist
+    whitelist = load_whitelist(args.whitelist)
+    if whitelist.files and args.verbose:
+        print(f"Loaded {len(whitelist.files)} whitelist entries from {args.whitelist}")
+
     excludes = set(args.excludes)
     all_violations: list[Violation] = []
     all_errors: list[FileProcessingError] = []
+    whitelisted_count = 0
     file_count = 0
 
     print(f"Checking for transport/I/O library imports in {src_dir}...")
@@ -418,8 +543,15 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
     for file_path in iter_python_files(src_dir, excludes, verbose=args.verbose):
         file_count += 1
         violations, errors = check_file(file_path)
-        all_violations.extend(violations)
         all_errors.extend(errors)
+
+        for v in violations:
+            if is_whitelisted(v.file_path, v.module_name, whitelist):
+                whitelisted_count += 1
+                if args.verbose:
+                    print(f"  [whitelisted] {v}")
+            else:
+                all_violations.append(v)
 
     if all_errors:
         print("\nWarnings (file processing errors):", file=sys.stderr)
@@ -444,23 +576,28 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         print("  1. Define a protocol for the capability you need")
         print("  2. Implement the protocol in an infrastructure package")
         print("  3. Use TYPE_CHECKING guards for type-only imports")
+        print("  4. Add to whitelist if this is a legitimate infrastructure file")
         print()
-        print(
-            f"Total: {len(all_violations)} violation(s), "
-            f"{len(all_errors)} error(s) in {file_count} files scanned"
-        )
+        summary_parts = [
+            f"{len(all_violations)} violation(s)",
+            f"{len(all_errors)} error(s)",
+        ]
+        if whitelisted_count > 0:
+            summary_parts.append(f"{whitelisted_count} whitelisted")
+        summary_parts.append(f"{file_count} files scanned")
+        print(f"Total: {', '.join(summary_parts)}")
         return 1
 
+    summary_parts = [f"{file_count} files scanned"]
+    if whitelisted_count > 0:
+        summary_parts.append(f"{whitelisted_count} whitelisted")
     if all_errors:
-        print(
-            f"No transport/I/O library imports found in omnimemory "
-            f"({file_count} files scanned, {len(all_errors)} file(s) could not be processed)"
-        )
-    else:
-        print(
-            f"No transport/I/O library imports found in omnimemory "
-            f"({file_count} files scanned)"
-        )
+        summary_parts.append(f"{len(all_errors)} file(s) could not be processed")
+
+    print(
+        f"No transport/I/O library imports found in omnimemory "
+        f"({', '.join(summary_parts)})"
+    )
     return 0
 
 

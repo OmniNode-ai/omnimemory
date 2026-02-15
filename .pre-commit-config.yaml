@@ -41,7 +41,7 @@
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
 # validate-kafka-imports            | onex-validation          | python scripts/validation/validate_kafka_imports.py src/
 # validate-model-locations          | onex-validation          | python scripts/validation/validate_model_locations.py src/
-# validate-no-transport-imports     | transport-import-guard   | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime
+# validate-no-transport-imports     | transport-import-guard   | python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
 # contract-linter                   | contract-validation      | python -m omnimemory.tools.contract_linter <contracts>
 # io-audit                          | io-audit                 | python -m omnimemory.audit
 #
@@ -305,21 +305,23 @@ repos:
       # --------------------------------------------------------------------------
       # Transport Import Validator - ARCH-002 enforcement (AST-based)
       # Validates: Nodes do not import transport/I/O libraries at runtime
-      # Scope: Node source files (where ARCH-002 applies)
+      # Scope: All source files (ARCH-002 applies broadly; runtime excluded)
       # Purpose: Enforces "Nodes never touch Kafka directly. Runtime owns all
       #          Kafka plumbing." TYPE_CHECKING imports are allowed.
+      # Whitelist: Pre-existing violations in tests/audit/transport_import_whitelist.yaml
       # Banned: aiohttp, httpx, asyncpg, aiokafka, redis, grpc, etc.
       # Added: OMN-2218
       # --------------------------------------------------------------------------
       - id: validate-no-transport-imports
         name: ARCH-002 Transport Import Guard (AST-based)
-        entry: python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime
+        entry: python scripts/validate_no_transport_imports.py --exclude src/omnimemory/runtime --whitelist
+          tests/audit/transport_import_whitelist.yaml
         language: python
         pass_filenames: false
         types: [python]
-        files: ^src/omnimemory/nodes/
+        files: ^src/omnimemory/
         stages: [pre-commit]
-        additional_dependencies: []
+        additional_dependencies: [pyyaml]
 
       # --------------------------------------------------------------------------
       # Contract Linter - ONEX contract YAML validation
