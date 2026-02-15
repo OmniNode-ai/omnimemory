@@ -269,10 +269,16 @@ DEFAULT_VALKEY_PORT = 6379
 def get_test_db_dsn() -> str:
     """Get PostgreSQL DSN from environment or default.
 
+    Checks TEST_DB_DSN first (test-specific override), then
+    OMNIMEMORY_DB_URL (service connection), then falls back to default.
+
     Returns:
         PostgreSQL connection string for tests.
     """
-    return os.environ.get("TEST_DB_DSN", DEFAULT_DB_DSN)
+    return os.environ.get(
+        "TEST_DB_DSN",
+        os.environ.get("OMNIMEMORY_DB_URL", DEFAULT_DB_DSN),
+    )
 
 
 def get_test_valkey_host() -> str:

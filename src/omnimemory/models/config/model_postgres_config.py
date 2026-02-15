@@ -11,7 +11,6 @@ from pydantic import (
     ConfigDict,
     Field,
     PostgresDsn,
-    SecretStr,
     field_validator,
 )
 
@@ -23,18 +22,15 @@ class ModelPostgresConfig(BaseModel):
     """Configuration for PostgreSQL memory storage.
 
     This config defines connection parameters for PostgreSQL-based
-    persistent memory storage. Optional for Phase 1.
+    persistent memory storage. The DSN must be a full connection URL
+    including credentials (sourced from OMNIMEMORY_DB_URL).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     # Connection configuration
     dsn: PostgresDsn = Field(
-        description="PostgreSQL connection DSN (e.g., postgresql://user@host:port/db)",
-    )
-    password: SecretStr = Field(
-        description="Database password (stored securely, never logged)",
-        exclude=True,
+        description="PostgreSQL connection URL (e.g., postgresql://user:pass@host:port/db)",
     )
 
     # Connection pool settings
