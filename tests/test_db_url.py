@@ -107,11 +107,11 @@ class TestSafeDbUrlDisplay:
 
     def test_ipv6_host_url(self) -> None:
         """Test URL with IPv6 host preserves brackets for unambiguous output."""
-        url = "postgresql://user:pass@[::1]:5432/mydb"
+        url = "postgresql://testuser:s3cret@[::1]:5432/mydb"
         result = safe_db_url_display(url)
         assert result == "[::1]:5432/mydb"
-        assert "user" not in result
-        assert "pass" not in result
+        assert "testuser" not in result
+        assert "s3cret" not in result
 
     def test_ipv6_host_without_port(self) -> None:
         """Test IPv6 URL without port."""
@@ -128,6 +128,22 @@ class TestSafeDbUrlDisplay:
             assert result == "(unparseable URL)"
             mock_logger.warning.assert_called_once()
             assert "scheme" in str(mock_logger.warning.call_args)
+
+    def test_sqlalchemy_asyncpg_dialect(self) -> None:
+        """Test SQLAlchemy asyncpg dialect URL."""
+        url = "postgresql+asyncpg://appuser:dbpass@db.example.com:5432/myapp"
+        result = safe_db_url_display(url)
+        assert result == "db.example.com:5432/myapp"
+        assert "appuser" not in result
+        assert "dbpass" not in result
+
+    def test_sqlalchemy_psycopg2_dialect(self) -> None:
+        """Test SQLAlchemy psycopg2 dialect URL."""
+        url = "postgresql+psycopg2://appuser:dbpass@localhost:5432/testdb"
+        result = safe_db_url_display(url)
+        assert result == "localhost:5432/testdb"
+        assert "appuser" not in result
+        assert "dbpass" not in result
 
     def test_import_from_utils_package(self) -> None:
         """Test that safe_db_url_display is importable from utils package."""
