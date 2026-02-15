@@ -115,8 +115,8 @@ class TestDetectContractType:
         data = {"operations": ["read", "write"]}
         assert _detect_contract_type(data) == "subcontract"
 
-    def test_subcontract_not_detected_when_node_type_present(self) -> None:
-        """operations + node_type should be detected as node_contract, not subcontract."""
+    def test_node_type_takes_precedence_over_operations(self) -> None:
+        """node_type check precedes operations check, so node_contract wins."""
         data = {"operations": ["read"], "node_type": "effect"}
         assert _detect_contract_type(data) == "node_contract"
 
@@ -468,25 +468,33 @@ class TestValidateContract:
     def test_file_not_found(self, tmp_path: Path) -> None:
         result = validate_contract(tmp_path / "does_not_exist.yaml")
         assert result["is_valid"] is False
-        assert any("not found" in str(e).lower() for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("not found" in str(e).lower() for e in errors)
         assert result["contract_type"] is None
 
     def test_path_is_directory(self, tmp_path: Path) -> None:
         result = validate_contract(tmp_path)
         assert result["is_valid"] is False
-        assert any("directory" in str(e).lower() for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("directory" in str(e).lower() for e in errors)
 
     def test_empty_file(self, tmp_path: Path) -> None:
         path = _write_text(tmp_path, "")
         result = validate_contract(path)
         assert result["is_valid"] is False
-        assert any("empty" in str(e).lower() for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("empty" in str(e).lower() for e in errors)
 
     def test_invalid_yaml(self, tmp_path: Path) -> None:
         path = _write_text(tmp_path, "name: [broken\n")
         result = validate_contract(path)
         assert result["is_valid"] is False
-        assert any("yaml" in str(e).lower() for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("yaml" in str(e).lower() for e in errors)
 
     def test_yaml_only_comments(self, tmp_path: Path) -> None:
         path = _write_text(tmp_path, "# just a comment\n")
@@ -497,21 +505,27 @@ class TestValidateContract:
         path = _write_text(tmp_path, "- a\n- b\n")
         result = validate_contract(path)
         assert result["is_valid"] is False
-        assert any("mapping" in str(e) for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("mapping" in str(e) for e in errors)
 
     def test_unknown_contract_type(self, tmp_path: Path) -> None:
         path = _write_yaml(tmp_path, {"random_key": "value"})
         result = validate_contract(path)
         assert result["is_valid"] is False
         assert result["contract_type"] == "unknown"
-        assert any("Unable to detect" in str(e) for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("Unable to detect" in str(e) for e in errors)
 
     def test_invalid_node_type(self, tmp_path: Path) -> None:
         data = _make_valid_node_contract(node_type="invalid_type")
         path = _write_yaml(tmp_path, data)
         result = validate_contract(path)
         assert result["is_valid"] is False
-        assert any("Invalid node_type" in str(e) for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert any("Invalid node_type" in str(e) for e in errors)
 
     @pytest.mark.parametrize(
         "node_type",
@@ -569,7 +583,9 @@ class TestValidateContract:
         result = validate_contract(path)
         assert result["is_valid"] is False
         assert result["contract_type"] == "node_contract"
-        errors_str = " ".join(str(e) for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        errors_str = " ".join(str(e) for e in errors)
         assert "name" in errors_str
         assert "description" in errors_str
 
@@ -578,7 +594,9 @@ class TestValidateContract:
         path = _write_yaml(tmp_path, data)
         result = validate_contract(path)
         assert result["is_valid"] is False
-        errors_str = " ".join(str(e) for e in result["errors"])  # type: ignore[union-attr]
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        errors_str = " ".join(str(e) for e in errors)
         assert "Expected object" in errors_str
 
 

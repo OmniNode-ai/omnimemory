@@ -339,6 +339,9 @@ repos:
         entry: poetry run python -m omnimemory.tools.contract_linter
         language: system
         pass_filenames: true
+        # SYNC: CI uses `find src/omnimemory -name contract.yaml` with graceful
+        # skip in .github/workflows/test.yml contract-validation job. This regex
+        # scopes the pre-commit hook; the CI job discovers files independently.
         files: ^src/omnimemory/(nodes|handlers)/.*/contract\.yaml$
         stages: [pre-commit]
 

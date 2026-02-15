@@ -458,8 +458,13 @@ def check_file(
     return violations, errors
 
 
-def main() -> int:
-    """Main entry point for the transport import validator CLI."""
+def main(args: list[str] | None = None) -> int:
+    """Main entry point for the transport import validator CLI.
+
+    Args:
+        args: CLI arguments to parse.  Defaults to ``sys.argv[1:]`` when
+            *None* (the standard ``argparse`` behaviour).
+    """
     parser = argparse.ArgumentParser(
         description="Validate no banned transport/I/O imports in omnimemory nodes",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -509,9 +514,9 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         help="Show import statement snippets for each violation",
     )
 
-    args = parser.parse_args()
+    parsed = parser.parse_args(args)
 
-    src_dir = args.src_dir
+    src_dir = parsed.src_dir
     if not src_dir.exists():
         print(f"Error: Source directory does not exist: {src_dir}", file=sys.stderr)
         return 1
@@ -521,11 +526,13 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         return 1
 
     # Load whitelist
-    whitelist = load_whitelist(args.whitelist)
-    if whitelist.files and args.verbose:
-        print(f"Loaded {len(whitelist.files)} whitelist entries from {args.whitelist}")
+    whitelist = load_whitelist(parsed.whitelist)
+    if whitelist.files and parsed.verbose:
+        print(
+            f"Loaded {len(whitelist.files)} whitelist entries from {parsed.whitelist}"
+        )
 
-    excludes = set(args.excludes)
+    excludes = set(parsed.excludes)
     all_violations: list[Violation] = []
     all_errors: list[FileProcessingError] = []
     whitelisted_count = 0
@@ -533,7 +540,7 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
 
     print(f"Checking for transport/I/O library imports in {src_dir}...")
 
-    for file_path in iter_python_files(src_dir, excludes, verbose=args.verbose):
+    for file_path in iter_python_files(src_dir, excludes, verbose=parsed.verbose):
         file_count += 1
         violations, errors = check_file(file_path)
         all_errors.extend(errors)
@@ -541,7 +548,7 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         for v in violations:
             if is_whitelisted(v.file_path, v.module_name, whitelist):
                 whitelisted_count += 1
-                if args.verbose:
+                if parsed.verbose:
                     print(f"  [whitelisted] {v}")
             else:
                 all_violations.append(v)
@@ -558,7 +565,7 @@ Per ARCH-002: Nodes never touch Kafka directly. Runtime owns all Kafka plumbing.
         print("Violations:")
         for v in all_violations:
             print(f"  {v}")
-            if args.verbose:
+            if parsed.verbose:
                 print(f"    -> {v.import_statement}")
         print()
         print("Architectural Invariant: Nodes never touch Kafka directly.")

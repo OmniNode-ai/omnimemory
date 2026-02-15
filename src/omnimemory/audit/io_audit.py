@@ -430,6 +430,15 @@ class IOAuditVisitor(ast.NodeVisitor):
         return False
 
     def _is_likely_path_object(self, node: ast.expr) -> bool:
+        """Heuristically determine whether *node* likely refers to a Path object.
+
+        This uses variable-name pattern matching (e.g. names ending in
+        ``_path`` or matching known patterns like ``fp``, ``file_path``).
+        Because it relies on naming conventions rather than type inference,
+        it can produce false positives (a variable named ``path`` that is
+        actually a ``str``) and false negatives (a ``Path`` object stored
+        in a variable with an unconventional name like ``destination``).
+        """
         if isinstance(node, ast.Call):
             if isinstance(node.func, ast.Name) and node.func.id == "Path":
                 return True

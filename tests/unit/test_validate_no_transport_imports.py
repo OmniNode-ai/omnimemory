@@ -15,7 +15,6 @@ import importlib.util
 import sys
 import textwrap
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 import yaml
@@ -471,24 +470,21 @@ class TestIterPythonFiles:
 
 @pytest.mark.unit
 class TestMain:
-    """Test ``main()`` CLI entry point with mocked argv and filesystem."""
+    """Test ``main()`` CLI entry point with explicit args and filesystem."""
 
     def test_clean_directory_returns_zero(self, tmp_path: Path) -> None:
         src = tmp_path / "src"
         src.mkdir()
         (src / "clean.py").write_text("import os\n", encoding="utf-8")
 
-        with patch(
-            "sys.argv",
+        result = main(
             [
-                "validate_no_transport_imports.py",
                 "--src-dir",
                 str(src),
                 "--whitelist",
                 str(tmp_path / "nonexistent_wl.yaml"),
-            ],
-        ):
-            result = main()
+            ]
+        )
         assert result == 0
 
     def test_violation_returns_one(self, tmp_path: Path) -> None:
@@ -496,17 +492,14 @@ class TestMain:
         src.mkdir()
         (src / "bad.py").write_text("import httpx\n", encoding="utf-8")
 
-        with patch(
-            "sys.argv",
+        result = main(
             [
-                "validate_no_transport_imports.py",
                 "--src-dir",
                 str(src),
                 "--whitelist",
                 str(tmp_path / "nonexistent_wl.yaml"),
-            ],
-        ):
-            result = main()
+            ]
+        )
         assert result == 1
 
     def test_whitelisted_violation_returns_zero(self, tmp_path: Path) -> None:
@@ -527,31 +520,25 @@ class TestMain:
         }
         wl_path = _write_whitelist(tmp_path, wl_data)
 
-        with patch(
-            "sys.argv",
+        result = main(
             [
-                "validate_no_transport_imports.py",
                 "--src-dir",
                 str(src),
                 "--whitelist",
                 str(wl_path),
-            ],
-        ):
-            result = main()
+            ]
+        )
         assert result == 0
 
     def test_nonexistent_src_dir_returns_one(self, tmp_path: Path) -> None:
-        with patch(
-            "sys.argv",
+        result = main(
             [
-                "validate_no_transport_imports.py",
                 "--src-dir",
                 str(tmp_path / "does_not_exist"),
                 "--whitelist",
                 str(tmp_path / "wl.yaml"),
-            ],
-        ):
-            result = main()
+            ]
+        )
         assert result == 1
 
     def test_exclude_prevents_scanning(self, tmp_path: Path) -> None:
@@ -560,19 +547,16 @@ class TestMain:
         infra.mkdir(parents=True)
         (infra / "bridge.py").write_text("import aiokafka\n", encoding="utf-8")
 
-        with patch(
-            "sys.argv",
+        result = main(
             [
-                "validate_no_transport_imports.py",
                 "--src-dir",
                 str(src),
                 "--exclude",
                 str(infra),
                 "--whitelist",
                 str(tmp_path / "wl.yaml"),
-            ],
-        ):
-            result = main()
+            ]
+        )
         assert result == 0
 
     def test_type_checking_guard_passes_main(self, tmp_path: Path) -> None:
@@ -586,17 +570,14 @@ class TestMain:
         """)
         (src / "guarded.py").write_text(source, encoding="utf-8")
 
-        with patch(
-            "sys.argv",
+        result = main(
             [
-                "validate_no_transport_imports.py",
                 "--src-dir",
                 str(src),
                 "--whitelist",
                 str(tmp_path / "wl.yaml"),
-            ],
-        ):
-            result = main()
+            ]
+        )
         assert result == 0
 
 

@@ -66,7 +66,7 @@ def _detect_contract_type(data: dict[str, object]) -> str:
     if "node_type" in data:
         return "node_contract"
 
-    if "operations" in data and "node_type" not in data:
+    if "operations" in data:
         return "subcontract"
 
     return "unknown"
