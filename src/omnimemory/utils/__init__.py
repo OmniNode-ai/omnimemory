@@ -9,6 +9,7 @@ This package provides common utilities used across the OmniMemory system:
 - Health checking with comprehensive dependency monitoring
 - Performance monitoring helpers
 - Common validation patterns
+- Database URL display utilities for safe credential masking
 """
 
 from ..models.utils.model_concurrency import ModelConnectionPoolConfig
@@ -26,6 +27,7 @@ from .concurrency import (
     with_fair_semaphore,
     with_priority_lock,
 )
+from .db_url import safe_db_url_display
 from .error_sanitizer import (
     ErrorSanitizer,
     SanitizationLevel,
@@ -174,6 +176,8 @@ __all__ = [
     "ModelPIIPatternConfig",
     "PIIDetector",
     "PIIType",
+    # Database URL display
+    "safe_db_url_display",
     # Error Sanitization
     "SanitizationLevel",
     "ErrorSanitizer",
