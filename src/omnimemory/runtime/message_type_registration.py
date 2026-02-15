@@ -268,7 +268,7 @@ def register_memory_message_types(
             _registry_ready = False
             failure_count_snapshot = _registration_failure_count
         logger.exception(
-            "Memory message type registration failed " "(registered=%d, failures=%d)",
+            "Memory message type registration failed (registered=%d, failures=%d)",
             len(registered),
             failure_count_snapshot,
         )

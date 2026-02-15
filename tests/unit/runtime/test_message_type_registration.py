@@ -21,6 +21,7 @@ from omnibase_core.models.errors import ModelOnexError
 from omnibase_infra.enums import EnumMessageCategory
 from omnibase_infra.runtime.registry import RegistryMessageType
 
+import omnimemory.runtime.message_type_registration as _mtr_module
 from omnimemory.runtime.message_type_registration import (
     EXPECTED_MESSAGE_TYPE_COUNT,
     MEMORY_DOMAIN,
@@ -346,6 +347,20 @@ class TestRegistryProperties:
 @pytest.mark.unit
 class TestRegistrationObservability:
     """Verify readiness flag and metric counters after registration."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_observability_globals(self) -> None:
+        """Reset module-level observability state before each test.
+
+        Without this reset the globals (_registry_ready, _registered_count,
+        _registration_failure_count) persist across tests.  Under parallel
+        execution (pytest-xdist) or reordered collection this causes flaky
+        assertions that depend on "clean slate" state.
+        """
+        with _mtr_module._registry_lock:
+            _mtr_module._registry_ready = False
+            _mtr_module._registered_count = 0
+            _mtr_module._registration_failure_count = 0
 
     def test_is_ready_after_success(self, registry: RegistryMessageType) -> None:
         """is_registry_ready() returns True after successful registration."""
