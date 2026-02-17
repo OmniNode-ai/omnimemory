@@ -1,10 +1,12 @@
 # OmniMemory - Advanced Memory Management System
 
+> **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: Poetry | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
+
 **Status**: Active Development | **Architecture**: ONEX 4.0 Compliant | **Performance Target**: Sub-100ms Operations
 
 ---
 
-## 🚫🚫🚫 CRITICAL POLICY: NO BACKWARDS COMPATIBILITY 🚫🚫🚫
+## CRITICAL POLICY: NO BACKWARDS COMPATIBILITY
 
 ---
 
@@ -93,11 +95,11 @@ OmniMemory is an advanced unified memory and intelligence system designed to mig
 OmniMemory strictly follows ONEX standards from omnibase_core:
 
 **Directory Structure Standards:**
-- ✅ **models/** directory (NOT core/) - all models in `src/omnimemory/models/`
-- ✅ **Pydantic BaseModel** - all models inherit from `BaseModel`
-- ✅ **Strong Typing** - zero `Any` types throughout codebase
-- ✅ **Field Documentation** - `Field(..., description="...")` pattern
-- ✅ **Domain Organization** - models organized by functional domain
+- **models/** directory (NOT core/) - all models in `src/omnimemory/models/`
+- **Pydantic BaseModel** - all models inherit from `BaseModel`
+- **Strong Typing** - zero `Any` types throughout codebase
+- **Field Documentation** - `Field(..., description="...")` pattern
+- **Domain Organization** - models organized by functional domain
 
 **Current Model Structure:**
 ```
@@ -283,50 +285,25 @@ src/omnimemory/
 ### Development Commands
 
 ```bash
-# Setup and development
-poetry install                    # Install dependencies
-poetry run pre-commit install   # Setup pre-commit hooks
+# Setup
+poetry install                         # Install dependencies
+pre-commit install                     # Install pre-commit hooks
+pre-commit install --hook-type pre-push  # Install pre-push hooks
 
-# Code quality
-poetry run black .              # Format code
-poetry run isort .              # Sort imports
-poetry run mypy src/            # Type checking
-poetry run flake8 src/          # Linting
+# Code quality (ruff replaces black + isort + flake8)
+ruff format src/ tests/                # Format code
+ruff check --fix src/ tests/           # Lint and auto-fix
+poetry run mypy src/omnimemory         # Type checking (strict)
 
 # Testing
-poetry run pytest              # Run all tests
-poetry run pytest -m unit     # Unit tests only
-poetry run pytest -m integration  # Integration tests
-poetry run pytest --cov       # Coverage report
+poetry run pytest                      # Run all tests
+poetry run pytest -m unit              # Unit tests only
+poetry run pytest -m integration       # Integration tests
+poetry run pytest --cov                # Coverage report
 
-# Migration tools
-poetry run python scripts/migrate_intelligence.py  # Migrate legacy tools
-poetry run python scripts/validate_onex.py         # ONEX compliance check
-```
-
-### Environment Configuration
-
-```bash
-# Database connections
-DATABASE_URL="postgresql://user:pass@localhost:5432/omnimemory"
-SUPABASE_URL="https://your-project.supabase.co"
-SUPABASE_ANON_KEY="your-anon-key"
-
-# Vector database
-PINECONE_API_KEY="your-pinecone-key"
-PINECONE_ENVIRONMENT="your-environment"
-
-# Cache and temporary storage
-REDIS_URL="redis://localhost:6379"
-
-# ONEX integration
-OMNIBASE_SPI_VERSION="latest"
-OMNIBASE_CORE_VERSION="latest"
-
-# Development settings
-DEVELOPMENT_MODE="true"
-LOG_LEVEL="INFO"
-MEMORY_CACHE_SIZE="1000"
+# Pre-commit validation
+pre-commit run --all-files             # Run all pre-commit hooks
+pre-commit run --all-files --hook-stage pre-push  # Run pre-push hooks
 ```
 
 ## Integration Patterns
@@ -461,7 +438,3 @@ score = await compliance.evaluate_operation(operation_result)
 
 **Project Repository**: `/Volumes/PRO-G40/Code/omnimemory`
 **ONEX Version**: 4.0+
-**Python Version**: 3.12+
-**Last Updated**: 2025-09-13
-
-For questions or contributions, refer to the project documentation in the `docs/` directory or contact the OmniNode-ai development team.
