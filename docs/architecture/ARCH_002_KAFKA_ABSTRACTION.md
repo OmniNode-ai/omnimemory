@@ -191,12 +191,13 @@ class HandlerSubscription:
             )
         self._event_bus = event_bus
         self._publisher = AdapterKafkaPublisher(event_bus)
+        self._notification_topic = config.kafka_notification_topic
 
     async def notify(self, topic: str, event: ModelNotificationEvent) -> int:
         event_payload = cast(dict[str, object], event.model_dump(mode="json"))
         # Delegates to protocol adapter -- no aiokafka anywhere in this file
         await self._publisher.publish(
-            topic=config.kafka_notification_topic,
+            topic=self._notification_topic,
             key=topic,
             value=event_payload,
         )
