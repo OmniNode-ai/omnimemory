@@ -9,10 +9,9 @@
 ## Overview
 
 ARCH-002 prohibits direct `aiokafka`, `kafka`, or `confluent_kafka` imports
-inside `omnimemory/nodes/` and `omnimemory/handlers/`. All event bus
-interaction must go through the `ProtocolEventBusPublish` protocol defined in
-`omnimemory.runtime.adapters`. Concrete transport wiring lives exclusively in
-the runtime layer.
+inside `omnimemory/nodes/`. All event bus interaction must go through the
+`ProtocolEventBusPublish` protocol defined in `omnimemory.runtime.adapters`.
+Concrete transport wiring lives exclusively in the runtime layer.
 
 This rule prevents handler code from coupling to a specific Kafka client
 library, making transport swappable and keeping handlers testable in isolation.

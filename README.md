@@ -42,11 +42,35 @@ poetry add omnimemory
 
 Minimal example using the intent handler:
 ```python
-from omnimemory.handlers.handler_intent import HandlerIntent
-from omnimemory.models.core.model_memory_operation import ModelMemoryOperation
+from uuid import uuid4
 
-handler = HandlerIntent(container=container)
-result = await handler.handle(ModelMemoryOperation(...))
+from omnibase_core.container import ModelONEXContainer
+from omnibase_core.models.intelligence import ModelIntentClassificationOutput
+from omnimemory.handlers.handler_intent import HandlerIntent
+
+container = ModelONEXContainer()
+handler = HandlerIntent(container)
+
+await handler.initialize(connection_uri="bolt://localhost:7687")
+
+# Store an intent
+result = await handler.store_intent(
+    session_id="session_123",
+    intent_data=ModelIntentClassificationOutput(
+        intent_category="debugging",
+        confidence=0.92,
+        keywords=["error", "traceback"],
+    ),
+    correlation_id=str(uuid4()),
+)
+
+# Query session intents
+query_result = await handler.query_session(
+    session_id="session_123",
+    min_confidence=0.5,
+)
+
+await handler.shutdown()
 ```
 
 Run tests:
