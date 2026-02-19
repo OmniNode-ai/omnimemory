@@ -229,7 +229,7 @@ Tested in `tests/unit/test_validate_kafka_imports.py`.
 AST-based scanner covering a broader set of banned transport modules:
 `aiokafka`, `kafka`, `confluent_kafka`, `httpx`, `redis`, `asyncpg`, `grpc`,
 `websockets`, `requests`, `aiohttp`, `celery`. Supports a YAML whitelist
-(`scripts/transport_import_whitelist.yaml`) for intentional exceptions.
+(`tests/audit/transport_import_whitelist.yaml`) for intentional exceptions.
 
 Tested in `tests/unit/test_validate_no_transport_imports.py`.
 

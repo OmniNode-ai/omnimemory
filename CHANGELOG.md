@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `event_bus` topic declarations to all effect node contracts ([OMN-2212](https://linear.app/omninode/issue/OMN-2212), [#37](https://github.com/OmniNode-ai/omnimemory/pull/37))
 - Add contract-driven topic discovery for runtime event-bus wiring ([OMN-2213](https://linear.app/omninode/issue/OMN-2213), [#38](https://github.com/OmniNode-ai/omnimemory/pull/38))
 - Migrate omnimemory to standard `event_bus.subscribe_topics` contract field ([OMN-1746](https://linear.app/omninode/issue/OMN-1746), [#39](https://github.com/OmniNode-ai/omnimemory/pull/39))
-- ARCH-002 compliance — abstract Kafka from handlers behind `ProtocolMessageDispatcher` ([OMN-2214](https://linear.app/omninode/issue/OMN-2214), [#40](https://github.com/OmniNode-ai/omnimemory/pull/40))
+- ARCH-002 compliance — abstract Kafka from handlers behind `ProtocolEventBusPublish` ([OMN-2214](https://linear.app/omninode/issue/OMN-2214), [#40](https://github.com/OmniNode-ai/omnimemory/pull/40))
 - Add `MessageDispatchEngine` integration for handler-level event dispatch ([OMN-2215](https://linear.app/omninode/issue/OMN-2215), [#41](https://github.com/OmniNode-ai/omnimemory/pull/41))
 - Add CI Kafka import lint guard to enforce ARCH-002 (no direct `kafka` imports in handlers) ([OMN-1750](https://linear.app/omninode/issue/OMN-1750), [#42](https://github.com/OmniNode-ai/omnimemory/pull/42))
 - Add `PluginMemory` runtime plugin for memory subsystem registration ([OMN-2216](https://linear.app/omninode/issue/OMN-2216), [#43](https://github.com/OmniNode-ai/omnimemory/pull/43))
