@@ -288,9 +288,9 @@ def safe_db_url_display(url: str) -> str: ...
 ```python
 from omnimemory.utils import safe_db_url_display
 
-url = "postgresql://omnimemory:super_secret@192.168.86.200:5436/omninode_bridge"
+url = "postgresql://omnimemory:super_secret@<db-host>:5436/omninode_bridge"
 print(safe_db_url_display(url))
-# Output: 192.168.86.200:5436/omninode_bridge
+# Output: <db-host>:5436/omninode_bridge
 ```
 
 **Edge cases**:

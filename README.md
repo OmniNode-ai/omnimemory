@@ -45,7 +45,7 @@ Minimal example using the intent handler:
 from uuid import uuid4
 
 from omnibase_core.container import ModelONEXContainer
-from omnibase_core.models.intelligence import ModelIntentClassificationOutput
+from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
 from omnimemory.handlers.handler_intent import HandlerIntent
 
 container = ModelONEXContainer()

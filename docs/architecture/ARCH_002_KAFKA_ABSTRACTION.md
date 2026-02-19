@@ -155,11 +155,12 @@ class HandlerSubscription:
         self._producer = AIOKafkaProducer(
             bootstrap_servers=config.kafka_bootstrap_servers,
         )
+        self._config = config
         await self._producer.start()
 
     async def notify(self, topic: str, event: ModelNotificationEvent) -> int:
         value = json.dumps(event.model_dump(mode="json")).encode()
-        await self._producer.send(config.kafka_notification_topic, value=value)
+        await self._producer.send(self._config.kafka_notification_topic, value=value)
 ```
 
 Problems:
@@ -228,8 +229,11 @@ Tested in `tests/unit/test_validate_kafka_imports.py`.
 
 AST-based scanner covering a broader set of banned transport modules:
 `aiokafka`, `kafka`, `confluent_kafka`, `httpx`, `redis`, `asyncpg`, `grpc`,
-`websockets`, `requests`, `aiohttp`, `celery`. Supports a YAML whitelist
-(`tests/audit/transport_import_whitelist.yaml`) for intentional exceptions.
+`websockets`, `requests`, `aiohttp`, `celery`. This list is not exhaustive —
+see [docs/ci/CI_MONITORING_GUIDE.md](../ci/CI_MONITORING_GUIDE.md) for the
+complete banned module table, which additionally covers `urllib3`, `aioredis`,
+`psycopg2`, `psycopg`, `aiomysql`, `pika`, `aio_pika`, `kombu`, and `wsproto`.
+Supports a YAML whitelist (`tests/audit/transport_import_whitelist.yaml`) for intentional exceptions.
 
 Tested in `tests/unit/test_validate_no_transport_imports.py`.
 
