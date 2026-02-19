@@ -158,7 +158,7 @@ class HandlerSubscription:
         self._config = config
         await self._producer.start()
 
-    async def notify(self, topic: str, event: ModelNotificationEvent) -> int:
+    async def notify(self, topic: str, event: ModelNotificationEvent) -> None:
         value = json.dumps(event.model_dump(mode="json")).encode()
         await self._producer.send(self._config.kafka_notification_topic, value=value)
 ```
@@ -172,6 +172,8 @@ Problems:
 
 ```python
 # src/omnimemory/handlers/handler_subscription.py  -- CORRECT
+
+from typing import cast
 
 from omnimemory.runtime.adapters import (
     AdapterKafkaPublisher,
@@ -194,7 +196,7 @@ class HandlerSubscription:
         self._publisher = AdapterKafkaPublisher(event_bus)
         self._notification_topic = config.kafka_notification_topic
 
-    async def notify(self, topic: str, event: ModelNotificationEvent) -> int:
+    async def notify(self, topic: str, event: ModelNotificationEvent) -> None:
         event_payload = cast(dict[str, object], event.model_dump(mode="json"))
         # Delegates to protocol adapter -- no aiokafka anywhere in this file
         await self._publisher.publish(
