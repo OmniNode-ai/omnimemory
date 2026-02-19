@@ -209,8 +209,7 @@ The handler receives its dependencies via constructor injection:
 ```python
 # src/omnimemory/nodes/my_storage_effect/handlers/handler_my_storage.py
 
-# Canonical import path (see stub_protocols.md for upstream path rationale)
-from omnibase_core.models.container.model_onex_container import ModelONEXContainer
+from omnibase_core.container import ModelONEXContainer
 
 from omnimemory.nodes.my_storage_effect.models import (
     ModelMyStorageRequest,

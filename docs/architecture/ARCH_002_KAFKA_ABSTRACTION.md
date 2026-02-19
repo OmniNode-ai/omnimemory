@@ -20,13 +20,12 @@ library, making transport swappable and keeping handlers testable in isolation.
 
 ## The Rule
 
-**No handler or node file may import directly from `aiokafka`, `kafka`,
+**No node file may import directly from `aiokafka`, `kafka`,
 `confluent_kafka`, or any other transport module.**
 
 | Context | Allowed |
 |---------|---------|
-| `omnimemory/nodes/**/*.py` | Protocol interfaces only |
-| `omnimemory/handlers/**/*.py` | Protocol interfaces only |
+| `omnimemory/nodes/**/*.py` | Protocol interfaces only — enforced by CI |
 | `omnimemory/runtime/**/*.py` | Direct transport imports allowed |
 | `if TYPE_CHECKING:` blocks | Allowed (never executed at runtime) |
 | `# omnimemory-kafka-exempt:` annotation | Allowed (explicit bypass with reason) |
