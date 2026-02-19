@@ -491,10 +491,10 @@ Install the `omnibase-infra` package from PyPI:
 
 ```bash
 # Add as development dependency
-uv add --group dev omnibase-infra
+poetry add --group dev omnibase-infra
 
 # Or install directly
-uv pip install omnibase-infra
+pip install omnibase-infra
 ```
 
 > **Naming Convention**: The PyPI package name uses hyphens (`omnibase-infra`) while

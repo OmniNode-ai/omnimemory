@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "omnimemory"
-version = "0.2.0"
+version = "0.3.0"
 description = "Advanced memory management and retrieval system for AI applications"
 authors = ["OmniNode-ai <contact@omninode.ai>"]
 readme = "README.md"

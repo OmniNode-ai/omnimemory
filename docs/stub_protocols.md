@@ -186,7 +186,7 @@ The handler reuse matrix (`docs/handler_reuse_matrix.md`) references handlers fr
 
 **Add when available**:
 ```bash
-uv add --group dev omnibase-infra
+poetry add --group dev omnibase-infra
 ```
 
 ---

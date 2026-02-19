@@ -37,7 +37,7 @@
 
 Install:
 ```bash
-uv add omnimemory
+poetry add omnimemory
 ```
 
 Minimal example using the intent handler:
@@ -51,7 +51,7 @@ result = await handler.handle(ModelMemoryOperation(...))
 
 Run tests:
 ```bash
-uv run pytest
+poetry run pytest
 ```
 
 ## Directory Structure
@@ -72,14 +72,14 @@ src/omnimemory/
 
 ## Development
 
-Uses [uv](https://docs.astral.sh/uv/) for package management.
+Uses [Poetry](https://python-poetry.org/) for package management.
 
 ```bash
-uv sync --all-extras
-uv run pytest tests/
-uv run mypy src/omnimemory/
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
+poetry install
+poetry run pytest tests/
+poetry run mypy src/omnimemory/
+poetry run ruff check src/ tests/
+poetry run ruff format src/ tests/
 ```
 
 ## Documentation
