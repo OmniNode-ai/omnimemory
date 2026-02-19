@@ -30,6 +30,8 @@ library, making transport swappable and keeping handlers testable in isolation.
 | `if TYPE_CHECKING:` blocks | Allowed (never executed at runtime) |
 | `# omnimemory-kafka-exempt:` annotation | Allowed (explicit bypass with reason) |
 
+> **Note on scope**: The CI lint guard enforces the no-direct-import rule on `omnimemory/nodes/**/*.py` only. The BEFORE/AFTER examples in this document use a file from `omnimemory/handlers/` to illustrate the architectural intent — the same principle (avoid coupling application code to a specific Kafka client) applies broadly to any code outside the runtime layer, even if the CI guard does not cover every such path explicitly.
+
 ---
 
 ## Pattern: subscribe_topics

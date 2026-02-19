@@ -116,7 +116,7 @@ The service fails fast on startup if `OMNIMEMORY_DB_URL` is not set when postgre
 postgresql://user:password@host:port/database
 ```
 
-When using the `asyncpg` driver (used internally for health checks and lifecycle handlers), the `postgresql+asyncpg://` scheme is also accepted by `asyncpg.connect()` but the standard `postgresql://` scheme is sufficient and preferred for the pydantic-settings `PostgresDsn` field.
+When using the `asyncpg` driver (used internally for health checks and lifecycle handlers), the `postgresql+asyncpg://` scheme is a SQLAlchemy dialect specifier and is **not** accepted directly by `asyncpg.connect()`. OmniMemory normalizes the URL before passing it to asyncpg, stripping the `+asyncpg` suffix so that asyncpg receives the standard `postgresql://` form it expects. The standard `postgresql://` scheme is sufficient and preferred for the pydantic-settings `PostgresDsn` field.
 
 **Examples**:
 
