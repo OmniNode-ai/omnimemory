@@ -45,8 +45,17 @@ Every CI validation job has a corresponding pre-commit hook so that "works local
 # WRONG - direct Kafka import in a node
 from aiokafka import AIOKafkaConsumer
 
-# CORRECT - use the EventBus SPI from the runtime layer
-from omnimemory.runtime.event_bus import EventBus
+# CORRECT - for subscribing: receive an injected subscribe_callback; never import aiokafka
+async def initialize(
+    self,
+    subscribe_callback: Callable[
+        [str, Callable[[dict[str, object]], None]], Callable[[], None]
+    ],
+) -> None:
+    unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
+
+# CORRECT - for publishing: depend on ProtocolEventBusPublish from the runtime adapters
+from omnimemory.runtime.adapters import ProtocolEventBusPublish
 ```
 
 **Exemption annotation** (use sparingly, requires justification):
