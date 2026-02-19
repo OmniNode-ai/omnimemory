@@ -1,3 +1,5 @@
+> **Navigation**: [Home](../INDEX.md) > DB Split
+
 # FK Audit: omnimemory (OMN-2069)
 
 **Audit Date**: 2026-02-10

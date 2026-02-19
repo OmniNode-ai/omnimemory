@@ -1,440 +1,238 @@
-# OmniMemory - Advanced Memory Management System
+# CLAUDE.md - OmniMemory
 
 > **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: Poetry | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
 
-**Status**: Active Development | **Architecture**: ONEX 4.0 Compliant | **Performance Target**: Sub-100ms Operations
+---
+
+## Table of Contents
+
+1. [Repo Invariants](#repo-invariants)
+2. [Non-Goals](#non-goals)
+3. [Quick Reference](#quick-reference)
+4. [Package Manager](#package-manager)
+5. [Forbidden Patterns](#forbidden-patterns)
+6. [Required Patterns](#required-patterns)
+7. [Model Exemption Pattern](#model-exemption-pattern)
+8. [Documentation](#documentation)
 
 ---
 
-## CRITICAL POLICY: NO BACKWARDS COMPATIBILITY
+## Repo Invariants
+
+These are non-negotiable architectural truths:
+
+- **Zero `Any` types** — no `Any` anywhere in `src/`; use precise types or explicit `object`
+- **`frozen=True` on boundary-crossing models** — all models that cross handler/node boundaries must be immutable
+- **`ModelSemVer` only for version fields** — no `str`, no `str | ModelSemVer`, no validator coercion
+- **No backwards compatibility** — ever; delete old code, never deprecate
+- **Models live in `src/omnimemory/models/`** — organized by domain subdirectory; exceptions require `omnimemory-model-exempt` comment
+- **`Field(..., description="...")` on all model fields** — no bare field declarations
+- **PEP 604 unions** — `X | Y` not `Optional[X]` or `Union[X, Y]`
+- **Async-first** — all I/O operations must be `async`; no blocking calls in async contexts
 
 ---
 
-### **NEVER KEEP BACKWARDS COMPATIBILITY EVER EVER EVER**
+## Non-Goals
+
+OmniMemory explicitly does **NOT**:
+
+- **Maintain backwards compatibility** — breaking changes are always acceptable; callers update or they break
+- **Accept strings where typed models are required** — no convenience coercions in validators
+- **Keep deprecated code** — the moment something is outdated, delete it; no `_deprecated` suffixes or shims
+- **Support legacy omnibase_3 patterns** — migrated code must fully conform to ONEX 4.0; no hybrid patterns
+- **Expose untyped public APIs** — every public function and method must be fully typed
 
 ---
 
-This project follows a **ZERO BACKWARDS COMPATIBILITY** policy. This is **NON-NEGOTIABLE**.
+## Quick Reference
 
-**Core Principles:**
-- **Breaking changes are always acceptable** - break whatever needs breaking
-- **No deprecated code maintenance** - delete old code, never deprecate
-- **All models MUST conform to current protocols** - no legacy support
-- **Clean, modern architecture only** - no compatibility shims
-- **Remove old patterns immediately** - the moment something is outdated, delete it
+```bash
+# Setup
+poetry install
+pre-commit install
+pre-commit install --hook-type pre-push
+
+# Format and lint
+ruff format src/ tests/
+ruff check --fix src/ tests/
+
+# Type checking
+poetry run mypy src/omnimemory
+
+# Testing
+poetry run pytest                    # All tests
+poetry run pytest -m unit            # Unit tests only
+poetry run pytest -m integration     # Integration tests
+poetry run pytest --cov              # With coverage report
+
+# Pre-commit validation
+pre-commit run --all-files
+pre-commit run --all-files --hook-stage pre-push
+```
+
+**Test markers**: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.slow`, `@pytest.mark.benchmark`, `@pytest.mark.memgraph`, `@pytest.mark.embedding`
 
 ---
 
-### Version Fields: ModelSemVer ONLY
+## Package Manager
 
-**ALL version fields in ALL models MUST use `ModelSemVer` directly.**
+This repository uses **Poetry** for dependency management. All Python commands must be run via `poetry run`.
 
-**FORBIDDEN PATTERNS** (never do these):
+```bash
+poetry install          # Install all dependencies
+poetry run <command>    # Run command in venv
+poetry lock             # Regenerate lockfile
+```
+
+---
+
+## Forbidden Patterns
+
+### Version fields: never accept strings
 
 ```python
-# WRONG - Union types for backwards compatibility
-version: ModelSemVer | str  # NEVER DO THIS
+# WRONG - union type for backwards compatibility
+version: ModelSemVer | str
 
-# WRONG - Optional string fallback
-version: ModelSemVer | None = None  # NEVER when accommodating strings
+# WRONG - optional string fallback
+version: ModelSemVer | None = None  # when accommodating string callers
 
-# WRONG - Helper methods to convert strings
+# WRONG - validator coercion for "convenience"
+@field_validator("version", mode="before")
+def convert_string(cls, v: object) -> ModelSemVer:
+    if isinstance(v, str):
+        return ModelSemVer.from_str(v)
+    return v  # type: ignore[return-value]
+
+# WRONG - helper method hiding the string/ModelSemVer duality
 def get_semver(self) -> ModelSemVer:
     if isinstance(self.version, str):
         return ModelSemVer.from_str(self.version)
     return self.version
-
-# WRONG - Accepting strings in validators for "convenience"
-@field_validator("version", mode="before")
-def convert_string(cls, v):
-    if isinstance(v, str):
-        return ModelSemVer.from_str(v)
-    return v
 ```
 
-**REQUIRED PATTERN** (always do this):
+### Models: no Any, no bare fields, no missing frozen
 
 ```python
-# CORRECT - ModelSemVer only, no exceptions
-version: ModelSemVer = Field(..., description="Semantic version")
-contract_version: ModelSemVer = Field(..., description="Contract version")
+# WRONG - Any type
+class MyModel(BaseModel):
+    data: Any  # never
 
-# Callers convert BEFORE calling - that's THEIR responsibility
+# WRONG - undocumented field
+class MyModel(BaseModel):
+    name: str  # no Field(), no description
+
+# WRONG - boundary model not frozen
+class MyRequest(BaseModel):  # crosses handler boundary
+    payload: str  # missing frozen=True in ConfigDict
+```
+
+### Old code: delete, never deprecate
+
+```python
+# WRONG - keeping deprecated code
+def old_process(data):  # deprecated, use new_process instead
+    ...
+
+# WRONG - compatibility shim
+OldName = NewName  # backwards compat alias - never do this
+```
+
+---
+
+## Required Patterns
+
+### Version fields: ModelSemVer only, caller converts
+
+```python
+# CORRECT - ModelSemVer directly; callers convert before passing
+class MyConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
+
+    version: ModelSemVer = Field(..., description="Semantic version of this config")
+    contract_version: ModelSemVer = Field(..., description="Contract version")
+
+# Caller responsibility:
 config = MyConfig(
-    version=ModelSemVer.from_str("1.0.0"),  # Caller converts
+    version=ModelSemVer.from_str("1.0.0"),
+    contract_version=ModelSemVer.from_str("2.0.0"),
 )
 ```
 
-**The Rule:** If callers have strings, they convert to `ModelSemVer` BEFORE passing to models. Models NEVER accept strings. No exceptions. No "convenience" methods. No union types.
-
----
-
-### When You See Old Code
-
-1. **DELETE IT** - Do not refactor, do not deprecate, delete
-2. **No migration path** - Callers update or they break
-3. **No compatibility layer** - Clean break every time
-4. **No "just in case"** - If it's not the current pattern, it's gone
-
----
-
-## Project Overview
-
-OmniMemory is an advanced unified memory and intelligence system designed to migrate and modernize 274+ intelligence modules from legacy omnibase_3 into a comprehensive, ONEX-compliant memory architecture. This system accelerates development across all omni agents through systematic memory management, retrieval operations, and cross-modal intelligence patterns.
-
-### Core Mission
-- **Legacy Migration**: Modernize 52,880+ lines of intelligence code from ../omnibase_3/intelligence_tools/
-- **ONEX Compliance**: Full adherence to ONEX 4.0 architectural standards and patterns
-- **Unified Intelligence**: Create cohesive memory system serving all omni agents
-- **Performance Excellence**: Achieve sub-100ms memory operations with 1M+ ops/hour capacity
-
-## Architecture & Design Patterns
-
-### ONEX Standards Compliance
-
-OmniMemory strictly follows ONEX standards from omnibase_core:
-
-**Directory Structure Standards:**
-- **models/** directory (NOT core/) - all models in `src/omnimemory/models/`
-- **Pydantic BaseModel** - all models inherit from `BaseModel`
-- **Strong Typing** - zero `Any` types throughout codebase
-- **Field Documentation** - `Field(..., description="...")` pattern
-- **Domain Organization** - models organized by functional domain
-
-**Current Model Structure:**
-```
-src/omnimemory/models/         # 26 Pydantic models, zero Any types
-├── core/                      # Foundation models (4 models)
-├── memory/                    # Memory-specific models (6 models)
-├── intelligence/              # Intelligence processing (5 models)
-├── service/                   # Service configuration (4 models)
-├── container/                 # Container and DI models (4 models)
-└── foundation/                # Base architectural models (3 models)
-```
-
-### Model Exemption Comments
-
-Some Pydantic models are exempt from standard model validation rules (e.g., models directory organization). These use the comment pattern:
+### Boundary-crossing models: frozen + extra="forbid"
 
 ```python
-class MyModel(  # omnimemory-model-exempt: <reason>
+# CORRECT - immutable, strict, documented
+class MyRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
+
+    query: str = Field(..., description="Search query string")
+    limit: int = Field(default=10, description="Maximum number of results to return")
+```
+
+### Models in domain subdirectory
+
+```python
+# CORRECT location: src/omnimemory/models/memory/model_search_request.py
+class ModelSearchRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
+
+    query: str = Field(..., description="Semantic search query")
+```
+
+---
+
+## Model Exemption Pattern
+
+Some Pydantic models are exempt from the `src/omnimemory/models/` location rule when they are tightly coupled to a handler or adapter implementation. Mark them with the exemption comment:
+
+```python
+class MyHandlerConfig(  # omnimemory-model-exempt: handler config
     BaseModel
 ):
-    """Model exempt from standard location rules."""
-    pass
+    """Handler-specific configuration; lives alongside handler, not in models/."""
+    ...
 ```
 
 **Valid exemption reasons:**
 
-*Handler exemptions* (models tightly coupled to handler implementation):
-- `handler metadata` - Handler introspection models (returned by `describe()`)
-- `handler health` - Handler health status models (returned by `health_check()`)
-- `handler config` - Handler-specific configuration models
-- `handler internal` - Internal implementation models not part of public API
-- `handler result` - Handler operation result models
-- `handler command` - Command/request models for handler operations
-- `handler event` - Event models emitted by handlers
-- `handler state` - State snapshot models for handler operations
-
-*Adapter exemptions* (models specific to adapter implementations):
-- `adapter config` - Adapter-specific configuration models
-- `adapter health` - Adapter health status models
-- `adapter internal` - Internal adapter implementation models
-
-*Domain-specific exemptions*:
-- `projection model` - Event sourcing projection models
-- `archive record format` - Archive/storage record format models
-
-These models are defined alongside their handler/adapter rather than in `/models/` because they are tightly coupled to the implementation and would create unnecessary indirection if separated.
-
-### ONEX 4-Node Architecture Integration
-
-```
-EFFECT → COMPUTE → REDUCER → ORCHESTRATOR
-```
-
-- **EFFECT Nodes**: Memory storage, retrieval, and persistence operations
-- **COMPUTE Nodes**: Intelligence processing, semantic analysis, pattern recognition
-- **REDUCER Nodes**: Memory consolidation, aggregation, and optimization
-- **ORCHESTRATOR Nodes**: Cross-agent coordination and workflow management
-
-### Memory System Architecture
-
-```mermaid
-graph TB
-    A[Memory Manager] --> B[Vector Memory]
-    A --> C[Temporal Memory]
-    A --> D[Persistent Memory]
-    A --> E[Cross-Modal Memory]
-
-    B --> F[Pinecone Vector DB]
-    C --> G[Redis Cache]
-    D --> H[PostgreSQL/Supabase]
-    E --> I[Multi-Modal Index]
-
-    J[Intelligence Tools] --> A
-    K[Omni Agents] --> A
-    L[Legacy omnibase_3] --> M[Migration Layer] --> A
-```
-
-### Core Dependencies & Technology Stack
-
-**Storage Layer:**
-- PostgreSQL + Supabase: Persistent memory and relational data
-- Redis: High-speed caching and temporal memory patterns
-- Pinecone: Vector-based semantic memory and similarity search
-
-**Framework & API:**
-- FastAPI: Production-ready API layer with async support
-- SQLAlchemy + Alembic: Database ORM and migrations
-- Pydantic: Data validation and serialization
-
-**ONEX Integration:**
-- omnibase_spi: Service Provider Interface for ONEX compliance
-- omnibase_core: Core ONEX node implementations and patterns
-- MCP Protocol: Agent communication and tool integration
-
-## Development Workflow
-
-### Memory System Design Patterns
-
-1. **Memory Hierarchy**: Implement tiered memory (L1: Redis, L2: PostgreSQL, L3: Vector DB)
-2. **Semantic Indexing**: Vector-based memory retrieval with similarity matching
-3. **Temporal Patterns**: Time-aware memory decay and consolidation
-4. **Cross-Modal Integration**: Multi-modal memory bridging different data types
-
-### ONEX Compliance Requirements
-
-- **Contract-Driven Development**: All interfaces defined via Pydantic models
-- **Async-First Design**: Full async/await support for all operations
-- **Error Recovery Patterns**: Circuit breakers, timeouts, graceful degradation
-- **Observability**: Comprehensive logging, metrics, and health checks
-- **Security-by-Design**: Input validation, PII detection, secure communication
-
-## Migration Strategy
-
-### Legacy Intelligence Tools Migration
-
-**Source**: `../omnibase_3/intelligence_tools/` (274 Python files, 52,880+ lines)
-
-**Migration Phases**:
-1. **Analysis Phase**: Catalog existing tools, dependencies, and patterns
-2. **Modernization Phase**: Refactor to ONEX patterns with proper typing
-3. **Integration Phase**: Unified memory interface and cross-agent communication
-4. **Validation Phase**: Performance testing and ONEX compliance verification
-
-### Migration Patterns
-
-```python
-# Legacy Pattern (omnibase_3)
-def process_intelligence(data):
-    # Synchronous, no typing, direct file I/O
-    with open('memory.json') as f:
-        return json.load(f)
-
-# Modern ONEX Pattern (omnimemory)
-async def process_intelligence(data: IntelligenceRequest) -> IntelligenceResponse:
-    """Process intelligence with ONEX compliance."""
-    async with memory_manager.session() as session:
-        result = await session.store_and_analyze(data)
-        return IntelligenceResponse.model_validate(result)
-```
-
-## Performance & Quality Targets
-
-### Performance Specifications
-- **Memory Operations**: <100ms response time (95th percentile)
-- **Throughput**: 1M+ operations per hour sustained
-- **Storage Efficiency**: <10MB memory footprint per 100K records
-- **Vector Search**: <50ms semantic similarity queries
-- **Bulk Operations**: >10K records/second batch processing
-
-### Quality Gates
-- **ONEX Compliance**: 100% contract adherence with automated validation
-- **Test Coverage**: >90% code coverage with integration tests
-- **Type Safety**: Full mypy strict mode compliance
-- **Security**: Automated secret detection and input sanitization
-- **Documentation**: Comprehensive API docs with usage examples
-
-## Development Guidelines
-
-### Code Organization
-
-```
-src/omnimemory/
-├── core/                 # Core memory interfaces and base classes
-│   ├── memory_manager.py
-│   ├── interfaces.py
-│   └── exceptions.py
-├── storage/             # Storage layer implementations
-│   ├── vector_store.py
-│   ├── temporal_store.py
-│   └── persistent_store.py
-├── intelligence/        # Migrated intelligence tools
-│   ├── analysis/
-│   ├── patterns/
-│   └── retrieval/
-├── api/                 # FastAPI endpoints
-│   ├── routes/
-│   └── schemas/
-└── migration/           # Legacy migration utilities
-    ├── extractors/
-    └── transformers/
-```
-
-### Development Commands
-
-```bash
-# Setup
-poetry install                         # Install dependencies
-pre-commit install                     # Install pre-commit hooks
-pre-commit install --hook-type pre-push  # Install pre-push hooks
-
-# Code quality (ruff replaces black + isort + flake8)
-ruff format src/ tests/                # Format code
-ruff check --fix src/ tests/           # Lint and auto-fix
-poetry run mypy src/omnimemory         # Type checking (strict)
-
-# Testing
-poetry run pytest                      # Run all tests
-poetry run pytest -m unit              # Unit tests only
-poetry run pytest -m integration       # Integration tests
-poetry run pytest --cov                # Coverage report
-
-# Pre-commit validation
-pre-commit run --all-files             # Run all pre-commit hooks
-pre-commit run --all-files --hook-stage pre-push  # Run pre-push hooks
-```
-
-## Integration Patterns
-
-### Agent Integration
-
-```python
-from omnimemory import MemoryManager, VectorMemory
-
-class IntelligentAgent:
-    def __init__(self):
-        self.memory = MemoryManager()
-        self.vector_memory = VectorMemory()
-
-    async def process_with_memory(self, input_data: str) -> str:
-        # Retrieve relevant memories
-        context = await self.vector_memory.similarity_search(
-            query=input_data,
-            limit=5,
-            threshold=0.8
-        )
-
-        # Process with context
-        result = await self.analyze_with_context(input_data, context)
-
-        # Store new memory
-        await self.memory.store(
-            key=f"processed_{datetime.now().isoformat()}",
-            value=result,
-            metadata={"source": "agent_processing"}
-        )
-
-        return result
-```
-
-### MCP Tool Integration
-
-```python
-@mcp_tool("omnimemory_store")
-async def mcp_memory_store(
-    key: str,
-    value: str,
-    memory_type: str = "persistent"
-) -> Dict[str, Any]:
-    """Store information in OmniMemory system."""
-    async with get_memory_manager() as memory:
-        result = await memory.store(key, value, memory_type)
-        return {"success": True, "memory_id": result.id}
-
-@mcp_tool("omnimemory_retrieve")
-async def mcp_memory_retrieve(
-    query: str,
-    limit: int = 10,
-    similarity_threshold: float = 0.7
-) -> Dict[str, Any]:
-    """Retrieve memories using semantic search."""
-    async with get_memory_manager() as memory:
-        results = await memory.semantic_search(query, limit, similarity_threshold)
-        return {"memories": [r.to_dict() for r in results]}
-```
-
-## Troubleshooting & Common Issues
-
-### Performance Optimization
-
-- **Slow Vector Search**: Increase Pinecone index replicas, optimize embedding dimensions
-- **Memory Leaks**: Use async context managers, implement proper cleanup in finally blocks
-- **Database Connections**: Configure connection pooling, implement circuit breakers
-- **Cache Misses**: Tune Redis configuration, implement intelligent prefetching
-
-### Migration Issues
-
-- **Legacy Code Compatibility**: Use adapter pattern for gradual migration
-- **Type Errors**: Implement progressive typing with `# type: ignore` for interim compatibility
-- **Dependency Conflicts**: Pin specific versions, use Poetry dependency groups
-- **Performance Regression**: Implement benchmarking suite for before/after comparisons
-
-### ONEX Compliance
-
-- **Contract Validation**: Use Pydantic strict mode, implement custom validators
-- **Async Patterns**: Ensure all I/O operations are async, avoid blocking calls
-- **Error Handling**: Implement proper exception hierarchies, use structured logging
-- **Security**: Enable all pre-commit hooks, implement input sanitization
-
-## Success Metrics & Monitoring
-
-### Key Performance Indicators
-
-- **Migration Progress**: Track completion percentage of 274 intelligence tools
-- **Performance Metrics**: Monitor response times, throughput, and error rates
-- **ONEX Compliance**: Automated compliance scoring and validation
-- **Agent Integration**: Number of omni agents successfully integrated
-- **Memory Efficiency**: Storage utilization and optimization ratios
-
-### Monitoring & Observability
-
-```python
-from omnimemory.monitoring import PerformanceMonitor, ComplianceTracker
-
-# Performance monitoring
-monitor = PerformanceMonitor()
-await monitor.track_operation("memory_store", duration_ms=45)
-
-# ONEX compliance tracking
-compliance = ComplianceTracker()
-score = await compliance.evaluate_operation(operation_result)
-```
-
-## Future Roadmap
-
-### Phase 1: Foundation (Current)
-- Core memory architecture implementation
-- Basic ONEX compliance patterns
-- Initial intelligence tool migration
-
-### Phase 2: Intelligence Integration
-- Advanced semantic search capabilities
-- Cross-modal memory bridging
-- Performance optimization and scaling
-
-### Phase 3: Agent Ecosystem
-- Full omni agent integration
-- Advanced workflow orchestration
-- Real-time collaboration patterns
-
-### Phase 4: Advanced Intelligence
-- Machine learning-enhanced memory patterns
-- Predictive memory prefetching
-- Self-optimizing memory hierarchies
+| Tag | When to use |
+|-----|-------------|
+| `handler metadata` | Returned by `describe()` |
+| `handler health` | Returned by `health_check()` |
+| `handler config` | Handler-specific configuration |
+| `handler internal` | Internal implementation model not part of public API |
+| `handler result` | Handler operation result |
+| `handler command` | Command/request model for handler operations |
+| `handler event` | Event emitted by a handler |
+| `handler state` | State snapshot for handler operations |
+| `adapter config` | Adapter-specific configuration |
+| `adapter health` | Adapter health status |
+| `adapter internal` | Internal adapter implementation |
+| `projection model` | Event sourcing projection |
+| `archive record format` | Archive/storage record format |
+
+All other models belong in `src/omnimemory/models/<domain>/`.
 
 ---
 
-**Project Repository**: `/Volumes/PRO-G40/Code/omnimemory`
-**ONEX Version**: 4.0+
+## Documentation
+
+| Topic | Document |
+|-------|----------|
+| Documentation index | `docs/INDEX.md` |
+| Environment variables | `docs/environment_variables.md` |
+| Handler reuse matrix | `docs/handler_reuse_matrix.md` |
+| Performance testing | `docs/PERFORMANCE_TESTING.md` |
+| PII handling | `docs/pii_handling.md` |
+| Stub protocols | `docs/stub_protocols.md` |
+| Architecture (ONEX 4-node) | `docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md` |
+| Architecture (Kafka abstraction) | `docs/architecture/ARCH_002_KAFKA_ABSTRACTION.md` |
+| CI monitoring | `docs/ci/CI_MONITORING_GUIDE.md` |
+| Runtime plugins | `docs/runtime/RUNTIME_PLUGINS.md` |
+
+For project overview, mission, and technology stack, see `README.md`.
+
+---
+
+**Python**: 3.12+ | **Package Manager**: Poetry | **ONEX**: 4.0+

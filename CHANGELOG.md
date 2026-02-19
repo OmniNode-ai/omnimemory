@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-19
+
+### Added
+
+- Add `event_bus` topic declarations to all effect node contracts ([OMN-2212](https://linear.app/omninode/issue/OMN-2212), [#37](https://github.com/OmniNode-ai/omnimemory/pull/37))
+- Add contract-driven topic discovery for runtime event-bus wiring ([OMN-2213](https://linear.app/omninode/issue/OMN-2213), [#38](https://github.com/OmniNode-ai/omnimemory/pull/38))
+- Migrate omnimemory to standard `event_bus.subscribe_topics` contract field ([OMN-1746](https://linear.app/omninode/issue/OMN-1746), [#39](https://github.com/OmniNode-ai/omnimemory/pull/39))
+- ARCH-002 compliance — abstract Kafka from handlers behind `ProtocolMessageDispatcher` ([OMN-2214](https://linear.app/omninode/issue/OMN-2214), [#40](https://github.com/OmniNode-ai/omnimemory/pull/40))
+- Add `MessageDispatchEngine` integration for handler-level event dispatch ([OMN-2215](https://linear.app/omninode/issue/OMN-2215), [#41](https://github.com/OmniNode-ai/omnimemory/pull/41))
+- Add CI Kafka import lint guard to enforce ARCH-002 (no direct `kafka` imports in handlers) ([OMN-1750](https://linear.app/omninode/issue/OMN-1750), [#42](https://github.com/OmniNode-ai/omnimemory/pull/42))
+- Add `PluginMemory` runtime plugin for memory subsystem registration ([OMN-2216](https://linear.app/omninode/issue/OMN-2216), [#43](https://github.com/OmniNode-ai/omnimemory/pull/43))
+- Make `AdapterIntentGraph` conform to `ProtocolIntentGraph` from omnibase-spi ([OMN-1476](https://linear.app/omninode/issue/OMN-1476), [#44](https://github.com/OmniNode-ai/omnimemory/pull/44))
+- Add wire model registration and entry point declaration for plugin discovery ([OMN-2217](https://linear.app/omninode/issue/OMN-2217), [#45](https://github.com/OmniNode-ai/omnimemory/pull/45))
+- Add CI infrastructure alignment tooling for cross-repo consistency checks ([OMN-2218](https://linear.app/omninode/issue/OMN-2218), [#46](https://github.com/OmniNode-ai/omnimemory/pull/46))
+- Apply required status checks to branch protection rules ([OMN-2186](https://linear.app/omninode/issue/OMN-2186), [#47](https://github.com/OmniNode-ai/omnimemory/pull/47))
+- Add `safe_db_url_display` utility for masking credentials in logs and diagnostics ([OMN-2220](https://linear.app/omninode/issue/OMN-2220), [#50](https://github.com/OmniNode-ai/omnimemory/pull/50))
+
+### Changed
+
+- Switch database connection to `OMNIMEMORY_DB_URL` environment variable ([OMN-2060](https://linear.app/omninode/issue/OMN-2060), [#49](https://github.com/OmniNode-ai/omnimemory/pull/49))
+- Extract shared CLAUDE.md rules into `~/.claude/CLAUDE.md` and replace local copy with a reference ([OMN-2164](https://linear.app/omninode/issue/OMN-2164), [#51](https://github.com/OmniNode-ai/omnimemory/pull/51))
+
+### Breaking Changes
+
+- **`frozen=True` on boundary-crossing models** ([OMN-2219](https://linear.app/omninode/issue/OMN-2219), [#48](https://github.com/OmniNode-ai/omnimemory/pull/48)): All Pydantic models that cross subsystem boundaries now have `frozen=True`. Any code that mutates these models after construction will raise a `ValidationError`. Callers must construct new instances instead of modifying existing ones.
+- **`OMNIMEMORY_DB_URL` replaces previous database URL configuration** ([OMN-2060](https://linear.app/omninode/issue/OMN-2060), [#49](https://github.com/OmniNode-ai/omnimemory/pull/49)): The database connection is now read exclusively from `OMNIMEMORY_DB_URL`. Update your `.env` file accordingly (e.g. `OMNIMEMORY_DB_URL=postgresql://user:pass@host:port/db`).
+
 ## [0.2.0] - 2026-02-13
 
 ### Changed

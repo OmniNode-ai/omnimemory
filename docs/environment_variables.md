@@ -1,4 +1,8 @@
+> **Navigation**: [Home](./INDEX.md) > Reference
+
 # OmniMemory Environment Variables
+
+**Last Updated**: 2026-02-19
 
 This document describes all environment variables used to configure OmniMemory.
 
@@ -102,9 +106,29 @@ Set `OMNIMEMORY__POSTGRES_ENABLED=true` to enable PostgreSQL backend for persist
 |----------|------|---------|-------------|-------------|
 | `OMNIMEMORY_DB_URL` | str | **required if enabled** | Valid PostgreSQL URL | Full PostgreSQL connection URL with credentials |
 
+> **Important — naming convention**: `OMNIMEMORY_DB_URL` uses a **single underscore** between `OMNIMEMORY` and `DB`. It is **not** prefixed with `OMNIMEMORY__` (double-underscore). This is a top-level environment variable read via a `validation_alias` in pydantic-settings, not a nested `OMNIMEMORY__POSTGRES__` variable. Setting `OMNIMEMORY__POSTGRES__DB_URL` will have no effect.
+
 The service fails fast on startup if `OMNIMEMORY_DB_URL` is not set when postgres is enabled. No silent fallback to shared databases.
 
-**URL Format**: `postgresql://user:password@host:port/database`
+**URL Format**:
+
+```
+postgresql://user:password@host:port/database
+```
+
+When using the `asyncpg` driver (used internally for health checks and lifecycle handlers), the `postgresql+asyncpg://` scheme is also accepted by `asyncpg.connect()` but the standard `postgresql://` scheme is sufficient and preferred for the pydantic-settings `PostgresDsn` field.
+
+**Examples**:
+
+```bash
+# Local development
+OMNIMEMORY_DB_URL=postgresql://omnimemory:dev_password@localhost:5432/omnimemory_dev
+
+# Remote shared infrastructure (OmniNode standard)
+OMNIMEMORY_DB_URL=postgresql://postgres:secret@192.168.86.200:5436/omninode_bridge
+```
+
+> **Breaking change (0.2.0 → 0.3.0)**: The database connection URL is now read **exclusively** from `OMNIMEMORY_DB_URL`. Any previous mechanism for supplying the database URL no longer applies. Update your `.env` file to include this variable before upgrading.
 
 **Tuning variables** (prefix: `OMNIMEMORY__POSTGRES__`):
 
@@ -233,6 +257,54 @@ OMNIMEMORY__QDRANT__PREFER_GRPC=true
 OMNIMEMORY__QDRANT__GRPC_PORT=6334
 OMNIMEMORY__QDRANT__ON_DISK=true
 ```
+
+## Utilities
+
+### `safe_db_url_display`
+
+**Module**: `omnimemory.utils.db_url`
+**Import**: `from omnimemory.utils import safe_db_url_display`
+
+A helper that strips credentials from a PostgreSQL connection URL so the result is safe to include in log messages, error text, and diagnostic output.
+
+**Signature**:
+
+```python
+def safe_db_url_display(url: str) -> str: ...
+```
+
+**What it does**:
+
+- Parses the URL with `urllib.parse.urlparse` (no fragile string splitting)
+- Validates that the URL scheme starts with `postgres` — returns `"(unparseable URL)"` for any other scheme (e.g. `https://`) to prevent misleading output
+- Strips the username and password from the result entirely
+- Wraps IPv6 host addresses in brackets to avoid ambiguous `host:port` output
+- Returns a string in the form `host:port/database`
+
+**When to use it**: Any time you need to log or display the value of `OMNIMEMORY_DB_URL` — whether in startup banners, health-check output, or error messages. Never log the raw URL; always pass it through `safe_db_url_display` first.
+
+**Example**:
+
+```python
+from omnimemory.utils import safe_db_url_display
+
+url = "postgresql://omnimemory:super_secret@192.168.86.200:5436/omninode_bridge"
+print(safe_db_url_display(url))
+# Output: 192.168.86.200:5436/omninode_bridge
+```
+
+**Edge cases**:
+
+| Input | Output |
+|-------|--------|
+| `postgresql://user:pass@localhost:5432/mydb` | `localhost:5432/mydb` |
+| `postgresql://user:pass@192.168.86.200:5436/omninode_bridge` | `192.168.86.200:5436/omninode_bridge` |
+| `postgresql://user:pass@[::1]:5432/mydb` (IPv6) | `[::1]:5432/mydb` |
+| `postgresql://host_only/mydb` (no port) | `host_only/mydb` |
+| `https://not-a-db-url` (wrong scheme) | `(unparseable URL)` |
+| Malformed / unparseable string | `(unparseable URL)` |
+
+**Which env var it masks**: `OMNIMEMORY_DB_URL`. The full URL (including password) must never appear in logs; `safe_db_url_display` is the only approved way to surface connection target information.
 
 ## Type Reference
 

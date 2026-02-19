@@ -1,3 +1,5 @@
+> **Navigation**: [Home](./INDEX.md) > Reference
+
 # Performance Testing Guide
 
 This document describes how to run and interpret performance benchmarks for OmniMemory.

@@ -1,3 +1,5 @@
+> **Navigation**: [Home](./INDEX.md) > Reference
+
 # Handler Reuse Matrix - Core 8 Nodes
 
 ## Overview
@@ -6,14 +8,14 @@ This document maps existing handlers from `omnibase_infra` to the Core 8 memory 
 
 ## Contract Version
 
-**Document Version**: 1.0.0
-**Last Updated**: 2025-01-18
+**Document Version**: 1.1.0
+**Last Updated**: 2026-02-19
 **ONEX Compliance**: 4.0
 
 ## Existing Handlers in omnibase_infra
 
 > **Note**: All paths below are Python module paths within the `omnibase_infra` package.
-> Install via PyPI: `pip install omnibase-infra`. Handler classes follow the naming
+> Install via PyPI: `uv pip install omnibase-infra`. Handler classes follow the naming
 > convention `Handler<Name>` (e.g., `HandlerDb`, `HandlerQdrant`).
 
 ### Core Infrastructure Handlers (`omnibase_infra.handlers`)
@@ -437,23 +439,23 @@ Before integrating any handler from `omnibase_infra`, verify:
 
 ## Implementation Priority
 
-### Phase 1: Foundation (Week 1-2)
+### Phase 1: Foundation (Completed)
 1. Import `HandlerDb` for storage
 2. Import `HandlerQdrant` for vectors
 3. Import `HandlerFileSystem` for persistence
 4. Create `memory_storage_effect` node using these handlers
 
-### Phase 2: Search & Retrieval (Week 3-4)
+### Phase 2: Search & Retrieval (Completed)
 1. Import `HandlerGraph` for relationships
 2. Create `memory_retrieval_effect` with adapters
 3. Implement basic similarity compute
 
-### Phase 3: Intelligence (Week 5-6)
+### Phase 3: Intelligence (Completed)
 1. Create `HandlerSemanticCompute`
 2. Adapt `HandlerHttp` for LLM calls
 3. Implement `HandlerSimilarityCompute`
 
-### Phase 4: Lifecycle & Coordination (Week 7-8)
+### Phase 4: Lifecycle & Coordination (Completed)
 1. Adapt `HandlerRuntimeTick` for lifecycle
 2. Create memory consolidator reducer
 3. Implement agent coordinator orchestrator
@@ -489,10 +491,10 @@ Install the `omnibase-infra` package from PyPI:
 
 ```bash
 # Add as development dependency
-poetry add --group dev omnibase-infra
+uv add --group dev omnibase-infra
 
-# Or install directly with pip
-pip install omnibase-infra
+# Or install directly
+uv pip install omnibase-infra
 ```
 
 > **Naming Convention**: The PyPI package name uses hyphens (`omnibase-infra`) while
@@ -777,5 +779,6 @@ Contracts are validated against:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-02-19 | Replace poetry/pip commands with uv; update document version and Last Updated; mark all implementation phases as Completed |
 | 1.0.0 | 2025-01-18 | Added contract layout documentation, HealthStatus aggregation, consistent handler naming |
 | 0.1.0 | 2025-01-17 | Initial handler reuse matrix |

@@ -1,3 +1,5 @@
+> **Navigation**: [Home](./INDEX.md) > Reference
+
 # PII Handling Guide for Memory Systems
 
 ## Overview
