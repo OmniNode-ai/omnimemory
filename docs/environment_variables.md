@@ -125,7 +125,7 @@ When using the `asyncpg` driver (used internally for health checks and lifecycle
 OMNIMEMORY_DB_URL=postgresql://omnimemory:dev_password@localhost:5432/omnimemory_dev
 
 # Remote shared infrastructure (OmniNode standard)
-OMNIMEMORY_DB_URL=postgresql://postgres:secret@192.168.86.200:5436/omninode_bridge
+OMNIMEMORY_DB_URL=postgresql://postgres:secret@<db-host>:<db-port>/omninode_bridge
 ```
 
 > **Breaking change (0.2.0 → 0.3.0)**: The database connection URL is now read **exclusively** from `OMNIMEMORY_DB_URL`. Any previous mechanism for supplying the database URL no longer applies. Update your `.env` file to include this variable before upgrading.

@@ -455,10 +455,10 @@ Before integrating any handler from `omnibase_infra`, verify:
 2. Adapt `HandlerHttp` for LLM calls
 3. Implement `HandlerSimilarityCompute`
 
-### Phase 4: Lifecycle & Coordination (Completed)
+### Phase 4: Lifecycle & Coordination (Scaffolded - Implementation In Progress)
 1. Adapt `HandlerRuntimeTick` for lifecycle
-2. Create memory consolidator reducer
-3. Implement agent coordinator orchestrator
+2. Create memory consolidator reducer (scaffolded, implementation in progress)
+3. Implement agent coordinator orchestrator (in progress)
 
 ---
 
@@ -779,6 +779,6 @@ Contracts are validated against:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.1.0 | 2026-02-19 | Replace poetry/pip commands with uv; update document version and Last Updated; mark all implementation phases as Completed |
+| 1.1.0 | 2026-02-19 | Replace poetry/pip commands with uv; update document version and Last Updated; mark Phases 1–3 as Completed; mark Phase 4 as Scaffolded - Implementation In Progress to reflect reducer nodes and agent_coordinator_orchestrator still in progress |
 | 1.0.0 | 2025-01-18 | Added contract layout documentation, HealthStatus aggregation, consistent handler naming |
 | 0.1.0 | 2025-01-17 | Initial handler reuse matrix |
