@@ -15,7 +15,7 @@ This document describes how to run and interpret performance benchmarks for Omni
 
 ## SLA Targets
 
-OmniMemory has the following documented performance targets (from CLAUDE.md):
+OmniMemory has the following documented performance targets (from architecture requirements):
 
 | Metric | Target | Test Class |
 |--------|--------|------------|
@@ -282,7 +282,7 @@ performance-tests:
         python-version: '3.12'
     - name: Install dependencies
       run: |
-        pip install poetry
+        pipx install poetry
         poetry install
     - name: Run performance benchmarks
       run: |

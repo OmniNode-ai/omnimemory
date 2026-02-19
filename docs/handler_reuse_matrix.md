@@ -494,7 +494,7 @@ Install the `omnibase-infra` package from PyPI:
 poetry add --group dev omnibase-infra
 
 # Or install directly
-pip install omnibase-infra
+uv pip install omnibase-infra
 ```
 
 > **Naming Convention**: The PyPI package name uses hyphens (`omnibase-infra`) while

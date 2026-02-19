@@ -180,14 +180,7 @@ Contains a placeholder for health check aggregation logic that returns healthy s
 
 ## Dependency on omnibase_infra
 
-The handler reuse matrix (`docs/handler_reuse_matrix.md`) references handlers from `omnibase_infra`. This package should be added as a dependency when it becomes available on PyPI.
-
-**Current Status**: Commented in `pyproject.toml` dev dependencies
-
-**Add when available**:
-```bash
-poetry add --group dev omnibase-infra
-```
+The handler reuse matrix (`docs/handler_reuse_matrix.md`) references handlers from `omnibase_infra`. This package is declared as a dependency in `pyproject.toml`.
 
 ---
 
