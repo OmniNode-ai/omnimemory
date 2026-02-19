@@ -298,7 +298,7 @@ print(safe_db_url_display(url))
 | Input | Output |
 |-------|--------|
 | `postgresql://user:pass@localhost:5432/mydb` | `localhost:5432/mydb` |
-| `postgresql://user:pass@192.168.86.200:5436/omninode_bridge` | `192.168.86.200:5436/omninode_bridge` |
+| `postgresql://user:pass@<db-host>:5436/omninode_bridge` | `<db-host>:5436/omninode_bridge` |
 | `postgresql://user:pass@[::1]:5432/mydb` (IPv6) | `[::1]:5432/mydb` |
 | `postgresql://host_only/mydb` (no port) | `host_only/mydb` |
 | `https://not-a-db-url` (wrong scheme) | `(unparseable URL)` |
