@@ -4,6 +4,7 @@ ONEX-compliant enums for omnimemory system.
 All enums are centralized here for better maintainability and ONEX compliance.
 """
 
+from .crawl import EnumContextSourceType, EnumCrawlerType, EnumDetectedDocType
 from .enum_entity_extraction_mode import EnumEntityExtractionMode
 from .enum_error_code import EnumOmniMemoryErrorCode
 from .enum_intelligence_operation_type import EnumIntelligenceOperationType
@@ -21,7 +22,10 @@ from .enum_subscription_status import EnumSubscriptionStatus
 from .enum_trust_level import EnumDecayFunction, EnumTrustLevel
 
 __all__ = [
+    "EnumContextSourceType",
+    "EnumCrawlerType",
     "EnumDecayFunction",
+    "EnumDetectedDocType",
     "EnumEntityExtractionMode",
     "EnumFileProcessingStatus",
     "EnumIntelligenceOperationType",

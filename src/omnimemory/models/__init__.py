@@ -24,6 +24,7 @@ from . import (
     config,
     container,
     core,
+    crawl,
     events,
     foundation,
     intelligence,
@@ -32,6 +33,12 @@ from . import (
     subscription,
     utils,
 )
+from .crawl import (
+    ModelCrawlStateRecord,
+    ModelDocumentChangedEvent,
+    ModelDocumentDiscoveredEvent,
+    ModelDocumentRemovedEvent,
+)
 
 # Re-export domains for direct access
 __all__ = [
@@ -39,6 +46,7 @@ __all__ = [
     "config",
     "container",
     "core",
+    "crawl",
     "events",
     "foundation",
     "intelligence",
@@ -46,4 +54,9 @@ __all__ = [
     "service",
     "subscription",
     "utils",
+    # Crawl models
+    "ModelCrawlStateRecord",
+    "ModelDocumentChangedEvent",
+    "ModelDocumentDiscoveredEvent",
+    "ModelDocumentRemovedEvent",
 ]

@@ -2,6 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Document changed event model for document ingestion pipeline."""
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -42,7 +43,7 @@ class ModelDocumentChangedEvent(BaseModel):
         ...,
         description="Correlation ID threaded from the originating crawl tick command",
     )
-    emitted_at_utc: str = Field(
+    emitted_at_utc: datetime = Field(
         ...,
         description="ISO-8601 UTC timestamp when this event was emitted",
     )
