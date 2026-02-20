@@ -39,7 +39,7 @@ Example::
     instead of local domain model (omnibase-core 0.13.1).
 
 .. versionchanged:: 0.3.0
-    Uses ModelModelIntentRecordPayload from omnibase-core 0.17.
+    Uses ModelIntentRecordPayload from omnibase-core 0.17.
 
 .. versionchanged:: 0.4.0
     ModelIntentRecord from omnibase_core.models.intelligence (OMN-1476).
@@ -86,9 +86,13 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
 
+    if record.session_ref is None:
+        msg = f"session_ref is required but is None on record with intent_id={record.intent_id}"
+        raise ValueError(msg)
+
     return ModelIntentRecordPayload(
         intent_id=record.intent_id,
-        session_ref=record.session_ref or "",
+        session_ref=record.session_ref,
         intent_category=record.intent_category,
         confidence=record.confidence,
         keywords=record.keywords,

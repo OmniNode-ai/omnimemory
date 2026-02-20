@@ -15,6 +15,7 @@ Ticket: OMN-2426
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -132,7 +133,7 @@ class TestModelCrawlTickCommand:
             crawl_type=EnumCrawlerType.FILESYSTEM,
             crawl_scope="omninode/omnimemory",
             correlation_id=uuid4(),
-            triggered_at_utc="2026-02-20T00:00:00Z",
+            triggered_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             trigger_source="scheduled",
         )
 
@@ -176,7 +177,7 @@ class TestModelDocumentDiscoveredEvent:
     def _make(self) -> ModelDocumentDiscoveredEvent:
         return ModelDocumentDiscoveredEvent(
             correlation_id=uuid4(),
-            emitted_at_utc="2026-02-20T00:00:00Z",
+            emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             crawler_type=EnumCrawlerType.FILESYSTEM,
             crawl_scope="omninode/omnimemory",
             trigger_source="scheduled",
@@ -211,7 +212,7 @@ class TestModelDocumentDiscoveredEvent:
         with pytest.raises(ValidationError):
             ModelDocumentDiscoveredEvent(
                 correlation_id=uuid4(),
-                emitted_at_utc="2026-02-20T00:00:00Z",
+                emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
                 crawler_type=EnumCrawlerType.FILESYSTEM,
                 crawl_scope="omninode/omnimemory",
                 trigger_source="scheduled",
@@ -244,7 +245,7 @@ class TestModelDocumentChangedEvent:
     def _make(self) -> ModelDocumentChangedEvent:
         return ModelDocumentChangedEvent(
             correlation_id=uuid4(),
-            emitted_at_utc="2026-02-20T00:00:00Z",
+            emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             crawler_type=EnumCrawlerType.GIT_REPO,
             crawl_scope="omninode/omniintelligence",
             trigger_source="git_hook",
@@ -294,7 +295,7 @@ class TestModelDocumentRemovedEvent:
     def _make(self) -> ModelDocumentRemovedEvent:
         return ModelDocumentRemovedEvent(
             correlation_id=uuid4(),
-            emitted_at_utc="2026-02-20T00:00:00Z",
+            emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             crawler_type=EnumCrawlerType.LINEAR,
             source_ref="linear://OMN-1234",
             source_type=EnumContextSourceType.LINEAR_DERIVED,
@@ -471,7 +472,7 @@ class TestModelPromotionDecision:
     def test_tier_changed_true_on_transition(self) -> None:
         decision = ModelPromotionDecision(
             context_item_id="item-001",
-            evaluated_at_utc="2026-02-20T00:00:00Z",
+            evaluated_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             tier_before=EnumPromotionTier.QUARANTINE,
             tier_after=EnumPromotionTier.VALIDATED,
             tier_changed=True,
@@ -485,7 +486,7 @@ class TestModelPromotionDecision:
     def test_tier_changed_false_on_no_transition(self) -> None:
         decision = ModelPromotionDecision(
             context_item_id="item-002",
-            evaluated_at_utc="2026-02-20T00:00:00Z",
+            evaluated_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             tier_before=EnumPromotionTier.VALIDATED,
             tier_after=EnumPromotionTier.VALIDATED,
             tier_changed=False,
@@ -496,7 +497,7 @@ class TestModelPromotionDecision:
     def test_bootstrap_cleared_field(self) -> None:
         decision = ModelPromotionDecision(
             context_item_id="item-003",
-            evaluated_at_utc="2026-02-20T00:00:00Z",
+            evaluated_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             tier_before=EnumPromotionTier.VALIDATED,
             tier_after=EnumPromotionTier.VALIDATED,
             tier_changed=False,
@@ -508,7 +509,7 @@ class TestModelPromotionDecision:
     def test_is_frozen(self) -> None:
         decision = ModelPromotionDecision(
             context_item_id="item-004",
-            evaluated_at_utc="2026-02-20T00:00:00Z",
+            evaluated_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             tier_before=EnumPromotionTier.QUARANTINE,
             tier_after=EnumPromotionTier.VALIDATED,
             tier_changed=True,
@@ -520,7 +521,7 @@ class TestModelPromotionDecision:
     def test_round_trip(self) -> None:
         decision = ModelPromotionDecision(
             context_item_id="item-005",
-            evaluated_at_utc="2026-02-20T00:00:00Z",
+            evaluated_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             tier_before=EnumPromotionTier.VALIDATED,
             tier_after=EnumPromotionTier.SHARED,
             tier_changed=True,

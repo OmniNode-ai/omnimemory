@@ -11,6 +11,7 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §6
 Ticket: OMN-2426
 """
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -52,9 +53,9 @@ class ModelDocumentDiscoveredEvent(BaseModel):
         ...,
         description="Correlation ID for distributed tracing across the pipeline.",
     )
-    emitted_at_utc: str = Field(
+    emitted_at_utc: datetime = Field(
         ...,
-        description="ISO-8601 UTC timestamp when this event was emitted.",
+        description="UTC timestamp when this event was emitted.",
     )
 
     # ------------------------------------------------------------------

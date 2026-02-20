@@ -12,6 +12,7 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §4
 Ticket: OMN-2426
 """
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -54,9 +55,9 @@ class ModelCrawlTickCommand(BaseModel):
         ...,
         description="Correlation ID for distributed tracing across the pipeline.",
     )
-    triggered_at_utc: str = Field(
+    triggered_at_utc: datetime = Field(
         ...,
-        description="ISO-8601 UTC timestamp when this command was emitted.",
+        description="UTC timestamp when this command was emitted.",
     )
     trigger_source: Literal["scheduled", "manual", "git_hook", "filesystem_watch"] = (
         Field(

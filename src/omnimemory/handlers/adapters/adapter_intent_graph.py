@@ -27,8 +27,6 @@ The adapter handles:
 Example::
 
     async def example():
-        from omnibase_core.enums.intelligence import EnumIntentCategory
-
         config = ModelAdapterIntentGraphConfig(timeout_seconds=30.0)
         adapter = AdapterIntentGraph(config)
         await adapter.initialize(
@@ -37,8 +35,7 @@ Example::
 
         # Store an intent (classification already happened upstream)
         classification = ModelIntentClassificationOutput(
-            success=True,
-            intent_category=EnumIntentCategory.DEBUGGING,
+            intent_category="debugging",
             confidence=0.92,
             keywords=["error", "traceback"],
         )
@@ -47,7 +44,7 @@ Example::
             intent_data=classification,
             correlation_id="corr-456",
         )
-        if result.success:
+        if result.status == "success":
             print(f"Stored intent: {result.intent_id}")
 
         await adapter.shutdown()
@@ -276,8 +273,6 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     Example::
 
         async def example():
-            from omnibase_core.enums.intelligence import EnumIntentCategory
-
             config = ModelAdapterIntentGraphConfig(
                 timeout_seconds=30.0,
                 max_intents_per_session=100,
@@ -291,8 +286,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
             result = await adapter.store_intent(
                 session_id="sess_123",
                 intent_data=ModelIntentClassificationOutput(
-                    success=True,
-                    intent_category=EnumIntentCategory.CODE_GENERATION,
+                    intent_category="code_generation",
                     confidence=0.95,
                     keywords=["python", "function"],
                 ),
@@ -1083,9 +1077,9 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                 min_confidence=0.8,
                 limit=100,
             )
-            if result.success:
+            if result.status == "success":
                 for intent in result.intents:
-                    print(f"Session {intent.session_id}: {intent.intent_category}")
+                    print(f"Session {intent.session_ref}: {intent.intent_category}")
 
         Note:
             This method never raises on business errors - it returns
@@ -1094,11 +1088,16 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
         .. versionadded:: 0.1.0
             Added for OMN-1504 to support querying recent intents across sessions.
         """
+        start_time = time.perf_counter()
+
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
             return ModelIntentQueryResult(
                 status="error",
+                execution_time_ms=execution_time_ms,
                 error_message=str(e),
             )
 
@@ -1144,12 +1143,15 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                 )
 
                 if not result.records:
+                    end_time = time.perf_counter()
+                    execution_time_ms = (end_time - start_time) * 1000
                     logger.debug(
                         "No recent intents found in last %d hours",
                         effective_time_range,
                     )
                     return ModelIntentQueryResult(
                         status="no_results",
+                        execution_time_ms=execution_time_ms,
                     )
 
                 # Convert records to intent models
@@ -1232,35 +1234,46 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                         )
                     )
 
+                end_time = time.perf_counter()
+                execution_time_ms = (end_time - start_time) * 1000
+
                 logger.debug(
-                    "Retrieved %d recent intents from last %d hours",
+                    "Retrieved %d recent intents from last %d hours (%.2fms)",
                     len(intents),
                     effective_time_range,
+                    execution_time_ms,
                 )
 
                 return ModelIntentQueryResult(
                     status="success",
                     intents=intents,
                     total_count=len(intents),
+                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
             logger.warning(
                 "Timeout querying recent intents after %ss",
                 self._config.timeout_seconds,
             )
             return ModelIntentQueryResult(
                 status="error",
+                execution_time_ms=execution_time_ms,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
         except Exception as e:
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
             logger.error(
                 "Error querying recent intents: %s",
                 e,
             )
             return ModelIntentQueryResult(
                 status="error",
+                execution_time_ms=execution_time_ms,
                 error_message=f"Query failed: {e}",
             )
 

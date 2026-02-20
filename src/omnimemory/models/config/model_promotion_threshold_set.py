@@ -104,6 +104,14 @@ PROMOTION_THRESHOLD_MEMORY_HOOK = ModelPromotionThresholdSet(
     validated_to_shared_signal_floor=0,
 )
 
+PROMOTION_THRESHOLD_MEMORY_PATTERN = ModelPromotionThresholdSet(
+    source_type=EnumContextSourceType.MEMORY_PATTERN,
+    quarantine_to_validated_runs=5,
+    validated_to_shared_runs=20,
+    validated_to_shared_used_rate=0.15,
+    validated_to_shared_signal_floor=5,
+)
+
 PROMOTION_THRESHOLD_LINEAR_DERIVED = ModelPromotionThresholdSet(
     source_type=EnumContextSourceType.LINEAR_DERIVED,
     quarantine_to_validated_runs=5,
@@ -118,5 +126,6 @@ DEFAULT_PROMOTION_THRESHOLDS: dict[
     EnumContextSourceType.STATIC_STANDARDS: PROMOTION_THRESHOLD_STATIC_STANDARDS,
     EnumContextSourceType.REPO_DERIVED: PROMOTION_THRESHOLD_REPO_DERIVED,
     EnumContextSourceType.MEMORY_HOOK: PROMOTION_THRESHOLD_MEMORY_HOOK,
+    EnumContextSourceType.MEMORY_PATTERN: PROMOTION_THRESHOLD_MEMORY_PATTERN,
     EnumContextSourceType.LINEAR_DERIVED: PROMOTION_THRESHOLD_LINEAR_DERIVED,
 }

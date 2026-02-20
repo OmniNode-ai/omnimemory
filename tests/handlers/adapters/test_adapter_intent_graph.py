@@ -49,8 +49,6 @@ pytest.importorskip(
     "omnibase_infra", reason="omnibase_infra required for adapter tests"
 )
 
-from omnibase_core.enums.intelligence import EnumIntentCategory
-
 from omnimemory.handlers.adapters import (
     AdapterIntentGraph,
     IntentCypherTemplates,
@@ -124,7 +122,7 @@ def adapter_with_mock(
 def sample_intent_classification() -> ModelIntentClassificationOutput:
     """Create a sample intent classification for testing."""
     return ModelIntentClassificationOutput(
-        intent_category=EnumIntentCategory.DEBUGGING,
+        intent_category="debugging",
         confidence=0.92,
         keywords=["error", "traceback", "fix"],
     )
@@ -336,16 +334,14 @@ class TestModels:
     def test_intent_classification_output_all_fields(self) -> None:
         """Test ModelIntentClassificationOutput with all fields."""
         classification = ModelIntentClassificationOutput(
-            intent_category=EnumIntentCategory.CODE_GENERATION,
+            intent_category="code_generation",
             confidence=0.95,
             keywords=["python", "function", "async"],
             raw_text="Write a python async function",
             metadata={"model_version": "1.0"},
         )
 
-        assert (
-            classification.intent_category == EnumIntentCategory.CODE_GENERATION.value
-        )
+        assert classification.intent_category == "code_generation"
         assert classification.confidence == 0.95
         assert classification.keywords == ["python", "function", "async"]
         assert classification.raw_text == "Write a python async function"
@@ -412,7 +408,7 @@ class TestModels:
         record = ModelIntentRecord(
             intent_id=TEST_INTENT_ID_1,
             session_ref="session_123",
-            intent_category=EnumIntentCategory.DEBUGGING.value,
+            intent_category="debugging",
             confidence=0.92,
             keywords=["error", "fix"],
             created_at_utc=TEST_CREATED_AT_1,
@@ -421,7 +417,7 @@ class TestModels:
 
         assert record.intent_id == TEST_INTENT_ID_1
         assert record.session_ref == "session_123"
-        assert record.intent_category == EnumIntentCategory.DEBUGGING.value
+        assert record.intent_category == "debugging"
         assert record.confidence == 0.92
         assert record.keywords == ["error", "fix"]
         assert record.created_at_utc == TEST_CREATED_AT_1
@@ -432,7 +428,7 @@ class TestModels:
         record = ModelIntentRecord(
             intent_id=TEST_INTENT_ID_1,
             session_ref="session_123",
-            intent_category=EnumIntentCategory.UNKNOWN.value,
+            intent_category="unknown",
             confidence=0.5,
             created_at_utc=TEST_CREATED_AT_1,
         )
@@ -446,14 +442,14 @@ class TestModels:
             ModelIntentRecord(
                 intent_id=TEST_INTENT_ID_1,
                 session_ref="session_123",
-                intent_category=EnumIntentCategory.DEBUGGING.value,
+                intent_category="debugging",
                 confidence=0.9,
                 created_at_utc=TEST_CREATED_AT_1,
             ),
             ModelIntentRecord(
                 intent_id=TEST_INTENT_ID_2,
                 session_ref="session_123",
-                intent_category=EnumIntentCategory.CODE_GENERATION.value,
+                intent_category="code_generation",
                 confidence=0.85,
                 created_at_utc=TEST_CREATED_AT_2,
             ),
@@ -565,12 +561,18 @@ class TestProtocolConformance:
         assert isinstance(adapter, ProtocolIntentGraphAdapter)
 
     def test_inherits_from_protocol(self) -> None:
-        """Test that AdapterIntentGraph explicitly inherits from ProtocolIntentGraphAdapter."""
+        """Test that AdapterIntentGraph explicitly inherits from ProtocolIntentGraphAdapter.
+
+        Note: issubclass() cannot be used here because Python raises
+        TypeError for Protocols with non-method members (e.g., properties).
+        Instead we verify via MRO that the protocol appears in the
+        inheritance chain, which confirms explicit inheritance.
+        """
         from omnimemory.protocols.protocol_intent_graph_adapter import (
             ProtocolIntentGraphAdapter,
         )
 
-        assert issubclass(AdapterIntentGraph, ProtocolIntentGraphAdapter)
+        assert ProtocolIntentGraphAdapter in AdapterIntentGraph.__mro__
 
 
 # =============================================================================
@@ -1070,12 +1072,12 @@ class TestContextManager:
                     result = await adapter.store_intent(
                         session_id="session_123",
                         intent_data=ModelIntentClassificationOutput(
-                            intent_category=EnumIntentCategory.DEBUGGING,
+                            intent_category="debugging",
                             confidence=0.9,
                         ),
                         correlation_id=str(TEST_CORRELATION_ID),
                     )
-                    assert result.success is True
+                    assert result.status == "success"
 
                 # After context exit, shutdown should be called
                 mock_instance.shutdown.assert_called_once()
@@ -1143,7 +1145,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert result.intent_id == TEST_INTENT_ID_1
         assert result.created is True
         assert result.error_message is None
@@ -1180,7 +1182,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert result.created is False
         assert result.intent_id == TEST_INTENT_ID_EXISTING
 
@@ -1199,7 +1201,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1219,7 +1221,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1259,7 +1261,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "session_id cannot be empty" in result.error_message
 
@@ -1270,7 +1272,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID_2),
         )
 
-        assert result_whitespace.success is False
+        assert result_whitespace.status == "error"
         assert result_whitespace.error_message is not None
         assert "session_id cannot be empty" in result_whitespace.error_message
 
@@ -1315,12 +1317,12 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.success is True
+        assert result.status == "success"
         assert len(result.intents) == 2
 
-        # Verify first intent (core ModelIntentRecord uses EnumIntentCategory, not str)
+        # Verify first intent
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
-        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING
+        assert result.intents[0].intent_category == "debugging"
         assert result.intents[0].confidence == 0.92
         assert result.intents[0].keywords == ["error", "fix"]
 
@@ -1337,7 +1339,7 @@ class TestGetSessionIntents:
             session_id="session_empty",
         )
 
-        assert result.success is True
+        assert result.status == "no_results"
         assert result.intents == []
 
     @pytest.mark.asyncio
@@ -1409,7 +1411,7 @@ class TestGetSessionIntents:
 
         result = await adapter.get_session_intents(session_id="session_123")
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1426,7 +1428,7 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1673,7 +1675,7 @@ class TestErrorHandling:
         mock_handler.execute_query.side_effect = RuntimeError("Unexpected error")
 
         classification = ModelIntentClassificationOutput(
-            intent_category=EnumIntentCategory.UNKNOWN,
+            intent_category="unknown",
             confidence=0.5,
         )
 
@@ -1683,7 +1685,7 @@ class TestErrorHandling:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.success is False
+        assert result.status == "error"
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1724,7 +1726,7 @@ class TestErrorHandling:
 
         result = await adapter_with_mock.get_session_intents(session_id="session_123")
 
-        assert result.success is True
+        assert result.status == "success"
         # Only the valid record with proper UUID should be included
         assert len(result.intents) == 1
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
@@ -1740,7 +1742,7 @@ class TestErrorHandling:
 
         # All operations should return error status
         classification = ModelIntentClassificationOutput(
-            intent_category=EnumIntentCategory.UNKNOWN,
+            intent_category="unknown",
             confidence=0.5,
         )
 
@@ -1749,12 +1751,12 @@ class TestErrorHandling:
             intent_data=classification,
             correlation_id=str(TEST_CORRELATION_ID),
         )
-        assert store_result.success is False
+        assert store_result.status == "error"
 
         query_result = await adapter_with_mock.get_session_intents(
             session_id="session_123",
         )
-        assert query_result.success is False
+        assert query_result.status == "error"
 
         distribution = await adapter_with_mock.get_intent_distribution()
         assert distribution.status == "error"

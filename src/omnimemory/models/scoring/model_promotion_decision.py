@@ -10,7 +10,9 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §12
 Ticket: OMN-2426
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from omnimemory.enums.enum_context_source_type import EnumContextSourceType
 from omnimemory.enums.enum_promotion_tier import EnumPromotionTier
@@ -34,9 +36,9 @@ class ModelPromotionDecision(BaseModel):
         min_length=1,
         description="Identifier of the ContextItem being evaluated.",
     )
-    evaluated_at_utc: str = Field(
+    evaluated_at_utc: datetime = Field(
         ...,
-        description="ISO-8601 UTC timestamp of this evaluation.",
+        description="UTC timestamp of this evaluation.",
     )
 
     # ------------------------------------------------------------------
@@ -97,3 +99,19 @@ class ModelPromotionDecision(BaseModel):
             "The item transitions from bootstrapped VALIDATED to earned VALIDATED."
         ),
     )
+
+    # ------------------------------------------------------------------
+    # Cross-field invariants
+    # ------------------------------------------------------------------
+
+    @model_validator(mode="after")
+    def _validate_tier_changed_consistency(self) -> "ModelPromotionDecision":
+        """Ensure tier_changed is consistent with tier_before and tier_after."""
+        expected = self.tier_before != self.tier_after
+        if self.tier_changed != expected:
+            raise ValueError(
+                f"tier_changed={self.tier_changed!r} is inconsistent with "
+                f"tier_before={self.tier_before!r} and tier_after={self.tier_after!r}; "
+                f"expected tier_changed={expected!r}"
+            )
+        return self
