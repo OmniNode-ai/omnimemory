@@ -126,8 +126,10 @@ into the higher-level dict-based publish interface used by `HandlerSubscription`
 ```python
 # src/omnimemory/runtime/adapters.py
 
+from collections.abc import Mapping
+
 class AdapterKafkaPublisher:
-    """Thin adapter: dict[str, object] -> ProtocolEventBusPublish.publish()."""
+    """Thin adapter: Mapping[str, object] -> ProtocolEventBusPublish.publish()."""
 
     def __init__(self, event_bus: ProtocolEventBusPublish) -> None:
         self._event_bus = event_bus
@@ -136,7 +138,7 @@ class AdapterKafkaPublisher:
         self,
         topic: str,
         key: str | None,
-        value: dict[str, object],
+        value: Mapping[str, object],
     ) -> None:
         ...
 ```

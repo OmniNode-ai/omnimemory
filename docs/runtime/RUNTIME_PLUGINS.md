@@ -39,7 +39,7 @@ All runtime modules live under `src/omnimemory/runtime/`:
 **Class**: `PluginMemory`
 **File**: `src/omnimemory/runtime/plugin.py`
 
-`PluginMemory` implements `ProtocolDomainPlugin` (from `omnibase_infra.runtime.protocol_domain_plugin`). The kernel calls its methods sequentially during bootstrap.
+`PluginMemory` implements `ProtocolDomainPlugin` (from `omnibase_infra.runtime.protocol_domain_plugin`; verified against omnibase-infra 0.7.x). The kernel calls its methods sequentially during bootstrap.
 
 ### Lifecycle Methods
 
