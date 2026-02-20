@@ -1497,3 +1497,356 @@ class TestExplicitGuards:
 
         with pytest.raises(RuntimeError, match="Archive base path not initialized"):
             handler._get_archive_path(memory_id, now)
+
+
+# =============================================================================
+# Compression Level Configuration Tests
+# =============================================================================
+
+
+class TestCompressionLevelConfiguration:
+    """Tests for configurable gzip compression level.
+
+    Covers all three resolution sources:
+    1. Constructor ``compression_level`` argument (highest priority)
+    2. ``OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL`` environment variable
+    3. Built-in default (level 6)
+
+    Also covers range validation and the public property.
+
+    Related ticket: OMN-1544
+    """
+
+    @pytest.mark.asyncio
+    async def test_default_compression_level_is_six(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test handler uses compression level 6 when nothing is configured.
+
+        Given: No compression_level argument and no env var set
+        When: Calling initialize()
+        Then: compression_level property returns 6
+        """
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", raising=False)
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(db_pool=None, archive_base_path=archive_base_path)
+
+        assert handler.compression_level == 6
+
+    @pytest.mark.asyncio
+    async def test_constructor_argument_sets_level(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test explicit constructor argument is used as compression level.
+
+        Given: compression_level=1 passed to initialize()
+        When: Accessing compression_level property
+        Then: Returns 1
+        """
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", raising=False)
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=1,
+        )
+
+        assert handler.compression_level == 1
+
+    @pytest.mark.asyncio
+    async def test_constructor_argument_max_level(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test compression level 9 (maximum) is accepted.
+
+        Given: compression_level=9 passed to initialize()
+        When: Accessing compression_level property
+        Then: Returns 9
+        """
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", raising=False)
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=9,
+        )
+
+        assert handler.compression_level == 9
+
+    @pytest.mark.asyncio
+    async def test_env_var_sets_compression_level(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL env var is respected.
+
+        Given: OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL=3 set in environment
+        When: Calling initialize() without explicit compression_level
+        Then: compression_level property returns 3
+        """
+        monkeypatch.setenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", "3")
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(db_pool=None, archive_base_path=archive_base_path)
+
+        assert handler.compression_level == 3
+
+    @pytest.mark.asyncio
+    async def test_constructor_argument_overrides_env_var(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test explicit constructor argument takes precedence over env var.
+
+        Given: OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL=9 set in environment
+          and compression_level=1 passed to initialize()
+        When: Accessing compression_level property
+        Then: Returns 1 (constructor wins)
+        """
+        monkeypatch.setenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", "9")
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=1,
+        )
+
+        assert handler.compression_level == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_level_zero_raises_value_error(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+    ) -> None:
+        """Test compression_level=0 raises ValueError with clear message.
+
+        Given: compression_level=0 passed to initialize()
+        When: Calling initialize()
+        Then: ValueError is raised mentioning valid range 1-9
+        """
+        handler = HandlerMemoryArchive(container)
+
+        with pytest.raises(
+            ValueError, match="compression_level must be between 1 and 9"
+        ):
+            await handler.initialize(
+                db_pool=None,
+                archive_base_path=archive_base_path,
+                compression_level=0,
+            )
+
+    @pytest.mark.asyncio
+    async def test_invalid_level_ten_raises_value_error(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+    ) -> None:
+        """Test compression_level=10 raises ValueError with clear message.
+
+        Given: compression_level=10 passed to initialize()
+        When: Calling initialize()
+        Then: ValueError is raised mentioning valid range 1-9
+        """
+        handler = HandlerMemoryArchive(container)
+
+        with pytest.raises(
+            ValueError, match="compression_level must be between 1 and 9"
+        ):
+            await handler.initialize(
+                db_pool=None,
+                archive_base_path=archive_base_path,
+                compression_level=10,
+            )
+
+    @pytest.mark.asyncio
+    async def test_invalid_level_negative_raises_value_error(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+    ) -> None:
+        """Test negative compression_level raises ValueError.
+
+        Given: compression_level=-1 passed to initialize()
+        When: Calling initialize()
+        Then: ValueError is raised
+        """
+        handler = HandlerMemoryArchive(container)
+
+        with pytest.raises(
+            ValueError, match="compression_level must be between 1 and 9"
+        ):
+            await handler.initialize(
+                db_pool=None,
+                archive_base_path=archive_base_path,
+                compression_level=-1,
+            )
+
+    @pytest.mark.asyncio
+    async def test_invalid_env_var_value_raises_value_error(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test out-of-range env var raises ValueError.
+
+        Given: OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL=0 set in environment
+        When: Calling initialize() without explicit compression_level
+        Then: ValueError is raised mentioning valid range 1-9
+        """
+        monkeypatch.setenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", "0")
+
+        handler = HandlerMemoryArchive(container)
+
+        with pytest.raises(
+            ValueError, match="compression_level must be between 1 and 9"
+        ):
+            await handler.initialize(db_pool=None, archive_base_path=archive_base_path)
+
+    @pytest.mark.asyncio
+    async def test_non_integer_env_var_raises_value_error(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test non-integer env var raises ValueError with clear message.
+
+        Given: OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL="fast" set in environment
+        When: Calling initialize() without explicit compression_level
+        Then: ValueError is raised mentioning the invalid value
+        """
+        monkeypatch.setenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", "fast")
+
+        handler = HandlerMemoryArchive(container)
+
+        with pytest.raises(
+            ValueError,
+            match="OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL must be an integer",
+        ):
+            await handler.initialize(db_pool=None, archive_base_path=archive_base_path)
+
+    @pytest.mark.asyncio
+    async def test_compression_level_reflected_in_describe(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test describe() reports the configured compression level.
+
+        Given: Handler initialized with compression_level=2
+        When: Calling describe()
+        Then: ModelMemoryArchiveMetadata.compression_level is 2
+        """
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", raising=False)
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=2,
+        )
+
+        metadata = await handler.describe()
+
+        assert metadata.compression_level == 2
+
+    @pytest.mark.asyncio
+    async def test_compression_level_affects_serialize_output(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        memory_id: UUID,
+        fixed_now: datetime,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that compression level is actually used during serialization.
+
+        Given: Two handlers with different compression levels (1 and 9)
+        When: Serializing the same record
+        Then: Both produce valid, decompressible gzip data with the same content
+        """
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", raising=False)
+
+        record = ModelArchiveRecord(
+            memory_id=memory_id,
+            content="x" * 10000,  # Repeated content compresses well
+            content_type="text/plain",
+            created_at=fixed_now,
+            expired_at=fixed_now,
+            archived_at=fixed_now,
+            lifecycle_revision=1,
+        )
+
+        handler_fast = HandlerMemoryArchive(container)
+        await handler_fast.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=1,
+        )
+
+        handler_best = HandlerMemoryArchive(container)
+        await handler_best.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=9,
+        )
+
+        compressed_fast = handler_fast._serialize_for_archive_sync(record)
+        compressed_best = handler_best._serialize_for_archive_sync(record)
+
+        # Both outputs must be valid gzip and decompress to the same content
+        decompressed_fast = gzip.decompress(compressed_fast)
+        decompressed_best = gzip.decompress(compressed_best)
+        assert decompressed_fast == decompressed_best
+
+        # Level 9 should produce equal or smaller output than level 1
+        # for highly compressible data (repeated characters)
+        assert len(compressed_best) <= len(compressed_fast)
+
+    @pytest.mark.asyncio
+    async def test_compression_level_resets_on_shutdown(
+        self,
+        container: ModelONEXContainer,
+        archive_base_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test compression level resets to default after shutdown.
+
+        Given: Handler initialized with compression_level=9
+        When: Calling shutdown()
+        Then: _compression_level resets to built-in default (6)
+        """
+        monkeypatch.delenv("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL", raising=False)
+
+        handler = HandlerMemoryArchive(container)
+        await handler.initialize(
+            db_pool=None,
+            archive_base_path=archive_base_path,
+            compression_level=9,
+        )
+        assert handler.compression_level == 9
+
+        await handler.shutdown()
+
+        # After shutdown, compression_level property resets to default
+        assert handler.compression_level == handler._DEFAULT_COMPRESSION_LEVEL
