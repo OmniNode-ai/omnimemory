@@ -248,7 +248,7 @@ engine = create_memory_dispatch_engine(
     intent_consumer=intent_consumer_handler,
     intent_query_handler=intent_query_handler,
     publish_callback=event_bus.publish,
-    publish_topics={"intent_query": "dev.onex.evt.omnimemory.intent-query-response.v1"},
+    publish_topics={"intent_query": "onex.evt.omnimemory.intent-query-response.v1"},  # Runtime env prefix (e.g., dev., prod.) is added by the topic builder
 )
 # engine is now frozen and ready for dispatch
 ```

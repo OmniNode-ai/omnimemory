@@ -24,7 +24,7 @@
 
 ## What This Repo Provides
 
-- **Memory nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`
+- **Memory nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`, `intent_event_consumer_effect`
 - **Compute nodes** — `semantic_analyzer_compute`, `similarity_compute`
 - **Reducer nodes** — `memory_consolidator_reducer`, `statistics_reducer`
 - **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`
