@@ -42,35 +42,41 @@ poetry add omnimemory
 
 Minimal example using the intent handler:
 ```python
+import asyncio
 from uuid import uuid4
 
 from omnibase_core.container import ModelONEXContainer
 from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
 from omnimemory.handlers.handler_intent import HandlerIntent
 
-container = ModelONEXContainer()
-handler = HandlerIntent(container)
 
-await handler.initialize(connection_uri="bolt://localhost:7687")
+async def main() -> None:
+    container = ModelONEXContainer()
+    handler = HandlerIntent(container)
 
-# Store an intent
-result = await handler.store_intent(
-    session_id="session_123",
-    intent_data=ModelIntentClassificationOutput(
-        intent_category="debugging",
-        confidence=0.92,
-        keywords=["error", "traceback"],
-    ),
-    correlation_id=str(uuid4()),
-)
+    await handler.initialize(connection_uri="bolt://localhost:7687")
 
-# Query session intents
-query_result = await handler.query_session(
-    session_id="session_123",
-    min_confidence=0.5,
-)
+    # Store an intent
+    result = await handler.store_intent(
+        session_id="session_123",
+        intent_data=ModelIntentClassificationOutput(
+            intent_category="debugging",
+            confidence=0.92,
+            keywords=["error", "traceback"],
+        ),
+        correlation_id=str(uuid4()),
+    )
 
-await handler.shutdown()
+    # Query session intents
+    query_result = await handler.query_session(
+        session_id="session_123",
+        min_confidence=0.5,
+    )
+
+    await handler.shutdown()
+
+
+asyncio.run(main())
 ```
 
 Run tests:

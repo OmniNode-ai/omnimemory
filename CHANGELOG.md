@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrate omnimemory to standard `event_bus.subscribe_topics` contract field ([OMN-1746](https://linear.app/omninode/issue/OMN-1746), [#39](https://github.com/OmniNode-ai/omnimemory/pull/39))
 - ARCH-002 compliance — abstract Kafka from handlers behind `ProtocolEventBusPublish` ([OMN-2214](https://linear.app/omninode/issue/OMN-2214), [#40](https://github.com/OmniNode-ai/omnimemory/pull/40))
 - Add `MessageDispatchEngine` integration for handler-level event dispatch ([OMN-2215](https://linear.app/omninode/issue/OMN-2215), [#41](https://github.com/OmniNode-ai/omnimemory/pull/41))
-- Add CI Kafka import lint guard to enforce ARCH-002 (no direct `kafka` imports in handlers) ([OMN-1750](https://linear.app/omninode/issue/OMN-1750), [#42](https://github.com/OmniNode-ai/omnimemory/pull/42))
+- Add CI Kafka import lint guard to enforce ARCH-002 (no direct `kafka` imports in `src/`) ([OMN-1750](https://linear.app/omninode/issue/OMN-1750), [#42](https://github.com/OmniNode-ai/omnimemory/pull/42))
 - Add `PluginMemory` runtime plugin for memory subsystem registration ([OMN-2216](https://linear.app/omninode/issue/OMN-2216), [#43](https://github.com/OmniNode-ai/omnimemory/pull/43))
 - Make `AdapterIntentGraph` conform to `ProtocolIntentGraph` from omnibase-spi ([OMN-1476](https://linear.app/omninode/issue/OMN-1476), [#44](https://github.com/OmniNode-ai/omnimemory/pull/44))
 - Add wire model registration and entry point declaration for plugin discovery ([OMN-2217](https://linear.app/omninode/issue/OMN-2217), [#45](https://github.com/OmniNode-ai/omnimemory/pull/45))
