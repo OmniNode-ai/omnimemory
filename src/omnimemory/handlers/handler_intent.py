@@ -87,7 +87,6 @@ from omnimemory.handlers.adapters.models import (
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
     ModelIntentQueryResult,
-    ModelIntentRecord,
     ModelIntentStorageResult,
 )
 from omnimemory.utils.concurrency import (
@@ -98,7 +97,8 @@ from omnimemory.utils.concurrency import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
-    from omnibase_core.models.intelligence import ModelIntentClassificationOutput
+
+    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
 
 __all__ = [
     "CircuitBreakerOpenError",
@@ -619,18 +619,11 @@ class HandlerIntent:
             # Record success/failure based on adapter result.
             # Adapter-level errors (timeouts, connection failures) should trip
             # the circuit breaker, consistent with query_session behaviour.
-            if result.success:
+            if result.status == "success":
                 circuit_breaker.record_success()
             else:
                 circuit_breaker.record_failure()
-            # Convert omnibase_core ModelIntentStorageResult to local ModelIntentStorageResult
-            return ModelIntentStorageResult(
-                status="success" if result.success else "error",
-                intent_id=result.intent_id,
-                session_id=session_id,
-                created=result.created,
-                error_message=result.error_message,
-            )
+            return result
         except Exception as e:
             circuit_breaker.record_failure()
             logger.error(
@@ -722,43 +715,17 @@ class HandlerIntent:
         )
 
         try:
-            core_result = await adapter.get_session_intents(
+            result = await adapter.get_session_intents(
                 session_id=session_id,
                 min_confidence=min_confidence if min_confidence is not None else 0.0,
                 limit=limit,
             )
             # Record success/failure based on adapter result.
-            # The core ModelIntentQueryResult uses success: bool, so we
-            # treat any non-error result as a healthy adapter response.
-            if core_result.success:
+            if result.status != "error":
                 circuit_breaker.record_success()
             else:
                 circuit_breaker.record_failure()
-            # Convert omnibase_core ModelIntentQueryResult to local ModelIntentQueryResult
-            has_intents = len(core_result.intents) > 0
-            if core_result.success:
-                status = "success" if has_intents else "no_results"
-            else:
-                status = "error"
-            # Convert core ModelIntentRecord to local ModelIntentRecord
-            local_intents = [
-                ModelIntentRecord(
-                    intent_id=r.intent_id,
-                    session_ref=r.session_id,
-                    intent_category=r.intent_category.value,
-                    confidence=r.confidence,
-                    keywords=r.keywords,
-                    created_at_utc=r.created_at,
-                    correlation_id=r.correlation_id,
-                )
-                for r in core_result.intents
-            ]
-            return ModelIntentQueryResult(
-                status=status,
-                intents=local_intents,
-                total_count=len(local_intents),
-                error_message=core_result.error_message,
-            )
+            return result
         except Exception as e:
             circuit_breaker.record_failure()
             logger.error(

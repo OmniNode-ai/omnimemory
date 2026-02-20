@@ -74,8 +74,8 @@ class TestMapEventToStorageRequest:
         assert result.session_id == event.session_id
         assert result.correlation_id == event.correlation_id
         assert result.intent_data is not None
-        # intent_category is now an enum, compare with .value
-        assert result.intent_data.intent_category.value == event.intent_category
+        # intent_category is a str in the local ModelIntentClassificationOutput
+        assert result.intent_data.intent_category == event.intent_category
         assert result.intent_data.confidence == event.confidence
         assert result.intent_data.keywords == list(event.keywords)
 

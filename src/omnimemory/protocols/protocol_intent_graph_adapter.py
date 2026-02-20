@@ -58,12 +58,9 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from omnimemory.handlers.adapters.models import (
         ModelIntentClassificationOutput,
         ModelIntentDistributionResult,
-        ModelIntentGraphHealth,
         ModelIntentQueryResult,
         ModelIntentStorageResult,
     )
@@ -153,9 +150,7 @@ class ProtocolIntentGraphAdapter(Protocol):
         self,
         session_id: str,
         intent_data: ModelIntentClassificationOutput,
-        correlation_id: UUID,
-        *,
-        user_context: str = "",
+        correlation_id: str,
     ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
@@ -183,7 +178,7 @@ class ProtocolIntentGraphAdapter(Protocol):
     async def get_session_intents(
         self,
         session_id: str,
-        min_confidence: float | None = None,
+        min_confidence: float = 0.0,
         limit: int | None = None,
     ) -> ModelIntentQueryResult:
         """Get intents for a session with optional filtering.
@@ -285,15 +280,10 @@ class ProtocolIntentGraphAdapter(Protocol):
         """
         ...
 
-    async def health_check(self) -> ModelIntentGraphHealth:
+    async def health_check(self) -> bool:
         """Check if the graph connection is healthy.
 
-        Performs connectivity check and optionally gathers graph
-        statistics (session and intent counts).
-
         Returns:
-            ModelIntentGraphHealth with detailed health status.
-            This method never raises - errors are captured in the
-            result model.
+            True if the graph is healthy and accessible, False otherwise.
         """
         ...

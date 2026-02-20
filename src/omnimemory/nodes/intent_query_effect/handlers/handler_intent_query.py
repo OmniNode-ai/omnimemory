@@ -555,7 +555,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if not result.success:
+        if result.status == "error":
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="session",
@@ -623,7 +623,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if not result.success:
+        if result.status == "error":
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="recent",

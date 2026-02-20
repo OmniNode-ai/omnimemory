@@ -309,7 +309,7 @@ class HandlerIntentStorageAdapter:
             correlation_id=correlation_id,
         )
 
-        if result.success:
+        if result.status == "success":
             return ModelIntentStorageResponse(
                 status="success",
                 intent_id=result.intent_id,
@@ -350,7 +350,7 @@ class HandlerIntentStorageAdapter:
             limit=request.limit,
         )
 
-        if not result.success:
+        if result.status != "success":
             return ModelIntentStorageResponse(
                 status="error",
                 error_message=result.error_message,
@@ -363,16 +363,16 @@ class HandlerIntentStorageAdapter:
                 total_count=0,
             )
 
-        # Convert core ModelIntentRecord to response model format
+        # Convert local ModelIntentRecord to response model format
         intents: list[ModelIntentRecordResponse] = []
         for intent in result.intents:
             intents.append(
                 ModelIntentRecordResponse(
                     intent_id=intent.intent_id,
-                    intent_category=intent.intent_category.value,
+                    intent_category=intent.intent_category,
                     confidence=intent.confidence,
                     keywords=intent.keywords,
-                    created_at_utc=intent.created_at.isoformat(),
+                    created_at_utc=intent.created_at_utc.isoformat(),
                     correlation_id=intent.correlation_id,
                 )
             )

@@ -71,26 +71,21 @@ from typing import cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-# NOTE: This file uses omnibase_core's ModelIntentClassificationOutput (where
-# intent_category is EnumIntentCategory enum), not the omnimemory local version
-# (where intent_category is plain str). The core version is used because
-# store_intent() receives data from the upstream classification pipeline.
 from omnibase_core.container import ModelONEXContainer
-from omnibase_core.enums.intelligence import EnumIntentCategory
-from omnibase_core.models.intelligence import (
+from omnibase_core.types.type_json import JsonType
+from omnibase_infra.handlers.handler_graph import HandlerGraph
+
+from omnimemory.handlers.adapters.models import (
+    ModelAdapterIntentGraphConfig,
     ModelIntentClassificationOutput,
+    ModelIntentDistributionResult,
+    ModelIntentGraphHealth,
     ModelIntentQueryResult,
     ModelIntentRecord,
     ModelIntentStorageResult,
 )
-from omnibase_core.types.type_json import JsonType
-from omnibase_infra.handlers.handler_graph import HandlerGraph
-from omnibase_spi.protocols import ProtocolIntentGraph
-
-from omnimemory.handlers.adapters.models import (
-    ModelAdapterIntentGraphConfig,
-    ModelIntentDistributionResult,
-    ModelIntentGraphHealth,
+from omnimemory.protocols.protocol_intent_graph_adapter import (
+    ProtocolIntentGraphAdapter,
 )
 
 __all__ = ["AdapterIntentGraph", "IntentCypherTemplates"]
@@ -246,7 +241,7 @@ class IntentCypherTemplates:
         """
 
 
-class AdapterIntentGraph(ProtocolIntentGraph):
+class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     """Adapter that wraps HandlerGraph for intent classification storage.
 
     Implements the ProtocolIntentGraph protocol from omnibase_spi,
@@ -593,20 +588,14 @@ class AdapterIntentGraph(ProtocolIntentGraph):
             This method never raises on business errors - it returns
             an error status in the result model instead.
         """
-        # Extract intent category string from the classification output.
-        # intent_data.intent_category is EnumIntentCategory (from
-        # omnibase_core.models.intelligence.ModelIntentClassificationOutput),
-        # so .value extracts the underlying str. The hasattr guard handles
-        # any edge case where a plain str is passed instead of the enum.
-        raw_category = intent_data.intent_category
-        intent_category_str = (
-            raw_category.value if hasattr(raw_category, "value") else str(raw_category)
-        )
+        # intent_data.intent_category is str in the local ModelIntentClassificationOutput.
+        intent_category_str = intent_data.intent_category
 
         # Validate session_id is non-empty
         if not session_id or not session_id.strip():
             return ModelIntentStorageResult(
-                success=False,
+                status="error",
+                session_id=session_id,
                 error_message="session_id cannot be empty",
             )
 
@@ -614,7 +603,8 @@ class AdapterIntentGraph(ProtocolIntentGraph):
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentStorageResult(
-                success=False,
+                status="error",
+                session_id=session_id,
                 error_message=str(e),
             )
 
@@ -707,9 +697,11 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 )
 
                 return ModelIntentStorageResult(
-                    success=True,
+                    status="success",
+                    session_id=session_id,
                     intent_id=returned_intent_id,
                     created=was_created,
+                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
@@ -721,7 +713,9 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 execution_time_ms,
             )
             return ModelIntentStorageResult(
-                success=False,
+                status="error",
+                session_id=session_id,
+                execution_time_ms=execution_time_ms,
                 error_message=f"Operation timed out after {self._config.timeout_seconds}s",
             )
 
@@ -734,7 +728,9 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 e,
             )
             return ModelIntentStorageResult(
-                success=False,
+                status="error",
+                session_id=session_id,
+                execution_time_ms=execution_time_ms,
                 error_message=f"Storage failed: {e}",
             )
 
@@ -768,7 +764,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
                 error_message=str(e),
             )
 
@@ -817,7 +813,8 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                         execution_time_ms,
                     )
                     return ModelIntentQueryResult(
-                        success=True,
+                        status="no_results",
+                        execution_time_ms=execution_time_ms,
                     )
 
                 # Convert records to intent models
@@ -878,26 +875,17 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                         )
                         continue
 
-                    # Convert stored string to EnumIntentCategory
+                    # Use category string directly for local model
                     intent_category_str = str(record.get("intent_category", "unknown"))
-                    try:
-                        intent_category = EnumIntentCategory(intent_category_str)
-                    except ValueError:
-                        # If stored category doesn't match enum, use UNKNOWN
-                        logger.warning(
-                            "Unknown intent category '%s', using UNKNOWN",
-                            intent_category_str,
-                        )
-                        intent_category = EnumIntentCategory.UNKNOWN
 
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
-                            session_id=session_id,
-                            intent_category=intent_category,
+                            session_ref=session_id,
+                            intent_category=intent_category_str,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at=created_at,
+                            created_at_utc=created_at,
                             correlation_id=correlation_id,
                         )
                     )
@@ -909,9 +897,10 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                     execution_time_ms,
                 )
                 return ModelIntentQueryResult(
-                    success=True,
+                    status="success",
                     intents=intents,
                     total_count=len(intents),
+                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
@@ -923,7 +912,8 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 execution_time_ms,
             )
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
+                execution_time_ms=execution_time_ms,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
@@ -936,7 +926,8 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 e,
             )
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
+                execution_time_ms=execution_time_ms,
                 error_message=f"Query failed: {e}",
             )
 
@@ -1107,7 +1098,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
             handler = self._ensure_initialized()
         except RuntimeError as e:
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
                 error_message=str(e),
             )
 
@@ -1158,7 +1149,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                         effective_time_range,
                     )
                     return ModelIntentQueryResult(
-                        success=True,
+                        status="no_results",
                     )
 
                 # Convert records to intent models
@@ -1226,25 +1217,17 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                         )
                         continue
 
-                    # Convert stored string to EnumIntentCategory
+                    # Use category string directly for local model
                     intent_category_str = str(record.get("intent_category", "unknown"))
-                    try:
-                        intent_category = EnumIntentCategory(intent_category_str)
-                    except ValueError:
-                        logger.warning(
-                            "Unknown intent category '%s', using UNKNOWN",
-                            intent_category_str,
-                        )
-                        intent_category = EnumIntentCategory.UNKNOWN
 
                     intents.append(
                         ModelIntentRecord(
                             intent_id=intent_id,
-                            session_id=record_session_id,
-                            intent_category=intent_category,
+                            session_ref=record_session_id,
+                            intent_category=intent_category_str,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at=created_at,
+                            created_at_utc=created_at,
                             correlation_id=correlation_id,
                         )
                     )
@@ -1256,7 +1239,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 )
 
                 return ModelIntentQueryResult(
-                    success=True,
+                    status="success",
                     intents=intents,
                     total_count=len(intents),
                 )
@@ -1267,7 +1250,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 self._config.timeout_seconds,
             )
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
@@ -1277,7 +1260,7 @@ class AdapterIntentGraph(ProtocolIntentGraph):
                 e,
             )
             return ModelIntentQueryResult(
-                success=False,
+                status="error",
                 error_message=f"Query failed: {e}",
             )
 

@@ -553,20 +553,24 @@ class TestModels:
 
 
 class TestProtocolConformance:
-    """Tests that AdapterIntentGraph conforms to ProtocolIntentGraph."""
+    """Tests that AdapterIntentGraph conforms to ProtocolIntentGraphAdapter."""
 
     def test_isinstance_check(self, config: ModelAdapterIntentGraphConfig) -> None:
-        """Test that AdapterIntentGraph is an instance of ProtocolIntentGraph."""
-        from omnibase_spi.protocols import ProtocolIntentGraph
+        """Test that AdapterIntentGraph is an instance of ProtocolIntentGraphAdapter."""
+        from omnimemory.protocols.protocol_intent_graph_adapter import (
+            ProtocolIntentGraphAdapter,
+        )
 
         adapter = AdapterIntentGraph(config)
-        assert isinstance(adapter, ProtocolIntentGraph)
+        assert isinstance(adapter, ProtocolIntentGraphAdapter)
 
     def test_inherits_from_protocol(self) -> None:
-        """Test that AdapterIntentGraph explicitly inherits from ProtocolIntentGraph."""
-        from omnibase_spi.protocols import ProtocolIntentGraph
+        """Test that AdapterIntentGraph explicitly inherits from ProtocolIntentGraphAdapter."""
+        from omnimemory.protocols.protocol_intent_graph_adapter import (
+            ProtocolIntentGraphAdapter,
+        )
 
-        assert issubclass(AdapterIntentGraph, ProtocolIntentGraph)
+        assert issubclass(AdapterIntentGraph, ProtocolIntentGraphAdapter)
 
 
 # =============================================================================
