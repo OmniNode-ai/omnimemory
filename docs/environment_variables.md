@@ -178,7 +178,7 @@ Set `OMNIMEMORY__EMBEDDING_ENABLED=true` to enable the real embedding server for
 ```bash
 # Enable real embeddings with explicit server URL
 export OMNIMEMORY__EMBEDDING_ENABLED=true
-export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8102
+export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.201:8002
 ```
 
 **Note**: When using `ModelHandlerQdrantMockConfig` with `use_real_embeddings=True`, the `embedding_server_url` must be provided explicitly (typically loaded from this environment variable). The handler will fail fast with a clear error if the URL is missing or invalid.
@@ -218,7 +218,7 @@ OMNIMEMORY__QDRANT__VECTOR_SIZE=1024
 
 # Embedding (for real semantic search)
 OMNIMEMORY__EMBEDDING_ENABLED=true
-OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8102
+OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.201:8002
 ```
 
 ### Production
