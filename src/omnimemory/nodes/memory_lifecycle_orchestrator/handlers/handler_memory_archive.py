@@ -758,7 +758,7 @@ class HandlerMemoryArchive:
                 "orphan_tracking",
             ],
             archive_format="JSONL with gzip compression (.jsonl.gz)",
-            compression_level=self._compression_level,  # _DEFAULT_COMPRESSION_LEVEL when not initialized
+            compression_level=self._compression_level,
             query_timeout_seconds=self._QUERY_TIMEOUT_SECONDS,
             circuit_breaker_config=ModelCircuitBreakerConfigInfo(
                 failure_threshold=self._CB_FAILURE_THRESHOLD,
