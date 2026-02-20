@@ -23,7 +23,7 @@ class ModelContextItemStats(BaseModel):
     the item is actually injected into a session.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     # ------------------------------------------------------------------
     # Core run counters

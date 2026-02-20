@@ -27,7 +27,7 @@ class ModelScopeMappingConfig(BaseModel):
     back to a default or skip the document).
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     path_mappings: tuple[ModelPathScopeMapping, ...] = Field(
         default=(),

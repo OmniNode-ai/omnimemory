@@ -25,7 +25,7 @@ class ModelPromotionDecision(BaseModel):
     One row per ContextItem per evaluation pass.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     # ------------------------------------------------------------------
     # Item identity

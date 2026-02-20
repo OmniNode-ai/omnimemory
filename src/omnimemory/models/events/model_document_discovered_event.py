@@ -31,7 +31,7 @@ class ModelDocumentDiscoveredEvent(BaseModel):
     Raw document text is never inlined into Kafka events.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     # ------------------------------------------------------------------
     # Event envelope

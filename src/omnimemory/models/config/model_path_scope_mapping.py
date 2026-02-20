@@ -19,7 +19,7 @@ class ModelPathScopeMapping(BaseModel):
     length, the first entry in the list wins.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     path_prefix: str = Field(
         ...,

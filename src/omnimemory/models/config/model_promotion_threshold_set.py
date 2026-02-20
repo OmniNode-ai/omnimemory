@@ -22,7 +22,7 @@ class ModelPromotionThresholdSet(BaseModel):
     directly at VALIDATED (e.g., STATIC_STANDARDS bootstrap grant).
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     source_type: EnumContextSourceType = Field(
         ...,

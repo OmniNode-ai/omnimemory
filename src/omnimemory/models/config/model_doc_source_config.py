@@ -20,7 +20,7 @@ class ModelDocSourceConfig(BaseModel):
     initial values. Operators can override per deployment.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     prefer_narrow_scope: bool = Field(
         default=True,

@@ -18,7 +18,7 @@ class ModelLinearScopeMapping(BaseModel):
     assigned to a specific project (team-level fallback mapping).
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     team: str = Field(
         ...,

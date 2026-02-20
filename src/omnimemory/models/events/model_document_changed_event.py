@@ -32,7 +32,7 @@ class ModelDocumentChangedEvent(BaseModel):
     or start fresh (similarity < 0.85).
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     # ------------------------------------------------------------------
     # Event envelope

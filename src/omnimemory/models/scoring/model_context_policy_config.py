@@ -25,7 +25,7 @@ class ModelContextPolicyConfig(BaseModel):
     valid hook-only (pre-OMN-2426) configuration.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     # ------------------------------------------------------------------
     # Base retrieval settings

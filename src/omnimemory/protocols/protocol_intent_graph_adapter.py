@@ -160,7 +160,6 @@ class ProtocolIntentGraphAdapter(Protocol):
             session_id: Unique identifier for the session.
             intent_data: The intent classification output to store.
             correlation_id: Correlation ID for request tracing.
-            user_context: Optional user context string for the session.
 
         Returns:
             ModelIntentStorageResult indicating success or failure.

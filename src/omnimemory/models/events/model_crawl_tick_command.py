@@ -29,7 +29,7 @@ class ModelCrawlTickCommand(BaseModel):
     guard and audit purposes.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     event_id: UUID = Field(
         default_factory=uuid4,
