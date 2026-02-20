@@ -75,6 +75,10 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     Returns:
         ModelIntentRecordPayload suitable for event transmission.
 
+    Raises:
+        ValueError: If ``record.session_ref`` is None. A session reference
+            is required to populate ``ModelIntentRecordPayload.session_ref``.
+
     Note:
         Field mappings:
             - ModelIntentRecord.session_ref (str) -> ModelIntentRecordPayload.session_ref (str)

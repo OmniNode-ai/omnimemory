@@ -87,8 +87,8 @@ class ModelIntentClassificationOutput(  # omnimemory-model-exempt: adapter inter
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
     )
 
     intent_category: str = Field(
@@ -145,8 +145,8 @@ class ModelIntentStorageResult(BaseModel):  # omnimemory-model-exempt: adapter i
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
     )
 
     status: Literal["success", "error"] = Field(
@@ -202,8 +202,8 @@ class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
     )
 
     intent_id: UUID = Field(
@@ -266,8 +266,8 @@ class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter int
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
     )
 
     status: Literal["success", "error", "not_found", "no_results"] = Field(
@@ -312,8 +312,8 @@ class ModelIntentDistributionResult(  # omnimemory-model-exempt: adapter interna
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
     )
 
     status: Literal["success", "error"] = Field(

@@ -35,9 +35,7 @@ Example::
             self,
             session_id: str,
             intent_data: ModelIntentClassificationOutput,
-            correlation_id: UUID,
-            *,
-            user_context: str = "",
+            correlation_id: str,
         ) -> ModelIntentStorageResult:
             return ModelIntentStorageResult(
                 status="success",
