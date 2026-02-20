@@ -177,8 +177,8 @@ Set `OMNIMEMORY__EMBEDDING_ENABLED=true` to enable the real embedding server for
 **Example**:
 ```bash
 # Enable real embeddings with explicit server URL.
-# This repo uses LLM_EMBEDDING_URL=http://192.168.86.201:8002 (vLLM on RTX 4090,
-# Linux GPU server 192.168.86.201). This is distinct from LLM_QWEN_72B_URL at
+# This repo uses LLM_EMBEDDING_URL=http://192.168.86.201:8002 (vLLM on Linux
+# GPU server 192.168.86.201, port 8002). This is distinct from LLM_QWEN_72B_URL at
 # 192.168.86.200:8100 (M2 Ultra). Always verify the value in .env before use.
 export OMNIMEMORY__EMBEDDING_ENABLED=true
 export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.201:8002

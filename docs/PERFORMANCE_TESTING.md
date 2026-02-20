@@ -282,7 +282,7 @@ performance-tests:
         python-version: '3.12'
     - name: Install dependencies
       run: |
-        pipx install poetry
+        pipx install poetry==2.2.1  # pin to match POETRY_VERSION in .github/workflows/test.yml
         poetry install
     - name: Run performance benchmarks
       run: |
