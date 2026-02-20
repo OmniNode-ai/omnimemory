@@ -188,5 +188,5 @@ The handler reuse matrix (`docs/handler_reuse_matrix.md`) references handlers fr
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.1.0 | 2026-02-19 | Audit stub status: ModelONEXContainer marked MIGRATED (upstream available at omnibase_core.container); OnexError/BaseOnexError confirmed still active (upstream exposes ModelOnexError, not OnexError); revert uv pip install to pip install in install snippet (Poetry venv compatibility) |
+| 1.1.0 | 2026-02-19 | Audit stub status: ModelONEXContainer marked MIGRATED (upstream available at omnibase_core.container); OnexError/BaseOnexError confirmed still active (upstream exposes ModelOnexError, not OnexError) |
 | 1.0.0 | 2025-01-18 | Initial documentation |
