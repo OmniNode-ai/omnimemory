@@ -48,8 +48,8 @@ class ModelGraphMemoryConfig(BaseModel):
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
     )
 
     max_depth: int = Field(
@@ -117,6 +117,7 @@ class ModelGraphMemoryConfig(BaseModel):
     retry_base_delay_seconds: float = Field(
         default=1.0,
         gt=0.0,
+        le=60.0,
         description=(
             "Base delay in seconds for the first retry attempt. "
             "Subsequent retries use exponential backoff: "

@@ -535,7 +535,7 @@ class TestFindRelated:
         mock_handler: MagicMock,
     ) -> None:
         """Test that find_related respects max_depth configuration."""
-        config.max_depth = 3
+        config = config.model_copy(update={"max_depth": 3})
         adapter = AdapterGraphMemory(config)
         adapter._handler = mock_handler
         adapter._initialized = True
@@ -1444,6 +1444,7 @@ class TestRetryLogic:
     # Configuration tests
     # -------------------------------------------------------------------------
 
+    @pytest.mark.unit
     def test_retry_config_defaults(self) -> None:
         """Test default retry configuration values."""
         config = ModelGraphMemoryConfig()
@@ -1452,6 +1453,7 @@ class TestRetryLogic:
         assert config.retry_base_delay_seconds == 1.0
         assert config.retry_max_delay_seconds == 30.0
 
+    @pytest.mark.unit
     def test_retry_config_custom(self) -> None:
         """Test custom retry configuration is accepted."""
         config = ModelGraphMemoryConfig(
@@ -1464,11 +1466,13 @@ class TestRetryLogic:
         assert config.retry_base_delay_seconds == 0.5
         assert config.retry_max_delay_seconds == 60.0
 
+    @pytest.mark.unit
     def test_retry_config_zero_max_retries(self) -> None:
         """Test that max_retries=0 is valid (disables retries)."""
         config = ModelGraphMemoryConfig(max_retries=0)
         assert config.max_retries == 0
 
+    @pytest.mark.unit
     def test_retry_config_max_retries_upper_bound(self) -> None:
         """Test that max_retries is bounded at 10."""
         from pydantic import ValidationError
@@ -1476,6 +1480,7 @@ class TestRetryLogic:
         with pytest.raises(ValidationError):
             ModelGraphMemoryConfig(max_retries=11)
 
+    @pytest.mark.unit
     def test_retry_config_base_delay_must_be_positive(self) -> None:
         """Test that retry_base_delay_seconds must be > 0."""
         from pydantic import ValidationError
@@ -1483,6 +1488,7 @@ class TestRetryLogic:
         with pytest.raises(ValidationError):
             ModelGraphMemoryConfig(retry_base_delay_seconds=0.0)
 
+    @pytest.mark.unit
     def test_retry_config_max_delay_must_be_positive(self) -> None:
         """Test that retry_max_delay_seconds must be > 0."""
         from pydantic import ValidationError
@@ -1494,6 +1500,7 @@ class TestRetryLogic:
     # _execute_with_retry unit tests
     # -------------------------------------------------------------------------
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_succeeds_on_first_attempt(
         self,
@@ -1512,6 +1519,7 @@ class TestRetryLogic:
         assert result == "ok"
         assert call_count == 1
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_retries_on_transient_error_then_succeeds(
         self,
@@ -1544,6 +1552,7 @@ class TestRetryLogic:
         assert result == "success_after_retry"
         assert call_count == 3  # Failed twice, succeeded on third attempt
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_exhausts_all_retries(
         self,
@@ -1577,6 +1586,7 @@ class TestRetryLogic:
         # Should have been called max_retries + 1 times (original + retries)
         assert call_count == 3  # 1 original + 2 retries
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_no_retry_on_zero_max_retries(
         self,
@@ -1602,6 +1612,7 @@ class TestRetryLogic:
 
         assert call_count == 1  # Only the original attempt, no retries
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_does_not_retry_permanent_errors(
         self,
@@ -1630,6 +1641,7 @@ class TestRetryLogic:
         # Permanent error must not retry - only 1 call
         assert call_count == 1
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_retries_infra_timeout_error(
         self,
@@ -1668,6 +1680,7 @@ class TestRetryLogic:
         assert result == "ok"
         assert call_count == 2
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_retries_infra_unavailable_error(
         self,
@@ -1702,6 +1715,7 @@ class TestRetryLogic:
         assert result == "ok"
         assert call_count == 2
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_uses_exponential_backoff(
         self,
@@ -1744,6 +1758,7 @@ class TestRetryLogic:
         assert sleep_calls[1] >= 2.0, f"Second retry delay too short: {sleep_calls[1]}"
         assert sleep_calls[2] >= 4.0, f"Third retry delay too short: {sleep_calls[2]}"
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_execute_with_retry_respects_max_delay_cap(
         self,
@@ -1781,6 +1796,7 @@ class TestRetryLogic:
     # Integration with find_related and get_connections
     # -------------------------------------------------------------------------
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_find_related_retries_on_transient_error(
         self,
@@ -1824,6 +1840,7 @@ class TestRetryLogic:
         # Should have retried (at least 3 calls since first 2 raise)
         assert call_count >= 3
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_find_related_returns_error_after_all_retries_exhausted(
         self,
@@ -1853,6 +1870,7 @@ class TestRetryLogic:
         # Should have retried: 1 original + 1 retry = 2 total calls
         assert mock_handler.execute_query.call_count == 2
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_get_connections_retries_on_transient_error(
         self,
@@ -1899,6 +1917,7 @@ class TestRetryLogic:
         assert len(result.connections) == 1
         assert call_count == 3
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_get_connections_returns_error_after_all_retries_exhausted(
         self,
@@ -1928,6 +1947,7 @@ class TestRetryLogic:
         # Should have retried: 1 original + 1 retry = 2 total calls
         assert mock_handler.execute_query.call_count == 2
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_retry_logs_warning_on_each_attempt(
         self,

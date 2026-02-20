@@ -595,7 +595,10 @@ class AdapterGraphMemory:
                         exc,
                     )
                     raise
-                # Calculate exponential backoff with jitter
+                # Calculate exponential backoff with jitter.
+                # random.uniform (default PRNG) is acceptable here: asyncio is
+                # single-threaded so there is no shared-state race, and retry
+                # jitter does not require cryptographic quality randomness.
                 delay = min(
                     base_delay * (2**attempt) + random.uniform(0.0, base_delay),
                     max_delay,
@@ -612,7 +615,9 @@ class AdapterGraphMemory:
                 )
                 await asyncio.sleep(delay)
 
-        # This line is unreachable - the loop either returns or raises.
+        # This line is unreachable in practice: ModelGraphMemoryConfig enforces
+        # max_retries >= 0, so the loop executes at least once (attempt 0) and
+        # always assigns last_exc before raising or completing all retries.
         # The assertion satisfies mypy's exhaustiveness analysis.
         assert last_exc is not None
         raise last_exc  # pragma: no cover
