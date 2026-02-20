@@ -169,14 +169,17 @@ Set `OMNIMEMORY__EMBEDDING_ENABLED=true` to enable the real embedding server for
 
 | Variable | Type | Default | Constraints | Description |
 |----------|------|---------|-------------|-------------|
-| `OMNIMEMORY__EMBEDDING__SERVER_URL` | str | **REQUIRED** | Valid HTTP(S) URL | URL of the embedding server (e.g., MLX server) |
+| `OMNIMEMORY__EMBEDDING__SERVER_URL` | str | **REQUIRED** | Valid HTTP(S) URL | URL of the embedding server (set from `LLM_EMBEDDING_URL` in `.env`) |
 | `OMNIMEMORY__EMBEDDING__TIMEOUT_SECONDS` | float | `5.0` | > 0 | Request timeout in seconds |
 | `OMNIMEMORY__EMBEDDING__MAX_RETRIES` | int | `3` | 0 - 10 | Maximum retry attempts for transient failures |
 | `OMNIMEMORY__EMBEDDING__DIMENSION` | int | `1024` | > 0 | Expected embedding vector dimension |
 
 **Example**:
 ```bash
-# Enable real embeddings with explicit server URL
+# Enable real embeddings with explicit server URL.
+# This repo uses LLM_EMBEDDING_URL=http://192.168.86.201:8002 (vLLM on RTX 4090,
+# Linux GPU server 192.168.86.201). This is distinct from LLM_QWEN_72B_URL at
+# 192.168.86.200:8100 (M2 Ultra). Always verify the value in .env before use.
 export OMNIMEMORY__EMBEDDING_ENABLED=true
 export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.201:8002
 ```
