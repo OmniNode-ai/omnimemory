@@ -122,10 +122,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: >-
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            ${{ hashFiles('**/poetry.lock') }}-
-            ${{ env.CACHE_VERSION }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
           # Restore-keys use prefix matching for better fallback:
           # - First tries exact OS + Python + lock hash
           # - Falls back to OS + Python (different lock hash)
@@ -136,10 +133,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --frozen --no-root --frozen
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --frozen
 
       # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
       # Both pre-commit and CI use --check for consistent validation
@@ -184,10 +181,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: >-
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            ${{ hashFiles('**/poetry.lock') }}-
-            ${{ env.CACHE_VERSION }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
           # Restore-keys use prefix matching for better fallback:
           # - First tries exact OS + Python + lock hash
           # - Falls back to OS + Python (different lock hash)
@@ -198,10 +192,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --frozen --no-root --frozen
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --frozen
 
       # SYNC: Pre-commit hook 'pyright' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
@@ -236,10 +230,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: >-
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            ${{ hashFiles('**/poetry.lock') }}-
-            ${{ env.CACHE_VERSION }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
           # Restore-keys use prefix matching for better fallback:
           # - First tries exact OS + Python + lock hash
           # - Falls back to OS + Python (different lock hash)
@@ -250,10 +241,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --frozen --no-root --frozen
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --frozen
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
@@ -360,20 +351,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: >-
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            ${{ hashFiles('**/poetry.lock') }}-
-            ${{ env.CACHE_VERSION }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
           restore-keys: |
             venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
             venv-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --frozen --no-root --frozen
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --frozen
 
       - name: Find and validate contract YAML files
         run: |
@@ -417,20 +405,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: >-
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            ${{ hashFiles('**/poetry.lock') }}-
-            ${{ env.CACHE_VERSION }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
           restore-keys: |
             venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
             venv-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --frozen --no-root --frozen
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --frozen
 
       - name: Run I/O audit
         run: poetry run python -m omnimemory.audit
@@ -513,10 +498,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: >-
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            ${{ hashFiles('**/poetry.lock') }}-
-            ${{ env.CACHE_VERSION }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
           # Restore-keys use prefix matching for better fallback:
           # - First tries exact OS + Python + lock hash
           # - Falls back to OS + Python (different lock hash)
@@ -527,10 +509,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --frozen --no-root --frozen
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --frozen
 
       - name: Run tests
         run: |
