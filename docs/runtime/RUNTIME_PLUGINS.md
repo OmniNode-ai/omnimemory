@@ -365,7 +365,7 @@ Per ARCH-002, no handler or node file may import directly from transport modules
 
 ### AdapterKafkaPublisher
 
-`AdapterKafkaPublisher` wraps a `ProtocolEventBusPublish` event bus and provides a handler-friendly interface that accepts `dict` values (serialized to compact JSON bytes internally):
+`AdapterKafkaPublisher` wraps a `ProtocolEventBusPublish` event bus and provides a handler-friendly interface that accepts `Mapping[str, object]` values (serialized to compact JSON bytes internally):
 
 ```python
 from omnimemory.runtime.adapters import AdapterKafkaPublisher
