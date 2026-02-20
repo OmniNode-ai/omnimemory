@@ -87,7 +87,7 @@ raise OnexError(
 
 **Purpose**: Dependency injection container for ONEX nodes, providing service registration and resolution.
 
-**Upstream Target**: `omnibase_core.core.model_onex_container.ModelONEXContainer`
+**Upstream Target**: `omnibase_core.container.ModelONEXContainer`
 
 **Status**: **MIGRATED** — use `omnibase_core` directly. `ModelONEXContainer` is now available in the installed package (omnibase-core 0.17+) at:
 

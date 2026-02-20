@@ -133,7 +133,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root --frozen
+        run: poetry install --no-interaction --frozen --no-root
 
       - name: Install project
         run: poetry install --no-interaction --frozen
@@ -192,7 +192,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root --frozen
+        run: poetry install --no-interaction --frozen --no-root
 
       - name: Install project
         run: poetry install --no-interaction --frozen
@@ -241,7 +241,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root --frozen
+        run: poetry install --no-interaction --frozen --no-root
 
       - name: Install project
         run: poetry install --no-interaction --frozen
@@ -358,7 +358,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root --frozen
+        run: poetry install --no-interaction --frozen --no-root
 
       - name: Install project
         run: poetry install --no-interaction --frozen
@@ -412,7 +412,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root --frozen
+        run: poetry install --no-interaction --frozen --no-root
 
       - name: Install project
         run: poetry install --no-interaction --frozen
@@ -509,7 +509,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root --frozen
+        run: poetry install --no-interaction --frozen --no-root
 
       - name: Install project
         run: poetry install --no-interaction --frozen

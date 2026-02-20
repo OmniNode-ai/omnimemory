@@ -8,7 +8,7 @@ This document describes all environment variables used to configure OmniMemory.
 
 ## Overview
 
-OmniMemory uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for configuration management. All environment variables use the `OMNIMEMORY__` prefix with `__` as the nested delimiter.
+OmniMemory uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for configuration management. All environment variables use the `OMNIMEMORY__` prefix with `__` as the nested delimiter, **except** `OMNIMEMORY_DB_URL` which uses a single underscore and is read as a top-level variable via a `validation_alias` in pydantic-settings (not as a nested `OMNIMEMORY__POSTGRES__` variable).
 
 **Example**: `OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/memory`
 
@@ -75,6 +75,7 @@ Top-level settings that control service behavior.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
+| `OMNIMEMORY_ENABLED` | bool | unset (disabled) | Activate the OmniMemory plugin in the ONEX kernel. When set to `true`, the `PluginMemory` domain plugin initializes and subscribes to Kafka topics. When unset or `false`, the plugin is skipped entirely, allowing graceful degradation in kernels that do not require the memory domain. Expected values: `true` or `false`. See also: [Runtime Plugins](./runtime/RUNTIME_PLUGINS.md). |
 | `OMNIMEMORY__POSTGRES_ENABLED` | bool | `false` | Enable PostgreSQL backend |
 | `OMNIMEMORY__QDRANT_ENABLED` | bool | `false` | Enable Qdrant vector backend |
 | `OMNIMEMORY__EMBEDDING_ENABLED` | bool | `false` | Enable real embedding server (requires `EMBEDDING__SERVER_URL`) |
@@ -106,7 +107,7 @@ Set `OMNIMEMORY__POSTGRES_ENABLED=true` to enable PostgreSQL backend for persist
 |----------|------|---------|-------------|-------------|
 | `OMNIMEMORY_DB_URL` | str | **required if enabled** | Valid PostgreSQL URL | Full PostgreSQL connection URL with credentials |
 
-> **Important — naming convention**: `OMNIMEMORY_DB_URL` uses a **single underscore** between `OMNIMEMORY` and `DB`. It is **not** prefixed with `OMNIMEMORY__` (double-underscore). This is a top-level environment variable read via a `validation_alias` in pydantic-settings, not a nested `OMNIMEMORY__POSTGRES__` variable. Setting `OMNIMEMORY__POSTGRES__DB_URL` will have no effect.
+> **Important — naming convention exception**: While all other OmniMemory variables use the `OMNIMEMORY__` prefix with `__` as the nested delimiter (see [Overview](#overview)), `OMNIMEMORY_DB_URL` is the **one exception**: it uses a **single underscore** between `OMNIMEMORY` and `DB`. It is read as a top-level environment variable via a `validation_alias` in pydantic-settings, not as a nested `OMNIMEMORY__POSTGRES__` variable. Setting `OMNIMEMORY__POSTGRES__DB_URL` will have no effect.
 
 The service fails fast on startup if `OMNIMEMORY_DB_URL` is not set when postgres is enabled. No silent fallback to shared databases.
 

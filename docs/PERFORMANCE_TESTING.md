@@ -15,7 +15,7 @@ This document describes how to run and interpret performance benchmarks for Omni
 
 ## SLA Targets
 
-OmniMemory has the following documented performance targets (from architecture requirements):
+OmniMemory has the following documented performance targets (from [architecture requirements](./architecture/ONEX_FOUR_NODE_ARCHITECTURE.md)):
 
 | Metric | Target | Test Class |
 |--------|--------|------------|

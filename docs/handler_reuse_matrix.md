@@ -15,7 +15,7 @@ This document maps existing handlers from `omnibase_infra` to the Core 8 memory 
 ## Existing Handlers in omnibase_infra
 
 > **Note**: All paths below are Python module paths within the `omnibase_infra` package.
-> Install via PyPI: `uv pip install omnibase-infra`. Handler classes follow the naming
+> Install via PyPI: `poetry add omnibase-infra`. Handler classes follow the naming
 > convention `Handler<Name>` (e.g., `HandlerDb`, `HandlerQdrant`).
 
 ### Core Infrastructure Handlers (`omnibase_infra.handlers`)

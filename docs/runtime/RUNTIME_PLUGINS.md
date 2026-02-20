@@ -14,7 +14,7 @@ For OmniMemory, the plugin (`PluginMemory`) performs five sequential steps:
 4. Publish node introspection events so the platform registration orchestrator can discover each memory node.
 5. Subscribe to all Kafka input topics declared in node `contract.yaml` files (`start_consumers`, OMN-2213).
 
-The plugin activates only when the `OMNIMEMORY_ENABLED` environment variable is set, enabling graceful degradation in kernels that do not require the memory domain.
+The plugin activates only when the `OMNIMEMORY_ENABLED` environment variable is set, enabling graceful degradation in kernels that do not require the memory domain. See [`OMNIMEMORY_ENABLED` in the environment variables reference](../environment_variables.md#service-level-configuration) for configuration details and expected values.
 
 ---
 
