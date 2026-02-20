@@ -50,6 +50,12 @@ class ModelDocumentRemovedEvent(BaseModel):
         ...,
         description="Crawler that detected the removal",
     )
+    trigger_source: Literal["scheduled", "manual", "git_hook", "filesystem_watch"] = (
+        Field(
+            ...,
+            description="What triggered the crawl: scheduled, manual, git_hook, or filesystem_watch",
+        )
+    )
     source_ref: str = Field(
         ...,
         description="Absolute path, URL, or Linear ID of the removed document",

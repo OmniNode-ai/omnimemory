@@ -53,9 +53,11 @@ class ModelDocumentDiscoveredEvent(BaseModel):
         ...,
         description="Scope string from the originating crawl tick (e.g. 'omninode/omnimemory')",
     )
-    trigger_source: str = Field(
-        ...,
-        description="What triggered the crawl: scheduled, manual, git_hook, or filesystem_watch",
+    trigger_source: Literal["scheduled", "manual", "git_hook", "filesystem_watch"] = (
+        Field(
+            ...,
+            description="What triggered the crawl: scheduled, manual, git_hook, or filesystem_watch",
+        )
     )
 
     # Document identity

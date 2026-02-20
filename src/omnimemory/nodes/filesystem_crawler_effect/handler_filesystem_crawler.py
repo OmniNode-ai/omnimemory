@@ -593,6 +593,7 @@ class HandlerFilesystemCrawler:
             scope_refs_seen=scope_refs_seen,
             correlation_id=correlation_id,
             emitted_at_utc=now_utc,
+            trigger_source=trigger_source,
             env_prefix=env_prefix,
             publish_callback=publish_callback,
             resolved_mappings=resolved_mappings,
@@ -634,6 +635,7 @@ class HandlerFilesystemCrawler:
         scope_refs_seen: set[str],
         correlation_id: UUID,
         emitted_at_utc: datetime,
+        trigger_source: str,
         env_prefix: str,
         publish_callback: Callable[
             [str, dict[str, object]], Coroutine[object, object, None]
@@ -653,6 +655,7 @@ class HandlerFilesystemCrawler:
                 during the walk, collected as each file is processed.
             correlation_id: Correlation ID for event envelope.
             emitted_at_utc: UTC datetime when the crawl run started.
+            trigger_source: What triggered the crawl run.
             env_prefix: Environment prefix for topic construction.
             publish_callback: Async publish callback.
             resolved_mappings: Scope mappings for source_type resolution.
@@ -688,6 +691,7 @@ class HandlerFilesystemCrawler:
                         correlation_id=correlation_id,
                         emitted_at_utc=emitted_at_utc,
                         crawler_type=EnumCrawlerType.FILESYSTEM,
+                        trigger_source=trigger_source,
                         source_ref=record.source_ref,
                         source_type=source_type,
                         scope_ref=scope_ref,

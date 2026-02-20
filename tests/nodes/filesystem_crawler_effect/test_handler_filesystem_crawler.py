@@ -26,7 +26,7 @@ Tests cover:
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -104,11 +104,14 @@ def make_mock_repo() -> MagicMock:
 
 
 def make_publish_capture() -> (
-    tuple[Callable[[str, dict[str, object]], None], list[PublishRecord]]
+    tuple[
+        Callable[[str, dict[str, object]], Coroutine[object, object, None]],
+        list[PublishRecord],
+    ]
 ):
     published: list[PublishRecord] = []
 
-    def capture(topic: str, payload: dict[str, object]) -> None:
+    async def capture(topic: str, payload: dict[str, object]) -> None:
         published.append((topic, payload))
 
     return capture, published
@@ -771,7 +774,7 @@ class TestHandlerFilesystemCrawlerPublishErrors:
 
         call_count = 0
 
-        def failing_publish(topic: str, payload: dict[str, object]) -> None:
+        async def failing_publish(topic: str, payload: dict[str, object]) -> None:
             nonlocal call_count
             call_count += 1
             raise RuntimeError("Kafka unavailable")

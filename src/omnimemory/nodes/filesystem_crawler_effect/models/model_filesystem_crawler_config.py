@@ -32,10 +32,10 @@ class ModelFilesystemCrawlerConfig(BaseModel):
 
     # File pattern
     file_glob: str = Field(
-        default="**/*.md",
+        default="*.md",
         description=(
-            "Glob pattern relative to each path prefix. "
-            "Default '**/*.md' matches all Markdown files recursively"
+            "Glob pattern passed to Path.rglob(). "
+            "Default '*.md' matches all Markdown files recursively"
         ),
     )
 
