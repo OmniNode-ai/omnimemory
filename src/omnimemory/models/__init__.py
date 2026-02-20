@@ -13,6 +13,7 @@ Models are organized into functional domains following omnibase_core patterns:
 - config/: Configuration models
 - utils/: Utility models
 - events/: Kafka event models for message processing
+- scoring/: ContextItem scoring, tier promotion, and session policy models (OMN-2426)
 
 This __init__.py maintains compatibility by re-exporting
 all models at the package level following ONEX standards.
@@ -28,6 +29,7 @@ from . import (
     foundation,
     intelligence,
     memory,
+    scoring,
     service,
     subscription,
     utils,
@@ -43,6 +45,7 @@ __all__ = [
     "foundation",
     "intelligence",
     "memory",
+    "scoring",
     "service",
     "subscription",
     "utils",
