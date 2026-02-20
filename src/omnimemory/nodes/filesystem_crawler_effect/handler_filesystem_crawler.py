@@ -363,7 +363,6 @@ class HandlerFilesystemCrawler:
         """
         resolved_mappings = scope_mappings or []
         now_utc = datetime.now(timezone.utc)
-        now_iso = now_utc.isoformat()
 
         files_walked = 0
         discovered_count = 0
@@ -490,7 +489,7 @@ class HandlerFilesystemCrawler:
                     # New document
                     discovered_event = ModelDocumentDiscoveredEvent(
                         correlation_id=correlation_id,
-                        emitted_at_utc=now_iso,
+                        emitted_at_utc=now_utc,
                         crawler_type=EnumCrawlerType.FILESYSTEM,
                         crawl_scope=crawl_scope,
                         trigger_source=trigger_source,
@@ -544,7 +543,7 @@ class HandlerFilesystemCrawler:
                     # Content changed
                     changed_event = ModelDocumentChangedEvent(
                         correlation_id=correlation_id,
-                        emitted_at_utc=now_iso,
+                        emitted_at_utc=now_utc,
                         crawler_type=EnumCrawlerType.FILESYSTEM,
                         crawl_scope=crawl_scope,
                         trigger_source=trigger_source,
@@ -590,7 +589,7 @@ class HandlerFilesystemCrawler:
             scope_refs_seen=scope_refs_seen,
             crawl_scope=crawl_scope,
             correlation_id=correlation_id,
-            emitted_at_utc=now_iso,
+            emitted_at_utc=now_utc,
             env_prefix=env_prefix,
             publish_callback=publish_callback,
             resolved_mappings=resolved_mappings,
@@ -631,7 +630,7 @@ class HandlerFilesystemCrawler:
         scope_refs_seen: set[str],
         crawl_scope: str,
         correlation_id: UUID,
-        emitted_at_utc: str,
+        emitted_at_utc: datetime,
         env_prefix: str,
         publish_callback: Callable[
             [str, dict[str, object]], Coroutine[object, object, None]
@@ -651,7 +650,7 @@ class HandlerFilesystemCrawler:
                 during the walk, collected as each file is processed.
             crawl_scope: Scope string from the crawl tick.
             correlation_id: Correlation ID for event envelope.
-            emitted_at_utc: ISO-8601 timestamp string.
+            emitted_at_utc: UTC datetime when the crawl run started.
             env_prefix: Environment prefix for topic construction.
             publish_callback: Async publish callback.
             resolved_mappings: Scope mappings for source_type resolution.
