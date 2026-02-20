@@ -300,7 +300,6 @@ class HandlerFilesystemCrawler:
     Attributes:
         _config: Crawler configuration including path prefixes and topics.
         _crawl_state_repo: Repository for loading and storing crawl state.
-        _scope_mappings: Parsed (path_prefix, scope_ref) pairs from config.
     """
 
     def __init__(
@@ -592,7 +591,6 @@ class HandlerFilesystemCrawler:
         removed_count = await self._detect_and_emit_removals(
             walked_paths=walked_paths,
             scope_refs_seen=scope_refs_seen,
-            crawl_scope=crawl_scope,
             correlation_id=correlation_id,
             emitted_at_utc=now_utc,
             env_prefix=env_prefix,
@@ -634,7 +632,6 @@ class HandlerFilesystemCrawler:
         self,
         walked_paths: set[str],
         scope_refs_seen: set[str],
-        crawl_scope: str,
         correlation_id: UUID,
         emitted_at_utc: datetime,
         env_prefix: str,
@@ -654,7 +651,6 @@ class HandlerFilesystemCrawler:
             walked_paths: Set of absolute path strings visited this run.
             scope_refs_seen: Set of all scope_ref values assigned to files
                 during the walk, collected as each file is processed.
-            crawl_scope: Scope string from the crawl tick.
             correlation_id: Correlation ID for event envelope.
             emitted_at_utc: UTC datetime when the crawl run started.
             env_prefix: Environment prefix for topic construction.
