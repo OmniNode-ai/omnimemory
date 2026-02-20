@@ -240,7 +240,7 @@ def _scope_ref_for_path(
     Args:
         path: Absolute path to the file.
         scope_mappings: List of (path_prefix, scope_ref) pairs evaluated
-            in declaration order. First match wins.
+            for longest-prefix match. Longest-prefix match wins.
 
     Returns:
         The matched scope_ref, or DEFAULT_SCOPE_REF if no prefix matches.
@@ -392,7 +392,7 @@ class HandlerFilesystemCrawler:
                 )
                 continue
 
-            for md_path in prefix_path.rglob("*.md"):
+            for md_path in prefix_path.rglob(self._config.file_glob):
                 if files_walked >= self._config.max_files_per_crawl:
                     truncated = True
                     logger.warning(
