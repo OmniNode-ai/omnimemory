@@ -218,9 +218,9 @@ OMNIMEMORY__QDRANT__URL=http://localhost:6333
 OMNIMEMORY__QDRANT__COLLECTION_NAME=omnimemory_dev
 OMNIMEMORY__QDRANT__VECTOR_SIZE=1024
 
-# Embedding (for real semantic search)
+# Embedding (for real semantic search - M2 Ultra, Qwen3-Embedding-8B-4bit)
 OMNIMEMORY__EMBEDDING_ENABLED=true
-OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.201:8002
+OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8100
 ```
 
 ### Production

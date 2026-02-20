@@ -779,6 +779,6 @@ Contracts are validated against:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.1.0 | 2026-02-19 | Revert uv pip install to pip install in install snippet (Poetry venv compatibility); update document version and Last Updated; mark Phases 1–3 as Completed; mark Phase 4 as Scaffolded - Implementation In Progress to reflect reducer nodes and agent_coordinator_orchestrator still in progress |
+| 1.1.0 | 2026-02-19 | Replace `pip install omnibase-infra` with `poetry add omnibase-infra` in install snippet to align with Poetry-only package manager standard; update document version and Last Updated; mark Phases 1–3 as Completed; mark Phase 4 as Scaffolded - Implementation In Progress to reflect reducer nodes and agent_coordinator_orchestrator still in progress |
 | 1.0.0 | 2025-01-18 | Added contract layout documentation, HealthStatus aggregation, consistent handler naming |
 | 0.1.0 | 2025-01-17 | Initial handler reuse matrix |
