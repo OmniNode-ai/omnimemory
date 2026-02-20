@@ -56,6 +56,10 @@ class ModelFilesystemCrawlResult(BaseModel):
         ge=0,
         description="Number of files that caused non-fatal errors during processing",
     )
+    mtime_skipped_count: int = Field(
+        default=0,
+        description="Files skipped via mtime fast-path (mtime unchanged since last crawl, no content check performed)",
+    )
     truncated: bool = Field(
         default=False,
         description=(

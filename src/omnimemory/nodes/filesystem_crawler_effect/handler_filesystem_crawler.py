@@ -369,6 +369,7 @@ class HandlerFilesystemCrawler:
         changed_count = 0
         unchanged_count = 0
         skipped_count = 0
+        mtime_skipped_count = 0
         error_count = 0
         truncated = False
 
@@ -381,7 +382,7 @@ class HandlerFilesystemCrawler:
 
         for prefix_str in self._config.path_prefixes:
             prefix_path = Path(prefix_str)
-            if not prefix_path.exists():
+            if not await asyncio.to_thread(prefix_path.exists):
                 logger.warning(
                     "Path prefix does not exist, skipping",
                     extra={
@@ -392,7 +393,10 @@ class HandlerFilesystemCrawler:
                 )
                 continue
 
-            for md_path in prefix_path.rglob(self._config.file_glob):
+            file_glob = self._config.file_glob
+            for md_path in await asyncio.to_thread(
+                lambda p=prefix_path, g=file_glob: list(p.rglob(g))
+            ):
                 if files_walked >= self._config.max_files_per_crawl:
                     truncated = True
                     logger.warning(
@@ -410,7 +414,7 @@ class HandlerFilesystemCrawler:
                 walked_paths.add(abs_path_str)
 
                 try:
-                    stat = md_path.stat()
+                    stat = await asyncio.to_thread(md_path.stat)
                 except OSError as exc:
                     logger.warning(
                         "Could not stat file, skipping",
@@ -467,6 +471,7 @@ class HandlerFilesystemCrawler:
                         last_known_mtime=current_mtime,
                     )
                     await self._crawl_state_repo.upsert_state(updated_state)
+                    mtime_skipped_count += 1
                     continue
 
                 # mtime changed (or no prior state) -- read and hash content
@@ -601,6 +606,7 @@ class HandlerFilesystemCrawler:
             changed_count=changed_count,
             unchanged_count=unchanged_count,
             skipped_count=skipped_count,
+            mtime_skipped_count=mtime_skipped_count,
             removed_count=removed_count,
             error_count=error_count,
             truncated=truncated,

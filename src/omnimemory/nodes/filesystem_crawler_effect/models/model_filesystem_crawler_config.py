@@ -17,7 +17,9 @@ class ModelFilesystemCrawlerConfig(BaseModel):
     truth for topic declarations.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, from_attributes=True
+    )
 
     # Path prefixes to crawl (longest-prefix scope mapping is applied externally)
     path_prefixes: list[str] = Field(
