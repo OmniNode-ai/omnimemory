@@ -618,10 +618,9 @@ class HandlerMemoryArchive:
         Raises:
             ValueError: If compression_level is outside the valid range 1-9.
         """
-        self._db_pool = db_pool
-        self._orphan_tracker = orphan_tracker
-
-        # Resolve compression level: explicit arg > env var > default
+        # Resolve and validate compression level BEFORE any instance-state
+        # assignment to avoid leaving the handler in a partial-initialization
+        # state if a ValueError is raised.
         if compression_level is not None:
             resolved_level = compression_level
             level_source = "initialize() argument"
@@ -652,6 +651,9 @@ class HandlerMemoryArchive:
                 f"got {resolved_level} (from {level_source})"
             )
 
+        # All validation passed — begin instance-state assignment.
+        self._db_pool = db_pool
+        self._orphan_tracker = orphan_tracker
         self._compression_level = resolved_level
         logger.debug(
             "Archive compression level configured",

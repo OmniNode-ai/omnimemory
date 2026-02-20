@@ -68,7 +68,7 @@ Variables used by `HandlerMemoryArchive` for cold-storage archival.
 | Variable | Type | Default | Constraints | Description |
 |----------|------|---------|-------------|-------------|
 | `OMNIMEMORY_ARCHIVE_PATH` | Path | `{tempdir}/omnimemory/archives` | Must be writable | Base directory for archive files. Overridden by the `archive_base_path` initialize() argument. |
-| `OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL` | int | `6` | 1–9 | Gzip compression level for `.jsonl.gz` archive files. Level 1 is fastest (lowest ratio); level 9 is slowest (highest ratio). Level 6 is the balanced default. Overridden by the `compression_level` `initialize()` argument. Read at `initialize()` call time — must be set before `initialize()` is called to take effect. |
+| `OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL` | int | `6` | 1–9 | Gzip compression level for `.jsonl.gz` archive files. Level 1 is fastest (lowest ratio); level 9 is slowest (highest ratio). Level 6 is the balanced default. Overridden by the `compression_level` `initialize()` argument. Read at `initialize()` call time — must be set before `initialize()` is called to take effect. An out-of-range value (outside 1–9) raises `ValueError` at `initialize()` call time, not at process startup (deferred validation). |
 
 > **Note — naming exception**: These variables use a single underscore (`OMNIMEMORY_ARCHIVE_*`) because they are read directly by `os.environ.get()` inside the handler, not via pydantic-settings. They do **not** use the `OMNIMEMORY__` double-underscore prefix.
 
