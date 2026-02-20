@@ -38,6 +38,13 @@ class ModelGraphMemoryConfig(BaseModel):
             increase query cost. Defaults to 3.0. Range: 1.0-10.0.
         ensure_indexes: Whether to create indexes on memory_id during
             initialization. Defaults to True. Index creation is idempotent.
+        max_retries: Maximum number of retry attempts for transient connection
+            errors. Set to 0 to disable retries. Defaults to 3.
+        retry_base_delay_seconds: Base delay (in seconds) for the first retry.
+            Subsequent retries use exponential backoff:
+            delay = min(base * 2^attempt + jitter, max_delay). Defaults to 1.0.
+        retry_max_delay_seconds: Maximum delay cap (in seconds) for exponential
+            backoff. Prevents unbounded wait times. Defaults to 30.0.
     """
 
     model_config = ConfigDict(
@@ -95,6 +102,33 @@ class ModelGraphMemoryConfig(BaseModel):
             "Whether to create indexes on memory_id during initialization. "
             "Index creation is idempotent (safe to run multiple times). "
             "Set to False to skip index creation if managing indexes manually."
+        ),
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description=(
+            "Maximum number of retry attempts for transient connection errors "
+            "(InfraConnectionError, InfraTimeoutError, InfraUnavailableError). "
+            "Set to 0 to disable retries entirely. Range: 0-10."
+        ),
+    )
+    retry_base_delay_seconds: float = Field(
+        default=1.0,
+        gt=0.0,
+        description=(
+            "Base delay in seconds for the first retry attempt. "
+            "Subsequent retries use exponential backoff: "
+            "delay = min(base * 2^attempt + jitter, retry_max_delay_seconds)."
+        ),
+    )
+    retry_max_delay_seconds: float = Field(
+        default=30.0,
+        gt=0.0,
+        description=(
+            "Maximum delay cap in seconds for exponential backoff. "
+            "Prevents unbounded wait times between retry attempts."
         ),
     )
 

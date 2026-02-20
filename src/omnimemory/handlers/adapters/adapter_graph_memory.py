@@ -48,12 +48,18 @@ from __future__ import annotations
 import asyncio
 import heapq
 import logging
+import random
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from typing import TypeVar
 from urllib.parse import urlparse
 
 from omnibase_core.container import ModelONEXContainer  # noqa: TC002 - used at runtime
-from omnibase_infra.errors import InfraConnectionError
+from omnibase_infra.errors import (
+    InfraConnectionError,
+    InfraTimeoutError,
+    InfraUnavailableError,
+)
 from omnibase_infra.handlers.handler_graph import HandlerGraph
 
 from omnimemory.models.adapters import (
@@ -67,6 +73,18 @@ from omnimemory.models.adapters import (
 )
 
 logger = logging.getLogger(__name__)
+
+# TypeVar for the generic retry helper return type
+_T = TypeVar("_T")
+
+# Transient error types that trigger automatic retry with exponential backoff.
+# Permanent errors (InfraAuthenticationError, InfraProtocolError, etc.) are not
+# included here because retrying them would not resolve the underlying problem.
+_TRANSIENT_ERRORS: tuple[type[Exception], ...] = (
+    InfraConnectionError,
+    InfraTimeoutError,
+    InfraUnavailableError,
+)
 
 __all__ = [
     "AdapterGraphMemory",
@@ -529,6 +547,76 @@ class AdapterGraphMemory:
             )
         return self._handler
 
+    async def _execute_with_retry(
+        self,
+        operation_name: str,
+        fn: Callable[[], Awaitable[_T]],
+    ) -> _T:
+        """Execute an async operation with exponential backoff retry.
+
+        Retries the given callable on transient graph DB failures
+        (InfraConnectionError, InfraTimeoutError, InfraUnavailableError).
+        Permanent errors (authentication, protocol violations, etc.) propagate
+        immediately without retrying.
+
+        Backoff formula: ``delay = min(base * 2^attempt + jitter, max_delay)``
+        where ``jitter`` is a uniform random value in ``[0, base]`` to prevent
+        thundering-herd effects when multiple callers retry simultaneously.
+
+        Args:
+            operation_name: Human-readable name used in log messages (e.g.,
+                ``"find_related"`` or ``"get_connections"``).
+            fn: Zero-argument async callable that performs the graph operation.
+
+        Returns:
+            The return value of ``fn()`` on the first successful attempt.
+
+        Raises:
+            InfraConnectionError | InfraTimeoutError | InfraUnavailableError:
+                Re-raised after all retry attempts are exhausted.
+            Exception: Any non-transient exception propagates immediately.
+        """
+        max_retries = self._config.max_retries
+        base_delay = self._config.retry_base_delay_seconds
+        max_delay = self._config.retry_max_delay_seconds
+
+        last_exc: Exception | None = None
+        for attempt in range(max_retries + 1):
+            try:
+                return await fn()
+            except _TRANSIENT_ERRORS as exc:
+                last_exc = exc
+                if attempt >= max_retries:
+                    # All retries exhausted - re-raise the last transient error
+                    logger.warning(
+                        "Graph operation '%s' failed after %d attempt(s): %s",
+                        operation_name,
+                        attempt + 1,
+                        exc,
+                    )
+                    raise
+                # Calculate exponential backoff with jitter
+                delay = min(
+                    base_delay * (2**attempt) + random.uniform(0.0, base_delay),
+                    max_delay,
+                )
+                logger.warning(
+                    "Graph operation '%s' attempt %d/%d failed with transient "
+                    "error %s: %s. Retrying in %.2fs.",
+                    operation_name,
+                    attempt + 1,
+                    max_retries + 1,
+                    type(exc).__name__,
+                    exc,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        # This line is unreachable - the loop either returns or raises.
+        # The assertion satisfies mypy's exhaustiveness analysis.
+        assert last_exc is not None
+        raise last_exc  # pragma: no cover
+
     async def find_related(
         self,
         memory_id: str,
@@ -604,12 +692,45 @@ class AdapterGraphMemory:
         # Determine traversal direction (bidirectional or outgoing-only)
         is_bidirectional = self._config.bidirectional
 
-        try:
+        # Select appropriate query template based on direction and filters
+        # Request more results than needed to account for min_score filtering.
+        # The multiplier is configurable via score_filter_multiplier.
+        query_limit = min(
+            int(effective_limit * self._config.score_filter_multiplier),
+            self._config.max_limit,
+        )
+
+        # Generate query with embedded depth (required for Memgraph compatibility)
+        # Memgraph does NOT support parameterized depth in variable-length paths
+        node_label = self._config.memory_node_label
+        if relationship_types:
+            traversal_query = CypherTemplates.find_related_by_type_query(
+                max_depth=effective_depth,
+                node_label=node_label,
+                bidirectional=is_bidirectional,
+            )
+            traversal_params: dict[str, object] = {
+                "memory_id": memory_id,
+                "relationship_types": relationship_types,
+                "limit": query_limit,
+            }
+        else:
+            traversal_query = CypherTemplates.find_related_query(
+                max_depth=effective_depth,
+                node_label=node_label,
+                bidirectional=is_bidirectional,
+            )
+            traversal_params = {
+                "memory_id": memory_id,
+                "limit": query_limit,
+            }
+
+        async def _do_find_related() -> ModelRelatedMemoryResult:
             start_time = time.perf_counter()
 
             # First, check if the memory node exists
             node_result = await handler.execute_query(
-                query=CypherTemplates.node_exists(self._config.memory_node_label),
+                query=CypherTemplates.node_exists(node_label),
                 parameters={"memory_id": memory_id},
             )
 
@@ -619,43 +740,10 @@ class AdapterGraphMemory:
                     error_message=f"Memory '{memory_id}' not found in graph",
                 )
 
-            # Select appropriate query template based on direction and filters
-            # Request more results than needed to account for min_score filtering.
-            # The multiplier is configurable via score_filter_multiplier.
-            query_limit = min(
-                int(effective_limit * self._config.score_filter_multiplier),
-                self._config.max_limit,
-            )
-
-            # Generate query with embedded depth (required for Memgraph compatibility)
-            # Memgraph does NOT support parameterized depth in variable-length paths
-            node_label = self._config.memory_node_label
-            if relationship_types:
-                query = CypherTemplates.find_related_by_type_query(
-                    max_depth=effective_depth,
-                    node_label=node_label,
-                    bidirectional=is_bidirectional,
-                )
-                parameters: dict[str, object] = {
-                    "memory_id": memory_id,
-                    "relationship_types": relationship_types,
-                    "limit": query_limit,
-                }
-            else:
-                query = CypherTemplates.find_related_query(
-                    max_depth=effective_depth,
-                    node_label=node_label,
-                    bidirectional=is_bidirectional,
-                )
-                parameters = {
-                    "memory_id": memory_id,
-                    "limit": query_limit,
-                }
-
             # Execute the traversal query
             result = await handler.execute_query(
-                query=query,
-                parameters=parameters,
+                query=traversal_query,
+                parameters=traversal_params,
             )
 
             end_time = time.perf_counter()
@@ -735,9 +823,11 @@ class AdapterGraphMemory:
                 execution_time_ms=execution_time_ms,
             )
 
-        except InfraConnectionError as e:
+        try:
+            return await self._execute_with_retry("find_related", _do_find_related)
+        except _TRANSIENT_ERRORS as e:
             logger.warning(
-                "Graph traversal failed for memory %s: %s",
+                "Graph traversal failed for memory %s after all retries: %s",
                 memory_id,
                 e,
             )
@@ -810,43 +900,43 @@ class AdapterGraphMemory:
             bidirectional if bidirectional is not None else self._config.bidirectional
         )
 
-        try:
-            # Choose query based on bidirectional flag and relationship_types
-            node_label = self._config.memory_node_label
-            if effective_bidirectional and relationship_types:
-                # Bidirectional with type filter
-                query = CypherTemplates.get_connections_by_type(node_label)
-                parameters: dict[str, object] = {
-                    "memory_id": memory_id,
-                    "relationship_types": relationship_types,
-                    "limit": effective_limit,
-                }
-            elif effective_bidirectional:
-                # Bidirectional without type filter
-                query = CypherTemplates.get_connections(node_label)
-                parameters = {
-                    "memory_id": memory_id,
-                    "limit": effective_limit,
-                }
-            elif relationship_types:
-                # Outgoing-only with type filter
-                query = CypherTemplates.get_connections_by_type_outgoing(node_label)
-                parameters = {
-                    "memory_id": memory_id,
-                    "relationship_types": relationship_types,
-                    "limit": effective_limit,
-                }
-            else:
-                # Outgoing-only without type filter
-                query = CypherTemplates.get_connections_outgoing(node_label)
-                parameters = {
-                    "memory_id": memory_id,
-                    "limit": effective_limit,
-                }
+        # Choose query based on bidirectional flag and relationship_types
+        node_label = self._config.memory_node_label
+        if effective_bidirectional and relationship_types:
+            # Bidirectional with type filter
+            conn_query = CypherTemplates.get_connections_by_type(node_label)
+            conn_params: dict[str, object] = {
+                "memory_id": memory_id,
+                "relationship_types": relationship_types,
+                "limit": effective_limit,
+            }
+        elif effective_bidirectional:
+            # Bidirectional without type filter
+            conn_query = CypherTemplates.get_connections(node_label)
+            conn_params = {
+                "memory_id": memory_id,
+                "limit": effective_limit,
+            }
+        elif relationship_types:
+            # Outgoing-only with type filter
+            conn_query = CypherTemplates.get_connections_by_type_outgoing(node_label)
+            conn_params = {
+                "memory_id": memory_id,
+                "relationship_types": relationship_types,
+                "limit": effective_limit,
+            }
+        else:
+            # Outgoing-only without type filter
+            conn_query = CypherTemplates.get_connections_outgoing(node_label)
+            conn_params = {
+                "memory_id": memory_id,
+                "limit": effective_limit,
+            }
 
+        async def _do_get_connections() -> ModelConnectionsResult:
             result = await handler.execute_query(
-                query=query,
-                parameters=parameters,
+                query=conn_query,
+                parameters=conn_params,
             )
 
             if not result.records:
@@ -891,9 +981,13 @@ class AdapterGraphMemory:
                 total_count=len(connections),
             )
 
-        except InfraConnectionError as e:
+        try:
+            return await self._execute_with_retry(
+                "get_connections", _do_get_connections
+            )
+        except _TRANSIENT_ERRORS as e:
             logger.warning(
-                "Failed to get connections for memory %s: %s",
+                "Failed to get connections for memory %s after all retries: %s",
                 memory_id,
                 e,
             )

@@ -1430,3 +1430,530 @@ class TestErrorHandling:
 
         assert result.status == "error"
         assert "unexpected" in result.error_message.lower()
+
+
+# =============================================================================
+# Retry Logic Tests
+# =============================================================================
+
+
+class TestRetryLogic:
+    """Tests for exponential backoff retry behavior on transient errors."""
+
+    # -------------------------------------------------------------------------
+    # Configuration tests
+    # -------------------------------------------------------------------------
+
+    def test_retry_config_defaults(self) -> None:
+        """Test default retry configuration values."""
+        config = ModelGraphMemoryConfig()
+
+        assert config.max_retries == 3
+        assert config.retry_base_delay_seconds == 1.0
+        assert config.retry_max_delay_seconds == 30.0
+
+    def test_retry_config_custom(self) -> None:
+        """Test custom retry configuration is accepted."""
+        config = ModelGraphMemoryConfig(
+            max_retries=5,
+            retry_base_delay_seconds=0.5,
+            retry_max_delay_seconds=60.0,
+        )
+
+        assert config.max_retries == 5
+        assert config.retry_base_delay_seconds == 0.5
+        assert config.retry_max_delay_seconds == 60.0
+
+    def test_retry_config_zero_max_retries(self) -> None:
+        """Test that max_retries=0 is valid (disables retries)."""
+        config = ModelGraphMemoryConfig(max_retries=0)
+        assert config.max_retries == 0
+
+    def test_retry_config_max_retries_upper_bound(self) -> None:
+        """Test that max_retries is bounded at 10."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            ModelGraphMemoryConfig(max_retries=11)
+
+    def test_retry_config_base_delay_must_be_positive(self) -> None:
+        """Test that retry_base_delay_seconds must be > 0."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            ModelGraphMemoryConfig(retry_base_delay_seconds=0.0)
+
+    def test_retry_config_max_delay_must_be_positive(self) -> None:
+        """Test that retry_max_delay_seconds must be > 0."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            ModelGraphMemoryConfig(retry_max_delay_seconds=0.0)
+
+    # -------------------------------------------------------------------------
+    # _execute_with_retry unit tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_succeeds_on_first_attempt(
+        self,
+        adapter_with_mock: AdapterGraphMemory,
+    ) -> None:
+        """Test _execute_with_retry returns immediately on first success."""
+        call_count = 0
+
+        async def succeeding_op() -> str:
+            nonlocal call_count
+            call_count += 1
+            return "ok"
+
+        result = await adapter_with_mock._execute_with_retry("test_op", succeeding_op)
+
+        assert result == "ok"
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_retries_on_transient_error_then_succeeds(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that transient errors are retried and eventual success is returned."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=3,
+            retry_base_delay_seconds=0.01,  # Fast retries for test
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def flaky_op() -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise InfraConnectionError("Transient connection failure")
+            return "success_after_retry"
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter._execute_with_retry("test_op", flaky_op)
+
+        assert result == "success_after_retry"
+        assert call_count == 3  # Failed twice, succeeded on third attempt
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_exhausts_all_retries(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that after max_retries exhaustion, the last error is re-raised."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=2,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def always_failing_op() -> str:
+            nonlocal call_count
+            call_count += 1
+            raise InfraConnectionError("Persistent connection failure")
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(
+                InfraConnectionError, match="Persistent connection failure"
+            ):
+                await adapter._execute_with_retry("test_op", always_failing_op)
+
+        # Should have been called max_retries + 1 times (original + retries)
+        assert call_count == 3  # 1 original + 2 retries
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_no_retry_on_zero_max_retries(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that max_retries=0 disables retry (fails immediately)."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(max_retries=0)
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def always_failing_op() -> str:
+            nonlocal call_count
+            call_count += 1
+            raise InfraConnectionError("Connection refused")
+
+        with pytest.raises(InfraConnectionError):
+            await adapter._execute_with_retry("test_op", always_failing_op)
+
+        assert call_count == 1  # Only the original attempt, no retries
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_does_not_retry_permanent_errors(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that non-transient errors propagate immediately without retrying."""
+        config = ModelGraphMemoryConfig(
+            max_retries=3,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def permanent_error_op() -> str:
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("Invalid Cypher query syntax")
+
+        with pytest.raises(ValueError, match="Invalid Cypher query syntax"):
+            await adapter._execute_with_retry("test_op", permanent_error_op)
+
+        # Permanent error must not retry - only 1 call
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_retries_infra_timeout_error(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that InfraTimeoutError is treated as transient and retried."""
+        from omnibase_infra.enums import EnumInfraTransportType
+        from omnibase_infra.errors import InfraTimeoutError, ModelTimeoutErrorContext
+
+        config = ModelGraphMemoryConfig(
+            max_retries=2,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+        timeout_context = ModelTimeoutErrorContext(
+            transport_type=EnumInfraTransportType.GRAPH,
+            operation="execute_query",
+            timeout_seconds=5.0,
+        )
+
+        async def timeout_then_success() -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise InfraTimeoutError("Query timed out", context=timeout_context)
+            return "ok"
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter._execute_with_retry("test_op", timeout_then_success)
+
+        assert result == "ok"
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_retries_infra_unavailable_error(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that InfraUnavailableError is treated as transient and retried."""
+        from omnibase_infra.errors import InfraUnavailableError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=2,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def unavailable_then_success() -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise InfraUnavailableError("Service temporarily unavailable")
+            return "ok"
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter._execute_with_retry(
+                "test_op", unavailable_then_success
+            )
+
+        assert result == "ok"
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_uses_exponential_backoff(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that sleep durations increase exponentially between retries."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=3,
+            retry_base_delay_seconds=1.0,
+            retry_max_delay_seconds=100.0,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        async def always_failing_op() -> str:
+            raise InfraConnectionError("Connection refused")
+
+        sleep_calls: list[float] = []
+
+        async def capture_sleep(delay: float) -> None:
+            sleep_calls.append(delay)
+
+        with patch("asyncio.sleep", side_effect=capture_sleep):
+            with pytest.raises(InfraConnectionError):
+                await adapter._execute_with_retry("test_op", always_failing_op)
+
+        # Should have 3 sleep calls (for 3 retries, not the final failure)
+        assert len(sleep_calls) == 3
+
+        # Each delay should be >= base * 2^attempt (before jitter is added)
+        # We verify that later delays are >= earlier delays (exponential growth trend)
+        # With jitter, exact values vary but the trend must hold:
+        # Attempt 0: base * 2^0 + jitter ~ 1.0 to 2.0
+        # Attempt 1: base * 2^1 + jitter ~ 2.0 to 3.0
+        # Attempt 2: base * 2^2 + jitter ~ 4.0 to 5.0
+        assert sleep_calls[0] >= 1.0, f"First retry delay too short: {sleep_calls[0]}"
+        assert sleep_calls[1] >= 2.0, f"Second retry delay too short: {sleep_calls[1]}"
+        assert sleep_calls[2] >= 4.0, f"Third retry delay too short: {sleep_calls[2]}"
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_respects_max_delay_cap(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that retry delay is capped at retry_max_delay_seconds."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=5,
+            retry_base_delay_seconds=10.0,
+            retry_max_delay_seconds=15.0,  # Low cap
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        async def always_failing_op() -> str:
+            raise InfraConnectionError("Connection refused")
+
+        sleep_calls: list[float] = []
+
+        async def capture_sleep(delay: float) -> None:
+            sleep_calls.append(delay)
+
+        with patch("asyncio.sleep", side_effect=capture_sleep):
+            with pytest.raises(InfraConnectionError):
+                await adapter._execute_with_retry("test_op", always_failing_op)
+
+        # All delays must be <= max_delay_seconds
+        for delay in sleep_calls:
+            assert delay <= 15.0, f"Delay {delay} exceeds max_delay_seconds=15.0"
+
+    # -------------------------------------------------------------------------
+    # Integration with find_related and get_connections
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_find_related_retries_on_transient_error(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test find_related retries transient errors and returns success result."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=2,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def flaky_execute_query(**kwargs: object) -> object:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise InfraConnectionError("Transient failure")
+            # Return successful results on 3rd attempt
+            if call_count == 3:
+                # node_exists call
+                return MagicMock(
+                    records=[{"memory_id": "mem_start", "element_id": "1"}]
+                )
+            # find_related call
+            return MagicMock(records=[])
+
+        mock_handler.execute_query = AsyncMock(side_effect=flaky_execute_query)
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter.find_related("mem_start")
+
+        # Should succeed after retries
+        assert result.status in ("success", "no_results", "not_found")
+        # Should have retried (at least 3 calls since first 2 raise)
+        assert call_count >= 3
+
+    @pytest.mark.asyncio
+    async def test_find_related_returns_error_after_all_retries_exhausted(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test find_related returns error status when all retries are exhausted."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=1,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        mock_handler.execute_query = AsyncMock(
+            side_effect=InfraConnectionError("Persistent failure")
+        )
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter.find_related("mem_123")
+
+        assert result.status == "error"
+        assert "failed" in result.error_message.lower()
+        # Should have retried: 1 original + 1 retry = 2 total calls
+        assert mock_handler.execute_query.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_connections_retries_on_transient_error(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections retries transient errors and returns success result."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=2,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        call_count = 0
+
+        async def flaky_execute_query(**kwargs: object) -> object:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise InfraConnectionError("Transient failure")
+            return MagicMock(
+                records=[
+                    {
+                        "source_id": "mem_1",
+                        "target_id": "mem_2",
+                        "relationship_type": "related_to",
+                        "weight": 1.0,
+                        "is_outgoing": True,
+                        "created_at": None,
+                    }
+                ]
+            )
+
+        mock_handler.execute_query = AsyncMock(side_effect=flaky_execute_query)
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter.get_connections("mem_1")
+
+        assert result.status == "success"
+        assert len(result.connections) == 1
+        assert call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_get_connections_returns_error_after_all_retries_exhausted(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test get_connections returns error status when all retries are exhausted."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=1,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        mock_handler.execute_query = AsyncMock(
+            side_effect=InfraConnectionError("Persistent failure")
+        )
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await adapter.get_connections("mem_123")
+
+        assert result.status == "error"
+        assert "failed" in result.error_message.lower()
+        # Should have retried: 1 original + 1 retry = 2 total calls
+        assert mock_handler.execute_query.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retry_logs_warning_on_each_attempt(
+        self,
+        mock_handler: MagicMock,
+    ) -> None:
+        """Test that retry attempts are logged at WARNING level for observability."""
+        from omnibase_infra.errors import InfraConnectionError
+
+        config = ModelGraphMemoryConfig(
+            max_retries=2,
+            retry_base_delay_seconds=0.01,
+            retry_max_delay_seconds=0.1,
+        )
+        adapter = AdapterGraphMemory(config)
+        adapter._handler = mock_handler
+        adapter._initialized = True
+
+        async def always_failing_op() -> str:
+            raise InfraConnectionError("Connection refused")
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            with patch(
+                "omnimemory.handlers.adapters.adapter_graph_memory.logger"
+            ) as mock_logger:
+                with pytest.raises(InfraConnectionError):
+                    await adapter._execute_with_retry("test_op", always_failing_op)
+
+                # Should have warning calls for retry attempts and final failure
+                assert mock_logger.warning.call_count >= 1
