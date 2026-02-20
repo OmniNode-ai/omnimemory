@@ -75,10 +75,6 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     Returns:
         ModelIntentRecordPayload suitable for event transmission.
 
-    Raises:
-        ValueError: If ``record.session_ref`` is None. A session reference
-            is required to populate ``ModelIntentRecordPayload.session_ref``.
-
     Note:
         Field mappings:
             - ModelIntentRecord.session_ref (str) -> ModelIntentRecordPayload.session_ref (str)
@@ -89,10 +85,6 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
     created_at = record.created_at_utc
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
-
-    if record.session_ref is None:
-        msg = f"session_ref is required but is None on record with intent_id={record.intent_id}"
-        raise ValueError(msg)
 
     return ModelIntentRecordPayload(
         intent_id=record.intent_id,

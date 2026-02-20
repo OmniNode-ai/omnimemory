@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
 """
 ContextItem statistics model for tier promotion tracking.
 

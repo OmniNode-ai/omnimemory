@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
 """
 Context policy configuration model for session context assembly.
 

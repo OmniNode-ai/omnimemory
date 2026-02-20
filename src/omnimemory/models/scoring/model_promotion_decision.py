@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 OmniNode Team
 """
 Promotion decision model for ContextItem tier transitions.
 
