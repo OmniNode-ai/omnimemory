@@ -10,6 +10,8 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §13
 Ticket: OMN-2426
 """
 
+from collections.abc import Mapping
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -43,7 +45,7 @@ class ModelDocSourceConfig(BaseModel):
             "items. Applied when the current intent has no explicit override."
         ),
     )
-    doc_token_budget_fraction_overrides: dict[str, float] = Field(
+    doc_token_budget_fraction_overrides: Mapping[str, float] = Field(
         default_factory=lambda: {
             "architecture": 0.40,
             "refactoring": 0.40,
@@ -52,7 +54,8 @@ class ModelDocSourceConfig(BaseModel):
             "debugging": 0.20,
         },
         description=(
-            "Per-intent budget fraction overrides. Keyed by intent_category string. "
+            "Per-intent budget fraction overrides (read-only mapping). "
+            "Keyed by intent_category string. "
             "Rationale: complex coding sessions must not starve hook-derived patterns; "
             "compliance/architecture sessions benefit from higher doc context."
         ),

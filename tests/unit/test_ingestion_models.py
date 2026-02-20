@@ -119,6 +119,7 @@ class TestEnumValues:
         assert EnumContextSourceType.REPO_DERIVED == "repo_derived"
         assert EnumContextSourceType.MEMORY_HOOK == "memory_hook"
         assert EnumContextSourceType.LINEAR_DERIVED == "linear_derived"
+        assert EnumContextSourceType.MEMORY_PATTERN == "memory_pattern"
 
 
 # ---------------------------------------------------------------------------

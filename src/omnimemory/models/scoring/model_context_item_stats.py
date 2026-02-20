@@ -122,7 +122,8 @@ class ModelContextItemStats(BaseModel):
         le=1.0,
         description=(
             "Bootstrap trust confidence assigned at item creation. "
-            "0.85 for CLAUDE.md, 0.75 for design docs, None for hook-derived items. "
+            "None means no bootstrap grant was applied (standard scoring from the start). "
+            "0.85 for CLAUDE.md, 0.75 for design docs. "
             "Decays toward 0 as bootstrap_runs_remaining reaches zero."
         ),
     )

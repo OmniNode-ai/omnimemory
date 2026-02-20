@@ -9,6 +9,8 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §7
 Ticket: OMN-2426
 """
 
+from collections.abc import Mapping
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums.enum_detected_doc_type import EnumDetectedDocType
@@ -44,11 +46,11 @@ class ModelScopeMappingConfig(BaseModel):
             "Resolution order: exact (team, project) first, then (team, None) fallback."
         ),
     )
-    priority_hints: dict[str, int] = Field(
+    priority_hints: Mapping[str, int] = Field(
         default_factory=dict,
         description=(
             "Static priority hint overrides keyed by source pattern or "
-            "EnumDetectedDocType value. "
+            "EnumDetectedDocType value (read-only mapping). "
             "Used by crawlers when no more specific hint is available. "
             "Values 0-100; higher is more important."
         ),
