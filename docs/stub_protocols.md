@@ -64,7 +64,7 @@ else:
 
 **Upstream Target**: `omnibase_core.core.errors.core_errors.OnexError`
 
-**Status**: Active (core 0.17) - Local stub still required. The upstream package exposes `ModelOnexError` (at `omnibase_core.models.errors.model_onex_error.ModelOnexError`) but does not export `OnexError` or `BaseOnexError` under the originally targeted module path. The local stub remains the canonical source until upstream aligns naming or an explicit migration is performed.
+**Status**: Active (core 0.17) - Local stub still required. The upstream package exposes `ModelOnexError` (at `omnibase_core.models.errors.model_onex_error.ModelOnexError`) but does not export `OnexError` or `BaseOnexError` under the originally targeted module path. The local stub remains the canonical source until upstream aligns naming or an explicit migration is performed. Target: tracked in omnibase-core upstream; check CHANGELOG for resolution.
 
 **Usage**:
 ```python

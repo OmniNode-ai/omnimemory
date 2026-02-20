@@ -329,6 +329,8 @@ MEMORY_SUBSCRIBE_TOPICS: list[str] = collect_subscribe_topics_from_contracts()
 publish_topics = await asyncio.to_thread(collect_publish_topics_for_dispatch)
 ```
 
+> **Note on module-level discovery**: `MEMORY_SUBSCRIBE_TOPICS` is computed at import time (synchronous filesystem I/O via `importlib.resources`). This is intentional: plugins are loaded during kernel startup before the async event loop begins, so synchronous discovery at import time is safe and avoids the need for an `asyncio.to_thread` wrapper. The publish variant (`collect_publish_topics_for_dispatch`) is called later inside `wire_dispatchers` — at that point the event loop is already running, so it is wrapped in `asyncio.to_thread` to keep the async handler non-blocking.
+
 If a `contract.yaml` is missing, contains invalid YAML, or belongs to a package that is not installed, that package is skipped with a warning log. A single broken contract does not prevent discovery from all other contracts.
 
 ### How Topics Are Discovered at Startup

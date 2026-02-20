@@ -177,11 +177,10 @@ Set `OMNIMEMORY__EMBEDDING_ENABLED=true` to enable the real embedding server for
 **Example**:
 ```bash
 # Enable real embeddings with explicit server URL.
-# This repo uses LLM_EMBEDDING_URL=http://192.168.86.201:8002 (vLLM on Linux
-# GPU server 192.168.86.201, port 8002). This is distinct from LLM_QWEN_72B_URL at
-# 192.168.86.200:8100 (M2 Ultra). Always verify the value in .env before use.
+# This repo uses LLM_EMBEDDING_URL=http://192.168.86.200:8100 (Qwen3-Embedding-8B-4bit
+# on M2 Ultra, port 8100). Always verify the value in .env before use.
 export OMNIMEMORY__EMBEDDING_ENABLED=true
-export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.201:8002
+export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8100
 ```
 
 **Note**: When using `ModelHandlerQdrantMockConfig` with `use_real_embeddings=True`, the `embedding_server_url` must be provided explicitly (typically loaded from this environment variable). The handler will fail fast with a clear error if the URL is missing or invalid.
