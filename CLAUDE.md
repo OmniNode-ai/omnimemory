@@ -53,8 +53,8 @@ pre-commit install
 pre-commit install --hook-type pre-push
 
 # Format and lint
-ruff format src/ tests/
-ruff check --fix src/ tests/
+poetry run ruff format src/ tests/
+poetry run ruff check --fix src/ tests/
 
 # Type checking
 poetry run mypy src/omnimemory
