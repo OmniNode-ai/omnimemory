@@ -133,10 +133,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root
+        run: poetry install --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction --frozen
+        run: poetry install --no-interaction
 
       # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
       # Both pre-commit and CI use --check for consistent validation
@@ -192,10 +192,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root
+        run: poetry install --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction --frozen
+        run: poetry install --no-interaction
 
       # SYNC: Pre-commit hook 'pyright' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
@@ -241,10 +241,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root
+        run: poetry install --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction --frozen
+        run: poetry install --no-interaction
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
@@ -358,10 +358,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root
+        run: poetry install --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction --frozen
+        run: poetry install --no-interaction
 
       - name: Find and validate contract YAML files
         run: |
@@ -412,10 +412,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root
+        run: poetry install --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction --frozen
+        run: poetry install --no-interaction
 
       - name: Run I/O audit
         run: poetry run python -m omnimemory.audit
@@ -509,10 +509,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --frozen --no-root
+        run: poetry install --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction --frozen
+        run: poetry install --no-interaction
 
       - name: Run tests
         run: |
