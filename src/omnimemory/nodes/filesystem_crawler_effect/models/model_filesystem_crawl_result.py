@@ -5,8 +5,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# omnimemory-model-exempt: handler result
-class ModelFilesystemCrawlResult(BaseModel):
+class ModelFilesystemCrawlResult(  # omnimemory-model-exempt: handler result
+    BaseModel
+):
     """Summary of a completed filesystem crawl run.
 
     Returned by HandlerFilesystemCrawler.crawl() to the caller

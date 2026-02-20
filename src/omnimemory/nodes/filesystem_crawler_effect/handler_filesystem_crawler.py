@@ -67,7 +67,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
@@ -107,6 +107,12 @@ DEFAULT_SCOPE_REF: str = "omninode/shared"
 # Mapping of path prefix patterns to EnumContextSourceType
 # Evaluated in order; first match wins.
 _STATIC_STANDARDS_PREFIXES: tuple[str, ...] = (str(Path("~/.claude").expanduser()),)
+
+# Intermediate directory names excluded when heuristically extracting repo names from paths
+_SKIP_DIRS: frozenset[str] = frozenset({"src", "docs", "design", "plans", "handoffs"})
+
+# Valid trigger sources for crawl events
+TriggerSource = Literal["scheduled", "manual", "git_hook", "filesystem_watch"]
 
 
 def _compute_sha256(content: bytes) -> str:
@@ -281,7 +287,6 @@ def _extract_tags(path: Path, doc_type: EnumDetectedDocType) -> list[str]:
 
     # Repository name heuristic: last path component before .md file
     # that is not a common intermediate directory
-    _SKIP_DIRS = frozenset({"src", "docs", "design", "plans", "handoffs"})
     for part in reversed(path.parts[:-1]):
         if part not in _SKIP_DIRS and not part.startswith("."):
             tags.append(f"repo:{part}")
@@ -329,7 +334,7 @@ class HandlerFilesystemCrawler:
         self,
         correlation_id: UUID,
         crawl_scope: str,
-        trigger_source: str,
+        trigger_source: TriggerSource,
         env_prefix: str,
         publish_callback: Callable[
             [str, dict[str, object]], Coroutine[object, object, None]
@@ -639,7 +644,7 @@ class HandlerFilesystemCrawler:
         scope_refs_seen: set[str],
         correlation_id: UUID,
         emitted_at_utc: datetime,
-        trigger_source: str,
+        trigger_source: TriggerSource,
         env_prefix: str,
         publish_callback: Callable[
             [str, dict[str, object]], Coroutine[object, object, None]
