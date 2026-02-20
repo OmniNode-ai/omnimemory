@@ -624,7 +624,7 @@ class HandlerMemoryArchive:
         # Resolve compression level: explicit arg > env var > default
         if compression_level is not None:
             resolved_level = compression_level
-            level_source = "constructor argument"
+            level_source = "initialize() argument"
         else:
             env_level_raw = os.environ.get("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL")
             if env_level_raw is not None:
@@ -758,7 +758,7 @@ class HandlerMemoryArchive:
                 "orphan_tracking",
             ],
             archive_format="JSONL with gzip compression (.jsonl.gz)",
-            compression_level=self._compression_level,
+            compression_level=self._compression_level,  # _DEFAULT_COMPRESSION_LEVEL when not initialized
             query_timeout_seconds=self._QUERY_TIMEOUT_SECONDS,
             circuit_breaker_config=ModelCircuitBreakerConfigInfo(
                 failure_threshold=self._CB_FAILURE_THRESHOLD,
@@ -791,7 +791,7 @@ class HandlerMemoryArchive:
 
         Returns:
             The active compression level (1-9). Returns the instance value,
-            which reflects the resolved configuration from constructor argument,
+            which reflects the resolved configuration from initialize() argument,
             environment variable, or built-in default.
         """
         return self._compression_level
