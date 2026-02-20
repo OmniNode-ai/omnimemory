@@ -393,9 +393,13 @@ class HandlerFilesystemCrawler:
                 continue
 
             file_glob = self._config.file_glob
-            for md_path in await asyncio.to_thread(
-                lambda p=prefix_path, g=file_glob: list(p.rglob(g))
-            ):
+
+            def _rglob_prefix(
+                _p: Path = prefix_path, _g: str = file_glob
+            ) -> list[Path]:
+                return list(_p.rglob(_g))
+
+            for md_path in await asyncio.to_thread(_rglob_prefix):
                 if files_walked >= self._config.max_files_per_crawl:
                     truncated = True
                     logger.warning(
