@@ -9,6 +9,7 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §7
 Ticket: OMN-2426
 """
 
+import types
 from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -161,18 +162,20 @@ class ModelScopeMappingConfig(BaseModel):
 # Default priority hints matching design doc §7
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PRIORITY_HINTS: dict[EnumDetectedDocType, int] = {
-    EnumDetectedDocType.CLAUDE_MD: 85,
-    EnumDetectedDocType.DESIGN_DOC: 70,
-    EnumDetectedDocType.ARCHITECTURE_DOC: 80,
-    EnumDetectedDocType.PLAN: 65,
-    EnumDetectedDocType.HANDOFF: 60,
-    EnumDetectedDocType.README: 55,
-    EnumDetectedDocType.TICKET: 50,
-    EnumDetectedDocType.LINEAR_DOCUMENT: 70,
-    EnumDetectedDocType.DEEP_DIVE: 60,
-    EnumDetectedDocType.UNKNOWN_MD: 35,
-}
+_DEFAULT_PRIORITY_HINTS: Mapping[EnumDetectedDocType, int] = types.MappingProxyType(
+    {
+        EnumDetectedDocType.CLAUDE_MD: 85,
+        EnumDetectedDocType.DESIGN_DOC: 70,
+        EnumDetectedDocType.ARCHITECTURE_DOC: 80,
+        EnumDetectedDocType.PLAN: 65,
+        EnumDetectedDocType.HANDOFF: 60,
+        EnumDetectedDocType.README: 55,
+        EnumDetectedDocType.TICKET: 50,
+        EnumDetectedDocType.LINEAR_DOCUMENT: 70,
+        EnumDetectedDocType.DEEP_DIVE: 60,
+        EnumDetectedDocType.UNKNOWN_MD: 35,
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Default scope mapping config matching design doc §7 examples

@@ -52,6 +52,7 @@ Example::
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import timezone
 from typing import TYPE_CHECKING
 
@@ -99,14 +100,14 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
 
 
 def map_intent_records(
-    records: list[ModelIntentRecord],
+    records: Sequence[ModelIntentRecord],
 ) -> list[ModelIntentRecordPayload]:
-    """Convert a list of ModelIntentRecord to ModelIntentRecordPayload.
+    """Convert a sequence of ModelIntentRecord to ModelIntentRecordPayload.
 
     Convenience function for bulk conversion of intent records.
 
     Args:
-        records: List of local intent records from AdapterIntentGraph.
+        records: Sequence of local intent records from AdapterIntentGraph.
 
     Returns:
         List of payload models for event transmission.
