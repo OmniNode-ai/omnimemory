@@ -536,6 +536,17 @@ class TestAdapterHealthCheck:
         health = await adapter.health_check()
         assert health.handler_health.db_pool_available is False
 
+    @pytest.mark.asyncio
+    async def test_health_after_initialization(
+        self, adapter: AdapterPostgresDeactivateMemory
+    ) -> None:
+        """health_check() reflects initialized state after initialize() is called."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+        health = await adapter.health_check()
+        assert health.initialized is True
+        assert health.handler_health.initialized is True
+
 
 # ---------------------------------------------------------------------------
 # Describe Tests
