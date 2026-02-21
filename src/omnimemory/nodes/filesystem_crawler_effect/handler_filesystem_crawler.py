@@ -87,7 +87,7 @@ from omnimemory.nodes.filesystem_crawler_effect.models.model_filesystem_crawl_re
 )
 
 if TYPE_CHECKING:
-    from omnimemory.models.crawl.model_crawl_tick_command import TriggerSource
+    from omnimemory.models.crawl.types import TriggerSource
     from omnimemory.nodes.filesystem_crawler_effect.models.model_filesystem_crawler_config import (
         ModelFilesystemCrawlerConfig,
     )

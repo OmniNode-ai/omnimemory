@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
-from omnimemory.models.crawl.model_crawl_tick_command import TriggerSource
+from omnimemory.models.crawl.types import TriggerSource
 
 
 class ModelDocumentRemovedEvent(BaseModel):
