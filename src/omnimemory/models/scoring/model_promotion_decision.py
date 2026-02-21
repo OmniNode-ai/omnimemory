@@ -13,6 +13,7 @@ Ticket: OMN-2426
 """
 
 from datetime import datetime
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -107,7 +108,7 @@ class ModelPromotionDecision(BaseModel):
     # ------------------------------------------------------------------
 
     @model_validator(mode="after")
-    def _validate_tier_changed_consistency(self) -> "ModelPromotionDecision":
+    def _validate_tier_changed_consistency(self) -> Self:
         """Ensure tier_changed is consistent with tier_before and tier_after."""
         expected = self.tier_before != self.tier_after
         if self.tier_changed != expected:
