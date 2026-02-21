@@ -268,8 +268,9 @@ def _scope_ref_for_path(
 
     for prefix, scope in scope_mappings:
         prefix_path = Path(prefix)
-        if path.is_relative_to(prefix_path) and len(prefix) > best_prefix_len:
-            best_prefix_len = len(prefix)
+        prefix_parts_len = len(prefix_path.parts)
+        if path.is_relative_to(prefix_path) and prefix_parts_len > best_prefix_len:
+            best_prefix_len = prefix_parts_len
             best_scope = scope
 
     return best_scope
@@ -396,6 +397,13 @@ class HandlerFilesystemCrawler:
         # _detect_and_emit_removals can query every scope that may contain
         # stale records -- including non-default scopes from scope_mappings.
         scope_refs_seen: set[str] = set()
+
+        # Validate that all path_prefixes are absolute before starting the walk.
+        # Relative paths would resolve against the process CWD, producing
+        # inconsistent source_ref values across environments.
+        for prefix_str in self._config.path_prefixes:
+            if not Path(prefix_str).is_absolute():
+                raise ValueError(f"path_prefix must be absolute: {prefix_str!r}")
 
         for prefix_str in self._config.path_prefixes:
             prefix_path = Path(prefix_str)
@@ -544,6 +552,10 @@ class HandlerFilesystemCrawler:
 
                 fingerprint = _compute_sha256(content)
                 blob_ref = f"sha256:{fingerprint}"
+                # errors='replace' substitutes U+FFFD for invalid byte sequences,
+                # which may over-estimate token count for binary files accidentally
+                # matched by the glob (e.g. a .md symlink pointing to a binary).
+                # This is intentional: the estimate is approximate and non-fatal.
                 token_estimate = len(content.decode("utf-8", errors="replace")) // 4
                 doc_type = _detect_doc_type(resolved_path)
                 source_type = _source_type_for_path(resolved_path)
