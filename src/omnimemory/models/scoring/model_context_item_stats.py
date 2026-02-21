@@ -12,7 +12,9 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §11-12
 Ticket: OMN-2426
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from omnimemory.enums.enum_context_source_type import EnumContextSourceType
 
@@ -145,3 +147,24 @@ class ModelContextItemStats(BaseModel):
             "Once True, bootstrap_confidence and bootstrap_runs_remaining are ignored."
         ),
     )
+
+    @model_validator(mode="after")
+    def _validate_bootstrap_cleared_consistency(self) -> Self:
+        """Enforce that cleared bootstrap records have no residual bootstrap fields.
+
+        When bootstrap_cleared is True, both bootstrap_confidence and
+        bootstrap_runs_remaining must be None — the bootstrap phase is over
+        and those values no longer apply.
+        """
+        if self.bootstrap_cleared:
+            if self.bootstrap_confidence is not None:
+                raise ValueError(
+                    "bootstrap_confidence must be None when bootstrap_cleared is True; "
+                    f"got bootstrap_confidence={self.bootstrap_confidence!r}"
+                )
+            if self.bootstrap_runs_remaining is not None:
+                raise ValueError(
+                    "bootstrap_runs_remaining must be None when bootstrap_cleared is True; "
+                    f"got bootstrap_runs_remaining={self.bootstrap_runs_remaining!r}"
+                )
+        return self

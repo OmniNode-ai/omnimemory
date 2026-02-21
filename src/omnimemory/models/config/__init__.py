@@ -57,7 +57,6 @@ from omnimemory.models.config.model_rate_limiter_config import (
     ModelRateLimiterConfig,
 )
 from omnimemory.models.config.model_scope_mapping_config import (
-    DEFAULT_SCOPE_MAPPING_CONFIG,
     ModelScopeMappingConfig,
 )
 from omnimemory.models.config.model_semantic_compute_policy_config import (
@@ -67,7 +66,6 @@ from omnimemory.models.config.model_semantic_compute_policy_config import (
 __all__ = [
     "DEFAULT_PROMOTION_THRESHOLDS",
     "DEFAULT_REQUESTS_PER_MINUTE",
-    "DEFAULT_SCOPE_MAPPING_CONFIG",
     "EnumEmbeddingProviderType",
     "ModelDocSourceConfig",
     "ModelEmbeddingHttpClientConfig",

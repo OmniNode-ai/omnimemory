@@ -507,7 +507,7 @@ class HandlerIntentQuery:
 
         return ModelIntentQueryResponseEvent.create_distribution_response(
             query_id=request.query_id,
-            distribution=result.distribution,
+            distribution=dict(result.distribution),
             time_range_hours=request.time_range_hours,
             execution_time_ms=execution_time_ms,
             correlation_id=request.correlation_id,
