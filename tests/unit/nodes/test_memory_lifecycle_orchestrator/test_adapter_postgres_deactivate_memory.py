@@ -22,7 +22,6 @@ Usage:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
@@ -49,12 +48,6 @@ def container() -> ModelONEXContainer:
 def memory_id() -> UUID:
     """Provide a fixed memory ID for testing."""
     return UUID("12345678-abcd-1234-abcd-567812345678")
-
-
-@pytest.fixture
-def fixed_now() -> datetime:
-    """Provide a fixed timestamp for deterministic testing."""
-    return datetime(2026, 1, 25, 12, 0, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture

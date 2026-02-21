@@ -270,8 +270,8 @@ class AdapterPostgresDeactivateMemory:
     ) -> ModelMemoryExpireResult:
         """Deactivate a memory with automatic retry on conflict.
 
-        Wraps deactivate() with automatic conflict resolution by re-reading
-        the current revision and retrying up to max_retries times.
+        Delegates retry logic to the handler's handle_with_retry() method,
+        which re-reads the current revision and retries up to max_retries times.
 
         Args:
             memory_id: UUID of the memory to deactivate.

@@ -7,11 +7,9 @@ This module validates that lifecycle state transitions follow the defined
 
 State Machine:
     ACTIVE -> STALE -> EXPIRED -> ARCHIVED -> DELETED
-                          |
-                       PROMOTED (returns to ACTIVE)
 
-    Where PROMOTED is a special transition from ARCHIVED back to ACTIVE,
-    representing a memory restoration operation.
+    ARCHIVED -> ACTIVE is also valid, representing a memory restoration
+    operation (archived memory returned to the active set).
 
 Valid Transitions:
     ACTIVE  -> STALE    (soft TTL exceeded, still accessible)
