@@ -134,6 +134,7 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
     name_upper = name.upper()
     parts_lower = [p.lower() for p in path.parts]
 
+    # Exact-case match: CLAUDE.md is always capitalised by convention.
     if name == "CLAUDE.md":
         return EnumDetectedDocType.CLAUDE_MD
 
@@ -152,6 +153,7 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
     ):
         return EnumDetectedDocType.ARCHITECTURE_DOC
 
+    # Case-insensitive: README.md, readme.md, Readme.md are all valid across repos.
     if name.upper() == "README.MD":
         return EnumDetectedDocType.README
 
