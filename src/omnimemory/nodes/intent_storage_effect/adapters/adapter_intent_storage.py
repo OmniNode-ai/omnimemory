@@ -373,7 +373,7 @@ class HandlerIntentStorageAdapter:
                     intent_id=intent.intent_id,
                     intent_category=intent.intent_category,
                     confidence=intent.confidence,
-                    keywords=intent.keywords,
+                    keywords=list(intent.keywords),
                     created_at_utc=intent.created_at_utc.isoformat(),
                     correlation_id=intent.correlation_id,
                 )
@@ -410,7 +410,7 @@ class HandlerIntentStorageAdapter:
         if result.status == "success":
             return ModelIntentStorageResponse(
                 status="success",
-                distribution=result.distribution,
+                distribution=dict(result.distribution),
                 total_intents=result.total_intents,
                 time_range_hours=result.time_range_hours,
                 execution_time_ms=result.execution_time_ms,

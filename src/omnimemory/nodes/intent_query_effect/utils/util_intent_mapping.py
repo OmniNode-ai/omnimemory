@@ -97,7 +97,7 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
         session_ref=record.session_ref,
         intent_category=record.intent_category,
         confidence=record.confidence,
-        keywords=record.keywords,
+        keywords=list(record.keywords),
         created_at=created_at,
     )
 
