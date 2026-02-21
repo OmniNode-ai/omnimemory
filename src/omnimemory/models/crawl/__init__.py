@@ -12,10 +12,12 @@ from omnimemory.models.crawl.model_document_discovered_event import (
 from omnimemory.models.crawl.model_document_removed_event import (
     ModelDocumentRemovedEvent,
 )
+from omnimemory.models.crawl.types import TriggerSource
 
 __all__ = [
     "ModelCrawlStateRecord",
     "ModelDocumentChangedEvent",
     "ModelDocumentDiscoveredEvent",
     "ModelDocumentRemovedEvent",
+    "TriggerSource",
 ]

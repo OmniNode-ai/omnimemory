@@ -32,7 +32,7 @@ from omnimemory.nodes.base import (
 from omnimemory.nodes.filesystem_crawler_effect import (
     HandlerFilesystemCrawler,
     ModelFilesystemCrawlerConfig,
-    ModelFilesystemCrawlResult,
+    ModelFilesystemCrawlResult,  # omnimemory-model-exempt: handler result
 )
 from omnimemory.nodes.intent_event_consumer_effect import (
     HandlerIntentEventConsumer,

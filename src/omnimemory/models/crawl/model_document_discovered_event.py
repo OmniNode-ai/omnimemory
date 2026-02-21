@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
 from omnimemory.enums.crawl.enum_detected_doc_type import EnumDetectedDocType
+from omnimemory.models.crawl.types import TriggerSource
 
 
 class ModelDocumentDiscoveredEvent(BaseModel):
@@ -53,11 +54,9 @@ class ModelDocumentDiscoveredEvent(BaseModel):
         ...,
         description="Scope string from the originating crawl tick (e.g. 'omninode/omnimemory')",
     )
-    trigger_source: Literal["scheduled", "manual", "git_hook", "filesystem_watch"] = (
-        Field(
-            ...,
-            description="What triggered the crawl: scheduled, manual, git_hook, or filesystem_watch",
-        )
+    trigger_source: TriggerSource = Field(
+        ...,
+        description="What triggered the crawl: scheduled, manual, git_hook, or filesystem_watch",
     )
 
     # Document identity

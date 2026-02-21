@@ -67,7 +67,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
@@ -88,6 +88,7 @@ from omnimemory.nodes.filesystem_crawler_effect.models.model_filesystem_crawl_re
 )
 
 if TYPE_CHECKING:
+    from omnimemory.models.crawl.types import TriggerSource
     from omnimemory.nodes.filesystem_crawler_effect.models.model_filesystem_crawler_config import (
         ModelFilesystemCrawlerConfig,
     )
@@ -110,9 +111,6 @@ _STATIC_STANDARDS_PREFIXES: tuple[str, ...] = (str(Path("~/.claude").expanduser(
 
 # Intermediate directory names excluded when heuristically extracting repo names from paths
 _SKIP_DIRS: frozenset[str] = frozenset({"src", "docs", "design", "plans", "handoffs"})
-
-# Valid trigger sources for crawl events
-TriggerSource = Literal["scheduled", "manual", "git_hook", "filesystem_watch"]
 
 
 def _compute_sha256(content: bytes) -> str:
@@ -418,7 +416,8 @@ class HandlerFilesystemCrawler:
                     break
 
                 files_walked += 1
-                abs_path_str = str(md_path.resolve())
+                resolved_path: Path = await asyncio.to_thread(md_path.resolve)
+                abs_path_str = str(resolved_path)
 
                 try:
                     stat = await asyncio.to_thread(md_path.stat)
@@ -453,7 +452,7 @@ class HandlerFilesystemCrawler:
                     skipped_count += 1
                     continue
 
-                scope_ref = _scope_ref_for_path(md_path.resolve(), resolved_mappings)
+                scope_ref = _scope_ref_for_path(resolved_path, resolved_mappings)
                 scope_refs_seen.add(scope_ref)
 
                 prior_state = await self._crawl_state_repo.get_state(
@@ -494,12 +493,12 @@ class HandlerFilesystemCrawler:
                 fingerprint = _compute_sha256(content)
                 blob_ref = f"sha256:{fingerprint}"
                 token_estimate = len(content) // 4
-                doc_type = _detect_doc_type(md_path.resolve())
-                source_type = _source_type_for_path(md_path.resolve())
+                doc_type = _detect_doc_type(resolved_path)
+                source_type = _source_type_for_path(resolved_path)
                 priority = _priority_hint_for_path(
-                    md_path.resolve(), self._config.path_prefixes
+                    resolved_path, self._config.path_prefixes
                 )
-                tags = _extract_tags(md_path.resolve(), doc_type)
+                tags = _extract_tags(resolved_path, doc_type)
 
                 if prior_state is None:
                     # New document
