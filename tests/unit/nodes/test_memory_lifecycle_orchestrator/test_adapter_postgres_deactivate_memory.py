@@ -22,6 +22,7 @@ Usage:
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
@@ -80,12 +81,19 @@ class TestAdapterInitialization:
             await adapter.initialize()  # type: ignore[call-arg]
 
     @pytest.mark.asyncio
+    async def test_initialized_after_initialize(
+        self, adapter: AdapterPostgresDeactivateMemory
+    ) -> None:
+        """Adapter reports initialized after initialize() is called with a db_pool."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+        assert adapter.initialized is True
+
+    @pytest.mark.asyncio
     async def test_initialize_validates_max_retries(
         self, adapter: AdapterPostgresDeactivateMemory
     ) -> None:
         """initialize() raises ValueError for max_retries < 1."""
-        from unittest.mock import MagicMock
-
         fake_pool = MagicMock()
         with pytest.raises(ValueError, match="max_retries"):
             await adapter.initialize(db_pool=fake_pool, max_retries=0)
