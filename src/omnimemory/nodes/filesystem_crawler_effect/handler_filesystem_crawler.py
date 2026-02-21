@@ -413,6 +413,10 @@ class HandlerFilesystemCrawler:
 
             file_glob = self._config.file_glob
 
+            # Default-argument capture prevents the classic Python
+            # closure-over-loop-variable bug: without _p=prefix_path and
+            # _g=file_glob, all iterations would share the last value of
+            # prefix_path/file_glob by the time _rglob_prefix is invoked.
             def _rglob_prefix(
                 _p: Path = prefix_path, _g: str = file_glob
             ) -> list[Path]:
@@ -457,6 +461,10 @@ class HandlerFilesystemCrawler:
                 abs_path_str = str(resolved_path)
 
                 try:
+                    # stat() is called on md_path (not resolved_path) so the
+                    # logged path matches the rglob result. Path.stat() follows
+                    # symlinks by default, so for a valid in-bounds symlink the
+                    # stat is against the target.
                     stat = await asyncio.to_thread(md_path.stat)
                 except OSError as exc:
                     logger.warning(
