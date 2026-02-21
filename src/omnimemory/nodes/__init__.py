@@ -29,6 +29,11 @@ from omnimemory.nodes.base import (
     BaseReducerNode,
     ContainerType,
 )
+from omnimemory.nodes.filesystem_crawler_effect import (
+    HandlerFilesystemCrawler,
+    ModelFilesystemCrawlerConfig,
+    ModelFilesystemCrawlResult,  # omnimemory-model-exempt: handler result
+)
 from omnimemory.nodes.intent_event_consumer_effect import (
     HandlerIntentEventConsumer,
     ModelIntentEventConsumerConfig,
@@ -49,6 +54,9 @@ __all__: list[str] = [
     "HandlerIntentEventConsumer",
     "ModelIntentEventConsumerConfig",
     "ModelIntentEventConsumerHealth",
+    "HandlerFilesystemCrawler",
+    "ModelFilesystemCrawlResult",
+    "ModelFilesystemCrawlerConfig",
     # Compute nodes
     "semantic_analyzer_compute",
     "similarity_compute",

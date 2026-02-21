@@ -44,7 +44,7 @@ from omnimemory.models.config.model_path_scope_mapping import ModelPathScopeMapp
 from omnimemory.models.config.model_postgres_config import ModelPostgresConfig
 from omnimemory.models.config.model_promotion_threshold_set import (
     DEFAULT_PROMOTION_THRESHOLDS,
-    PROMOTION_THRESHOLD_LINEAR_DERIVED,
+    PROMOTION_THRESHOLD_LINEAR_TICKET,
     PROMOTION_THRESHOLD_MEMORY_HOOK,
     PROMOTION_THRESHOLD_MEMORY_PATTERN,
     PROMOTION_THRESHOLD_REPO_DERIVED,
@@ -80,7 +80,7 @@ __all__ = [
     "ModelRateLimiterConfig",
     "ModelScopeMappingConfig",
     "ModelSemanticComputePolicyConfig",
-    "PROMOTION_THRESHOLD_LINEAR_DERIVED",
+    "PROMOTION_THRESHOLD_LINEAR_TICKET",
     "PROMOTION_THRESHOLD_MEMORY_HOOK",
     "PROMOTION_THRESHOLD_MEMORY_PATTERN",
     "PROMOTION_THRESHOLD_REPO_DERIVED",

@@ -16,7 +16,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from omnimemory.enums.enum_context_source_type import EnumContextSourceType
+from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 
 
 class ModelContextItemStats(BaseModel):

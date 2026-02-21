@@ -16,7 +16,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from omnimemory.enums.enum_context_source_type import EnumContextSourceType
+from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 from omnimemory.enums.enum_promotion_tier import EnumPromotionTier
 
 

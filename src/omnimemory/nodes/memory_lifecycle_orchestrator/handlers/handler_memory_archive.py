@@ -45,14 +45,16 @@ Example::
     container = ModelONEXContainer()
     handler = HandlerMemoryArchive(container)
 
-    # Option 1: Use OMNIMEMORY_ARCHIVE_PATH environment variable (recommended)
+    # Option 1: Use environment variables (recommended)
     # export OMNIMEMORY_ARCHIVE_PATH=/var/omnimemory/archives
+    # export OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL=6
     await handler.initialize(db_pool=pool)
 
-    # Option 2: Explicit path (useful for testing)
+    # Option 2: Explicit path and compression level (useful for testing)
     await handler.initialize(
         db_pool=pool,
         archive_base_path=Path("/custom/archive/path"),
+        compression_level=1,  # Fast compression for high-throughput scenarios
     )
 
     command = ModelArchiveMemoryCommand(
@@ -521,7 +523,7 @@ class HandlerMemoryArchive:
         The current implementation uses a local atomic write pattern.
     """
 
-    # Gzip compression level for archive files (valid range: 1-9).
+    # Default gzip compression level for archive files (valid range: 1-9).
     #
     # Level 6 is the gzip default and provides an optimal balance between
     # compression ratio and CPU time for archive storage workloads:
@@ -533,7 +535,13 @@ class HandlerMemoryArchive:
     # cost matters, level 6 optimizes throughput while maintaining substantial
     # space savings. Higher levels provide diminishing returns for JSON/JSONL
     # content which already compresses well.
-    _ARCHIVE_COMPRESSION_LEVEL: int = 6
+    #
+    # Override via constructor or OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL env var.
+    _DEFAULT_COMPRESSION_LEVEL: int = 6
+
+    # Minimum and maximum valid gzip compression levels.
+    _MIN_COMPRESSION_LEVEL: int = 1
+    _MAX_COMPRESSION_LEVEL: int = 9
 
     # Query timeout for database operations (seconds).
     #
@@ -563,14 +571,16 @@ class HandlerMemoryArchive:
 
         Note:
             After construction, call initialize() to set up runtime dependencies
-            (db_pool, archive_base_path, orphan_tracker). The handler will raise
-            RuntimeError if handle() is called before initialization.
+            (db_pool, archive_base_path, orphan_tracker, compression_level).
+            The handler will raise RuntimeError if handle() is called before
+            initialization.
         """
         self._container = container
         self._db_pool: Pool | None = None
         self._archive_base_path: Path | None = None
         self._orphan_tracker: ProtocolOrphanedArchiveTracker | None = None
         self._db_circuit_breaker: CircuitBreaker | None = None
+        self._compression_level: int = self._DEFAULT_COMPRESSION_LEVEL
         self._initialized = False
 
     async def initialize(
@@ -578,6 +588,7 @@ class HandlerMemoryArchive:
         db_pool: Pool | None = None,
         archive_base_path: Path | None = None,
         orphan_tracker: ProtocolOrphanedArchiveTracker | None = None,
+        compression_level: int | None = None,
     ) -> None:
         """Initialize runtime dependencies for the handler.
 
@@ -596,9 +607,59 @@ class HandlerMemoryArchive:
                 If provided, will be called when an archive file is written
                 but the database state update fails. This enables monitoring
                 and cleanup of orphaned files.
+            compression_level: Gzip compression level (1-9). Level 1 is fastest
+                with lowest ratio; level 9 is slowest with highest ratio. Level
+                6 is the balanced default.
+                Resolution order (first non-None value wins):
+                  1. ``compression_level`` argument (this parameter)
+                  2. ``OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL`` environment variable
+                  3. Built-in default (6)
+
+        Raises:
+            ValueError: If compression_level is outside the valid range 1-9.
         """
         self._db_pool = db_pool
         self._orphan_tracker = orphan_tracker
+
+        # Resolve compression level: explicit arg > env var > default
+        if compression_level is not None:
+            resolved_level = compression_level
+            level_source = "constructor argument"
+        else:
+            env_level_raw = os.environ.get("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL")
+            if env_level_raw is not None:
+                try:
+                    resolved_level = int(env_level_raw)
+                except ValueError:
+                    raise ValueError(
+                        "OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL must be an integer "
+                        f"between {self._MIN_COMPRESSION_LEVEL} and "
+                        f"{self._MAX_COMPRESSION_LEVEL} (inclusive), "
+                        f"got non-integer value: {env_level_raw!r}"
+                    ) from None
+                level_source = "OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL env var"
+            else:
+                resolved_level = self._DEFAULT_COMPRESSION_LEVEL
+                level_source = "built-in default"
+
+        # Validate range
+        if not (
+            self._MIN_COMPRESSION_LEVEL <= resolved_level <= self._MAX_COMPRESSION_LEVEL
+        ):
+            raise ValueError(
+                f"compression_level must be between {self._MIN_COMPRESSION_LEVEL} "
+                f"and {self._MAX_COMPRESSION_LEVEL} (inclusive), "
+                f"got {resolved_level} (from {level_source})"
+            )
+
+        self._compression_level = resolved_level
+        logger.debug(
+            "Archive compression level configured",
+            extra={
+                "compression_level": self._compression_level,
+                "source": level_source,
+            },
+        )
 
         # Initialize circuit breaker for DB operations
         self._db_circuit_breaker = CircuitBreaker(
@@ -645,6 +706,7 @@ class HandlerMemoryArchive:
             self._archive_base_path = None
             self._orphan_tracker = None
             self._db_circuit_breaker = None
+            self._compression_level = self._DEFAULT_COMPRESSION_LEVEL
             self._initialized = False
             logger.info("HandlerMemoryArchive shutdown complete")
 
@@ -696,7 +758,7 @@ class HandlerMemoryArchive:
                 "orphan_tracking",
             ],
             archive_format="JSONL with gzip compression (.jsonl.gz)",
-            compression_level=self._ARCHIVE_COMPRESSION_LEVEL,
+            compression_level=self._compression_level,
             query_timeout_seconds=self._QUERY_TIMEOUT_SECONDS,
             circuit_breaker_config=ModelCircuitBreakerConfigInfo(
                 failure_threshold=self._CB_FAILURE_THRESHOLD,
@@ -722,6 +784,17 @@ class HandlerMemoryArchive:
             The configured archive base path, or None if not yet initialized.
         """
         return self._archive_base_path
+
+    @property
+    def compression_level(self) -> int:
+        """Get the configured gzip compression level.
+
+        Returns:
+            The active compression level (1-9). Returns the instance value,
+            which reflects the resolved configuration from constructor argument,
+            environment variable, or built-in default.
+        """
+        return self._compression_level
 
     async def handle(
         self,
@@ -1186,7 +1259,7 @@ class HandlerMemoryArchive:
         jsonl_line = record.model_dump_json() + "\n"
         return gzip.compress(
             jsonl_line.encode("utf-8"),
-            compresslevel=self._ARCHIVE_COMPRESSION_LEVEL,
+            compresslevel=self._compression_level,
         )
 
     async def _serialize_for_archive_async(

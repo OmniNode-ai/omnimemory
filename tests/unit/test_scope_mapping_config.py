@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from omnimemory.enums.enum_detected_doc_type import EnumDetectedDocType
+from omnimemory.enums.crawl.enum_detected_doc_type import EnumDetectedDocType
 from omnimemory.models.config.model_linear_scope_mapping import (
     ModelLinearScopeMapping,
 )

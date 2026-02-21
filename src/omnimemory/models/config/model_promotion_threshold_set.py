@@ -15,7 +15,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.enums.enum_context_source_type import EnumContextSourceType
+from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 
 
 class ModelPromotionThresholdSet(BaseModel):
@@ -115,8 +115,8 @@ PROMOTION_THRESHOLD_MEMORY_PATTERN = ModelPromotionThresholdSet(
     validated_to_shared_signal_floor=5,
 )
 
-PROMOTION_THRESHOLD_LINEAR_DERIVED = ModelPromotionThresholdSet(
-    source_type=EnumContextSourceType.LINEAR_DERIVED,
+PROMOTION_THRESHOLD_LINEAR_TICKET = ModelPromotionThresholdSet(
+    source_type=EnumContextSourceType.LINEAR_TICKET,
     quarantine_to_validated_runs=5,
     validated_to_shared_runs=20,
     validated_to_shared_used_rate=0.15,
@@ -131,6 +131,6 @@ DEFAULT_PROMOTION_THRESHOLDS: Mapping[
         EnumContextSourceType.REPO_DERIVED: PROMOTION_THRESHOLD_REPO_DERIVED,
         EnumContextSourceType.MEMORY_HOOK: PROMOTION_THRESHOLD_MEMORY_HOOK,
         EnumContextSourceType.MEMORY_PATTERN: PROMOTION_THRESHOLD_MEMORY_PATTERN,
-        EnumContextSourceType.LINEAR_DERIVED: PROMOTION_THRESHOLD_LINEAR_DERIVED,
+        EnumContextSourceType.LINEAR_TICKET: PROMOTION_THRESHOLD_LINEAR_TICKET,
     }
 )

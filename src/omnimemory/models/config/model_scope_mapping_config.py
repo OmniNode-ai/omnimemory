@@ -14,7 +14,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.enums.enum_detected_doc_type import EnumDetectedDocType
+from omnimemory.enums.crawl.enum_detected_doc_type import EnumDetectedDocType
 from omnimemory.models.config.model_linear_scope_mapping import (
     ModelLinearScopeMapping,
 )

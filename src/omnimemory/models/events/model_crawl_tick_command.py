@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from omnimemory.enums.enum_crawler_type import EnumCrawlerType
+from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
 
 
 class ModelCrawlTickCommand(BaseModel):

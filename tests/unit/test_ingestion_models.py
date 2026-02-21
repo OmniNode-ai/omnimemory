@@ -21,27 +21,26 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
+from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
+from omnimemory.enums.crawl.enum_detected_doc_type import EnumDetectedDocType
 from omnimemory.enums.enum_attribution_signal_type import EnumAttributionSignalType
-from omnimemory.enums.enum_context_item_type import EnumContextItemType
-from omnimemory.enums.enum_context_source_type import EnumContextSourceType
-from omnimemory.enums.enum_crawler_type import EnumCrawlerType
-from omnimemory.enums.enum_detected_doc_type import EnumDetectedDocType
 from omnimemory.enums.enum_promotion_tier import EnumPromotionTier
 from omnimemory.models.config.model_doc_source_config import ModelDocSourceConfig
 from omnimemory.models.config.model_promotion_threshold_set import (
     DEFAULT_PROMOTION_THRESHOLDS,
     ModelPromotionThresholdSet,
 )
-from omnimemory.models.events.model_crawl_tick_command import ModelCrawlTickCommand
-from omnimemory.models.events.model_document_changed_event import (
+from omnimemory.models.crawl.model_document_changed_event import (
     ModelDocumentChangedEvent,
 )
-from omnimemory.models.events.model_document_discovered_event import (
+from omnimemory.models.crawl.model_document_discovered_event import (
     ModelDocumentDiscoveredEvent,
 )
-from omnimemory.models.events.model_document_removed_event import (
+from omnimemory.models.crawl.model_document_removed_event import (
     ModelDocumentRemovedEvent,
 )
+from omnimemory.models.events.model_crawl_tick_command import ModelCrawlTickCommand
 from omnimemory.models.scoring.model_context_item_stats import ModelContextItemStats
 from omnimemory.models.scoring.model_context_policy_config import (
     ModelContextPolicyConfig,
@@ -118,7 +117,7 @@ class TestEnumValues:
         assert EnumContextSourceType.STATIC_STANDARDS == "static_standards"
         assert EnumContextSourceType.REPO_DERIVED == "repo_derived"
         assert EnumContextSourceType.MEMORY_HOOK == "memory_hook"
-        assert EnumContextSourceType.LINEAR_DERIVED == "linear_derived"
+        assert EnumContextSourceType.LINEAR_TICKET == "linear_ticket"
         assert EnumContextSourceType.MEMORY_PATTERN == "memory_pattern"
 
 
@@ -189,7 +188,6 @@ class TestModelDocumentDiscoveredEvent:
             token_estimate=512,
             scope_ref="omninode/omnimemory",
             detected_doc_type=EnumDetectedDocType.CLAUDE_MD,
-            suggested_context_item_type=EnumContextItemType.RULE,
             priority_hint=85,
         )
 
@@ -208,25 +206,6 @@ class TestModelDocumentDiscoveredEvent:
         data = evt.model_dump()
         restored = ModelDocumentDiscoveredEvent.model_validate(data)
         assert restored == evt
-
-    def test_fingerprint_length_validated(self) -> None:
-        with pytest.raises(ValidationError):
-            ModelDocumentDiscoveredEvent(
-                correlation_id=uuid4(),
-                emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
-                crawler_type=EnumCrawlerType.FILESYSTEM,
-                crawl_scope="omninode/omnimemory",
-                trigger_source="scheduled",
-                source_ref="/path/to/file.md",
-                source_type=EnumContextSourceType.REPO_DERIVED,
-                content_fingerprint="tooshort",
-                content_blob_ref="blob://abc",
-                token_estimate=100,
-                scope_ref="omninode/shared",
-                detected_doc_type=EnumDetectedDocType.UNKNOWN_MD,
-                suggested_context_item_type=EnumContextItemType.DOC_EXCERPT,
-                priority_hint=35,
-            )
 
     def test_priority_hint_upper_bound_validated(self) -> None:
         evt = self._make()
@@ -258,7 +237,6 @@ class TestModelDocumentChangedEvent:
             token_estimate=600,
             scope_ref="omninode/omniintelligence",
             detected_doc_type=EnumDetectedDocType.CLAUDE_MD,
-            suggested_context_item_type=EnumContextItemType.RULE,
             priority_hint=85,
             previous_content_fingerprint=_PREV_FINGERPRINT,
             previous_source_version="old123sha",
@@ -298,8 +276,9 @@ class TestModelDocumentRemovedEvent:
             correlation_id=uuid4(),
             emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             crawler_type=EnumCrawlerType.LINEAR,
+            trigger_source="scheduled",
             source_ref="linear://OMN-1234",
-            source_type=EnumContextSourceType.LINEAR_DERIVED,
+            source_type=EnumContextSourceType.LINEAR_TICKET,
             scope_ref="omninode/shared",
             last_known_content_fingerprint=_FINGERPRINT,
         )

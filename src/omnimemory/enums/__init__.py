@@ -4,11 +4,9 @@ ONEX-compliant enums for omnimemory system.
 All enums are centralized here for better maintainability and ONEX compliance.
 """
 
+from .crawl import EnumContextSourceType, EnumCrawlerType, EnumDetectedDocType
 from .enum_attribution_signal_type import EnumAttributionSignalType
 from .enum_context_item_type import EnumContextItemType
-from .enum_context_source_type import EnumContextSourceType
-from .enum_crawler_type import EnumCrawlerType
-from .enum_detected_doc_type import EnumDetectedDocType
 from .enum_entity_extraction_mode import EnumEntityExtractionMode
 from .enum_error_code import EnumOmniMemoryErrorCode
 from .enum_intelligence_operation_type import EnumIntelligenceOperationType
