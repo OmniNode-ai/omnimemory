@@ -49,6 +49,11 @@ pytest.importorskip(
     "omnibase_infra", reason="omnibase_infra required for adapter tests"
 )
 
+from omnibase_core.enums.intelligence.enum_intent_category import EnumIntentCategory
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput as CoreModelIntentClassificationOutput,
+)
+
 from omnimemory.handlers.adapters import (
     AdapterIntentGraph,
     IntentCypherTemplates,
@@ -119,10 +124,11 @@ def adapter_with_mock(
 
 
 @pytest.fixture
-def sample_intent_classification() -> ModelIntentClassificationOutput:
-    """Create a sample intent classification for testing."""
-    return ModelIntentClassificationOutput(
-        intent_category="debugging",
+def sample_intent_classification() -> CoreModelIntentClassificationOutput:
+    """Create a sample intent classification for testing (core type used by adapter)."""
+    return CoreModelIntentClassificationOutput(
+        success=True,
+        intent_category=EnumIntentCategory.DEBUGGING,
         confidence=0.92,
         keywords=["error", "traceback", "fix"],
     )
@@ -1071,13 +1077,14 @@ class TestContextManager:
                     # Store an intent
                     result = await adapter.store_intent(
                         session_id="session_123",
-                        intent_data=ModelIntentClassificationOutput(
-                            intent_category="debugging",
+                        intent_data=CoreModelIntentClassificationOutput(
+                            success=True,
+                            intent_category=EnumIntentCategory.DEBUGGING,
                             confidence=0.9,
                         ),
                         correlation_id=str(TEST_CORRELATION_ID),
                     )
-                    assert result.status == "success"
+                    assert result.success is True
 
                 # After context exit, shutdown should be called
                 mock_instance.shutdown.assert_called_once()
@@ -1127,7 +1134,7 @@ class TestStoreIntent:
         self,
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
-        sample_intent_classification: ModelIntentClassificationOutput,
+        sample_intent_classification: CoreModelIntentClassificationOutput,
     ) -> None:
         """Test successful intent storage."""
         mock_handler.execute_query.return_value = MagicMock(
@@ -1145,7 +1152,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert result.intent_id == TEST_INTENT_ID_1
         assert result.created is True
         assert result.error_message is None
@@ -1164,7 +1171,7 @@ class TestStoreIntent:
         self,
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
-        sample_intent_classification: ModelIntentClassificationOutput,
+        sample_intent_classification: CoreModelIntentClassificationOutput,
     ) -> None:
         """Test storing intent that merges with existing."""
         mock_handler.execute_query.return_value = MagicMock(
@@ -1182,7 +1189,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert result.created is False
         assert result.intent_id == TEST_INTENT_ID_EXISTING
 
@@ -1190,7 +1197,7 @@ class TestStoreIntent:
     async def test_store_intent_not_initialized(
         self,
         config: ModelAdapterIntentGraphConfig,
-        sample_intent_classification: ModelIntentClassificationOutput,
+        sample_intent_classification: CoreModelIntentClassificationOutput,
     ) -> None:
         """Test store_intent returns error when not initialized."""
         adapter = AdapterIntentGraph(config)
@@ -1201,7 +1208,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1210,7 +1217,7 @@ class TestStoreIntent:
         self,
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
-        sample_intent_classification: ModelIntentClassificationOutput,
+        sample_intent_classification: CoreModelIntentClassificationOutput,
     ) -> None:
         """Test store_intent handles connection errors gracefully."""
         mock_handler.execute_query.side_effect = Exception("Connection lost")
@@ -1221,7 +1228,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1230,7 +1237,7 @@ class TestStoreIntent:
         self,
         adapter_with_mock: AdapterIntentGraph,
         mock_handler: MagicMock,
-        sample_intent_classification: ModelIntentClassificationOutput,
+        sample_intent_classification: CoreModelIntentClassificationOutput,
     ) -> None:
         """Test store_intent passes through correlation_id correctly."""
         mock_handler.execute_query.return_value = MagicMock(
@@ -1251,7 +1258,7 @@ class TestStoreIntent:
     async def test_store_intent_rejects_empty_session_id(
         self,
         adapter_with_mock: AdapterIntentGraph,
-        sample_intent_classification: ModelIntentClassificationOutput,
+        sample_intent_classification: CoreModelIntentClassificationOutput,
     ) -> None:
         """Test store_intent returns error for empty or whitespace-only session_id."""
         # Test empty string
@@ -1261,7 +1268,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "session_id cannot be empty" in result.error_message
 
@@ -1272,7 +1279,7 @@ class TestStoreIntent:
             correlation_id=str(TEST_CORRELATION_ID_2),
         )
 
-        assert result_whitespace.status == "error"
+        assert result_whitespace.success is False
         assert result_whitespace.error_message is not None
         assert "session_id cannot be empty" in result_whitespace.error_message
 
@@ -1317,12 +1324,12 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.status == "success"
+        assert result.success is True
         assert len(result.intents) == 2
 
         # Verify first intent
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
-        assert result.intents[0].intent_category == "debugging"
+        assert result.intents[0].intent_category == EnumIntentCategory.DEBUGGING
         assert result.intents[0].confidence == 0.92
         assert result.intents[0].keywords == ["error", "fix"]
 
@@ -1339,7 +1346,7 @@ class TestGetSessionIntents:
             session_id="session_empty",
         )
 
-        assert result.status == "no_results"
+        assert result.success is True
         assert result.intents == []
 
     @pytest.mark.asyncio
@@ -1411,7 +1418,7 @@ class TestGetSessionIntents:
 
         result = await adapter.get_session_intents(session_id="session_123")
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1428,7 +1435,7 @@ class TestGetSessionIntents:
             session_id="session_123",
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1674,8 +1681,9 @@ class TestErrorHandling:
         """Test adapter handles unexpected exceptions."""
         mock_handler.execute_query.side_effect = RuntimeError("Unexpected error")
 
-        classification = ModelIntentClassificationOutput(
-            intent_category="unknown",
+        classification = CoreModelIntentClassificationOutput(
+            success=True,
+            intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
         )
 
@@ -1685,7 +1693,7 @@ class TestErrorHandling:
             correlation_id=str(TEST_CORRELATION_ID),
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "failed" in result.error_message.lower()
 
@@ -1726,7 +1734,7 @@ class TestErrorHandling:
 
         result = await adapter_with_mock.get_session_intents(session_id="session_123")
 
-        assert result.status == "success"
+        assert result.success is True
         # Only the valid record with proper UUID should be included
         assert len(result.intents) == 1
         assert result.intents[0].intent_id == TEST_INTENT_ID_1
@@ -1741,8 +1749,9 @@ class TestErrorHandling:
         await adapter_with_mock.shutdown()
 
         # All operations should return error status
-        classification = ModelIntentClassificationOutput(
-            intent_category="unknown",
+        classification = CoreModelIntentClassificationOutput(
+            success=True,
+            intent_category=EnumIntentCategory.UNKNOWN,
             confidence=0.5,
         )
 
@@ -1751,12 +1760,12 @@ class TestErrorHandling:
             intent_data=classification,
             correlation_id=str(TEST_CORRELATION_ID),
         )
-        assert store_result.status == "error"
+        assert store_result.success is False
 
         query_result = await adapter_with_mock.get_session_intents(
             session_id="session_123",
         )
-        assert query_result.status == "error"
+        assert query_result.success is False
 
         distribution = await adapter_with_mock.get_intent_distribution()
         assert distribution.status == "error"

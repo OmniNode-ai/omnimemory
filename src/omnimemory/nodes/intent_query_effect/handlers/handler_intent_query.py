@@ -36,8 +36,10 @@ import asyncio
 import logging
 import time
 from collections.abc import Mapping
+from datetime import timezone
 from typing import TYPE_CHECKING
 
+from omnibase_core.models.events import ModelIntentRecordPayload
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.handlers.adapters import AdapterIntentGraph
@@ -556,7 +558,7 @@ class HandlerIntentQuery:
                 _CONTRACT_MAX_RESPONSE_TIME_MS,
             )
 
-        if result.status == "error":
+        if not result.success:
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,
                 query_type="session",
@@ -573,8 +575,22 @@ class HandlerIntentQuery:
             )
 
         try:
-            payloads = map_intent_records(result.intents)
-        except ValueError as e:
+            payloads: list[ModelIntentRecordPayload] = []
+            for record in result.intents:
+                created_at = record.created_at
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                payloads.append(
+                    ModelIntentRecordPayload(
+                        intent_id=record.intent_id,
+                        session_ref=record.session_id,
+                        intent_category=record.intent_category.value,
+                        confidence=record.confidence,
+                        keywords=list(record.keywords),
+                        created_at=created_at,
+                    )
+                )
+        except (ValueError, AttributeError) as e:
             logger.warning("Failed to map intent records: %s", e)
             return ModelIntentQueryResponseEvent.from_error(
                 query_id=request.query_id,

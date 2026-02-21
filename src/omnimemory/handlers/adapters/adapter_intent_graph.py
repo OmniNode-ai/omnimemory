@@ -70,17 +70,28 @@ from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from omnibase_core.container import ModelONEXContainer
+from omnibase_core.enums.intelligence.enum_intent_category import EnumIntentCategory
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput as CoreModelIntentClassificationOutput,
+)
+from omnibase_core.models.intelligence import (
+    ModelIntentQueryResult as CoreModelIntentQueryResult,
+)
+from omnibase_core.models.intelligence import (
+    ModelIntentRecord as CoreModelIntentRecord,
+)
+from omnibase_core.models.intelligence import (
+    ModelIntentStorageResult as CoreModelIntentStorageResult,
+)
 from omnibase_core.types.type_json import JsonType
 from omnibase_infra.handlers.handler_graph import HandlerGraph
 
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
-    ModelIntentClassificationOutput,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
     ModelIntentQueryResult,
     ModelIntentRecord,
-    ModelIntentStorageResult,
 )
 from omnimemory.protocols.protocol_intent_graph_adapter import (
     ProtocolIntentGraphAdapter,
@@ -562,9 +573,9 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     async def store_intent(
         self,
         session_id: str,
-        intent_data: ModelIntentClassificationOutput,
+        intent_data: CoreModelIntentClassificationOutput,
         correlation_id: str,
-    ) -> ModelIntentStorageResult:
+    ) -> CoreModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
         Implements ProtocolIntentGraphAdapter.store_intent.
@@ -587,23 +598,21 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
             This method never raises on business errors - it returns
             an error status in the result model instead.
         """
-        # intent_data.intent_category is str in the local ModelIntentClassificationOutput.
-        intent_category_str = intent_data.intent_category
+        # intent_data.intent_category is EnumIntentCategory in CoreModelIntentClassificationOutput.
+        intent_category_str = intent_data.intent_category.value
 
         # Validate session_id is non-empty
         if not session_id or not session_id.strip():
-            return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
+            return CoreModelIntentStorageResult(
+                success=False,
                 error_message="session_id cannot be empty",
             )
 
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
-            return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
+            return CoreModelIntentStorageResult(
+                success=False,
                 error_message=str(e),
             )
 
@@ -695,12 +704,10 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                     execution_time_ms,
                 )
 
-                return ModelIntentStorageResult(
-                    status="success",
-                    session_id=session_id,
+                return CoreModelIntentStorageResult(
+                    success=True,
                     intent_id=returned_intent_id,
                     created=was_created,
-                    execution_time_ms=execution_time_ms,
                 )
 
         except TimeoutError:
@@ -711,10 +718,8 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                 session_id,
                 execution_time_ms,
             )
-            return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
-                execution_time_ms=execution_time_ms,
+            return CoreModelIntentStorageResult(
+                success=False,
                 error_message=f"Operation timed out after {self._config.timeout_seconds}s",
             )
 
@@ -726,10 +731,8 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                 session_id,
                 e,
             )
-            return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
-                execution_time_ms=execution_time_ms,
+            return CoreModelIntentStorageResult(
+                success=False,
                 error_message=f"Storage failed: {e}",
             )
 
@@ -738,7 +741,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
         session_id: str,
         min_confidence: float = 0.0,
         limit: int | None = None,
-    ) -> ModelIntentQueryResult:
+    ) -> CoreModelIntentQueryResult:
         """Get intents for a session with optional filtering.
 
         Implements ProtocolIntentGraphAdapter.get_session_intents.
@@ -762,8 +765,8 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
         try:
             handler = self._ensure_initialized()
         except RuntimeError as e:
-            return ModelIntentQueryResult(
-                status="error",
+            return CoreModelIntentQueryResult(
+                success=False,
                 error_message=str(e),
             )
 
@@ -811,13 +814,12 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                         session_id,
                         execution_time_ms,
                     )
-                    return ModelIntentQueryResult(
-                        status="no_results",
-                        execution_time_ms=execution_time_ms,
+                    return CoreModelIntentQueryResult(
+                        success=True,
                     )
 
-                # Convert records to intent models
-                intents: list[ModelIntentRecord] = []
+                # Convert records to core intent models
+                core_intents: list[CoreModelIntentRecord] = []
                 for record in result.records:
                     intent_id_raw = record.get("intent_id")
                     if not isinstance(intent_id_raw, str):
@@ -874,32 +876,35 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                         )
                         continue
 
-                    # Use category string directly for local model
+                    # Map category string to EnumIntentCategory; fall back to unknown
                     intent_category_str = str(record.get("intent_category", "unknown"))
+                    try:
+                        intent_category = EnumIntentCategory(intent_category_str)
+                    except ValueError:
+                        intent_category = EnumIntentCategory.UNKNOWN
 
-                    intents.append(
-                        ModelIntentRecord(
+                    core_intents.append(
+                        CoreModelIntentRecord(
                             intent_id=intent_id,
-                            session_ref=session_id,
-                            intent_category=intent_category_str,
+                            session_id=session_id,
+                            intent_category=intent_category,
                             confidence=confidence_val,
                             keywords=keywords,
-                            created_at_utc=created_at,
+                            created_at=created_at,
                             correlation_id=correlation_id,
                         )
                     )
 
                 logger.debug(
                     "Found %d intents for session %s (%.2fms)",
-                    len(intents),
+                    len(core_intents),
                     session_id,
                     execution_time_ms,
                 )
-                return ModelIntentQueryResult(
-                    status="success",
-                    intents=intents,
-                    total_count=len(intents),
-                    execution_time_ms=execution_time_ms,
+                return CoreModelIntentQueryResult(
+                    success=True,
+                    intents=core_intents,
+                    total_count=len(core_intents),
                 )
 
         except TimeoutError:
@@ -910,9 +915,8 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                 session_id,
                 execution_time_ms,
             )
-            return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+            return CoreModelIntentQueryResult(
+                success=False,
                 error_message=f"Query timed out after {self._config.timeout_seconds}s",
             )
 
@@ -924,9 +928,8 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                 session_id,
                 e,
             )
-            return ModelIntentQueryResult(
-                status="error",
-                execution_time_ms=execution_time_ms,
+            return CoreModelIntentQueryResult(
+                success=False,
                 error_message=f"Query failed: {e}",
             )
 

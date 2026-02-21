@@ -56,11 +56,17 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from omnimemory.handlers.adapters.models import (
+    from omnibase_core.models.intelligence import (
         ModelIntentClassificationOutput,
-        ModelIntentDistributionResult,
         ModelIntentQueryResult,
         ModelIntentStorageResult,
+    )
+
+    from omnimemory.handlers.adapters.models import (
+        ModelIntentDistributionResult,
+    )
+    from omnimemory.handlers.adapters.models import (
+        ModelIntentQueryResult as LocalModelIntentQueryResult,
     )
 
 __all__ = [
@@ -191,16 +197,11 @@ class ProtocolIntentGraphAdapter(Protocol):
                 Defaults to implementation-specific maximum.
 
         Returns:
-            Local ``ModelIntentQueryResult`` with string-based status.
-            Possible status values:
-            - "success": Query completed with results
-            - "no_results": Session exists but has no intents matching criteria
-            - "not_found": Session not found (reserved for future use)
-            - "error": Query failed
+            Core ``ModelIntentQueryResult`` with bool success field.
 
         Note:
             This method never raises on business errors - it returns
-            an error status in the result model instead.
+            success=False with error_message in the result model instead.
         """
         ...
 
@@ -209,7 +210,7 @@ class ProtocolIntentGraphAdapter(Protocol):
         time_range_hours: int = 24,
         min_confidence: float | None = None,
         limit: int | None = None,
-    ) -> ModelIntentQueryResult:
+    ) -> LocalModelIntentQueryResult:
         """Get recent intents across all sessions within a time range.
 
         Retrieves intent classifications created within the specified time
