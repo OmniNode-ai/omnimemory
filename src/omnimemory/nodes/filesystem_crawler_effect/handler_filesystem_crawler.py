@@ -421,7 +421,6 @@ class HandlerFilesystemCrawler:
                     )
                     break
 
-                files_walked += 1
                 resolved_path = await asyncio.to_thread(md_path.resolve)
 
                 # Symlink escape guard: reject any path that resolves outside
@@ -440,6 +439,8 @@ class HandlerFilesystemCrawler:
                     )
                     skipped_count += 1
                     continue
+
+                files_walked += 1
 
                 abs_path_str = str(resolved_path)
 

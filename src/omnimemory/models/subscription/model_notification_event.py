@@ -9,7 +9,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..foundation.model_semver import ModelSemVer
+from omnimemory.models.foundation.model_semver import ModelSemVer
+
 from .constants import TOPIC_PATTERN, TOPIC_VALIDATION_ERROR
 from .model_notification_event_payload import (
     ModelNotificationEventPayload,  # noqa: TC001 - runtime import for Pydantic field type
