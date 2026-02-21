@@ -12,6 +12,8 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §13
 Ticket: OMN-2426
 """
 
+from typing import Self
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from omnimemory.models.config.model_doc_source_config import ModelDocSourceConfig
@@ -92,7 +94,7 @@ class ModelContextPolicyConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _validate_token_budget_fractions(self) -> "ModelContextPolicyConfig":
+    def _validate_token_budget_fractions(self) -> Self:
         """Validate that hook and doc token budget fractions do not exceed 1.0.
 
         When doc_source_config is set, the sum of hook_token_budget_fraction and

@@ -254,7 +254,9 @@ def _scope_ref_for_path(
     best_scope = DEFAULT_SCOPE_REF
 
     for prefix, scope in scope_mappings:
-        if path_str.startswith(prefix) and len(prefix) > best_prefix_len:
+        if (path_str == prefix or path_str.startswith(prefix + "/")) and len(
+            prefix
+        ) > best_prefix_len:
             best_prefix_len = len(prefix)
             best_scope = scope
 

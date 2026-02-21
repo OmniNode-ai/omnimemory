@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS omnimemory_crawl_state (
     source_version      TEXT,
     last_crawled_at_utc TIMESTAMPTZ NOT NULL,
     last_changed_at_utc TIMESTAMPTZ,
+    last_known_mtime    DOUBLE PRECISION,
     PRIMARY KEY (source_ref, crawler_type, scope_ref)
 );
 
@@ -81,3 +82,6 @@ COMMENT ON COLUMN omnimemory_crawl_state.last_crawled_at_utc IS
 
 COMMENT ON COLUMN omnimemory_crawl_state.last_changed_at_utc IS
     'Timestamp of the most recent content change. NULL if content has never changed since first crawl.';
+
+COMMENT ON COLUMN omnimemory_crawl_state.last_known_mtime IS
+    'stat.st_mtime value at last crawl for FilesystemCrawler mtime fast-path. NULL for non-filesystem crawlers.';

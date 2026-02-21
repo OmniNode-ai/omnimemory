@@ -186,8 +186,8 @@ _DEFAULT_PRIORITY_HINTS: Mapping[EnumDetectedDocType, int] = types.MappingProxyT
 # /Users/jonah/.claude) that are only valid on the primary developer's machine.
 # In CI and production, callers MUST override this with a ModelScopeMappingConfig
 # built from environment-appropriate paths (e.g., read from config file or env vars).
-# Do NOT rely on DEFAULT_SCOPE_MAPPING_CONFIG in any deployed or shared code path.
-DEFAULT_SCOPE_MAPPING_CONFIG = ModelScopeMappingConfig(
+# Do NOT rely on _DEFAULT_SCOPE_MAPPING_CONFIG in any deployed or shared code path.
+_DEFAULT_SCOPE_MAPPING_CONFIG = ModelScopeMappingConfig(
     path_mappings=(
         ModelPathScopeMapping(
             path_prefix="/Volumes/PRO-G40/Code/omniintelligence",

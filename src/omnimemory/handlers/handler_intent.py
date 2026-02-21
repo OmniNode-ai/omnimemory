@@ -128,6 +128,7 @@ class ModelHandlerIntentMetadata(  # omnimemory-model-exempt: handler metadata
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
         validate_assignment=True,
     )

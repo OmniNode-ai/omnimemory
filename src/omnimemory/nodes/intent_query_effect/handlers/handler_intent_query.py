@@ -72,7 +72,7 @@ class ModelIntentQueryConfigInfo(  # omnimemory-model-exempt: handler metadata
         default_min_confidence: Default minimum confidence threshold.
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     timeout_seconds: float = Field(
         ...,
@@ -110,6 +110,7 @@ class ModelIntentQueryHealth(  # omnimemory-model-exempt: handler health
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
         strict=True,
     )
@@ -159,7 +160,7 @@ class ModelIntentQueryMetadata(  # omnimemory-model-exempt: handler metadata
         config: Current configuration (None if not initialized).
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     name: str = Field(
         ...,
