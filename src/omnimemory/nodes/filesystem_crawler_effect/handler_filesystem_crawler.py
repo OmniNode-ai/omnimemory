@@ -419,6 +419,7 @@ class HandlerFilesystemCrawler:
 
                 files_walked += 1
                 abs_path_str = str(md_path.resolve())
+                resolved_path = Path(abs_path_str)  # Cache to avoid repeated syscalls
 
                 try:
                     stat = await asyncio.to_thread(md_path.stat)
@@ -453,7 +454,7 @@ class HandlerFilesystemCrawler:
                     skipped_count += 1
                     continue
 
-                scope_ref = _scope_ref_for_path(md_path.resolve(), resolved_mappings)
+                scope_ref = _scope_ref_for_path(resolved_path, resolved_mappings)
                 scope_refs_seen.add(scope_ref)
 
                 prior_state = await self._crawl_state_repo.get_state(
@@ -494,12 +495,12 @@ class HandlerFilesystemCrawler:
                 fingerprint = _compute_sha256(content)
                 blob_ref = f"sha256:{fingerprint}"
                 token_estimate = len(content) // 4
-                doc_type = _detect_doc_type(md_path.resolve())
-                source_type = _source_type_for_path(md_path.resolve())
+                doc_type = _detect_doc_type(resolved_path)
+                source_type = _source_type_for_path(resolved_path)
                 priority = _priority_hint_for_path(
-                    md_path.resolve(), self._config.path_prefixes
+                    resolved_path, self._config.path_prefixes
                 )
-                tags = _extract_tags(md_path.resolve(), doc_type)
+                tags = _extract_tags(resolved_path, doc_type)
 
                 if prior_state is None:
                     # New document
