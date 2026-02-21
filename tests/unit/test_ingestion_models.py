@@ -145,7 +145,7 @@ class TestModelCrawlTickCommand:
 
     def test_is_frozen(self) -> None:
         cmd = self._make()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             cmd.crawl_scope = "modified"  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -200,7 +200,7 @@ class TestModelDocumentDiscoveredEvent:
 
     def test_is_frozen(self) -> None:
         evt = self._make()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             evt.source_ref = "modified"  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -271,7 +271,7 @@ class TestModelDocumentChangedEvent:
 
     def test_is_frozen(self) -> None:
         evt = self._make()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             evt.source_ref = "modified"  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -310,7 +310,7 @@ class TestModelDocumentRemovedEvent:
 
     def test_is_frozen(self) -> None:
         evt = self._make()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             evt.source_ref = "modified"  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -340,7 +340,7 @@ class TestModelDocSourceConfig:
 
     def test_is_frozen(self) -> None:
         cfg = ModelDocSourceConfig()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             cfg.max_doc_items = 99  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -376,7 +376,7 @@ class TestModelPromotionThresholdSet:
             validated_to_shared_runs=20,
             validated_to_shared_used_rate=0.15,
         )
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ts.validated_to_shared_runs = 99  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -403,7 +403,7 @@ class TestModelContextPolicyConfig:
 
     def test_is_frozen(self) -> None:
         cfg = ModelContextPolicyConfig()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             cfg.max_total_items = 99  # type: ignore[misc]
 
     def test_round_trip_without_doc_config(self) -> None:
@@ -446,7 +446,7 @@ class TestModelContextItemStats:
 
     def test_is_frozen(self) -> None:
         stats = ModelContextItemStats(context_item_id="item-003")
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             stats.scored_runs = 99  # type: ignore[misc]
 
     def test_round_trip(self) -> None:
@@ -516,7 +516,7 @@ class TestModelPromotionDecision:
             tier_changed=True,
             reason="Test.",
         )
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             decision.tier_after = EnumPromotionTier.SHARED  # type: ignore[misc]
 
     def test_round_trip(self) -> None:

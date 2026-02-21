@@ -191,13 +191,15 @@ class HandlerIntentStorageAdapter:
             - ValueError: Invalid input data or configuration
             - Exception: Any other unexpected errors
         """
+        start_time = time.perf_counter()
+
         if not self._initialized or self._adapter is None:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
             return ModelIntentStorageResponse(
                 status="error",
                 error_message="Adapter not initialized. Call initialize() first.",
+                execution_time_ms=elapsed_ms,
             )
-
-        start_time = time.perf_counter()
         response: ModelIntentStorageResponse
 
         try:

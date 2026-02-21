@@ -81,7 +81,9 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
             - ModelIntentRecord.intent_category (str) -> ModelIntentRecordPayload.intent_category (str)
             - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
     """
-    # Ensure created_at_utc is timezone-aware (UTC) for the payload
+    # Ensure created_at_utc is timezone-aware (UTC) for the payload.
+    # Assumes naive datetimes from the database are UTC; database stores all
+    # timestamps in UTC.
     created_at = record.created_at_utc
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)

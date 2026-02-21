@@ -177,7 +177,13 @@ _DEFAULT_PRIORITY_HINTS: dict[EnumDetectedDocType, int] = {
 # ---------------------------------------------------------------------------
 # Default scope mapping config matching design doc §7 examples
 # ---------------------------------------------------------------------------
-
+#
+# WARNING: LOCAL-DEV CONVENIENCE ONLY.
+# This constant contains machine-specific paths (/Volumes/PRO-G40/Code/...,
+# /Users/jonah/.claude) that are only valid on the primary developer's machine.
+# In CI and production, callers MUST override this with a ModelScopeMappingConfig
+# built from environment-appropriate paths (e.g., read from config file or env vars).
+# Do NOT rely on DEFAULT_SCOPE_MAPPING_CONFIG in any deployed or shared code path.
 DEFAULT_SCOPE_MAPPING_CONFIG = ModelScopeMappingConfig(
     path_mappings=(
         ModelPathScopeMapping(

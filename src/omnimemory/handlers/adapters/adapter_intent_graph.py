@@ -439,8 +439,6 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                             options=init_options,
                         )
 
-                        self._initialized = True
-
                         # Log safe URI (without credentials)
                         safe_uri = f"{parsed_uri.scheme}://{parsed_uri.hostname}"
                         if parsed_uri.port:
@@ -451,7 +449,12 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                         )
 
                         # Ensure indexes exist for optimal query performance
+                        # self._initialized is set to True only after this completes
+                        # to prevent other coroutines from seeing a partially-initialized
+                        # adapter (race condition guard).
                         await self._ensure_indexes()
+
+                        self._initialized = True
 
                     except Exception as e:
                         logger.error(

@@ -94,8 +94,9 @@ class ModelContextItemStats(BaseModel):
     source_type: EnumContextSourceType | None = Field(
         default=None,
         description=(
-            "Source type of the ContextItem. Set at item creation; used to look up "
-            "the correct PromotionThresholdSet during promotion evaluation."
+            "Source type of the ContextItem. Used to look up the correct "
+            "PromotionThresholdSet during promotion evaluation. None when the "
+            "source type is not yet known or not applicable."
         ),
     )
     doc_version_hash: str | None = Field(

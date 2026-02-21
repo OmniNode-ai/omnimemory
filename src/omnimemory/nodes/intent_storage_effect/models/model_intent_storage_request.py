@@ -50,8 +50,9 @@ class ModelIntentStorageRequest(BaseModel):
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
-        validate_assignment=True,
+        from_attributes=True,
     )
 
     operation: Literal["store", "get_session", "get_distribution"] = Field(
