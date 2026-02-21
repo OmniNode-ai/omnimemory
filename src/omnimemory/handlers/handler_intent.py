@@ -79,6 +79,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from omnibase_core.models.intelligence import (
+    ModelIntentQueryResult as CoreIntentQueryResult,
+)
+from omnibase_core.models.intelligence import (
+    ModelIntentStorageResult as CoreIntentStorageResult,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.handlers.adapters.adapter_intent_graph import AdapterIntentGraph
@@ -86,8 +92,6 @@ from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
-    ModelIntentQueryResult,
-    ModelIntentStorageResult,
 )
 from omnimemory.utils.concurrency import (
     CircuitBreaker,
@@ -97,8 +101,7 @@ from omnimemory.utils.concurrency import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
-
-    from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
+    from omnibase_core.models.intelligence import ModelIntentClassificationOutput
 
 __all__ = [
     "CircuitBreakerOpenError",
@@ -533,7 +536,7 @@ class HandlerIntent:
         session_id: str,
         intent_data: ModelIntentClassificationOutput,
         correlation_id: str,
-    ) -> ModelIntentStorageResult:
+    ) -> CoreIntentStorageResult:
         """Store an intent classification linked to a session.
 
         Delegates to AdapterIntentGraph.store_intent() using MERGE semantics
@@ -570,9 +573,8 @@ class HandlerIntent:
                     "session_id": session_id,
                 },
             )
-            return ModelIntentStorageResult(
-                status="error",
-                session_id=session_id,
+            return CoreIntentStorageResult(
+                success=False,
                 error_message=str(e),
             )
 
@@ -620,7 +622,7 @@ class HandlerIntent:
             # Record success/failure based on adapter result.
             # Adapter-level errors (timeouts, connection failures) should trip
             # the circuit breaker, consistent with query_session behaviour.
-            if result.status == "success":
+            if result.success:
                 circuit_breaker.record_success()
             else:
                 circuit_breaker.record_failure()
@@ -645,7 +647,7 @@ class HandlerIntent:
         session_id: str,
         min_confidence: float | None = None,
         limit: int | None = None,
-    ) -> ModelIntentQueryResult:
+    ) -> CoreIntentQueryResult:
         """Retrieve intents for a specific session.
 
         Delegates to AdapterIntentGraph.get_session_intents() with optional
@@ -683,8 +685,8 @@ class HandlerIntent:
                     "session_id": session_id,
                 },
             )
-            return ModelIntentQueryResult(
-                status="error",
+            return CoreIntentQueryResult(
+                success=False,
                 error_message=str(e),
             )
 
@@ -722,7 +724,7 @@ class HandlerIntent:
                 limit=limit,
             )
             # Record success/failure based on adapter result.
-            if result.status != "error":
+            if result.success:
                 circuit_breaker.record_success()
             else:
                 circuit_breaker.record_failure()

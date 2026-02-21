@@ -311,7 +311,7 @@ class HandlerIntentStorageAdapter:
             correlation_id=correlation_id,
         )
 
-        if result.status == "success":
+        if result.success:
             return ModelIntentStorageResponse(
                 status="success",
                 intent_id=result.intent_id,
@@ -352,7 +352,7 @@ class HandlerIntentStorageAdapter:
             limit=request.limit,
         )
 
-        if result.status != "success":
+        if not result.success:
             return ModelIntentStorageResponse(
                 status="error",
                 error_message=result.error_message,
@@ -374,7 +374,7 @@ class HandlerIntentStorageAdapter:
                     intent_category=intent.intent_category,
                     confidence=intent.confidence,
                     keywords=list(intent.keywords),
-                    created_at_utc=intent.created_at_utc.isoformat(),
+                    created_at_utc=intent.created_at.isoformat(),
                     correlation_id=intent.correlation_id,
                 )
             )

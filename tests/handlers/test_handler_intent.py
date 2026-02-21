@@ -485,7 +485,7 @@ class TestCircuitBreaker:
                 correlation_id=str(uuid4()),
             )
 
-            assert result.status == "success"
+            assert result.success is True
             assert handler._circuit_breaker is not None
             assert handler._circuit_breaker.state == CircuitBreakerState.CLOSED
             assert handler._circuit_breaker.failure_count == 0
@@ -545,7 +545,7 @@ class TestCircuitBreaker:
                 correlation_id=str(uuid4()),
             )
 
-            assert result.status == "success"
+            assert result.success is True
             assert handler._circuit_breaker.failure_count == 0
 
 
@@ -578,7 +578,7 @@ class TestOperations:
                 correlation_id=correlation_id,
             )
 
-            assert result.status == "success"
+            assert result.success is True
             assert len(mock_adapter.store_intent_calls) == 1
 
             call = mock_adapter.store_intent_calls[0]
@@ -600,7 +600,7 @@ class TestOperations:
             correlation_id=correlation_id,
         )
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -637,7 +637,7 @@ class TestOperations:
                 limit=10,
             )
 
-            assert result.status == "success"
+            assert result.success is True
             assert len(result.intents) == 1
             assert len(mock_adapter.get_session_intents_calls) == 1
 
@@ -653,7 +653,7 @@ class TestOperations:
         """query_session on uninitialized handler should return error result."""
         result = await handler.query_session(session_id="session_123")
 
-        assert result.status == "error"
+        assert result.success is False
         assert result.error_message is not None
         assert "not initialized" in result.error_message.lower()
 
@@ -1017,14 +1017,14 @@ class TestIntegration:
                 intent_data=intent_data,
                 correlation_id=correlation_id,
             )
-            assert store_result.status == "success"
+            assert store_result.success is True
 
             # Query it back
             query_result = await handler.query_session(
                 session_id="session_123",
                 min_confidence=0.5,
             )
-            assert query_result.status == "success"
+            assert query_result.success is True
             assert len(query_result.intents) == 1
             assert query_result.intents[0].intent_category == "debugging"
 
