@@ -77,6 +77,7 @@ class ModelDocumentRemovedEvent(BaseModel):
     )
     last_known_content_fingerprint: str = Field(
         ...,
+        pattern=r"^[0-9a-f]{64}$",
         description="SHA-256 hex digest of the content at the last successful crawl",
     )
     last_known_source_version: str | None = Field(

@@ -121,6 +121,7 @@ class ModelDocumentChangedEvent(BaseModel):
     # Previous version fields (what changed)
     previous_content_fingerprint: str = Field(
         ...,
+        pattern=r"^[0-9a-f]{64}$",
         description="SHA-256 hex digest of the content before the change",
     )
     previous_source_version: str | None = Field(
