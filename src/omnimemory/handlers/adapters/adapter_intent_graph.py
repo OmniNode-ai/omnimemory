@@ -2,7 +2,8 @@
 # Copyright (c) 2025 OmniNode Team
 """Adapter for storing intent classifications in Memgraph.
 
-This adapter implements ProtocolIntentGraph from omnibase_spi,
+This adapter implements ProtocolIntentGraphAdapter from
+omnimemory.protocols.protocol_intent_graph_adapter,
 providing a Memgraph-backed implementation for storing and retrieving intent
 classifications.
 
@@ -53,7 +54,7 @@ Example::
     Initial implementation for OMN-1457.
 
 .. versionchanged:: 0.2.0
-    Implements ProtocolIntentGraph from omnibase_spi (OMN-1476).
+    Migrated to ProtocolIntentGraphAdapter from omnimemory.protocols.protocol_intent_graph_adapter (OMN-1476).
 """
 
 from __future__ import annotations
@@ -566,7 +567,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     ) -> ModelIntentStorageResult:
         """Store an intent classification linked to a session.
 
-        Implements ProtocolIntentGraph.store_intent.
+        Implements ProtocolIntentGraphAdapter.store_intent.
 
         Uses MERGE semantics to create or update the session and intent
         nodes. If an intent with the same category already exists for
@@ -625,7 +626,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
             float(confidence_raw) if isinstance(confidence_raw, int | float) else 0.0
         )
         keywords_raw = intent_data.keywords
-        keywords_val = list(keywords_raw) if isinstance(keywords_raw, list) else []
+        keywords_val = list(keywords_raw) if keywords_raw else []
 
         try:
             async with asyncio.timeout(self._config.timeout_seconds):
@@ -740,7 +741,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     ) -> ModelIntentQueryResult:
         """Get intents for a session with optional filtering.
 
-        Implements ProtocolIntentGraph.get_session_intents.
+        Implements ProtocolIntentGraphAdapter.get_session_intents.
 
         Retrieves intent classifications associated with the specified
         session, ordered by creation time (most recent first).
@@ -1284,7 +1285,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     async def health_check(self) -> bool:
         """Check if the intent graph storage is healthy and accessible.
 
-        Implements ProtocolIntentGraph.health_check.
+        Implements ProtocolIntentGraphAdapter.health_check.
 
         Returns:
             True if the storage is healthy, False otherwise.

@@ -10,6 +10,9 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §12
 Ticket: OMN-2426
 """
 
+import types
+from collections.abc import Mapping
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums.enum_context_source_type import EnumContextSourceType
@@ -120,12 +123,14 @@ PROMOTION_THRESHOLD_LINEAR_DERIVED = ModelPromotionThresholdSet(
     validated_to_shared_signal_floor=5,
 )
 
-DEFAULT_PROMOTION_THRESHOLDS: dict[
+DEFAULT_PROMOTION_THRESHOLDS: Mapping[
     EnumContextSourceType, ModelPromotionThresholdSet
-] = {
-    EnumContextSourceType.STATIC_STANDARDS: PROMOTION_THRESHOLD_STATIC_STANDARDS,
-    EnumContextSourceType.REPO_DERIVED: PROMOTION_THRESHOLD_REPO_DERIVED,
-    EnumContextSourceType.MEMORY_HOOK: PROMOTION_THRESHOLD_MEMORY_HOOK,
-    EnumContextSourceType.MEMORY_PATTERN: PROMOTION_THRESHOLD_MEMORY_PATTERN,
-    EnumContextSourceType.LINEAR_DERIVED: PROMOTION_THRESHOLD_LINEAR_DERIVED,
-}
+] = types.MappingProxyType(
+    {
+        EnumContextSourceType.STATIC_STANDARDS: PROMOTION_THRESHOLD_STATIC_STANDARDS,
+        EnumContextSourceType.REPO_DERIVED: PROMOTION_THRESHOLD_REPO_DERIVED,
+        EnumContextSourceType.MEMORY_HOOK: PROMOTION_THRESHOLD_MEMORY_HOOK,
+        EnumContextSourceType.MEMORY_PATTERN: PROMOTION_THRESHOLD_MEMORY_PATTERN,
+        EnumContextSourceType.LINEAR_DERIVED: PROMOTION_THRESHOLD_LINEAR_DERIVED,
+    }
+)

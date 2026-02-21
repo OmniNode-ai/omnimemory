@@ -200,10 +200,7 @@ class ProtocolIntentGraphAdapter(Protocol):
 
         Note:
             This method never raises on business errors - it returns
-            an error status in the result model instead.  The local
-            ``ModelIntentQueryResult`` (string ``status``) is distinct
-            from the core ``ModelIntentQueryResult`` (boolean ``success``)
-            returned by ``ProtocolIntentGraph`` from ``omnibase_spi``.
+            an error status in the result model instead.
         """
         ...
 
