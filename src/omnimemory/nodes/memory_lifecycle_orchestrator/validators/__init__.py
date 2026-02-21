@@ -4,29 +4,46 @@
 
 Validation logic for lifecycle state transitions.
 
-Validators (to be implemented):
-    - ValidatorLifecycleTransition: Validates state transition rules
+Validators:
+    ValidatorLifecycleTransition: Validates lifecycle state machine transitions.
+        Enforces the full 5-state memory lifecycle:
+        ACTIVE -> STALE -> EXPIRED -> ARCHIVED -> DELETED
+
+        With additional transitions:
+        STALE   -> ACTIVE   (soft refresh / promotion)
+        ARCHIVED -> ACTIVE  (restore from archive)
+        ACTIVE, STALE, EXPIRED, ARCHIVED -> DELETED (explicit deletion)
 
 Validation Rules:
     State transitions must follow the lifecycle state machine:
-    - ACTIVE -> EXPIRED (TTL expiration)
-    - ACTIVE -> ARCHIVED (explicit archival)
-    - EXPIRED -> ARCHIVED (post-expiration archival)
-    - ARCHIVED -> ACTIVE (restore command)
-    - Any -> DELETED (terminal state)
+    - ACTIVE  -> STALE, EXPIRED, DELETED
+    - STALE   -> ACTIVE, EXPIRED, DELETED
+    - EXPIRED -> ARCHIVED, DELETED
+    - ARCHIVED -> ACTIVE, DELETED
+    - DELETED -> (terminal, no transitions)
 
 Invalid Transitions:
     - DELETED -> any state (terminal, no recovery)
     - ARCHIVED -> EXPIRED (must restore first)
-    - EXPIRED -> ACTIVE (must archive then restore)
+    - EXPIRED -> ACTIVE   (must archive then restore)
+    - Self-transitions (same state to same state)
+
+Related Tickets:
+    - OMN-1603: Add adapter implementations for memory lifecycle orchestrator
+    - OMN-1453: OmniMemory P4b - Lifecycle Orchestrator Database Integration
 
 .. versionadded:: 0.1.0
-    Initial implementation for OMN-1453.
-
-Ticket: OMN-1453
+    Initial implementation for OMN-1603.
 """
 
-# TODO(OMN-1453): Add validator imports as implemented:
-#   ValidatorLifecycleTransition
+from omnimemory.nodes.memory_lifecycle_orchestrator.validators.validator_lifecycle_transition import (
+    VALID_TRANSITIONS,
+    ModelTransitionValidationResult,
+    ValidatorLifecycleTransition,
+)
 
-__all__: list[str] = []
+__all__: list[str] = [
+    "ValidatorLifecycleTransition",
+    "ModelTransitionValidationResult",
+    "VALID_TRANSITIONS",
+]
