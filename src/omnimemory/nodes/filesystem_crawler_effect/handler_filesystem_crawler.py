@@ -174,9 +174,8 @@ def _source_type_for_path(path: Path) -> EnumContextSourceType:
     Returns:
         The context source type enum value.
     """
-    path_str = str(path)
     for prefix in _STATIC_STANDARDS_PREFIXES:
-        if path_str.startswith(prefix):
+        if path.is_relative_to(Path(prefix)):
             return EnumContextSourceType.STATIC_STANDARDS
 
     if path.name == "CLAUDE.md":
@@ -199,13 +198,12 @@ def _priority_hint_for_path(path: Path, path_prefixes: list[str]) -> int:
     Returns:
         An integer in [0, 100].
     """
-    path_str = str(path)
     name_upper = path.name.upper()
     parts_lower = [p.lower() for p in path.parts]
 
     # ~/.claude/CLAUDE.md — global standards
     for prefix in _STATIC_STANDARDS_PREFIXES:
-        if path_str.startswith(prefix) and path.name == "CLAUDE.md":
+        if path.is_relative_to(Path(prefix)) and path.name == "CLAUDE.md":
             return 95
 
     # Any CLAUDE.md in a repo
@@ -251,12 +249,12 @@ def _scope_ref_for_path(
     Returns:
         The matched scope_ref, or DEFAULT_SCOPE_REF if no prefix matches.
     """
-    path_str = str(path)
     best_prefix_len = -1
     best_scope = DEFAULT_SCOPE_REF
 
     for prefix, scope in scope_mappings:
-        if path_str.startswith(prefix) and len(prefix) > best_prefix_len:
+        prefix_path = Path(prefix)
+        if path.is_relative_to(prefix_path) and len(prefix) > best_prefix_len:
             best_prefix_len = len(prefix)
             best_scope = scope
 
@@ -404,6 +402,8 @@ class HandlerFilesystemCrawler:
             ) -> list[Path]:
                 return list(_p.rglob(_g))
 
+            resolved_prefix_path = await asyncio.to_thread(prefix_path.resolve)
+
             for md_path in await asyncio.to_thread(_rglob_prefix):
                 if files_walked >= self._config.max_files_per_crawl:
                     truncated = True
@@ -418,8 +418,26 @@ class HandlerFilesystemCrawler:
                     break
 
                 files_walked += 1
-                abs_path_str = str(md_path.resolve())
-                resolved_path = Path(abs_path_str)  # Cache to avoid repeated syscalls
+                resolved_path = await asyncio.to_thread(md_path.resolve)
+
+                # Symlink escape guard: reject any path that resolves outside
+                # the configured prefix (e.g. a symlink pointing to /etc/passwd).
+                if not resolved_path.is_relative_to(resolved_prefix_path):
+                    logger.warning(
+                        "Resolved path escapes crawl prefix (possible symlink"
+                        " traversal), skipping",
+                        extra={
+                            "handler": HANDLER_ID_FILESYSTEM_CRAWLER,
+                            "path": str(md_path),
+                            "resolved_path": str(resolved_path),
+                            "prefix": str(resolved_prefix_path),
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+                    skipped_count += 1
+                    continue
+
+                abs_path_str = str(resolved_path)
 
                 try:
                     stat = await asyncio.to_thread(md_path.stat)
