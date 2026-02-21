@@ -67,7 +67,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
@@ -88,6 +88,7 @@ from omnimemory.nodes.filesystem_crawler_effect.models.model_filesystem_crawl_re
 )
 
 if TYPE_CHECKING:
+    from omnimemory.models.crawl.model_crawl_tick_command import TriggerSource
     from omnimemory.nodes.filesystem_crawler_effect.models.model_filesystem_crawler_config import (
         ModelFilesystemCrawlerConfig,
     )
@@ -110,9 +111,6 @@ _STATIC_STANDARDS_PREFIXES: tuple[str, ...] = (str(Path("~/.claude").expanduser(
 
 # Intermediate directory names excluded when heuristically extracting repo names from paths
 _SKIP_DIRS: frozenset[str] = frozenset({"src", "docs", "design", "plans", "handoffs"})
-
-# Valid trigger sources for crawl events
-TriggerSource = Literal["scheduled", "manual", "git_hook", "filesystem_watch"]
 
 
 def _compute_sha256(content: bytes) -> str:

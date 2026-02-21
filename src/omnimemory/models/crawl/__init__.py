@@ -3,7 +3,10 @@
 """Crawl-related models for the document ingestion pipeline."""
 
 from omnimemory.models.crawl.model_crawl_state_record import ModelCrawlStateRecord
-from omnimemory.models.crawl.model_crawl_tick_command import ModelCrawlTickCommand
+from omnimemory.models.crawl.model_crawl_tick_command import (
+    ModelCrawlTickCommand,
+    TriggerSource,
+)
 from omnimemory.models.crawl.model_document_changed_event import (
     ModelDocumentChangedEvent,
 )
@@ -17,6 +20,7 @@ from omnimemory.models.crawl.model_document_removed_event import (
 __all__ = [
     "ModelCrawlStateRecord",
     "ModelCrawlTickCommand",
+    "TriggerSource",
     "ModelDocumentChangedEvent",
     "ModelDocumentDiscoveredEvent",
     "ModelDocumentRemovedEvent",
