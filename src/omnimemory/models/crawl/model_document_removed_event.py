@@ -50,6 +50,10 @@ class ModelDocumentRemovedEvent(BaseModel):
         ...,
         description="Crawler that detected the removal",
     )
+    crawl_scope: str = Field(
+        ...,
+        description="Scope string from the originating crawl tick (e.g. 'omninode/omnimemory')",
+    )
     trigger_source: Literal["scheduled", "manual", "git_hook", "filesystem_watch"] = (
         Field(
             ...,

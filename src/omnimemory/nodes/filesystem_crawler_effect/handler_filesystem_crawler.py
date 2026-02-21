@@ -454,10 +454,6 @@ class HandlerFilesystemCrawler:
                     error_count += 1
                     continue
 
-                # Only mark as walked after a successful stat — a file deleted
-                # between rglob and stat must not be treated as "seen"
-                walked_paths.add(abs_path_str)
-
                 if stat.st_size > self._config.max_file_size_bytes:
                     logger.warning(
                         "File exceeds max_file_size_bytes, skipping",
@@ -471,6 +467,13 @@ class HandlerFilesystemCrawler:
                     )
                     skipped_count += 1
                     continue
+
+                # Only mark as walked after a successful stat and size check —
+                # a file deleted between rglob and stat, or a file that exceeds
+                # max_file_size_bytes, must not be treated as "seen". Size-exceeded
+                # files are treated as non-existent so that previously-indexed
+                # records for them trigger removal events on the next crawl.
+                walked_paths.add(abs_path_str)
 
                 scope_ref = _scope_ref_for_path(resolved_path, resolved_mappings)
                 scope_refs_seen.add(scope_ref)
@@ -638,6 +641,7 @@ class HandlerFilesystemCrawler:
                 scope_refs_seen=scope_refs_seen,
                 correlation_id=correlation_id,
                 emitted_at_utc=now_utc,
+                crawl_scope=crawl_scope,
                 trigger_source=trigger_source,
                 env_prefix=env_prefix,
                 publish_callback=publish_callback,
@@ -680,6 +684,7 @@ class HandlerFilesystemCrawler:
         scope_refs_seen: set[str],
         correlation_id: UUID,
         emitted_at_utc: datetime,
+        crawl_scope: str,
         trigger_source: TriggerSource,
         env_prefix: str,
         publish_callback: Callable[
@@ -694,12 +699,19 @@ class HandlerFilesystemCrawler:
         Using scope_refs_seen (collected per file during the walk) ensures that
         files assigned non-default scopes via scope_mappings are also checked.
 
+        When scope_refs_seen is non-empty, we also include DEFAULT_SCOPE_REF
+        if any configured prefix has no explicit scope_ref mapping (i.e. would
+        resolve to DEFAULT_SCOPE_REF). This prevents a gap where prefixes that
+        produce zero files during a crawl are never queried for removals because
+        they never contributed a scope_ref to scope_refs_seen.
+
         Args:
             walked_paths: Set of absolute path strings visited this run.
             scope_refs_seen: Set of all scope_ref values assigned to files
                 during the walk, collected as each file is processed.
             correlation_id: Correlation ID for event envelope.
             emitted_at_utc: UTC datetime when the crawl run started.
+            crawl_scope: Scope string from the originating crawl tick command.
             trigger_source: What triggered the crawl run.
             env_prefix: Environment prefix for topic construction.
             publish_callback: Async publish callback.
@@ -715,7 +727,20 @@ class HandlerFilesystemCrawler:
         # Fall back to prefix-level scopes if the walk produced no scope refs
         # (e.g. all prefixes were missing / no files found).
         if scope_refs_seen:
-            affected_scopes = scope_refs_seen
+            affected_scopes = set(scope_refs_seen)
+            # Also include DEFAULT_SCOPE_REF if any configured prefix has no
+            # explicit scope_ref mapping. Prefixes without explicit mappings
+            # resolve to DEFAULT_SCOPE_REF; if they produced zero files this
+            # run they never added DEFAULT_SCOPE_REF to scope_refs_seen, so
+            # stale records under DEFAULT_SCOPE_REF would be missed.
+            for prefix_str in self._config.path_prefixes:
+                prefix_path = Path(prefix_str)
+                if (
+                    _scope_ref_for_path(prefix_path, resolved_mappings)
+                    == DEFAULT_SCOPE_REF
+                ):
+                    affected_scopes.add(DEFAULT_SCOPE_REF)
+                    break
         else:
             affected_scopes = set()
             for prefix_str in self._config.path_prefixes:
@@ -736,6 +761,7 @@ class HandlerFilesystemCrawler:
                         correlation_id=correlation_id,
                         emitted_at_utc=emitted_at_utc,
                         crawler_type=EnumCrawlerType.FILESYSTEM,
+                        crawl_scope=crawl_scope,
                         trigger_source=trigger_source,
                         source_ref=record.source_ref,
                         source_type=source_type,
