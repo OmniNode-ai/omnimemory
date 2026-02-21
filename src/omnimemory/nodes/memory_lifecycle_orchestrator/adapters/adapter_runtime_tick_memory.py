@@ -143,7 +143,6 @@ class AdapterRuntimeTickMemory:
         - health_check() and describe() for introspection
 
     Attributes:
-        _container: ONEX container for dependency injection.
         _handler: Underlying HandlerMemoryTick instance.
         _initialized: Whether initialize() has been called.
     """
@@ -157,7 +156,6 @@ class AdapterRuntimeTickMemory:
         Note:
             Call initialize() before using process_tick().
         """
-        self._container = container
         self._handler = HandlerMemoryTick(container)
         self._initialized: bool = False
 

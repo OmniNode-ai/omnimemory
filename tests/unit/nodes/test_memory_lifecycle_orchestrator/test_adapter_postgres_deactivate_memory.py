@@ -85,6 +85,9 @@ class TestAdapterInitialization:
         self, adapter: AdapterPostgresDeactivateMemory
     ) -> None:
         """Adapter reports initialized after initialize() is called with a db_pool."""
+        # MagicMock() is a valid substitute here because HandlerMemoryExpire.initialize()
+        # only stores the pool reference (self._db_pool = db_pool) without type-checking
+        # it. No pool methods are called during initialization, so any object works.
         fake_pool = MagicMock()
         await adapter.initialize(db_pool=fake_pool)
         assert adapter.initialized is True

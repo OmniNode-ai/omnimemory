@@ -154,7 +154,6 @@ class AdapterPostgresDeactivateMemory:
         - health_check() and describe() for introspection
 
     Attributes:
-        _container: ONEX container for dependency injection.
         _handler: Underlying HandlerMemoryExpire instance.
         _initialized: Whether initialize() has been called.
     """
@@ -168,7 +167,6 @@ class AdapterPostgresDeactivateMemory:
         Note:
             Call initialize() with a db_pool before using deactivate().
         """
-        self._container = container
         self._handler = HandlerMemoryExpire(container)
         self._initialized: bool = False
 
@@ -188,7 +186,8 @@ class AdapterPostgresDeactivateMemory:
                 resilience. A default is created if not provided.
 
         Raises:
-            ValueError: If max_retries is less than 1.
+            ValueError: If max_retries is less than 1. Validation is delegated
+                to HandlerMemoryExpire.initialize(), which enforces this constraint.
         """
         await self._handler.initialize(
             db_pool=db_pool,

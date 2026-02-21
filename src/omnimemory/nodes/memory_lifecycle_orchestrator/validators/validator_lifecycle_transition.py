@@ -96,7 +96,7 @@ VALID_TRANSITIONS: MappingProxyType[
 
 class ModelTransitionValidationResult(
     BaseModel
-):  # omnimemory-model-exempt: handler result
+):  # omnimemory-model-exempt: validator result
     """Result of a lifecycle state transition validation.
 
     Attributes:
