@@ -3,7 +3,10 @@
 Maps incoming intent-classified events to storage requests.
 """
 
-from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
+from omnibase_core.models.intelligence import (
+    ModelIntentClassificationOutput,
+)
+
 from omnimemory.models.events import ModelIntentClassifiedEvent
 from omnimemory.nodes.intent_storage_effect.models import ModelIntentStorageRequest
 
@@ -23,6 +26,7 @@ def map_event_to_storage_request(
         operation="store",
         session_id=event.session_id,
         intent_data=ModelIntentClassificationOutput(
+            success=True,
             intent_category=event.intent_category,
             confidence=event.confidence,
             keywords=list(event.keywords),
