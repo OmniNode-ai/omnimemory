@@ -19,10 +19,10 @@ class ModelCrawlTickCommand(BaseModel):
     FilesystemCrawlerEffect (and future crawler nodes) via the
     ``onex.cmd.omnimemory.crawl-tick.v1`` topic.
 
-    # strict=True: JSON consumers must pass crawl_type as the enum value string
-    # (e.g. "filesystem"), not a dict. UUID fields must be passed as UUID objects
-    # or str — Pydantic v2 coerces str→UUID in non-strict mode, which is fine
-    # here since strict=True is NOT set on this command model.
+    This model does not use ``strict=True``, so Pydantic will coerce compatible
+    types (e.g. ``str`` → ``UUID``, ``str`` → ``EnumCrawlerType``). Callers
+    constructing the model from raw JSON via ``model_validate`` do not need to
+    pre-convert these fields.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
