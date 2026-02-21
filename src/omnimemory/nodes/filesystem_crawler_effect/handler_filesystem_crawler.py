@@ -147,6 +147,8 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
     ):
         return EnumDetectedDocType.DEEP_DIVE
 
+    # DEEP_DIVE is checked first; files matching both patterns (e.g.
+    # ARCHITECTURE_DEEP_DIVE.md) are classified as DEEP_DIVE by design.
     if name_upper.endswith(".MD") and (
         "ARCHITECTURE" in name_upper or "OVERVIEW" in name_upper
     ):
@@ -490,6 +492,11 @@ class HandlerFilesystemCrawler:
                 walked_paths.add(abs_path_str)
 
                 scope_ref = _scope_ref_for_path(resolved_path, resolved_mappings)
+                # Note: scope_refs_seen only contains scopes with at least one
+                # successfully stat'd and size-checked file. If all files in a
+                # scope fail stat checks, that scope never enters scope_refs_seen
+                # and stale state records for it will not be queried for removal
+                # in _detect_and_emit_removals. This is a known limitation.
                 scope_refs_seen.add(scope_ref)
 
                 prior_state = await self._crawl_state_repo.get_state(
