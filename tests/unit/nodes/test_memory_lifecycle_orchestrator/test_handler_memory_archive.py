@@ -1517,6 +1517,7 @@ class TestCompressionLevelConfiguration:
     Related ticket: OMN-1544
     """
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_default_compression_level_is_six(
         self,
@@ -1537,6 +1538,7 @@ class TestCompressionLevelConfiguration:
 
         assert handler.compression_level == 6
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_constructor_argument_sets_level(
         self,
@@ -1561,6 +1563,7 @@ class TestCompressionLevelConfiguration:
 
         assert handler.compression_level == 1
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_constructor_argument_max_level(
         self,
@@ -1585,6 +1588,7 @@ class TestCompressionLevelConfiguration:
 
         assert handler.compression_level == 9
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_env_var_sets_compression_level(
         self,
@@ -1605,6 +1609,7 @@ class TestCompressionLevelConfiguration:
 
         assert handler.compression_level == 3
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_constructor_argument_overrides_env_var(
         self,
@@ -1630,6 +1635,7 @@ class TestCompressionLevelConfiguration:
 
         assert handler.compression_level == 1
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_invalid_level_zero_raises_value_error(
         self,
@@ -1653,6 +1659,7 @@ class TestCompressionLevelConfiguration:
                 compression_level=0,
             )
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_invalid_level_ten_raises_value_error(
         self,
@@ -1676,6 +1683,7 @@ class TestCompressionLevelConfiguration:
                 compression_level=10,
             )
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_invalid_level_negative_raises_value_error(
         self,
@@ -1699,6 +1707,7 @@ class TestCompressionLevelConfiguration:
                 compression_level=-1,
             )
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_invalid_env_var_value_raises_value_error(
         self,
@@ -1721,6 +1730,7 @@ class TestCompressionLevelConfiguration:
         ):
             await handler.initialize(db_pool=None, archive_base_path=archive_base_path)
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_non_integer_env_var_raises_value_error(
         self,
@@ -1744,6 +1754,7 @@ class TestCompressionLevelConfiguration:
         ):
             await handler.initialize(db_pool=None, archive_base_path=archive_base_path)
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_compression_level_reflected_in_describe(
         self,
@@ -1770,6 +1781,7 @@ class TestCompressionLevelConfiguration:
 
         assert metadata.compression_level == 2
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_compression_level_affects_serialize_output(
         self,
@@ -1823,6 +1835,7 @@ class TestCompressionLevelConfiguration:
         # for highly compressible data (repeated characters)
         assert len(compressed_best) <= len(compressed_fast)
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_compression_level_resets_on_shutdown(
         self,

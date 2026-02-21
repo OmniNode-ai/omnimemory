@@ -18,9 +18,8 @@ Architecture:
 
     Scope Assignment:
         Path-to-scope mapping uses longest-prefix matching against the
-        scope_mappings list in ModelFilesystemCrawlerConfig. The first matching
-        prefix (in declaration order) wins. Paths with no match use
-        DEFAULT_SCOPE_REF.
+        scope_mappings list passed to crawl(). The longest matching prefix
+        wins. Paths with no match use DEFAULT_SCOPE_REF.
 
     Source Type Assignment:
         static_standards: ~/.claude/ prefixes and **/CLAUDE.md
