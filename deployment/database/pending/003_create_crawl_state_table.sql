@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS omnimemory_crawl_state (
     source_ref          TEXT        NOT NULL,
     crawler_type        TEXT        NOT NULL CHECK (crawler_type IN ('filesystem', 'git_repo', 'linear', 'watchdog')),
     scope_ref           TEXT        NOT NULL,
-    content_fingerprint TEXT        NOT NULL,
+    content_fingerprint TEXT        NOT NULL CHECK (length(content_fingerprint) = 64),
     source_version      TEXT,
     last_crawled_at_utc TIMESTAMPTZ NOT NULL,
     last_changed_at_utc TIMESTAMPTZ,

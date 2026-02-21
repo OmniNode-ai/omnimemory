@@ -43,6 +43,7 @@ Example::
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -106,7 +107,7 @@ class ModelIntentClassificationOutput(  # omnimemory-model-exempt: adapter inter
         le=1.0,
         description="Confidence score from 0.0 (no confidence) to 1.0 (full confidence)",
     )
-    keywords: list[str] = Field(
+    keywords: Sequence[str] = Field(
         default_factory=list,
         description="Keywords extracted from the text that contributed to classification",
     )
@@ -117,7 +118,7 @@ class ModelIntentClassificationOutput(  # omnimemory-model-exempt: adapter inter
             "use only; not stored in the graph database."
         ),
     )
-    metadata: dict[str, JsonType] = Field(
+    metadata: Mapping[str, JsonType] = Field(
         default_factory=dict,
         description=(
             "Additional key-value metadata (e.g., model version, timestamp). "
@@ -227,7 +228,7 @@ class ModelIntentRecord(BaseModel):  # omnimemory-model-exempt: adapter internal
         le=1.0,
         description="Confidence score from 0.0 to 1.0",
     )
-    keywords: list[str] = Field(
+    keywords: Sequence[str] = Field(
         default_factory=list,
         description="Keywords associated with this intent",
     )
@@ -278,7 +279,7 @@ class ModelIntentQueryResult(BaseModel):  # omnimemory-model-exempt: adapter int
         ...,
         description="Query status: 'success', 'error', 'not_found', or 'no_results'",
     )
-    intents: list[ModelIntentRecord] = Field(
+    intents: Sequence[ModelIntentRecord] = Field(
         default_factory=list,
         description="Intent records found, ordered by creation time",
     )
@@ -325,7 +326,7 @@ class ModelIntentDistributionResult(  # omnimemory-model-exempt: adapter interna
         ...,
         description="Query status - 'success' or 'error'",
     )
-    distribution: dict[str, int] = Field(
+    distribution: Mapping[str, int] = Field(
         default_factory=dict,
         description="Intent category counts",
     )

@@ -241,8 +241,9 @@ class IntentCypherTemplates:
 class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     """Adapter that wraps HandlerGraph for intent classification storage.
 
-    Implements the ProtocolIntentGraph protocol from omnibase_spi,
-    providing a Memgraph-backed implementation for storing and retrieving intent
+    Implements the ProtocolIntentGraphAdapter protocol from
+    omnimemory.protocols.protocol_intent_graph_adapter, providing a
+    Memgraph-backed implementation for storing and retrieving intent
     classifications.
 
     This adapter provides an intent-domain interface on top of the generic
