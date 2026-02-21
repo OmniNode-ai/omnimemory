@@ -205,8 +205,6 @@ class ValidatorLifecycleTransition:
                 f"Cannot transition from '{from_state.value}': DELETED is a "
                 "terminal state. No further transitions are permitted."
             )
-        elif not allowed:
-            reason = f"No transitions are permitted from '{from_state.value}' state."
         else:
             allowed_values = sorted(s.value for s in allowed)
             reason = (
