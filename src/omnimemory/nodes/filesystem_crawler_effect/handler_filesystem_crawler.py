@@ -148,6 +148,7 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
         name_upper == "DEEP_DIVE.MD"
         or name_upper.startswith("DEEP_DIVE_")
         or name_upper.endswith("_DEEP_DIVE.MD")
+        # Files with DEEP_DIVE mid-name (e.g. MY_DEEP_DIVE_SUMMARY.MD) fall through to UNKNOWN_MD by design.
     ):
         return EnumDetectedDocType.DEEP_DIVE
 
@@ -235,6 +236,14 @@ def _priority_hint_for_path(path: Path, path_prefixes: list[str]) -> int:
     # README at repo root: parent directory is one of the configured crawl prefixes
     if path.name.upper() == "README.MD" and str(path.parent) in path_prefixes:
         return 55
+
+    # Deep dive reports
+    if (
+        name_upper == "DEEP_DIVE.MD"
+        or name_upper.startswith("DEEP_DIVE_")
+        or name_upper.endswith("_DEEP_DIVE.MD")
+    ):
+        return 45
 
     return 35
 
