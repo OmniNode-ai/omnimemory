@@ -83,8 +83,11 @@ def map_to_intent_payload(record: ModelIntentRecord) -> ModelIntentRecordPayload
             - ModelIntentRecord.created_at_utc -> ModelIntentRecordPayload.created_at
     """
     # Ensure created_at_utc is timezone-aware (UTC) for the payload.
-    # Assumes naive datetimes from the database are UTC; database stores all
-    # timestamps in UTC.
+    # Only naive datetimes (tzinfo is None) are patched; already-aware datetimes
+    # are passed through unchanged. We do not raise for aware datetimes because
+    # the database driver (asyncpg / psycopg2) may return either form depending
+    # on connection settings. Naive values are safe to assume UTC here because
+    # the database schema stores all timestamps in UTC without tz metadata.
     created_at = record.created_at_utc
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)

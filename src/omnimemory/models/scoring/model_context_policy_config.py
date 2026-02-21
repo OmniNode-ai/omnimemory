@@ -12,7 +12,7 @@ Design doc: DESIGN_OMNIMEMORY_DOCUMENT_INGESTION_PIPELINE.md §13
 Ticket: OMN-2426
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from omnimemory.models.config.model_doc_source_config import ModelDocSourceConfig
 
@@ -90,3 +90,22 @@ class ModelContextPolicyConfig(BaseModel):
             "None = document ingestion disabled; engine runs in hook-only mode."
         ),
     )
+
+    @model_validator(mode="after")
+    def _validate_token_budget_fractions(self) -> "ModelContextPolicyConfig":
+        """Validate that hook and doc token budget fractions do not exceed 1.0.
+
+        When doc_source_config is set, the sum of hook_token_budget_fraction and
+        doc_token_budget_fraction_default must be at most 1.0 to prevent
+        silent over-allocation of the session token budget.
+        """
+        if self.doc_source_config is not None:
+            h = self.hook_token_budget_fraction
+            d = self.doc_source_config.doc_token_budget_fraction_default
+            total = h + d
+            if total > 1.0:
+                raise ValueError(
+                    f"hook_token_budget_fraction ({h}) + "
+                    f"doc_token_budget_fraction_default ({d}) = {total:.2f} exceeds 1.0"
+                )
+        return self

@@ -15,6 +15,7 @@ Ticket: OMN-2426
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from omnimemory.enums.enum_detected_doc_type import EnumDetectedDocType
 from omnimemory.models.config.model_linear_scope_mapping import (
@@ -333,7 +334,7 @@ class TestModelScopeMappingConfigSerialization:
 
     def test_model_is_frozen(self) -> None:
         cfg = ModelScopeMappingConfig()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             cfg.path_mappings = ()  # type: ignore[misc]
 
     def test_default_config_round_trip(self) -> None:
