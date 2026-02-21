@@ -139,11 +139,6 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
     if name == "CLAUDE.md":
         return EnumDetectedDocType.CLAUDE_MD
 
-    if name_upper.endswith(".MD") and (
-        "ARCHITECTURE" in name_upper or "OVERVIEW" in name_upper
-    ):
-        return EnumDetectedDocType.ARCHITECTURE_DOC
-
     if (
         name_upper == "DEEP_DIVE.MD"
         or name_upper.startswith("DEEP_DIVE_")
@@ -151,6 +146,11 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
         # Files with DEEP_DIVE mid-name (e.g. MY_DEEP_DIVE_SUMMARY.MD) fall through to UNKNOWN_MD by design.
     ):
         return EnumDetectedDocType.DEEP_DIVE
+
+    if name_upper.endswith(".MD") and (
+        "ARCHITECTURE" in name_upper or "OVERVIEW" in name_upper
+    ):
+        return EnumDetectedDocType.ARCHITECTURE_DOC
 
     if name.upper() == "README.MD":
         return EnumDetectedDocType.README

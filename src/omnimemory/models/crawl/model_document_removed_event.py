@@ -52,6 +52,7 @@ class ModelDocumentRemovedEvent(BaseModel):
     )
     crawl_scope: str = Field(
         ...,
+        min_length=1,
         description="Scope string from the originating crawl tick (e.g. 'omninode/omnimemory')",
     )
     trigger_source: Literal["scheduled", "manual", "git_hook", "filesystem_watch"] = (
@@ -62,6 +63,7 @@ class ModelDocumentRemovedEvent(BaseModel):
     )
     source_ref: str = Field(
         ...,
+        min_length=1,
         description="Absolute path, URL, or Linear ID of the removed document",
     )
     source_type: EnumContextSourceType = Field(
@@ -70,6 +72,7 @@ class ModelDocumentRemovedEvent(BaseModel):
     )
     scope_ref: str = Field(
         ...,
+        min_length=1,
         description="Scope assignment of the removed document",
     )
     last_known_content_fingerprint: str = Field(

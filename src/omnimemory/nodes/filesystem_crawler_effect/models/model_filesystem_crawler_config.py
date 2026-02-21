@@ -23,6 +23,8 @@ class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
     )
 
     # Path prefixes to crawl (longest-prefix scope mapping is applied externally)
+    # Note: strict=True in ConfigDict requires callers to pass a list[str] — not a
+    # tuple or generator — or Pydantic will raise a validation error.
     path_prefixes: list[str] = Field(
         default_factory=list,
         description=(

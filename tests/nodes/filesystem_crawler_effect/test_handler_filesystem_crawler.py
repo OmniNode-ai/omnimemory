@@ -287,6 +287,19 @@ class TestPriorityHintForPath:
             == 35
         )
 
+    @pytest.mark.unit
+    def test_readme_at_repo_root(self) -> None:
+        # Parent of README.md is /repo, which is in _PREFIXES → priority 55
+        assert _priority_hint_for_path(Path("/repo/README.md"), self._PREFIXES) == 55
+
+    @pytest.mark.unit
+    def test_readme_in_subdirectory(self) -> None:
+        # Parent of README.md is /repo/subdir, which is NOT in _PREFIXES → priority 35
+        assert (
+            _priority_hint_for_path(Path("/repo/subdir/README.md"), self._PREFIXES)
+            == 35
+        )
+
 
 class TestScopeRefForPath:
     @pytest.mark.unit
