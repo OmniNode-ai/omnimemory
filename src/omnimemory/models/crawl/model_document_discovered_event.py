@@ -89,7 +89,7 @@ class ModelDocumentDiscoveredEvent(BaseModel):
     token_estimate: int = Field(
         ...,
         ge=0,
-        description="Estimated token count computed as len(content) // 4",
+        description="Estimated token count computed as len(content.decode('utf-8', errors='replace')) // 4",
     )
 
     # Scope and classification

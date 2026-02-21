@@ -5,8 +5,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# omnimemory-model-exempt: handler config
-class ModelFilesystemCrawlerConfig(BaseModel):
+class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
+    BaseModel
+):
     """Configuration for HandlerFilesystemCrawler.
 
     Declares the filesystem path prefixes to walk, the .md file glob

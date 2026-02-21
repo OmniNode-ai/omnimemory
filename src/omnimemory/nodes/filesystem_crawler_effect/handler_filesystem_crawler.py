@@ -144,7 +144,11 @@ def _detect_doc_type(path: Path) -> EnumDetectedDocType:
     ):
         return EnumDetectedDocType.ARCHITECTURE_DOC
 
-    if name_upper.startswith("DEEP_DIVE") or "DEEP_DIVE" in name_upper:
+    if (
+        name_upper == "DEEP_DIVE.MD"
+        or name_upper.startswith("DEEP_DIVE_")
+        or name_upper.endswith("_DEEP_DIVE.MD")
+    ):
         return EnumDetectedDocType.DEEP_DIVE
 
     if name.upper() == "README.MD":
@@ -515,7 +519,7 @@ class HandlerFilesystemCrawler:
 
                 fingerprint = _compute_sha256(content)
                 blob_ref = f"sha256:{fingerprint}"
-                token_estimate = len(content) // 4
+                token_estimate = len(content.decode("utf-8", errors="replace")) // 4
                 doc_type = _detect_doc_type(resolved_path)
                 source_type = _source_type_for_path(resolved_path)
                 priority = _priority_hint_for_path(
