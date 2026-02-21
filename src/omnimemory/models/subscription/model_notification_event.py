@@ -19,7 +19,9 @@ from .model_notification_event_payload import (
 class ModelNotificationEvent(BaseModel):
     """Notification event for memory changes following ONEX standards."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, from_attributes=True
+    )
 
     event_id: str = Field(
         description="Unique event identifier (non-empty string)",

@@ -4,7 +4,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
 
@@ -73,3 +73,17 @@ class ModelCrawlStateRecord(BaseModel):
             "Not persisted by other crawler types"
         ),
     )
+
+    @field_validator("last_crawled_at_utc", mode="after")
+    @classmethod
+    def _require_tz_crawled(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("last_crawled_at_utc must be timezone-aware (UTC)")
+        return v
+
+    @field_validator("last_changed_at_utc", mode="after")
+    @classmethod
+    def _require_tz_changed(cls, v: datetime | None) -> datetime | None:
+        if v is not None and v.tzinfo is None:
+            raise ValueError("last_changed_at_utc must be timezone-aware (UTC)")
+        return v

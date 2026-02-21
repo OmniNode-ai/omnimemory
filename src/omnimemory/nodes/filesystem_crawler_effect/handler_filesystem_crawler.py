@@ -419,7 +419,6 @@ class HandlerFilesystemCrawler:
 
                 files_walked += 1
                 abs_path_str = str(md_path.resolve())
-                walked_paths.add(abs_path_str)
 
                 try:
                     stat = await asyncio.to_thread(md_path.stat)
@@ -435,6 +434,10 @@ class HandlerFilesystemCrawler:
                     )
                     error_count += 1
                     continue
+
+                # Only mark as walked after a successful stat — a file deleted
+                # between rglob and stat must not be treated as "seen"
+                walked_paths.add(abs_path_str)
 
                 if stat.st_size > self._config.max_file_size_bytes:
                     logger.warning(
@@ -596,17 +599,31 @@ class HandlerFilesystemCrawler:
             if truncated:
                 break
 
-        # Detect removals: state table entries not found in the walk
-        removed_count = await self._detect_and_emit_removals(
-            walked_paths=walked_paths,
-            scope_refs_seen=scope_refs_seen,
-            correlation_id=correlation_id,
-            emitted_at_utc=now_utc,
-            trigger_source=trigger_source,
-            env_prefix=env_prefix,
-            publish_callback=publish_callback,
-            resolved_mappings=resolved_mappings,
-        )
+        # Detect removals: state table entries not found in the walk.
+        # Skip when truncated — walked_paths is a subset of disk, so removal
+        # detection would emit spurious events for unvisited files.
+        if truncated:
+            logger.warning(
+                "crawl truncated at max_files_per_crawl; skipping removal"
+                " detection to avoid spurious removals",
+                extra={
+                    "handler": HANDLER_ID_FILESYSTEM_CRAWLER,
+                    "max_files_per_crawl": self._config.max_files_per_crawl,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            removed_count = 0
+        else:
+            removed_count = await self._detect_and_emit_removals(
+                walked_paths=walked_paths,
+                scope_refs_seen=scope_refs_seen,
+                correlation_id=correlation_id,
+                emitted_at_utc=now_utc,
+                trigger_source=trigger_source,
+                env_prefix=env_prefix,
+                publish_callback=publish_callback,
+                resolved_mappings=resolved_mappings,
+            )
 
         result = ModelFilesystemCrawlResult(
             files_walked=files_walked,

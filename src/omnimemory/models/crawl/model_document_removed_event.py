@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
@@ -76,3 +76,10 @@ class ModelDocumentRemovedEvent(BaseModel):
         default=None,
         description="Version identifier at the last successful crawl",
     )
+
+    @field_validator("emitted_at_utc", mode="after")
+    @classmethod
+    def _require_timezone_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("datetime must be timezone-aware (UTC)")
+        return v
