@@ -50,6 +50,7 @@ class ModelGraphMemoryConfig(BaseModel):
     model_config = ConfigDict(
         frozen=True,
         extra="forbid",
+        from_attributes=True,
     )
 
     max_depth: int = Field(
@@ -127,9 +128,11 @@ class ModelGraphMemoryConfig(BaseModel):
     retry_max_delay_seconds: float = Field(
         default=30.0,
         gt=0.0,
+        le=300.0,
         description=(
             "Maximum delay cap in seconds for exponential backoff. "
-            "Prevents unbounded wait times between retry attempts."
+            "Prevents unbounded wait times between retry attempts. "
+            "Range: gt=0.0, le=300.0."
         ),
     )
 
@@ -162,7 +165,12 @@ class ModelGraphMemoryConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_bounds(self) -> ModelGraphMemoryConfig:
-        """Ensure default values do not exceed their maximums."""
+        """Ensure default values do not exceed their maximums.
+
+        Note: frozen=True means this validator only runs at construction time.
+        Callers using model_copy(update={...}) bypass model validators — ensure
+        any retry delay ordering invariants are maintained at the call site.
+        """
         if self.default_depth > self.max_depth:
             msg = (
                 f"default_depth ({self.default_depth}) "
@@ -173,6 +181,12 @@ class ModelGraphMemoryConfig(BaseModel):
             msg = (
                 f"default_limit ({self.default_limit}) "
                 f"must be <= max_limit ({self.max_limit})"
+            )
+            raise ValueError(msg)
+        if self.retry_base_delay_seconds > self.retry_max_delay_seconds:
+            msg = (
+                f"retry_base_delay_seconds ({self.retry_base_delay_seconds}) "
+                f"must be <= retry_max_delay_seconds ({self.retry_max_delay_seconds})"
             )
             raise ValueError(msg)
         return self

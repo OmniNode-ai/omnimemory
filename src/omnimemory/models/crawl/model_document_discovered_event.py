@@ -53,6 +53,7 @@ class ModelDocumentDiscoveredEvent(BaseModel):
     )
     crawl_scope: str = Field(
         ...,
+        min_length=1,
         description="Scope string from the originating crawl tick (e.g. 'omninode/omnimemory')",
     )
     trigger_source: TriggerSource = Field(
@@ -63,6 +64,7 @@ class ModelDocumentDiscoveredEvent(BaseModel):
     # Document identity
     source_ref: str = Field(
         ...,
+        min_length=1,
         description="Absolute path, URL, or Linear ID that uniquely identifies this document",
     )
     source_type: EnumContextSourceType = Field(
@@ -77,10 +79,12 @@ class ModelDocumentDiscoveredEvent(BaseModel):
     # Content fingerprint (content stored in blob store, not inline)
     content_fingerprint: str = Field(
         ...,
+        pattern=r"^[0-9a-f]{64}$",
         description="SHA-256 hex digest of the raw document content",
     )
     content_blob_ref: str = Field(
         ...,
+        min_length=1,
         description=(
             "Pointer to blob storage entry containing the raw content. "
             "Format: 'sha256:<hex>' for content-addressed storage"
@@ -89,12 +93,13 @@ class ModelDocumentDiscoveredEvent(BaseModel):
     token_estimate: int = Field(
         ...,
         ge=0,
-        description="Estimated token count computed as len(content) // 4",
+        description="Estimated token count computed as len(content.decode('utf-8', errors='replace')) // 4",
     )
 
     # Scope and classification
     scope_ref: str = Field(
         ...,
+        min_length=1,
         description=(
             "Resolved scope assignment for this document "
             "(e.g. 'omninode/omnimemory')"

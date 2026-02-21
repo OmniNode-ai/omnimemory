@@ -14,7 +14,8 @@ Tests cover:
 - Priority hints: correct values per design §7
 - Doc type detection: CLAUDE.md, ARCHITECTURE, DEEP_DIVE, DESIGN, PLAN, etc.
 - Publish errors: non-fatal, crawl continues
-- File read errors: non-fatal, error_count incremented
+- File read errors: non-fatal, error_count incremented (_read_file_async returns None)
+- Symlink escape guard: symlink pointing outside crawl prefix increments skipped_count
 - max_files_per_crawl: truncation behaviour
 - Empty path_prefixes: no-op, zero events
 - Non-existent prefix: warning logged, no crash
@@ -284,6 +285,19 @@ class TestPriorityHintForPath:
     def test_unknown_md(self) -> None:
         assert (
             _priority_hint_for_path(Path("/repo/docs/something.md"), self._PREFIXES)
+            == 35
+        )
+
+    @pytest.mark.unit
+    def test_readme_at_repo_root(self) -> None:
+        # Parent of README.md is /repo, which is in _PREFIXES → priority 55
+        assert _priority_hint_for_path(Path("/repo/README.md"), self._PREFIXES) == 55
+
+    @pytest.mark.unit
+    def test_readme_in_subdirectory(self) -> None:
+        # Parent of README.md is /repo/subdir, which is NOT in _PREFIXES → priority 35
+        assert (
+            _priority_hint_for_path(Path("/repo/subdir/README.md"), self._PREFIXES)
             == 35
         )
 
@@ -759,6 +773,80 @@ class TestHandlerFilesystemCrawlerFileLimits:
         assert result.files_walked == 3
         # Should have discovered 3 (not 10)
         assert result.discovered_count == 3
+
+
+class TestHandlerFilesystemCrawlerReadErrors:
+    """File read errors are non-fatal; error_count is incremented."""
+
+    @pytest.mark.unit
+    async def test_read_file_error_increments_error_count(self, tmp_path: Path) -> None:
+        # Create a real file so rglob finds it and stat succeeds.
+        md_file = tmp_path / "unreadable.md"
+        md_file.write_bytes(b"# content")
+
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        # Patch the module-level _read_file_async so it returns None,
+        # simulating an OSError during file read.
+        with patch(
+            "omnimemory.nodes.filesystem_crawler_effect.handler_filesystem_crawler._read_file_async",
+            new=AsyncMock(return_value=None),
+        ):
+            result = await handler.crawl(
+                correlation_id=uuid4(),
+                crawl_scope="omninode/test",
+                trigger_source="scheduled",
+                env_prefix="dev",
+                publish_callback=publish,
+            )
+
+        assert result.error_count == 1
+        assert result.discovered_count == 0
+        assert not published
+
+
+class TestHandlerFilesystemCrawlerSymlinkEscape:
+    """Symlinks pointing outside the crawl prefix are rejected via skipped_count."""
+
+    @pytest.mark.unit
+    async def test_symlink_escaping_prefix_increments_skipped_count(
+        self, tmp_path: Path
+    ) -> None:
+        # Create a real file outside the crawl root.
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        target_file = outside_dir / "secret.md"
+        target_file.write_bytes(b"# secret")
+
+        # Crawl root is a separate subdirectory.
+        crawl_root = tmp_path / "crawl_root"
+        crawl_root.mkdir()
+
+        # Create a symlink inside crawl_root pointing at the outside file.
+        symlink = crawl_root / "escape.md"
+        symlink.symlink_to(target_file)
+
+        config = make_config(path_prefixes=[str(crawl_root)])
+        repo = make_mock_repo()
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        result = await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        # The symlink escape guard must increment skipped_count, not error_count.
+        assert result.skipped_count == 1
+        assert result.error_count == 0
+        assert result.files_walked == 0
+        assert not published
 
 
 class TestHandlerFilesystemCrawlerPublishErrors:

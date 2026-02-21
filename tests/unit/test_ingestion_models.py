@@ -276,6 +276,7 @@ class TestModelDocumentRemovedEvent:
             correlation_id=uuid4(),
             emitted_at_utc=datetime(2026, 2, 20, 0, 0, 0, tzinfo=timezone.utc),
             crawler_type=EnumCrawlerType.LINEAR,
+            crawl_scope="omninode/omnimemory",
             trigger_source="scheduled",
             source_ref="linear://OMN-1234",
             source_type=EnumContextSourceType.LINEAR_TICKET,

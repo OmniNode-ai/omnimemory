@@ -37,6 +37,7 @@ from . import (
 )
 from .crawl import (
     ModelCrawlStateRecord,
+    ModelCrawlTickCommand,
     ModelDocumentChangedEvent,
     ModelDocumentDiscoveredEvent,
     ModelDocumentRemovedEvent,
@@ -59,6 +60,7 @@ __all__ = [
     "utils",
     # Crawl models
     "ModelCrawlStateRecord",
+    "ModelCrawlTickCommand",
     "ModelDocumentChangedEvent",
     "ModelDocumentDiscoveredEvent",
     "ModelDocumentRemovedEvent",

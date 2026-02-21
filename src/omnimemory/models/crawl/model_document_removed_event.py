@@ -51,12 +51,18 @@ class ModelDocumentRemovedEvent(BaseModel):
         ...,
         description="Crawler that detected the removal",
     )
+    crawl_scope: str = Field(
+        ...,
+        min_length=1,
+        description="Scope string from the originating crawl tick (e.g. 'omninode/omnimemory')",
+    )
     trigger_source: TriggerSource = Field(
         ...,
         description="What triggered the crawl: scheduled, manual, git_hook, or filesystem_watch",
     )
     source_ref: str = Field(
         ...,
+        min_length=1,
         description="Absolute path, URL, or Linear ID of the removed document",
     )
     source_type: EnumContextSourceType = Field(
@@ -65,10 +71,12 @@ class ModelDocumentRemovedEvent(BaseModel):
     )
     scope_ref: str = Field(
         ...,
+        min_length=1,
         description="Scope assignment of the removed document",
     )
     last_known_content_fingerprint: str = Field(
         ...,
+        pattern=r"^[0-9a-f]{64}$",
         description="SHA-256 hex digest of the content at the last successful crawl",
     )
     last_known_source_version: str | None = Field(

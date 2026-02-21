@@ -5,8 +5,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# omnimemory-model-exempt: handler config
-class ModelFilesystemCrawlerConfig(BaseModel):
+class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
+    BaseModel
+):
     """Configuration for HandlerFilesystemCrawler.
 
     Declares the filesystem path prefixes to walk, the .md file glob
@@ -15,6 +16,10 @@ class ModelFilesystemCrawlerConfig(BaseModel):
     Note: Topic suffix defaults MUST match the ``event_bus.publish_topics``
     declared in this node's contract.yaml. The contract is the source of
     truth for topic declarations.
+
+    Note: This model uses ``strict=True``. All collection fields (e.g.
+    ``path_prefixes``) must be passed as the exact declared type (``list[str]``),
+    not a tuple or generator. Pydantic will raise a ValidationError otherwise.
     """
 
     model_config = ConfigDict(
@@ -22,6 +27,8 @@ class ModelFilesystemCrawlerConfig(BaseModel):
     )
 
     # Path prefixes to crawl (longest-prefix scope mapping is applied externally)
+    # Note: strict=True in ConfigDict requires callers to pass a list[str] — not a
+    # tuple or generator — or Pydantic will raise a validation error.
     path_prefixes: list[str] = Field(
         default_factory=list,
         description=(

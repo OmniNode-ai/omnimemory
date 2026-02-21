@@ -45,7 +45,7 @@ class TestMapEventToStorageRequest:
             correlation_id=UUID("660e8400-e29b-41d4-a716-446655440001"),
             intent_category="code_review",
             confidence=0.92,
-            keywords=["pull", "request", "review"],
+            keywords=("pull", "request", "review"),
             timestamp=datetime.now(timezone.utc),
         )
 
@@ -64,7 +64,7 @@ class TestMapEventToStorageRequest:
             correlation_id=correlation_id,
             intent_category="code_generation",  # Valid EnumIntentCategory value
             confidence=0.77,
-            keywords=["add", "feature"],
+            keywords=("add", "feature"),
             timestamp=datetime.now(timezone.utc),
         )
 

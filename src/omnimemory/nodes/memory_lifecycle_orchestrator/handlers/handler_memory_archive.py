@@ -354,6 +354,7 @@ class ModelMemoryRow(BaseModel):  # omnimemory-model-exempt: handler internal
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
         strict=True,
     )
@@ -379,7 +380,7 @@ class ModelCircuitBreakerConfigInfo(  # omnimemory-model-exempt: handler metadat
         success_threshold: Successes needed to close circuit.
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     failure_threshold: int = Field(
         ...,
@@ -410,6 +411,7 @@ class ModelMemoryArchiveHealth(BaseModel):  # omnimemory-model-exempt: handler h
     """
 
     model_config = ConfigDict(
+        frozen=True,
         extra="forbid",
         strict=True,
     )
@@ -454,7 +456,7 @@ class ModelMemoryArchiveMetadata(  # omnimemory-model-exempt: handler metadata
         circuit_breaker_config: Circuit breaker configuration.
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     name: str = Field(
         ...,

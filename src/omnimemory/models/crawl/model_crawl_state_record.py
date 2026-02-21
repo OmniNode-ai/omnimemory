@@ -28,6 +28,7 @@ class ModelCrawlStateRecord(BaseModel):
 
     source_ref: str = Field(
         ...,
+        min_length=1,
         description=(
             "Absolute path for filesystem crawls, URL for web crawls, "
             "or Linear ID for Linear crawls"
@@ -39,6 +40,7 @@ class ModelCrawlStateRecord(BaseModel):
     )
     scope_ref: str = Field(
         ...,
+        min_length=1,
         description=(
             "Scope assignment for this document (e.g. 'omninode/omnimemory'). "
             "Included in PK for scope migration safety"

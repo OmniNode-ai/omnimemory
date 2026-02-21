@@ -10,7 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelNotificationEventPayload(BaseModel):
     """Structured payload for notification events following ONEX standards."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, from_attributes=True
+    )
 
     entity_type: str = Field(
         description="Type of entity that changed (e.g., 'item', 'collection')",

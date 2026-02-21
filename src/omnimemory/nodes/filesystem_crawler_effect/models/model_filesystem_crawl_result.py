@@ -19,7 +19,16 @@ class ModelFilesystemCrawlResult(  # omnimemory-model-exempt: handler result
     files_walked: int = Field(
         ...,
         ge=0,
-        description="Total number of .md files found during the filesystem walk",
+        description=(
+            "Total number of .md files encountered by rglob that passed the "
+            "symlink guard, before any stat or size filtering. This counter is "
+            "incremented immediately after the symlink check. "
+            "Holds: files_walked == len(walked_paths) + error_count + size_exceeded_skipped, "
+            "where size_exceeded_skipped is the portion of skipped_count due to "
+            "max_file_size_bytes (NOT symlink-escaped files, which are rejected "
+            "before this counter is incremented and are tracked separately in "
+            "skipped_count)."
+        ),
     )
     discovered_count: int = Field(
         ...,
@@ -43,8 +52,10 @@ class ModelFilesystemCrawlResult(  # omnimemory-model-exempt: handler result
         ...,
         ge=0,
         description=(
-            "Number of files skipped (exceeded max_file_size_bytes or "
-            "other non-fatal exclusion)"
+            "Number of files skipped. Includes two categories: "
+            "(1) symlink-escaped files rejected before files_walked is incremented, "
+            "(2) files that exceeded max_file_size_bytes (counted in files_walked). "
+            "These two categories are not distinguished in this field."
         ),
     )
     removed_count: int = Field(
