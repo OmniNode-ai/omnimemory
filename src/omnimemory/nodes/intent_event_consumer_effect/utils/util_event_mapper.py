@@ -22,13 +22,22 @@ def map_event_to_storage_request(
 
     Returns:
         A storage request ready for HandlerIntentStorageAdapter.
+
+    Note:
+        Unknown intent_category values (from newer omniintelligence versions) are
+        mapped to EnumIntentCategory.UNKNOWN for forward compatibility.
     """
+    try:
+        intent_category: EnumIntentCategory = EnumIntentCategory(event.intent_category)
+    except ValueError:
+        intent_category = EnumIntentCategory.UNKNOWN
+
     return ModelIntentStorageRequest(
         operation="store",
         session_id=event.session_id,
         intent_data=ModelIntentClassificationOutput(
             success=True,
-            intent_category=EnumIntentCategory(event.intent_category),
+            intent_category=intent_category,
             confidence=event.confidence,
             keywords=list(event.keywords),
         ),

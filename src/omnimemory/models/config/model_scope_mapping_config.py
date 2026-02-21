@@ -182,64 +182,90 @@ _DEFAULT_PRIORITY_HINTS: Mapping[EnumDetectedDocType, int] = types.MappingProxyT
 # ---------------------------------------------------------------------------
 #
 # WARNING: LOCAL-DEV CONVENIENCE ONLY.
-# This constant contains machine-specific paths (/Volumes/PRO-G40/Code/...,
-# /Users/jonah/.claude) that are only valid on the primary developer's machine.
-# In CI and production, callers MUST override this with a ModelScopeMappingConfig
-# built from environment-appropriate paths (e.g., read from config file or env vars).
-# Do NOT rely on _DEFAULT_SCOPE_MAPPING_CONFIG in any deployed or shared code path.
-_DEFAULT_SCOPE_MAPPING_CONFIG = ModelScopeMappingConfig(
-    path_mappings=(
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code/omniintelligence",
-            scope_ref="omninode/omniintelligence",
+# The config returned by get_default_scope_mapping_config() contains
+# machine-specific paths (/Volumes/PRO-G40/Code/..., /Users/jonah/.claude)
+# that are only valid on the primary developer's machine.
+# In CI and production, callers MUST supply a ModelScopeMappingConfig
+# built from environment-appropriate paths (e.g., read from config file or
+# env vars). Do NOT call get_default_scope_mapping_config() in any deployed
+# or shared code path.
+
+
+def get_default_scope_mapping_config() -> ModelScopeMappingConfig:
+    """Return a local-dev convenience scope mapping config.
+
+    Constructs and returns a ``ModelScopeMappingConfig`` pre-populated with
+    machine-specific paths (``/Volumes/PRO-G40/Code/...``,
+    ``/Users/jonah/.claude``) that are only valid on the primary developer's
+    machine.
+
+    This function is intentionally lazy: the config is only constructed when
+    explicitly called, so importing this module in CI or production code does
+    not silently embed wrong paths via a module-level side effect.
+
+    Returns:
+        A ``ModelScopeMappingConfig`` covering the local developer's
+        filesystem layout and Linear team/project mappings.
+
+    Warning:
+        Do NOT call this function in any CI, staging, or production code path.
+        Callers in those environments must build their own
+        ``ModelScopeMappingConfig`` from environment-appropriate configuration
+        (e.g., environment variables or a config file).
+    """
+    return ModelScopeMappingConfig(
+        path_mappings=(
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code/omniintelligence",
+                scope_ref="omninode/omniintelligence",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code/omnimemory2",
+                scope_ref="omninode/omnimemory",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code/omnimemory",
+                scope_ref="omninode/omnimemory",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code/omnibase_core",
+                scope_ref="omninode/omnibase_core",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code/omni_save/design",
+                scope_ref="omninode/shared/design",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code/omni_save/plans",
+                scope_ref="omninode/shared/plans",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Users/jonah/.claude",
+                scope_ref="omninode/shared/global-standards",
+            ),
+            ModelPathScopeMapping(
+                path_prefix="/Volumes/PRO-G40/Code",
+                scope_ref="omninode/shared",
+            ),
         ),
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code/omnimemory2",
-            scope_ref="omninode/omnimemory",
+        linear_mappings=(
+            ModelLinearScopeMapping(
+                team="OmniNode",
+                project="OmniIntelligence",
+                scope_ref="omninode/omniintelligence",
+            ),
+            ModelLinearScopeMapping(
+                team="OmniNode",
+                project="OmniMemory",
+                scope_ref="omninode/omnimemory",
+            ),
+            ModelLinearScopeMapping(
+                team="OmniNode",
+                project=None,
+                scope_ref="omninode/shared",
+            ),
         ),
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code/omnimemory",
-            scope_ref="omninode/omnimemory",
-        ),
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code/omnibase_core",
-            scope_ref="omninode/omnibase_core",
-        ),
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code/omni_save/design",
-            scope_ref="omninode/shared/design",
-        ),
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code/omni_save/plans",
-            scope_ref="omninode/shared/plans",
-        ),
-        ModelPathScopeMapping(
-            path_prefix="/Users/jonah/.claude",
-            scope_ref="omninode/shared/global-standards",
-        ),
-        ModelPathScopeMapping(
-            path_prefix="/Volumes/PRO-G40/Code",
-            scope_ref="omninode/shared",
-        ),
-    ),
-    linear_mappings=(
-        ModelLinearScopeMapping(
-            team="OmniNode",
-            project="OmniIntelligence",
-            scope_ref="omninode/omniintelligence",
-        ),
-        ModelLinearScopeMapping(
-            team="OmniNode",
-            project="OmniMemory",
-            scope_ref="omninode/omnimemory",
-        ),
-        ModelLinearScopeMapping(
-            team="OmniNode",
-            project=None,
-            scope_ref="omninode/shared",
-        ),
-    ),
-    priority_hints={
-        "/Users/jonah/.claude/CLAUDE.md": 95,
-    },
-)
+        priority_hints={
+            "/Users/jonah/.claude/CLAUDE.md": 95,
+        },
+    )

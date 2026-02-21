@@ -616,7 +616,11 @@ class HandlerMemoryArchive:
                   3. Built-in default (6)
 
         Raises:
-            ValueError: If compression_level is outside the valid range 1-9.
+            ValueError: If ``compression_level`` (the argument) is outside
+                the valid range [1, 9], OR if the
+                ``OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL`` environment variable
+                is set but is not a valid integer (e.g. ``"fast"``), OR if
+                the integer parsed from the env var is outside [1, 9].
         """
         self._db_pool = db_pool
         self._orphan_tracker = orphan_tracker

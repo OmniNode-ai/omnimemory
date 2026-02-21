@@ -6,7 +6,7 @@ Tests cover:
 - Path-to-scope longest-prefix-match (basic, tie-break, no-match, path boundary)
 - Linear scope resolution (exact, team fallback, no-match)
 - Priority hint resolution (path override, doc-type lookup, default fallback)
-- _DEFAULT_SCOPE_MAPPING_CONFIG sanity checks
+- get_default_scope_mapping_config() sanity checks
 - ModelScopeMappingConfig round-trip serialization
 
 Ticket: OMN-2426
@@ -23,8 +23,8 @@ from omnimemory.models.config.model_linear_scope_mapping import (
 )
 from omnimemory.models.config.model_path_scope_mapping import ModelPathScopeMapping
 from omnimemory.models.config.model_scope_mapping_config import (
-    _DEFAULT_SCOPE_MAPPING_CONFIG,
     ModelScopeMappingConfig,
+    get_default_scope_mapping_config,
 )
 
 # ---------------------------------------------------------------------------
@@ -249,52 +249,52 @@ class TestResolvePriorityHint:
 
 
 # ---------------------------------------------------------------------------
-# _DEFAULT_SCOPE_MAPPING_CONFIG sanity checks
+# get_default_scope_mapping_config() sanity checks
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestDefaultScopeMappingConfig:
-    """Sanity-checks for the production default config."""
+    """Sanity-checks for the local-dev default config."""
 
     def test_global_claude_md_resolves_to_global_standards(self) -> None:
-        result = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_scope_for_path(
+        result = get_default_scope_mapping_config().resolve_scope_for_path(
             "/Users/jonah/.claude/CLAUDE.md"
         )
         assert result == "omninode/shared/global-standards"
 
     def test_repo_claude_md_resolves_to_repo_scope(self) -> None:
-        result = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_scope_for_path(
+        result = get_default_scope_mapping_config().resolve_scope_for_path(
             "/Volumes/PRO-G40/Code/omniintelligence/CLAUDE.md"
         )
         assert result == "omninode/omniintelligence"
 
     def test_omnimemory2_resolves_to_omnimemory(self) -> None:
-        result = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_scope_for_path(
+        result = get_default_scope_mapping_config().resolve_scope_for_path(
             "/Volumes/PRO-G40/Code/omnimemory2/src/omnimemory/models/foo.py"
         )
         assert result == "omninode/omnimemory"
 
     def test_design_doc_resolves_to_shared_design(self) -> None:
-        result = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_scope_for_path(
+        result = get_default_scope_mapping_config().resolve_scope_for_path(
             "/Volumes/PRO-G40/Code/omni_save/design/DESIGN_FOO.md"
         )
         assert result == "omninode/shared/design"
 
     def test_fallback_code_path_resolves_to_omninode_shared(self) -> None:
-        result = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_scope_for_path(
+        result = get_default_scope_mapping_config().resolve_scope_for_path(
             "/Volumes/PRO-G40/Code/some_unknown_repo/README.md"
         )
         assert result == "omninode/shared"
 
     def test_linear_omnimemory_project_resolves_correctly(self) -> None:
-        result = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_scope_for_linear(
+        result = get_default_scope_mapping_config().resolve_scope_for_linear(
             "OmniNode", "OmniMemory"
         )
         assert result == "omninode/omnimemory"
 
     def test_global_claude_md_priority_hint(self) -> None:
-        hint = _DEFAULT_SCOPE_MAPPING_CONFIG.resolve_priority_hint(
+        hint = get_default_scope_mapping_config().resolve_priority_hint(
             EnumDetectedDocType.CLAUDE_MD,
             absolute_path="/Users/jonah/.claude/CLAUDE.md",
         )
@@ -338,6 +338,7 @@ class TestModelScopeMappingConfigSerialization:
             cfg.path_mappings = ()  # type: ignore[misc]
 
     def test_default_config_round_trip(self) -> None:
-        data = _DEFAULT_SCOPE_MAPPING_CONFIG.model_dump()
+        default_cfg = get_default_scope_mapping_config()
+        data = default_cfg.model_dump()
         restored = ModelScopeMappingConfig.model_validate(data)
-        assert restored == _DEFAULT_SCOPE_MAPPING_CONFIG
+        assert restored == default_cfg

@@ -402,7 +402,24 @@ class HandlerFilesystemCrawler:
             def _rglob_prefix(
                 _p: Path = prefix_path, _g: str = file_glob
             ) -> list[Path]:
-                return list(_p.rglob(_g))
+                # Collect matching paths one-by-one so that a PermissionError
+                # or other OSError on an individual subdirectory does not abort
+                # the entire prefix walk.
+                results: list[Path] = []
+                try:
+                    for entry in _p.rglob(_g):
+                        results.append(entry)
+                except OSError as exc:
+                    logger.warning(
+                        "OSError during rglob, partial results returned",
+                        extra={
+                            "handler": HANDLER_ID_FILESYSTEM_CRAWLER,
+                            "prefix": str(_p),
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                return results
 
             for md_path in await asyncio.to_thread(_rglob_prefix):
                 if files_walked >= self._config.max_files_per_crawl:
