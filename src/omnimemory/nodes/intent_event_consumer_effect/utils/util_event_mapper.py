@@ -3,6 +3,7 @@
 Maps incoming intent-classified events to storage requests.
 """
 
+from omnibase_core.enums.intelligence import EnumIntentCategory
 from omnibase_core.models.intelligence import (
     ModelIntentClassificationOutput,
 )
@@ -27,7 +28,7 @@ def map_event_to_storage_request(
         session_id=event.session_id,
         intent_data=ModelIntentClassificationOutput(
             success=True,
-            intent_category=event.intent_category,
+            intent_category=EnumIntentCategory(event.intent_category),
             confidence=event.confidence,
             keywords=list(event.keywords),
         ),
