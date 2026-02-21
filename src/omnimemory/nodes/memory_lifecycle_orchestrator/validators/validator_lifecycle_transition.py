@@ -43,6 +43,8 @@ Related Tickets:
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.enums import EnumLifecycleState
@@ -58,36 +60,40 @@ __all__ = [
 # Key: source state, Value: set of valid destination states
 # ---------------------------------------------------------------------------
 
-VALID_TRANSITIONS: dict[EnumLifecycleState, frozenset[EnumLifecycleState]] = {
-    EnumLifecycleState.ACTIVE: frozenset(
-        {
-            EnumLifecycleState.STALE,
-            EnumLifecycleState.EXPIRED,
-            EnumLifecycleState.DELETED,
-        }
-    ),
-    EnumLifecycleState.STALE: frozenset(
-        {
-            EnumLifecycleState.ACTIVE,  # refreshed / promoted
-            EnumLifecycleState.EXPIRED,
-            EnumLifecycleState.DELETED,
-        }
-    ),
-    EnumLifecycleState.EXPIRED: frozenset(
-        {
-            EnumLifecycleState.ARCHIVED,
-            EnumLifecycleState.DELETED,
-        }
-    ),
-    EnumLifecycleState.ARCHIVED: frozenset(
-        {
-            EnumLifecycleState.ACTIVE,  # promoted / restored
-            EnumLifecycleState.DELETED,
-        }
-    ),
-    # DELETED is a terminal state - no outbound transitions.
-    EnumLifecycleState.DELETED: frozenset(),
-}
+VALID_TRANSITIONS: MappingProxyType[
+    EnumLifecycleState, frozenset[EnumLifecycleState]
+] = MappingProxyType(
+    {
+        EnumLifecycleState.ACTIVE: frozenset(
+            {
+                EnumLifecycleState.STALE,
+                EnumLifecycleState.EXPIRED,
+                EnumLifecycleState.DELETED,
+            }
+        ),
+        EnumLifecycleState.STALE: frozenset(
+            {
+                EnumLifecycleState.ACTIVE,  # refreshed / promoted
+                EnumLifecycleState.EXPIRED,
+                EnumLifecycleState.DELETED,
+            }
+        ),
+        EnumLifecycleState.EXPIRED: frozenset(
+            {
+                EnumLifecycleState.ARCHIVED,
+                EnumLifecycleState.DELETED,
+            }
+        ),
+        EnumLifecycleState.ARCHIVED: frozenset(
+            {
+                EnumLifecycleState.ACTIVE,  # promoted / restored
+                EnumLifecycleState.DELETED,
+            }
+        ),
+        # DELETED is a terminal state - no outbound transitions.
+        EnumLifecycleState.DELETED: frozenset(),
+    }
+)
 
 
 class ModelTransitionValidationResult(

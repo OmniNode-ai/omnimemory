@@ -56,6 +56,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
     HandlerMemoryExpire,
+    ModelExpireMemoryCommand,
     ModelMemoryExpireHealth,
     ModelMemoryExpireMetadata,
     ModelMemoryExpireResult,
@@ -252,10 +253,6 @@ class AdapterPostgresDeactivateMemory:
                 "AdapterPostgresDeactivateMemory not initialized. "
                 "Call initialize() before deactivate()."
             )
-        from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
-            ModelExpireMemoryCommand,
-        )
-
         command = ModelExpireMemoryCommand(
             memory_id=memory_id,
             expected_revision=expected_revision,
