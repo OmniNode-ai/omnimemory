@@ -22,7 +22,10 @@ class ModelFilesystemCrawlResult(  # omnimemory-model-exempt: handler result
         description=(
             "Total number of .md files that passed the symlink guard during the "
             "filesystem walk. Includes files that later failed stat checks "
-            "(see error_count) or exceeded max_file_size_bytes (see skipped_count)."
+            "(see error_count) or exceeded max_file_size_bytes. "
+            "Note: symlink-escaped files are in skipped_count but NOT in "
+            "files_walked; they are rejected before the files_walked counter "
+            "is incremented."
         ),
     )
     discovered_count: int = Field(

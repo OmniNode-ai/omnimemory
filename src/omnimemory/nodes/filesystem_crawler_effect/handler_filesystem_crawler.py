@@ -286,7 +286,8 @@ def _extract_tags(path: Path, doc_type: EnumDetectedDocType) -> list[str]:
         doc_type: Detected document type.
 
     Returns:
-        A deduplicated list of tag strings.
+        A list of tag strings. Tags are structurally distinct (different
+        prefixes), so duplicates cannot arise with the current logic.
     """
     tags: list[str] = []
 
