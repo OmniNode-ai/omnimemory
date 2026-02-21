@@ -22,7 +22,8 @@ Usage:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -32,6 +33,10 @@ from omnimemory.nodes.memory_lifecycle_orchestrator.adapters import (
     AdapterPostgresDeactivateMemory,
     ModelDeactivateAdapterHealth,
     ModelDeactivateAdapterMetadata,
+)
+from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
+    ModelExpireMemoryCommand,
+    ModelMemoryExpireResult,
 )
 
 # ---------------------------------------------------------------------------
@@ -139,6 +144,372 @@ class TestNotInitializedGuard:
 
 
 # ---------------------------------------------------------------------------
+# Command Delegation Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCommandDelegation:
+    """Verify that deactivate() and deactivate_with_retry() delegate correctly.
+
+    These tests bypass the real HandlerMemoryExpire by replacing the adapter's
+    internal _handler with an AsyncMock after initialization, so no database
+    connection is needed. This isolates the adapter's delegation logic from
+    the handler's database logic.
+    """
+
+    @pytest.mark.asyncio
+    async def test_deactivate_constructs_command_with_correct_memory_id(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() builds a ModelExpireMemoryCommand with the given memory_id."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate(memory_id=memory_id, expected_revision=1)
+
+        mock_handler.handle.assert_awaited_once()
+        command: ModelExpireMemoryCommand = mock_handler.handle.call_args[0][0]
+        assert command.memory_id == memory_id
+
+    @pytest.mark.asyncio
+    async def test_deactivate_constructs_command_with_correct_expected_revision(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() builds a ModelExpireMemoryCommand with the given expected_revision."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=6,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate(memory_id=memory_id, expected_revision=5)
+
+        command: ModelExpireMemoryCommand = mock_handler.handle.call_args[0][0]
+        assert command.expected_revision == 5
+
+    @pytest.mark.asyncio
+    async def test_deactivate_constructs_command_with_default_reason(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() uses 'ttl_expired' as the default reason in the command."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate(memory_id=memory_id, expected_revision=1)
+
+        command: ModelExpireMemoryCommand = mock_handler.handle.call_args[0][0]
+        assert command.reason == "ttl_expired"
+
+    @pytest.mark.asyncio
+    async def test_deactivate_constructs_command_with_custom_reason(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() passes a custom reason through to the command."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate(
+            memory_id=memory_id,
+            expected_revision=1,
+            reason="manual_admin_expire",
+        )
+
+        command: ModelExpireMemoryCommand = mock_handler.handle.call_args[0][0]
+        assert command.reason == "manual_admin_expire"
+
+    @pytest.mark.asyncio
+    async def test_deactivate_constructs_command_with_explicit_expired_at(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() passes an explicit expired_at timestamp through to the command."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        fixed_ts = datetime(2026, 1, 25, 12, 0, 0, tzinfo=timezone.utc)
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate(
+            memory_id=memory_id,
+            expected_revision=1,
+            expired_at=fixed_ts,
+        )
+
+        command: ModelExpireMemoryCommand = mock_handler.handle.call_args[0][0]
+        assert command.expired_at == fixed_ts
+
+    @pytest.mark.asyncio
+    async def test_deactivate_passes_command_to_handler_handle(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() calls handler.handle() with a ModelExpireMemoryCommand."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate(memory_id=memory_id, expected_revision=1)
+
+        mock_handler.handle.assert_awaited_once()
+        command: object = mock_handler.handle.call_args[0][0]
+        assert isinstance(command, ModelExpireMemoryCommand)
+
+    @pytest.mark.asyncio
+    async def test_deactivate_returns_handler_result(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() returns exactly the result produced by handler.handle()."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=7,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        result = await adapter.deactivate(memory_id=memory_id, expected_revision=6)
+
+        assert result is expected_result
+
+    @pytest.mark.asyncio
+    async def test_deactivate_returns_conflict_result_from_handler(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate() passes through a conflict result from handler unchanged."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        conflict_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=False,
+            conflict=True,
+            error_message="Revision conflict: expected 3, found 4",
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle = AsyncMock(return_value=conflict_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        result = await adapter.deactivate(memory_id=memory_id, expected_revision=3)
+
+        assert result is conflict_result
+        assert result.success is False
+        assert result.conflict is True
+
+    @pytest.mark.asyncio
+    async def test_deactivate_with_retry_delegates_to_handler_handle_with_retry(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate_with_retry() calls handler.handle_with_retry() with correct args."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=3,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate_with_retry(memory_id=memory_id, initial_revision=2)
+
+        mock_handler.handle_with_retry.assert_awaited_once_with(
+            memory_id=memory_id,
+            initial_revision=2,
+            reason="ttl_expired",
+            expired_at=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_deactivate_with_retry_returns_handler_result(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate_with_retry() returns exactly the result from handler.handle_with_retry()."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=5,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        result = await adapter.deactivate_with_retry(
+            memory_id=memory_id, initial_revision=4
+        )
+
+        assert result is expected_result
+
+    @pytest.mark.asyncio
+    async def test_deactivate_with_retry_passes_custom_reason(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate_with_retry() forwards a custom reason to handler.handle_with_retry()."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate_with_retry(
+            memory_id=memory_id,
+            initial_revision=1,
+            reason="scheduled_cleanup",
+        )
+
+        mock_handler.handle_with_retry.assert_awaited_once_with(
+            memory_id=memory_id,
+            initial_revision=1,
+            reason="scheduled_cleanup",
+            expired_at=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_deactivate_with_retry_passes_explicit_expired_at(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate_with_retry() forwards an explicit expired_at to handler.handle_with_retry()."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        fixed_ts = datetime(2026, 1, 25, 12, 0, 0, tzinfo=timezone.utc)
+        expected_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=True,
+            new_revision=2,
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(return_value=expected_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        await adapter.deactivate_with_retry(
+            memory_id=memory_id,
+            initial_revision=1,
+            expired_at=fixed_ts,
+        )
+
+        mock_handler.handle_with_retry.assert_awaited_once_with(
+            memory_id=memory_id,
+            initial_revision=1,
+            reason="ttl_expired",
+            expired_at=fixed_ts,
+        )
+
+    @pytest.mark.asyncio
+    async def test_deactivate_with_retry_returns_conflict_on_max_retries_exceeded(
+        self,
+        adapter: AdapterPostgresDeactivateMemory,
+        memory_id: UUID,
+    ) -> None:
+        """deactivate_with_retry() passes through a max-retries-exceeded conflict result."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+
+        exhausted_result = ModelMemoryExpireResult(
+            memory_id=memory_id,
+            success=False,
+            conflict=True,
+            error_message="Max retries (3) exceeded due to contention",
+        )
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(return_value=exhausted_result)
+        adapter._handler = mock_handler  # type: ignore[assignment]
+
+        result = await adapter.deactivate_with_retry(
+            memory_id=memory_id, initial_revision=1
+        )
+
+        assert result is exhausted_result
+        assert result.success is False
+        assert result.conflict is True
+
+
+# ---------------------------------------------------------------------------
 # Health Check Tests (without db_pool - tests model structure)
 # ---------------------------------------------------------------------------
 
@@ -233,8 +604,12 @@ class TestAdapterShutdown:
     async def test_shutdown_is_idempotent(
         self, adapter: AdapterPostgresDeactivateMemory
     ) -> None:
-        """Multiple shutdown() calls do not raise."""
+        """shutdown() after initialize() is idempotent: second call does not raise."""
+        fake_pool = MagicMock()
+        await adapter.initialize(db_pool=fake_pool)
+        assert adapter.initialized is True
         await adapter.shutdown()
+        assert adapter.initialized is False
         await adapter.shutdown()
         assert adapter.initialized is False
 

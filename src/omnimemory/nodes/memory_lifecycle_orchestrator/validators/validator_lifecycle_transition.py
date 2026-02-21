@@ -156,6 +156,7 @@ class ValidatorLifecycleTransition:
             to_state=EnumLifecycleState.ACTIVE,
         )
         assert result.valid is False
+        assert result.reason is not None
         assert "terminal" in result.reason
 
     Note:
