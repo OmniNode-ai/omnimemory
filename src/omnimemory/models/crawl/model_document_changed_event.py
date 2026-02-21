@@ -2,6 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Document changed event model for document ingestion pipeline."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
@@ -101,7 +102,7 @@ class ModelDocumentChangedEvent(BaseModel):
         ...,
         description="Document type classification",
     )
-    tags: list[str] = Field(
+    tags: Sequence[str] = Field(
         default_factory=list,
         description="Classification tags",
     )

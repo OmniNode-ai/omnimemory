@@ -14,8 +14,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-# Runtime import required for Pydantic model validation
-# (TYPE_CHECKING imports are not available at runtime for field type resolution)
 from omnimemory.handlers.adapters.models import (
     ModelIntentClassificationOutput,  # noqa: TC001
 )

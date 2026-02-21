@@ -2,6 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Document discovered event model for document ingestion pipeline."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
@@ -103,7 +104,7 @@ class ModelDocumentDiscoveredEvent(BaseModel):
         ...,
         description="Document type classification for chunking strategy selection",
     )
-    tags: list[str] = Field(
+    tags: Sequence[str] = Field(
         default_factory=list,
         description=(
             "Classification tags including file path, repo name, doc type, "

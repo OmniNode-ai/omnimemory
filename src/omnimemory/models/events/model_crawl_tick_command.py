@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
 
@@ -65,3 +65,10 @@ class ModelCrawlTickCommand(BaseModel):
             description="Mechanism that initiated this crawl tick.",
         )
     )
+
+    @field_validator("triggered_at_utc", mode="after")
+    @classmethod
+    def _require_timezone_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("datetime must be timezone-aware (UTC)")
+        return v
