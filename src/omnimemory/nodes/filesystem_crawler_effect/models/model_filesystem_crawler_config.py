@@ -16,6 +16,10 @@ class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
     Note: Topic suffix defaults MUST match the ``event_bus.publish_topics``
     declared in this node's contract.yaml. The contract is the source of
     truth for topic declarations.
+
+    Note: This model uses ``strict=True``. All collection fields (e.g.
+    ``path_prefixes``) must be passed as the exact declared type (``list[str]``),
+    not a tuple or generator. Pydantic will raise a ValidationError otherwise.
     """
 
     model_config = ConfigDict(

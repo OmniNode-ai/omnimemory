@@ -164,7 +164,12 @@ class ModelGraphMemoryConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_bounds(self) -> ModelGraphMemoryConfig:
-        """Ensure default values do not exceed their maximums."""
+        """Ensure default values do not exceed their maximums.
+
+        Note: frozen=True means this validator only runs at construction time.
+        Callers using model_copy(update={...}) bypass model validators — ensure
+        any retry delay ordering invariants are maintained at the call site.
+        """
         if self.default_depth > self.max_depth:
             msg = (
                 f"default_depth ({self.default_depth}) "
