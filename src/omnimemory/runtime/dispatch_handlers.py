@@ -312,20 +312,23 @@ def create_intent_query_dispatch_handler(
 # =============================================================================
 
 
-def create_lifecycle_dispatch_handler(
+def create_lifecycle_noop_dispatch_handler(
     *,
+    topic_label: str = "lifecycle",
     correlation_id: UUID | None = None,
 ) -> Callable[
     [ModelEventEnvelope[object], ProtocolHandlerContext],
     Awaitable[str],
 ]:
-    """Create a fail-fast dispatch handler for lifecycle orchestrator topics.
+    """Create a no-op dispatch handler for lifecycle orchestrator topics.
 
-    This is a fail-fast handler that raises RuntimeError on every invocation
-    to prevent silent data loss. The full implementation will be wired when
-    the memory_lifecycle_orchestrator handler integration is complete.
+    Receives runtime-tick, archive-memory, and expire-memory commands and
+    acknowledges them with structured logging. This prevents crashes when
+    upstream services send lifecycle commands before the full orchestrator
+    integration (OMN-1453, OMN-1524) is complete.
 
     Args:
+        topic_label: Human-readable label for this handler in log output.
         correlation_id: Optional fixed correlation ID for tracing.
 
     Returns:
@@ -336,7 +339,7 @@ def create_lifecycle_dispatch_handler(
         envelope: ModelEventEnvelope[object],
         context: ProtocolHandlerContext,
     ) -> str:
-        """Fail-fast handler: lifecycle orchestrator not yet wired."""
+        """No-op handler: lifecycle orchestrator not yet wired."""
         ctx_correlation_id = (
             correlation_id or getattr(context, "correlation_id", None) or uuid4()
         )
@@ -346,16 +349,139 @@ def create_lifecycle_dispatch_handler(
         if isinstance(payload, dict):
             payload_keys = list(payload.keys())
 
-        logger.error(
-            "Lifecycle dispatch handler not wired; refusing to ack message "
+        logger.info(
+            "Lifecycle handler received %s event — no-op (not yet implemented) "
             "(correlation_id=%s, payload_keys=%s)",
+            topic_label,
             ctx_correlation_id,
             payload_keys,
         )
-        raise RuntimeError(
-            f"Lifecycle dispatch handler not wired "
-            f"(correlation_id={ctx_correlation_id})"
+        return ""
+
+    return _handle
+
+
+def create_lifecycle_dispatch_handler(
+    *,
+    correlation_id: UUID | None = None,
+) -> Callable[
+    [ModelEventEnvelope[object], ProtocolHandlerContext],
+    Awaitable[str],
+]:
+    """Create a no-op dispatch handler for lifecycle orchestrator topics.
+
+    Previously a fail-fast handler that raised RuntimeError; now a no-op
+    with structured logging so that upstream lifecycle commands (runtime-tick,
+    archive-memory, expire-memory) are gracefully acknowledged instead of
+    crashing the service (OMN-2437).
+
+    Args:
+        correlation_id: Optional fixed correlation ID for tracing.
+
+    Returns:
+        Async handler function with signature (envelope, context) -> str.
+    """
+    return create_lifecycle_noop_dispatch_handler(
+        topic_label="lifecycle",
+        correlation_id=correlation_id,
+    )
+
+
+# =============================================================================
+# Bridge Handler: Memory Retrieval
+# =============================================================================
+
+
+def create_memory_retrieval_dispatch_handler(
+    *,
+    correlation_id: UUID | None = None,
+) -> Callable[
+    [ModelEventEnvelope[object], ProtocolHandlerContext],
+    Awaitable[str],
+]:
+    """Create a dispatch handler for memory-retrieval-requested commands.
+
+    Delegates to HandlerMemoryRetrieval (initialized with mock backends via
+    use_mock_handlers=True). Returns a serialised JSON response string.
+
+    The handler initialises HandlerMemoryRetrieval lazily on first call so
+    that container startup is not blocked by backend initialisation.
+
+    Args:
+        correlation_id: Optional fixed correlation ID for tracing.
+
+    Returns:
+        Async handler function with signature (envelope, context) -> str.
+    """
+    from omnimemory.nodes.memory_retrieval_effect.handlers import HandlerMemoryRetrieval
+    from omnimemory.nodes.memory_retrieval_effect.models import (
+        ModelHandlerMemoryRetrievalConfig,
+        ModelMemoryRetrievalRequest,
+    )
+
+    _retrieval_handler: HandlerMemoryRetrieval | None = None
+
+    async def _get_retrieval_handler() -> HandlerMemoryRetrieval:
+        nonlocal _retrieval_handler
+        if _retrieval_handler is None:
+            config = ModelHandlerMemoryRetrievalConfig(use_mock_handlers=True)
+            _retrieval_handler = HandlerMemoryRetrieval(config)
+            await _retrieval_handler.initialize()
+        return _retrieval_handler
+
+    async def _handle(
+        envelope: ModelEventEnvelope[object],
+        context: ProtocolHandlerContext,
+    ) -> str:
+        """Bridge handler: envelope -> HandlerMemoryRetrieval.execute()."""
+        ctx_correlation_id = (
+            correlation_id or getattr(context, "correlation_id", None) or uuid4()
         )
+
+        payload = envelope.payload
+
+        # Parse payload into ModelMemoryRetrievalRequest
+        if isinstance(payload, ModelMemoryRetrievalRequest):
+            request = payload
+        elif isinstance(payload, dict):
+            try:
+                request = ModelMemoryRetrievalRequest(**payload)
+            except Exception as exc:
+                msg = (
+                    f"Failed to parse payload as ModelMemoryRetrievalRequest: {exc} "
+                    f"(correlation_id={ctx_correlation_id})"
+                )
+                logger.warning(msg)
+                raise ValueError(msg) from exc
+        else:
+            msg = (
+                f"Unexpected payload type {type(payload).__name__} "
+                f"for memory-retrieval-requested "
+                f"(correlation_id={ctx_correlation_id})"
+            )
+            logger.warning(msg)
+            raise ValueError(msg)
+
+        logger.info(
+            "Dispatching memory-retrieval-requested via MessageDispatchEngine "
+            "(operation=%s, correlation_id=%s)",
+            request.operation,
+            ctx_correlation_id,
+        )
+
+        handler = await _get_retrieval_handler()
+        response = await handler.execute(request)
+
+        logger.info(
+            "Memory retrieval processed via dispatch engine "
+            "(operation=%s, status=%s, result_count=%d, correlation_id=%s)",
+            request.operation,
+            response.status,
+            len(response.results),
+            ctx_correlation_id,
+        )
+
+        return response.model_dump_json()
 
     return _handle
 
@@ -453,10 +579,10 @@ def create_memory_dispatch_engine(
         )
     )
 
-    # --- Handler 3: memory-retrieval-requested (fail-fast) ---
-    # Full HandlerMemoryRetrieval integration requires container-injected deps
-    # (vector store, DB adapters). Uses fail-fast handler until wired.
-    retrieval_handler = create_lifecycle_dispatch_handler()
+    # --- Handler 3: memory-retrieval-requested ---
+    # Uses HandlerMemoryRetrieval with mock backends so retrieval commands
+    # are served without external dependencies (OMN-2437).
+    retrieval_handler = create_memory_retrieval_dispatch_handler()
     engine.register_handler(
         handler_id="memory-retrieval-handler",
         handler=retrieval_handler,
@@ -702,5 +828,7 @@ __all__ = [
     "create_intent_classified_dispatch_handler",
     "create_intent_query_dispatch_handler",
     "create_lifecycle_dispatch_handler",
+    "create_lifecycle_noop_dispatch_handler",
     "create_memory_dispatch_engine",
+    "create_memory_retrieval_dispatch_handler",
 ]

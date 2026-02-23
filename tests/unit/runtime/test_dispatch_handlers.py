@@ -6,13 +6,15 @@ Validates:
     - Dispatch engine factory creates a frozen engine with correct routes/handlers
     - Bridge handler for intent-classified events delegates to consumer
     - Bridge handler for intent-query-requested events delegates to query handler
-    - Lifecycle handler raises RuntimeError (fail-fast, not wired)
+    - Lifecycle handler is a no-op (logs and returns empty string — OMN-2437)
+    - Memory retrieval handler delegates to HandlerMemoryRetrieval
     - Event bus callback deserializes bytes, wraps in envelope, dispatches
     - Event bus callback acks on success, nacks on failure
     - Topic alias mapping is correct
 
 Related:
     - OMN-2215: Phase 4 -- MessageDispatchEngine integration for omnimemory
+    - OMN-2437: Wire lifecycle orchestrator handlers (no-op) and retrieval handler
 """
 
 from __future__ import annotations
@@ -34,7 +36,9 @@ from omnimemory.runtime.dispatch_handlers import (
     create_intent_classified_dispatch_handler,
     create_intent_query_dispatch_handler,
     create_lifecycle_dispatch_handler,
+    create_lifecycle_noop_dispatch_handler,
     create_memory_dispatch_engine,
+    create_memory_retrieval_dispatch_handler,
 )
 
 # =============================================================================
@@ -535,20 +539,20 @@ class TestIntentQueryDispatchHandler:
 
 
 # =============================================================================
-# Tests: Lifecycle Dispatch Handler (fail-fast)
+# Tests: Lifecycle Dispatch Handler (no-op — OMN-2437)
 # =============================================================================
 
 
 @pytest.mark.unit
 class TestLifecycleDispatchHandler:
-    """Validate the fail-fast lifecycle dispatch handler."""
+    """Validate the no-op lifecycle dispatch handler (OMN-2437)."""
 
     @pytest.mark.asyncio
-    async def test_handler_raises_runtime_error(
+    async def test_handler_returns_empty_string_no_error(
         self,
         correlation_id: UUID,
     ) -> None:
-        """Lifecycle handler must raise RuntimeError (not silently drop)."""
+        """Lifecycle handler must not raise — it logs and returns empty string."""
         from omnibase_core.models.core.model_envelope_metadata import (
             ModelEnvelopeMetadata,
         )
@@ -575,15 +579,15 @@ class TestLifecycleDispatchHandler:
             envelope_id=uuid4(),
         )
 
-        with pytest.raises(RuntimeError, match="Lifecycle dispatch handler not wired"):
-            await handler(envelope, context)
+        result = await handler(envelope, context)
+        assert result == ""
 
     @pytest.mark.asyncio
-    async def test_handler_includes_correlation_id_in_error(
+    async def test_noop_handler_handles_archive_payload(
         self,
         correlation_id: UUID,
     ) -> None:
-        """RuntimeError message must include correlation_id for debugging."""
+        """No-op handler must not raise for archive-memory payloads."""
         from omnibase_core.models.events.model_event_envelope import (
             ModelEventEnvelope,
         )
@@ -591,7 +595,8 @@ class TestLifecycleDispatchHandler:
             ModelOrchestratorContext,
         )
 
-        handler = create_lifecycle_dispatch_handler(
+        handler = create_lifecycle_noop_dispatch_handler(
+            topic_label="archive-memory",
             correlation_id=correlation_id,
         )
 
@@ -604,7 +609,139 @@ class TestLifecycleDispatchHandler:
             envelope_id=uuid4(),
         )
 
-        with pytest.raises(RuntimeError, match=str(correlation_id)):
+        result = await handler(envelope, context)
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_noop_handler_handles_expire_payload(
+        self,
+        correlation_id: UUID,
+    ) -> None:
+        """No-op handler must not raise for expire-memory payloads."""
+        from omnibase_core.models.events.model_event_envelope import (
+            ModelEventEnvelope,
+        )
+        from omnibase_core.models.orchestrator.model_orchestrator_context import (
+            ModelOrchestratorContext,
+        )
+
+        handler = create_lifecycle_noop_dispatch_handler(
+            topic_label="expire-memory",
+            correlation_id=correlation_id,
+        )
+
+        envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
+            payload={"memory_id": "abc123", "reason": "ttl_expired"},
+            correlation_id=correlation_id,
+        )
+        context = ModelOrchestratorContext(
+            correlation_id=correlation_id,
+            envelope_id=uuid4(),
+        )
+
+        result = await handler(envelope, context)
+        assert result == ""
+
+
+# =============================================================================
+# Tests: Memory Retrieval Dispatch Handler (OMN-2437)
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestMemoryRetrievalDispatchHandler:
+    """Validate the memory retrieval dispatch handler (OMN-2437)."""
+
+    @pytest.mark.asyncio
+    async def test_handler_processes_search_text_request(
+        self,
+        correlation_id: UUID,
+    ) -> None:
+        """Retrieval handler must process a valid search_text request."""
+        from omnibase_core.models.core.model_envelope_metadata import (
+            ModelEnvelopeMetadata,
+        )
+        from omnibase_core.models.effect.model_effect_context import ModelEffectContext
+        from omnibase_core.models.events.model_event_envelope import (
+            ModelEventEnvelope,
+        )
+
+        handler = create_memory_retrieval_dispatch_handler(
+            correlation_id=correlation_id,
+        )
+
+        envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
+            payload={"operation": "search_text", "query_text": "authentication"},
+            correlation_id=correlation_id,
+            metadata=ModelEnvelopeMetadata(
+                tags={"message_category": "command"},
+            ),
+        )
+        context = ModelEffectContext(
+            correlation_id=correlation_id,
+            envelope_id=uuid4(),
+        )
+
+        result = await handler(envelope, context)
+        assert isinstance(result, str)
+        # Response is JSON — must be non-empty and parseable
+        import json
+
+        parsed = json.loads(result)
+        assert "status" in parsed
+
+    @pytest.mark.asyncio
+    async def test_handler_raises_for_invalid_payload(
+        self,
+        correlation_id: UUID,
+    ) -> None:
+        """Retrieval handler must raise ValueError for unparseable payloads."""
+        from omnibase_core.models.effect.model_effect_context import ModelEffectContext
+        from omnibase_core.models.events.model_event_envelope import (
+            ModelEventEnvelope,
+        )
+
+        handler = create_memory_retrieval_dispatch_handler(
+            correlation_id=correlation_id,
+        )
+
+        envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
+            payload={"operation": "search"},  # missing query_text / query_embedding
+            correlation_id=correlation_id,
+        )
+        context = ModelEffectContext(
+            correlation_id=correlation_id,
+            envelope_id=uuid4(),
+        )
+
+        with pytest.raises(ValueError, match="Failed to parse payload"):
+            await handler(envelope, context)
+
+    @pytest.mark.asyncio
+    async def test_handler_raises_for_non_dict_payload(
+        self,
+        correlation_id: UUID,
+    ) -> None:
+        """Retrieval handler must raise ValueError for non-dict payloads."""
+        from omnibase_core.models.effect.model_effect_context import ModelEffectContext
+        from omnibase_core.models.events.model_event_envelope import (
+            ModelEventEnvelope,
+        )
+
+        handler = create_memory_retrieval_dispatch_handler(
+            correlation_id=correlation_id,
+        )
+
+        envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
+            payload=42,
+            correlation_id=correlation_id,
+        )
+        context = ModelEffectContext(
+            correlation_id=correlation_id,
+            envelope_id=uuid4(),
+        )
+
+        with pytest.raises(ValueError, match="Unexpected payload type"):
             await handler(envelope, context)
 
 
