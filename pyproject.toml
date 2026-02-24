@@ -39,7 +39,7 @@ dependencies = [
     "alembic>=1.13.0,<2.0.0",
 
     # Redis support for caching and ephemeral memory
-    "redis>=6.4.0,<7.0.0",
+    "redis>=6.4.0,<8.0.0",
 
     # Vector database support
     # Pinecone for vector memory storage
