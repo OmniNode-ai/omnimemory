@@ -39,11 +39,11 @@ dependencies = [
     "alembic>=1.13.0,<2.0.0",
 
     # Redis support for caching and ephemeral memory
-    "redis>=6.4.0,<7.0.0",
+    "redis>=6.4.0,<8.0.0",
 
     # Vector database support
     # Pinecone for vector memory storage
-    "pinecone-client>=4.1.0,<5.0.0",
+    "pinecone-client>=4.1.0,<7.0.0",
     # qdrant-client is a transitive dep; ceiling at <1.17.0 because 1.17.0 applies
     # PEP 604 union syntax to protobuf EnumTypeWrapper objects, causing TypeError at
     # import time under Python 3.12. Remove ceiling once fixed upstream.
@@ -71,7 +71,7 @@ dependencies = [
     "pydantic-settings>=2.10.1,<3.0.0",
     "psutil>=7.0.0,<8.0.0",
     "aiohttp>=3.12.15,<4.0.0",
-    "cachetools>=6.2.4,<7.0.0",
+    "cachetools>=6.2.4,<8.0.0",
 ]
 
 [project.urls]
@@ -90,8 +90,8 @@ packages = ["src/omnimemory"]
 [dependency-groups]
 dev = [
     # Testing framework
-    "pytest>=8.3.4,<9.0.0",
-    "pytest-asyncio>=0.25.0,<1.0.0",
+    "pytest>=8.3.4,<10.0.0",
+    "pytest-asyncio>=0.25.0,<2.0.0",
     "pytest-cov>=6.0.0,<7.0.0",
     "pytest-timeout>=2.3.1,<3.0.0",
     "pytest-split>=0.10.0,<1.0.0",
