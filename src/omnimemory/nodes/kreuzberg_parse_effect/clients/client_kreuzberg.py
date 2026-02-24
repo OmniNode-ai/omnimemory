@@ -94,7 +94,12 @@ async def call_kreuzberg_extract(
             detail=exc.response.text[:200],
         ) from exc
 
-    response_data: list[dict[str, object]] = response.json()
+    response_data = response.json()
+    if not isinstance(response_data, list):
+        raise KreuzbergExtractionError(
+            status_code=200,
+            detail=f"kreuzberg returned unexpected response type: {type(response_data).__name__}",
+        )
     if not response_data:
         raise KreuzbergExtractionError(
             status_code=200,

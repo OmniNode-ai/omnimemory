@@ -269,7 +269,29 @@ class HandlerKreuzbergParse:
         # ------------------------------------------------------------------
         # Step 3: Read file bytes (deferred until after idempotency check)
         # ------------------------------------------------------------------
-        file_bytes: bytes = await asyncio.to_thread(validated_path.read_bytes)
+        try:
+            file_bytes: bytes = await asyncio.to_thread(validated_path.read_bytes)
+        except OSError as exc:
+            _log.warning(
+                "Failed to read source file",
+                extra={"source_url": source_url, "error": str(exc)},
+            )
+            failed_event = ModelDocumentParseFailedEvent(
+                correlation_id=event.correlation_id,
+                emitted_at_utc=now,
+                source_url=source_url,
+                content_hash=content_hash,
+                error_code="parse_error",
+                error_detail=f"Failed to read source file: {exc}",
+                parser_version=config.parser_version,
+            )
+            await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
+            return ModelKreuzbergParseResult(
+                indexed_count=0,
+                failed_count=1,
+                skipped_too_large_count=0,
+                timeout_count=0,
+            )
 
         # ------------------------------------------------------------------
         # Step 4: Hard limit — too large
