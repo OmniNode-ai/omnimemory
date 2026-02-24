@@ -34,6 +34,7 @@ from omnimemory.models.crawl.model_document_discovered_event import (
     ModelDocumentDiscoveredEvent,
 )
 from omnimemory.nodes.kreuzberg_parse_effect.clients.client_kreuzberg import (
+    KreuzbergExtractionError,
     KreuzbergExtractResult,
     KreuzbergTimeoutError,
 )
@@ -155,7 +156,7 @@ async def _run_handler(
 async def test_too_large_file_emits_parse_failed(tmp_path: Path) -> None:
     """Documents exceeding max_doc_bytes emit parse-failed without calling kreuzberg."""
     config = _make_config(
-        text_store_path=str(tmp_path / "texts"),
+        text_store_path=str(tmp_path),
         max_doc_bytes=10,
     )
     source_ref = str(tmp_path / "big_doc.md")
@@ -195,7 +196,7 @@ async def test_too_large_file_emits_parse_failed(tmp_path: Path) -> None:
 async def test_successful_parse_inline_text(tmp_path: Path) -> None:
     """Short extracted text (<4096 chars) is stored inline in the event."""
     config = _make_config(
-        text_store_path=str(tmp_path / "texts"),
+        text_store_path=str(tmp_path),
         inline_text_max_chars=4096,
     )
     source_ref = str(tmp_path / "small_doc.md")
@@ -222,7 +223,7 @@ async def test_successful_parse_inline_text(tmp_path: Path) -> None:
 async def test_successful_parse_file_pointer(tmp_path: Path) -> None:
     """Long extracted text (>= inline_text_max_chars) is referenced via file://."""
     config = _make_config(
-        text_store_path=str(tmp_path / "texts"),
+        text_store_path=str(tmp_path),
         inline_text_max_chars=10,  # very small threshold
     )
     source_ref = str(tmp_path / "large_doc.md")
@@ -250,7 +251,7 @@ async def test_successful_parse_file_pointer(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_timeout_emits_parse_failed(tmp_path: Path) -> None:
     """KreuzbergTimeoutError from the client maps to error_code=timeout."""
-    config = _make_config(text_store_path=str(tmp_path / "texts"))
+    config = _make_config(text_store_path=str(tmp_path))
     source_ref = str(tmp_path / "timeout_doc.md")
     event = _make_discovered_event(source_ref=source_ref)
 
@@ -272,7 +273,7 @@ async def test_timeout_emits_parse_failed(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_idempotent_second_call_no_reparse(tmp_path: Path) -> None:
     """Second call with same fingerprint re-emits indexed event without calling kreuzberg."""
-    config = _make_config(text_store_path=str(tmp_path / "texts"))
+    config = _make_config(text_store_path=str(tmp_path))
     source_ref = str(tmp_path / "idempotent_doc.md")
     fingerprint = _FAKE_FINGERPRINT
     event = _make_discovered_event(
@@ -319,3 +320,29 @@ async def test_idempotent_second_call_no_reparse(tmp_path: Path) -> None:
     for topic, payload in published:
         assert "document-indexed" in topic
         assert payload["extracted_text_ref"] == cached_text
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_kreuzberg_extraction_error_emits_parse_failed(tmp_path: Path) -> None:
+    """KreuzbergExtractionError from the client maps to error_code=parse_error."""
+    config = _make_config(text_store_path=str(tmp_path))
+    source_ref = str(tmp_path / "error_doc.md")
+    event = _make_discovered_event(source_ref=source_ref)
+
+    published = await _run_handler(
+        event=event,
+        config=config,
+        file_bytes=b"file content",
+        extract_result=KreuzbergExtractionError(
+            status_code=422,
+            detail="unsupported document format",
+        ),
+        cached=None,
+    )
+
+    assert len(published) == 1
+    topic, payload = published[0]
+    assert "parse-failed" in topic
+    assert payload["error_code"] == "parse_error"
+    assert payload["source_url"] == source_ref

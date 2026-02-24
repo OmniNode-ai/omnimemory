@@ -78,6 +78,9 @@ from omnimemory.nodes.kreuzberg_parse_effect.clients.client_kreuzberg import (
     read_cached_text,
     write_cached_text,
 )
+from omnimemory.nodes.kreuzberg_parse_effect.models.model_kreuzberg_parse_result import (
+    ModelKreuzbergParseResult,
+)
 
 if TYPE_CHECKING:
     from omnimemory.models.crawl.model_document_changed_event import (
@@ -91,6 +94,31 @@ if TYPE_CHECKING:
     )
 
 _log = logging.getLogger(__name__)
+
+
+def _validate_source_path(source_url: str, document_root: Path) -> Path:
+    """Validate that source_url resolves to a path within document_root.
+
+    Raises:
+        ValueError: If source_url is absolute and outside document_root, or
+            contains ``..`` components that would escape document_root.
+    """
+    candidate = Path(source_url)
+    # Resolve relative to document_root so that relative paths are anchored.
+    if not candidate.is_absolute():
+        resolved = (document_root / candidate).resolve()
+    else:
+        resolved = candidate.resolve()
+
+    # Ensure the resolved path is within the document root.
+    try:
+        resolved.relative_to(document_root.resolve())
+    except ValueError:
+        raise ValueError(
+            f"source_url {source_url!r} resolves to {resolved} which is outside "
+            f"the permitted document root {document_root.resolve()}"
+        )
+    return resolved
 
 
 def _compute_document_id(
@@ -134,7 +162,7 @@ class HandlerKreuzbergParse:
         event: ModelDocumentDiscoveredEvent | ModelDocumentChangedEvent,
         env_prefix: str,
         publish_callback: Callable[[str, dict[str, object]], Coroutine[Any, Any, None]],
-    ) -> None:
+    ) -> ModelKreuzbergParseResult:
         """Process a single document discovered or changed event.
 
         Args:
@@ -144,6 +172,10 @@ class HandlerKreuzbergParse:
                 topic names (e.g. "dev", "prod").
             publish_callback: Async callable that accepts (topic, payload_dict)
                 and publishes the message to the event bus.
+
+        Returns:
+            ModelKreuzbergParseResult summarising the outcome of this
+            invocation (counts for indexed, failed, too_large, timeout).
         """
         source_url = event.source_ref
         content_hash = event.content_fingerprint
@@ -154,9 +186,11 @@ class HandlerKreuzbergParse:
         now = datetime.now(tz=timezone.utc)
 
         # ------------------------------------------------------------------
-        # Step 1: Read file bytes (may raise — propagate to caller)
+        # Step 1: Validate source path is within document root, then read bytes
         # ------------------------------------------------------------------
-        file_bytes: bytes = await asyncio.to_thread(Path(source_url).read_bytes)
+        document_root = Path(config.text_store_path)
+        validated_path = _validate_source_path(source_url, document_root)
+        file_bytes: bytes = await asyncio.to_thread(validated_path.read_bytes)
 
         # ------------------------------------------------------------------
         # Step 2: Hard limit — too large
@@ -183,7 +217,12 @@ class HandlerKreuzbergParse:
                 parser_version=config.parser_version,
             )
             await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
-            return
+            return ModelKreuzbergParseResult(
+                indexed_count=0,
+                failed_count=0,
+                skipped_too_large_count=1,
+                timeout_count=0,
+            )
 
         # ------------------------------------------------------------------
         # Step 3: Idempotency check — skip re-parse if text already stored
@@ -221,12 +260,17 @@ class HandlerKreuzbergParse:
                 await publish_callback(
                     indexed_topic, indexed_event.model_dump(mode="json")
                 )
-                return
+                return ModelKreuzbergParseResult(
+                    indexed_count=1,
+                    failed_count=0,
+                    skipped_too_large_count=0,
+                    timeout_count=0,
+                )
 
         # ------------------------------------------------------------------
         # Step 4: Call kreuzberg POST /extract
         # ------------------------------------------------------------------
-        filename = Path(source_url).name
+        filename = validated_path.name
         mime_type = _detect_mime_type(source_url)
         timeout_seconds = config.timeout_ms / 1000.0
 
@@ -255,7 +299,12 @@ class HandlerKreuzbergParse:
                 parser_version=config.parser_version,
             )
             await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
-            return
+            return ModelKreuzbergParseResult(
+                indexed_count=0,
+                failed_count=1,
+                skipped_too_large_count=0,
+                timeout_count=1,
+            )
         except KreuzbergExtractionError as exc:
             _log.warning(
                 "kreuzberg HTTP error",
@@ -271,7 +320,12 @@ class HandlerKreuzbergParse:
                 parser_version=config.parser_version,
             )
             await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
-            return
+            return ModelKreuzbergParseResult(
+                indexed_count=0,
+                failed_count=1,
+                skipped_too_large_count=0,
+                timeout_count=0,
+            )
 
         # ------------------------------------------------------------------
         # Step 5: Extract text from response
@@ -281,18 +335,15 @@ class HandlerKreuzbergParse:
         # ------------------------------------------------------------------
         # Step 6: Store text and compute extracted_text_ref
         # ------------------------------------------------------------------
-        if len(extracted_text) < config.inline_text_max_chars:
-            extracted_text_ref = extracted_text
-        else:
-            await asyncio.to_thread(
-                write_cached_text, text_path, content_hash, extracted_text
-            )
-            extracted_text_ref = f"file://{text_path.resolve()}"
-
-        # Write cache even for inline text (for idempotency on next call)
+        # Write cache for idempotency on next call (always, regardless of branch).
         await asyncio.to_thread(
             write_cached_text, text_path, content_hash, extracted_text
         )
+
+        if len(extracted_text) < config.inline_text_max_chars:
+            extracted_text_ref = extracted_text
+        else:
+            extracted_text_ref = f"file://{text_path.resolve()}"
 
         # ------------------------------------------------------------------
         # Step 7: Emit document-indexed event
@@ -318,4 +369,10 @@ class HandlerKreuzbergParse:
                 "document_id": str(document_id),
                 "extracted_text_len": len(extracted_text),
             },
+        )
+        return ModelKreuzbergParseResult(
+            indexed_count=1,
+            failed_count=0,
+            skipped_too_large_count=0,
+            timeout_count=0,
         )

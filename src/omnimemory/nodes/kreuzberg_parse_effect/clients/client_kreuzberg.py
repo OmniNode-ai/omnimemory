@@ -90,7 +90,18 @@ async def call_kreuzberg_extract(
         ) from exc
 
     response_data: list[dict[str, object]] = response.json()
-    extracted_text = str(response_data[0]["content"])
+    if not response_data:
+        raise KreuzbergExtractionError(
+            status_code=200,
+            detail="kreuzberg returned empty response array",
+        )
+    try:
+        extracted_text = str(response_data[0]["content"])
+    except KeyError:
+        raise KreuzbergExtractionError(
+            status_code=200,
+            detail="kreuzberg response item missing 'content' key",
+        )
 
     return KreuzbergExtractResult(extracted_text=extracted_text)
 
