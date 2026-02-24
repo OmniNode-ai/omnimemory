@@ -26,7 +26,13 @@ class ModelKreuzbergParseResult(  # omnimemory-model-exempt: handler result
     failed_count: int = Field(
         ...,
         ge=0,
-        description="Number of document-parse-failed events emitted (parse_error or timeout)",
+        description=(
+            "Number of document-parse-failed events emitted for parse_error or timeout "
+            "outcomes only. Does NOT include too_large outcomes, which are tracked "
+            "separately in skipped_too_large_count. Callers that need the total number "
+            "of document-parse-failed events emitted must sum "
+            "failed_count + skipped_too_large_count."
+        ),
     )
     skipped_too_large_count: int = Field(
         ...,
