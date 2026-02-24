@@ -447,8 +447,10 @@ async def test_cache_write_oserror_too_large_emits_parse_failed(tmp_path: Path) 
     source_ref = str(tmp_path / "large_doc.md")
     event = _make_discovered_event(source_ref=source_ref)
 
-    large_text = "x" * (inline_max + 1)  # exceeds inline_max
-    assert len(large_text) >= inline_max
+    large_text = (
+        "x" * inline_max
+    )  # exactly at threshold — not inlineable (uses <, not <=)
+    assert len(large_text) == inline_max
 
     handler = HandlerKreuzbergParse(config=config)
     published: list[tuple[str, dict[str, object]]] = []

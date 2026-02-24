@@ -197,6 +197,11 @@ class HandlerKreuzbergParse:
         # Step 1: Validate source path is within document root
         # ------------------------------------------------------------------
         document_root = Path(config.document_root)
+        if str(document_root) == "/":
+            _log.warning(
+                "document_root is set to filesystem root ('/'). "
+                "Set KREUZBERG_DOCUMENT_ROOT to a tighter path in production."
+            )
         try:
             validated_path = _validate_source_path(source_url, document_root)
         except ValueError as exc:
