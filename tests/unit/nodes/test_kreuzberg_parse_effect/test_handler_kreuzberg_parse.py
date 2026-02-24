@@ -511,7 +511,9 @@ async def test_empty_env_prefix_uses_bare_topic_names(tmp_path: Path) -> None:
         patch(f"{_HANDLER_MOD}.write_cached_text"),
         patch(
             f"{_HANDLER_MOD}.call_kreuzberg_extract",
-            AsyncMock(return_value=KreuzbergExtractResult(extracted_text="hello world")),
+            AsyncMock(
+                return_value=KreuzbergExtractResult(extracted_text="hello world")
+            ),
         ),
     ):
         await handler.process_event(
