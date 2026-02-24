@@ -12,6 +12,9 @@ from omnimemory.models.crawl.model_document_changed_event import (
 from omnimemory.models.crawl.model_document_discovered_event import (
     ModelDocumentDiscoveredEvent,
 )
+from omnimemory.models.crawl.model_document_indexed_event import (
+    ModelDocumentIndexedEvent,
+)
 from omnimemory.models.crawl.model_document_removed_event import (
     ModelDocumentRemovedEvent,
 )
@@ -22,6 +25,7 @@ __all__ = [
     "ModelCrawlTickCommand",
     "ModelDocumentChangedEvent",
     "ModelDocumentDiscoveredEvent",
+    "ModelDocumentIndexedEvent",
     "ModelDocumentRemovedEvent",
     "TriggerSource",
 ]

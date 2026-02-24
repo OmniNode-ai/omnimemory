@@ -59,6 +59,14 @@ class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
         default="onex.evt.omnimemory.document-removed.v1",
         description="Topic suffix for document-removed events",
     )
+    publish_topic_indexed: str = Field(
+        default="onex.evt.omnimemory.document-indexed.v1",
+        description=(
+            "Topic suffix for document-indexed events. Emitted after a document "
+            "is fully crawled and indexed (discovered or changed). Consumed by "
+            "omniintelligence crawl_scheduler_effect to reset the debounce window."
+        ),
+    )
 
     # Operational limits
     max_file_size_bytes: int = Field(

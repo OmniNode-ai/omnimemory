@@ -79,6 +79,9 @@ from omnimemory.models.crawl.model_document_changed_event import (
 from omnimemory.models.crawl.model_document_discovered_event import (
     ModelDocumentDiscoveredEvent,
 )
+from omnimemory.models.crawl.model_document_indexed_event import (
+    ModelDocumentIndexedEvent,
+)
 from omnimemory.models.crawl.model_document_removed_event import (
     ModelDocumentRemovedEvent,
 )
@@ -388,6 +391,7 @@ class HandlerFilesystemCrawler:
         unchanged_count = 0
         skipped_count = 0
         mtime_skipped_count = 0
+        indexed_count = 0
         error_count = 0
         truncated = False
 
@@ -608,6 +612,25 @@ class HandlerFilesystemCrawler:
                     )
                     discovered_count += 1
 
+                    indexed_event = ModelDocumentIndexedEvent(
+                        correlation_id=correlation_id,
+                        emitted_at_utc=now_utc,
+                        crawler_type=EnumCrawlerType.FILESYSTEM,
+                        crawl_scope=crawl_scope,
+                        trigger_source=trigger_source,
+                        source_ref=abs_path_str,
+                        source_type=source_type,
+                        content_fingerprint=fingerprint,
+                        scope_ref=scope_ref,
+                    )
+                    await _publish_event(
+                        publish_callback,
+                        f"{env_prefix}.{self._config.publish_topic_indexed}",
+                        indexed_event.model_dump(mode="json"),
+                        correlation_id,
+                    )
+                    indexed_count += 1
+
                     new_state = ModelCrawlStateRecord(
                         source_ref=abs_path_str,
                         crawler_type=EnumCrawlerType.FILESYSTEM,
@@ -664,6 +687,25 @@ class HandlerFilesystemCrawler:
                     )
                     changed_count += 1
 
+                    indexed_event = ModelDocumentIndexedEvent(
+                        correlation_id=correlation_id,
+                        emitted_at_utc=now_utc,
+                        crawler_type=EnumCrawlerType.FILESYSTEM,
+                        crawl_scope=crawl_scope,
+                        trigger_source=trigger_source,
+                        source_ref=abs_path_str,
+                        source_type=source_type,
+                        content_fingerprint=fingerprint,
+                        scope_ref=scope_ref,
+                    )
+                    await _publish_event(
+                        publish_callback,
+                        f"{env_prefix}.{self._config.publish_topic_indexed}",
+                        indexed_event.model_dump(mode="json"),
+                        correlation_id,
+                    )
+                    indexed_count += 1
+
                     updated_state = ModelCrawlStateRecord(
                         source_ref=abs_path_str,
                         crawler_type=EnumCrawlerType.FILESYSTEM,
@@ -713,6 +755,7 @@ class HandlerFilesystemCrawler:
             unchanged_count=unchanged_count,
             skipped_count=skipped_count,
             mtime_skipped_count=mtime_skipped_count,
+            indexed_count=indexed_count,
             removed_count=removed_count,
             error_count=error_count,
             truncated=truncated,
@@ -728,6 +771,7 @@ class HandlerFilesystemCrawler:
                 "changed": changed_count,
                 "unchanged": unchanged_count,
                 "skipped": skipped_count,
+                "indexed": indexed_count,
                 "removed": removed_count,
                 "errors": error_count,
                 "truncated": truncated,
