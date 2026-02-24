@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for AdapterIntentGraph.
 
@@ -608,9 +610,9 @@ class TestIntentCypherTemplates:
 
         for template in templates:
             # Templates should use $param syntax for parameters
-            assert (
-                "$" in template or "count" in template.lower()
-            ), f"Template missing parameter: {template[:50]}..."
+            assert "$" in template or "count" in template.lower(), (
+                f"Template missing parameter: {template[:50]}..."
+            )
             # Templates should not have Python f-string or .format() placeholders
             unsafe_patterns = [
                 r"\{[0-9]+\}",  # {0}, {1} positional args
@@ -618,8 +620,7 @@ class TestIntentCypherTemplates:
             for pattern in unsafe_patterns:
                 matches = re.findall(pattern, template)
                 assert not matches, (
-                    f"Template has unsafe format pattern {matches}: "
-                    f"{template[:50]}..."
+                    f"Template has unsafe format pattern {matches}: {template[:50]}..."
                 )
 
     def test_store_intent_query_structure(self) -> None:

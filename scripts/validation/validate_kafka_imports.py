@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """ONEX Kafka Import Boundary Enforcement (ARCH-002).
 
 Ensures that direct Kafka consumer imports (AIOKafkaConsumer, KafkaConsumer,

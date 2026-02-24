@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Integration tests for HandlerSubscription with event bus notification.
 
@@ -955,9 +957,9 @@ class TestConcurrency:
 
             # Neither should raise an exception
             for result in results:
-                assert not isinstance(
-                    result, Exception
-                ), f"Unexpected exception: {result}"
+                assert not isinstance(result, Exception), (
+                    f"Unexpected exception: {result}"
+                )
 
         # Final state should be consistent (either subscribed or not)
         final_subs = await subscription_handler.list_subscriptions(agent_id)

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Contract version field validation tests (OMN-1436).
 
@@ -198,9 +200,9 @@ class TestContractVersionField:
         self, contract_data: MappingResultDict, node_name: str
     ) -> None:
         """Verify node_type field exists."""
-        assert (
-            "node_type" in contract_data
-        ), f"Contract must have 'node_type' field: {node_name}"
+        assert "node_type" in contract_data, (
+            f"Contract must have 'node_type' field: {node_name}"
+        )
         node_type: object = contract_data["node_type"]
         assert isinstance(node_type, str), f"node_type must be a string: {node_name}"
         assert node_type in (
@@ -254,9 +256,9 @@ class TestContractVersionField:
         if isinstance(tool_spec, dict) and "version" in tool_spec:
             version = tool_spec["version"]
             # Version can be either a string or a structured dict
-            assert isinstance(
-                version, str | dict
-            ), f"tool_specification.version should be a string or dict: {node_name}"
+            assert isinstance(version, str | dict), (
+                f"tool_specification.version should be a string or dict: {node_name}"
+            )
             if isinstance(version, dict):
                 _assert_valid_version_structure(
                     version, "tool_specification.version", node_name
@@ -267,9 +269,9 @@ class TestContractVersionField:
         if isinstance(event_type, dict) and "version" in event_type:
             version = event_type["version"]
             # Version can be either a string or a structured dict
-            assert isinstance(
-                version, str | dict
-            ), f"event_type.version should be a string or dict: {node_name}"
+            assert isinstance(version, str | dict), (
+                f"event_type.version should be a string or dict: {node_name}"
+            )
             if isinstance(version, dict):
                 _assert_valid_version_structure(
                     version, "event_type.version", node_name
@@ -348,8 +350,7 @@ class TestAllContractsDiscovery:
         assert isinstance(contracts, list), "get_all_contracts must return a list"
         for node_name in MIGRATED_CONTRACTS:
             assert node_name in contracts, (
-                f"get_all_contracts() should find '{node_name}' "
-                f"but got: {contracts}"
+                f"get_all_contracts() should find '{node_name}' but got: {contracts}"
             )
 
     @pytest.mark.skipif(
@@ -365,9 +366,9 @@ class TestAllContractsDiscovery:
         This test automatically validates any new contracts added to the
         nodes directory, ensuring they follow the contract_version standard.
         """
-        assert (
-            "contract_version" in contract_data
-        ), f"Contract must have 'contract_version' field: {node_name}"
+        assert "contract_version" in contract_data, (
+            f"Contract must have 'contract_version' field: {node_name}"
+        )
 
     @pytest.mark.skipif(
         not ALL_DISCOVERED_CONTRACTS,
@@ -413,9 +414,9 @@ class TestAllContractsDiscovery:
 
         ONEX contracts require both contract_version and node_version fields.
         """
-        assert (
-            "node_version" in contract_data
-        ), f"Contract must have 'node_version' field: {node_name}"
+        assert "node_version" in contract_data, (
+            f"Contract must have 'node_version' field: {node_name}"
+        )
 
     @pytest.mark.skipif(
         not ALL_DISCOVERED_CONTRACTS,

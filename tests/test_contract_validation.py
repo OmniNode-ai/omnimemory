@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Contract validation tests for Core 8 ONEX nodes.
 
@@ -93,9 +95,9 @@ class TestContractValidation:
         # ONEX contracts must have node_type at root level (no legacy nested format)
         raw_node_type = data.get("node_type", "")
         node_type: str = str(raw_node_type) if raw_node_type else ""
-        assert (
-            node_type
-        ), f"Contract must have 'node_type' field at root level: {node_name}"
+        assert node_type, (
+            f"Contract must have 'node_type' field at root level: {node_name}"
+        )
         node_type = node_type.upper()
 
         # Import extended contract models that support ONEX infra extension fields
@@ -167,9 +169,9 @@ class TestContractRuntimeLoad:
         try:
             module: types.ModuleType = importlib.import_module(module_name)
             node_class: type | None = getattr(module, class_name, None)
-            assert (
-                node_class is not None
-            ), f"Node class {class_name} not found in {module_name}"
+            assert node_class is not None, (
+                f"Node class {class_name} not found in {module_name}"
+            )
         except ModuleNotFoundError as e:
             # Package not installed in editable mode - skip rather than fail
             pytest.skip(f"Package not installed in editable mode: {e}")
@@ -281,38 +283,38 @@ class TestOrchestratorEventValidation:
         consumed_events = data.get("consumed_events")
 
         # consumed_events is required for orchestrators
-        assert (
-            consumed_events is not None
-        ), f"Orchestrator {node_name} missing consumed_events field"
-        assert isinstance(
-            consumed_events, list
-        ), f"consumed_events must be a list: {node_name}"
+        assert consumed_events is not None, (
+            f"Orchestrator {node_name} missing consumed_events field"
+        )
+        assert isinstance(consumed_events, list), (
+            f"consumed_events must be a list: {node_name}"
+        )
 
         # Validate each entry has required keys
         for idx, event in enumerate(consumed_events):
-            assert isinstance(
-                event, dict
-            ), f"consumed_events[{idx}] must be a dict: {node_name}"
-            assert (
-                "event_pattern" in event
-            ), f"consumed_events[{idx}] missing 'event_pattern': {node_name}"
-            assert (
-                "handler_function" in event
-            ), f"consumed_events[{idx}] missing 'handler_function': {node_name}"
+            assert isinstance(event, dict), (
+                f"consumed_events[{idx}] must be a dict: {node_name}"
+            )
+            assert "event_pattern" in event, (
+                f"consumed_events[{idx}] missing 'event_pattern': {node_name}"
+            )
+            assert "handler_function" in event, (
+                f"consumed_events[{idx}] missing 'handler_function': {node_name}"
+            )
             # Validate types
-            assert isinstance(
-                event["event_pattern"], str
-            ), f"consumed_events[{idx}].event_pattern must be str: {node_name}"
-            assert isinstance(
-                event["handler_function"], str
-            ), f"consumed_events[{idx}].handler_function must be str: {node_name}"
+            assert isinstance(event["event_pattern"], str), (
+                f"consumed_events[{idx}].event_pattern must be str: {node_name}"
+            )
+            assert isinstance(event["handler_function"], str), (
+                f"consumed_events[{idx}].handler_function must be str: {node_name}"
+            )
             # Validate non-empty
-            assert event[
-                "event_pattern"
-            ], f"consumed_events[{idx}].event_pattern cannot be empty: {node_name}"
-            assert event[
-                "handler_function"
-            ], f"consumed_events[{idx}].handler_function cannot be empty: {node_name}"
+            assert event["event_pattern"], (
+                f"consumed_events[{idx}].event_pattern cannot be empty: {node_name}"
+            )
+            assert event["handler_function"], (
+                f"consumed_events[{idx}].handler_function cannot be empty: {node_name}"
+            )
 
     @pytest.mark.parametrize("node_name", ORCHESTRATOR_NODES)
     def test_published_events_structure(self, node_name: str) -> None:
@@ -334,29 +336,29 @@ class TestOrchestratorEventValidation:
         published_events = data.get("published_events")
 
         # published_events is required but can be empty
-        assert (
-            published_events is not None
-        ), f"Orchestrator {node_name} missing published_events field"
-        assert isinstance(
-            published_events, list
-        ), f"published_events must be a list: {node_name}"
+        assert published_events is not None, (
+            f"Orchestrator {node_name} missing published_events field"
+        )
+        assert isinstance(published_events, list), (
+            f"published_events must be a list: {node_name}"
+        )
 
         # Validate each entry has required keys (if non-empty)
         for idx, event in enumerate(published_events):
-            assert isinstance(
-                event, dict
-            ), f"published_events[{idx}] must be a dict: {node_name}"
-            assert (
-                "event_pattern" in event
-            ), f"published_events[{idx}] missing 'event_pattern': {node_name}"
+            assert isinstance(event, dict), (
+                f"published_events[{idx}] must be a dict: {node_name}"
+            )
+            assert "event_pattern" in event, (
+                f"published_events[{idx}] missing 'event_pattern': {node_name}"
+            )
             # Validate types
-            assert isinstance(
-                event["event_pattern"], str
-            ), f"published_events[{idx}].event_pattern must be str: {node_name}"
+            assert isinstance(event["event_pattern"], str), (
+                f"published_events[{idx}].event_pattern must be str: {node_name}"
+            )
             # Validate non-empty
-            assert event[
-                "event_pattern"
-            ], f"published_events[{idx}].event_pattern cannot be empty: {node_name}"
+            assert event["event_pattern"], (
+                f"published_events[{idx}].event_pattern cannot be empty: {node_name}"
+            )
 
     @pytest.mark.parametrize("node_name", ORCHESTRATOR_NODES)
     def test_consumed_events_handler_naming_convention(self, node_name: str) -> None:
@@ -584,15 +586,15 @@ class TestHandlerRoutingKeyAlignment:
 
         version = handler_routing.get("version")
         assert version is not None, f"handler_routing missing version: {node_name}"
-        assert isinstance(
-            version, dict
-        ), f"handler_routing.version must be dict: {node_name}"
-        assert (
-            "major" in version
-        ), f"handler_routing.version missing 'major': {node_name}"
-        assert (
-            "minor" in version
-        ), f"handler_routing.version missing 'minor': {node_name}"
-        assert (
-            "patch" in version
-        ), f"handler_routing.version missing 'patch': {node_name}"
+        assert isinstance(version, dict), (
+            f"handler_routing.version must be dict: {node_name}"
+        )
+        assert "major" in version, (
+            f"handler_routing.version missing 'major': {node_name}"
+        )
+        assert "minor" in version, (
+            f"handler_routing.version missing 'minor': {node_name}"
+        )
+        assert "patch" in version, (
+            f"handler_routing.version missing 'patch': {node_name}"
+        )

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 PII Detection utility for memory content security.
 
@@ -136,7 +139,7 @@ class PIIDetector:
             ],
             PIIType.IP_ADDRESS: [
                 ModelPIIPatternConfig(
-                    # IPv4 address pattern (e.g., 192.168.1.1)
+                    # IPv4 address pattern (e.g., 192.168.1.1)  # onex-allow-internal-ip
                     pattern=r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
                     confidence=self.config.medium_confidence,
                     mask_template="***.***.***.***",

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 Performance benchmark tests for OmniMemory.
 
@@ -475,7 +478,7 @@ def generate_text_with_pii(size_bytes: int) -> str:
         "Contact john.doe@example.com for more info.",
         "Call us at +1-555-123-4567 or (800) 555-0123.",
         "SSN: 123-45-6789 is confidential.",
-        "Server IP: 192.168.1.100 and 10.0.0.1.",
+        "Server IP: 192.168.1.100 and 10.0.0.1.",  # onex-allow-internal-ip
         "API key: sk-1234567890abcdefghijklmnopqrstuvwxyz",
         "GitHub token: ghp_abcdefghijklmnopqrstuvwxyz1234567890",
     ]
@@ -650,9 +653,9 @@ class TestPIIDetectorPerformance:
         assert result.has_pii is False
         assert len(result.matches) == 0
 
-        assert (
-            elapsed_ms < 50
-        ), f"Clean text PII scan took {elapsed_ms:.2f}ms, exceeds 50ms target."
+        assert elapsed_ms < 50, (
+            f"Clean text PII scan took {elapsed_ms:.2f}ms, exceeds 50ms target."
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.slow
@@ -673,9 +676,9 @@ class TestPIIDetectorPerformance:
 
         scans_per_second = num_iterations / total_elapsed
 
-        assert (
-            scans_per_second >= 10
-        ), f"PII throughput {scans_per_second:.2f} scans/sec below 10 scans/sec target"
+        assert scans_per_second >= 10, (
+            f"PII throughput {scans_per_second:.2f} scans/sec below 10 scans/sec target"
+        )
 
     @pytest.mark.benchmark
     def test_pii_scan_reports_duration(self) -> None:
@@ -725,9 +728,9 @@ class TestModelSerializationPerformance:
 
         avg_ms_per_item = elapsed_ms / num_iterations
 
-        assert (
-            avg_ms_per_item < 1.0
-        ), f"Serialization averaged {avg_ms_per_item:.4f}ms, exceeds 1ms target"
+        assert avg_ms_per_item < 1.0, (
+            f"Serialization averaged {avg_ms_per_item:.4f}ms, exceeds 1ms target"
+        )
 
     @pytest.mark.benchmark
     def test_memory_item_deserialization_speed(self) -> None:
@@ -751,9 +754,9 @@ class TestModelSerializationPerformance:
 
         avg_ms_per_item = elapsed_ms / num_iterations
 
-        assert (
-            avg_ms_per_item < 1.0
-        ), f"Deserialization averaged {avg_ms_per_item:.4f}ms, exceeds 1ms target"
+        assert avg_ms_per_item < 1.0, (
+            f"Deserialization averaged {avg_ms_per_item:.4f}ms, exceeds 1ms target"
+        )
 
     @pytest.mark.benchmark
     def test_memory_item_json_roundtrip_speed(self) -> None:
@@ -778,9 +781,9 @@ class TestModelSerializationPerformance:
 
         avg_ms_per_roundtrip = elapsed_ms / num_iterations
 
-        assert (
-            avg_ms_per_roundtrip < 2.0
-        ), f"JSON roundtrip averaged {avg_ms_per_roundtrip:.4f}ms, exceeds 2ms target"
+        assert avg_ms_per_roundtrip < 2.0, (
+            f"JSON roundtrip averaged {avg_ms_per_roundtrip:.4f}ms, exceeds 2ms target"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.slow
@@ -799,9 +802,9 @@ class TestModelSerializationPerformance:
 
         items_per_second = len(items) / elapsed
 
-        assert (
-            items_per_second > 10000
-        ), f"Batch serialization {items_per_second:.0f} items/sec below 10K target"
+        assert items_per_second > 10000, (
+            f"Batch serialization {items_per_second:.0f} items/sec below 10K target"
+        )
 
 
 # =============================================================================
@@ -841,9 +844,9 @@ class TestConcurrencyPerformance:
 
         avg_ms_per_acquisition = elapsed_ms / num_iterations
 
-        assert (
-            avg_ms_per_acquisition < 1.0
-        ), f"Semaphore avg {avg_ms_per_acquisition:.4f}ms exceeds 1ms target"
+        assert avg_ms_per_acquisition < 1.0, (
+            f"Semaphore avg {avg_ms_per_acquisition:.4f}ms exceeds 1ms target"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.asyncio
@@ -869,9 +872,9 @@ class TestConcurrencyPerformance:
 
         avg_ms_per_acquisition = elapsed_ms / num_iterations
 
-        assert (
-            avg_ms_per_acquisition < 2.0
-        ), f"Lock avg {avg_ms_per_acquisition:.4f}ms exceeds 2ms target"
+        assert avg_ms_per_acquisition < 2.0, (
+            f"Lock avg {avg_ms_per_acquisition:.4f}ms exceeds 2ms target"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.asyncio
@@ -903,9 +906,9 @@ class TestConcurrencyPerformance:
         ops_per_second = total_ops / elapsed
 
         assert len(completed) == total_ops
-        assert (
-            ops_per_second > 500
-        ), f"Concurrent throughput {ops_per_second:.0f} ops/sec below 500 target"
+        assert ops_per_second > 500, (
+            f"Concurrent throughput {ops_per_second:.0f} ops/sec below 500 target"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.asyncio
@@ -928,9 +931,9 @@ class TestConcurrencyPerformance:
 
         assert stats.total_acquisitions == num_iterations
         assert stats.total_releases == num_iterations
-        assert (
-            stats_elapsed_ms < 1.0
-        ), f"Stats retrieval took {stats_elapsed_ms:.4f}ms, exceeds 1ms target"
+        assert stats_elapsed_ms < 1.0, (
+            f"Stats retrieval took {stats_elapsed_ms:.4f}ms, exceeds 1ms target"
+        )
 
 
 # =============================================================================
@@ -965,9 +968,9 @@ class TestIntegratedPerformance:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
         avg_ms = elapsed_ms / num_iterations
 
-        assert (
-            avg_ms < 150
-        ), f"Combined workflow averaged {avg_ms:.2f}ms, exceeds 150ms target"
+        assert avg_ms < 150, (
+            f"Combined workflow averaged {avg_ms:.2f}ms, exceeds 150ms target"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.asyncio
@@ -996,9 +999,9 @@ class TestIntegratedPerformance:
 
         assert all(results)
         assert len(results) == num_operations
-        assert (
-            ops_per_second > 50
-        ), f"Concurrent memory ops {ops_per_second:.0f}/sec below 50 target"
+        assert ops_per_second > 50, (
+            f"Concurrent memory ops {ops_per_second:.0f}/sec below 50 target"
+        )
 
 
 # =============================================================================
@@ -1027,9 +1030,9 @@ class TestStressPerformance:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         assert result is not None
-        assert (
-            elapsed_ms < 200
-        ), f"Max length scan took {elapsed_ms:.2f}ms, exceeds 200ms stress target"
+        assert elapsed_ms < 200, (
+            f"Max length scan took {elapsed_ms:.2f}ms, exceeds 200ms stress target"
+        )
 
     @pytest.mark.benchmark
     def test_large_batch_model_operations(self) -> None:
@@ -1052,12 +1055,12 @@ class TestStressPerformance:
         deserialize_rate = len(items) / deserialize_elapsed
 
         assert len(deserialized) == len(items)
-        assert (
-            serialize_rate > 10000
-        ), f"Batch serialize {serialize_rate:.0f}/sec below 10K target"
-        assert (
-            deserialize_rate > 10000
-        ), f"Batch deserialize {deserialize_rate:.0f}/sec below 10K target"
+        assert serialize_rate > 10000, (
+            f"Batch serialize {serialize_rate:.0f}/sec below 10K target"
+        )
+        assert deserialize_rate > 10000, (
+            f"Batch deserialize {deserialize_rate:.0f}/sec below 10K target"
+        )
 
 
 # =============================================================================
@@ -1335,9 +1338,9 @@ class TestPIIDetectionOverhead:
         mb_per_sec = kb_per_ms * 1000 / 1024
 
         # Target: at least 1 KB/ms = 1 MB/s
-        assert (
-            kb_per_ms >= 1.0
-        ), f"PII throughput {kb_per_ms:.2f} KB/ms below 1 KB/ms target"
+        assert kb_per_ms >= 1.0, (
+            f"PII throughput {kb_per_ms:.2f} KB/ms below 1 KB/ms target"
+        )
 
         print("\nPII Detection Throughput Report:")
         print(f"  Throughput: {kb_per_ms:.2f} KB/ms ({mb_per_sec:.2f} MB/s)")
@@ -1410,9 +1413,9 @@ class TestStorageEfficiency:
         # ModelMemoryItem has: 3 UUIDs (~108 chars), timestamps (~50 chars),
         # lists (~100 chars), scores (~60 chars), flags (~40 chars), etc.
         # Expected metadata overhead: ~850-950 bytes
-        assert (
-            metadata_overhead < 1000
-        ), f"Metadata overhead {metadata_overhead:.0f} bytes exceeds 1KB limit"
+        assert metadata_overhead < 1000, (
+            f"Metadata overhead {metadata_overhead:.0f} bytes exceeds 1KB limit"
+        )
 
         print("\nStorage Efficiency Report (Metadata Overhead):")
         print(f"  Sample size: {sample_size}")
@@ -1588,7 +1591,7 @@ class TestVectorSearchPerformance:
         print(f"  Vectors processed: {num_vectors}")
         print(f"  Dimensions: {dimensions}")
         print(f"  Total time: {elapsed_ms:.2f}ms")
-        print(f"  Per vector: {elapsed_ms/num_vectors:.4f}ms")
+        print(f"  Per vector: {elapsed_ms / num_vectors:.4f}ms")
 
 
 # =============================================================================
@@ -1633,9 +1636,9 @@ class TestEndToEndPerformance:
 
         calc = PercentileCalculator(measurements)
 
-        assert (
-            calc.p95 < 100
-        ), f"Full workflow P95={calc.p95:.2f}ms exceeds 100ms target"
+        assert calc.p95 < 100, (
+            f"Full workflow P95={calc.p95:.2f}ms exceeds 100ms target"
+        )
 
         print("\nFull Memory Workflow SLA Report:")
         print("  Operations: Create + PII Scan + Serialize + Deserialize")
@@ -1677,9 +1680,9 @@ class TestEndToEndPerformance:
         calc = PercentileCalculator(measurements)
 
         # Under concurrency, allow slightly higher P95 (150ms)
-        assert (
-            calc.p95 < 150
-        ), f"Concurrent workflow P95={calc.p95:.2f}ms exceeds 150ms target"
+        assert calc.p95 < 150, (
+            f"Concurrent workflow P95={calc.p95:.2f}ms exceeds 150ms target"
+        )
 
         print("\nConcurrent Workflow SLA Report:")
         print(f"  Concurrent workflows: {num_workflows}")

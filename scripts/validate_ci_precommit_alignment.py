@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Validate alignment between CI workflow jobs and pre-commit hooks.
 
 This script ensures that the CI workflow (.github/workflows/test.yml) and
@@ -38,7 +41,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     # Formatting and linting
     ("ruff-format", "lint", "ruff format --check"),
     ("ruff", "lint", "ruff check"),
-    ("mypy", "lint", "mypy"),
+    ("mypy-type-check", "lint", "mypy"),
     ("pyright", "pyright", "pyright"),
     # ONEX validation hooks
     ("validate-pydantic-patterns", "onex-validation", "validate_pydantic_patterns.py"),
@@ -54,7 +57,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
         "validate_no_backward_compatibility.py",
     ),
     ("validate-secrets", "onex-validation", "validate_secrets.py"),
-    ("validate-naming-conventions", "onex-validation", "validate_naming.py"),
+    ("onex-validate-naming", "onex-validation", "validate_naming.py"),
     ("validate-http-imports", "onex-validation", "validate_http_imports.py"),
     ("validate-kafka-imports", "onex-validation", "validate_kafka_imports.py"),
     ("validate-model-locations", "onex-validation", "validate_model_locations.py"),

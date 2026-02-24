@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """ONEX Enum Member Casing Validation.
 
 Enforces UPPER_SNAKE_CASE for all enum member names.

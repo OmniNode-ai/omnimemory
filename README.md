@@ -35,10 +35,14 @@
 
 ## Quick Start
 
-Install:
 ```bash
-poetry add omnimemory
+git clone https://github.com/OmniNode-ai/omnimemory.git
+cd omnimemory
+uv sync
+uv run pytest tests/ -m unit
 ```
+
+For configuration options see [docs/environment_variables.md](docs/environment_variables.md).
 
 Minimal example using the intent handler:
 ```python
@@ -79,11 +83,6 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Run tests:
-```bash
-poetry run pytest
-```
-
 ## Directory Structure
 
 ```text
@@ -102,16 +101,18 @@ src/omnimemory/
 
 ## Development
 
-Uses [Poetry](https://python-poetry.org/) for package management.
+Uses [uv](https://docs.astral.sh/uv/) for package management.
 
 ```bash
-poetry install
-poetry run pytest tests/
-poetry run mypy src/omnimemory/
-poetry run ruff check src/ tests/
-poetry run ruff format src/ tests/
+uv sync
+uv run pytest tests/ -m unit
+uv run mypy src/omnimemory/ --strict
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 ```
 
 ## Documentation
 
 **Reference**: [docs/](docs/)
+
+Open an issue or email contact@omninode.ai.

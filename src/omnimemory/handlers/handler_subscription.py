@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Subscription Handler for agent subscriptions and memory change notifications.
 
 This module provides the core subscription management functionality:
@@ -922,7 +925,7 @@ class HandlerSubscription:
         # Publish event via protocol adapter (ARCH-002 compliant)
         # Agents consume from this topic via consumer groups keyed by agent_id
         kafka_topic = config.kafka_notification_topic
-        event_payload = cast(dict[str, object], event.model_dump(mode="json"))
+        event_payload = cast("dict[str, object]", event.model_dump(mode="json"))
         try:
             await publisher.publish(
                 topic=kafka_topic,
@@ -1312,7 +1315,7 @@ class HandlerSubscription:
         if metadata_raw is not None:
             if isinstance(metadata_raw, dict):
                 # JSONB already parsed by driver (e.g., asyncpg)
-                metadata = cast(dict[str, str], metadata_raw)
+                metadata = cast("dict[str, str]", metadata_raw)
             elif isinstance(metadata_raw, str):
                 # JSON string needs parsing
                 metadata = json.loads(metadata_raw)
@@ -1331,7 +1334,7 @@ class HandlerSubscription:
                 created_at_raw.replace("Z", "+00:00")
             )
         else:
-            created_at_parsed = cast(datetime, created_at_raw)
+            created_at_parsed = cast("datetime", created_at_raw)
 
         updated_at_raw = row["updated_at"]
         if isinstance(updated_at_raw, str):
@@ -1339,7 +1342,7 @@ class HandlerSubscription:
                 updated_at_raw.replace("Z", "+00:00")
             )
         else:
-            updated_at_parsed = cast(datetime, updated_at_raw)
+            updated_at_parsed = cast("datetime", updated_at_raw)
 
         return ModelSubscription(
             id=str(row["id"]),
@@ -1598,7 +1601,7 @@ class HandlerSubscription:
         placeholders = _sql_placeholders(id_count)
         columns_str = ", ".join(columns)
         return (
-            f"SELECT {columns_str} FROM {table} WHERE {id_column} IN ({placeholders})"  # noqa: S608  # nosec B608
+            f"SELECT {columns_str} FROM {table} WHERE {id_column} IN ({placeholders})"  # nosec B608
         )
 
     async def _load_subscriptions(

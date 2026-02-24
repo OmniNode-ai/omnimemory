@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Environment-based settings loading for OmniMemory.
 
 Uses pydantic-settings to automatically load configuration from environment
@@ -157,8 +160,7 @@ class PostgresSettings(BaseSettings):
     )
     ssl_mode: str = Field(
         default="prefer",
-        description="SSL mode: disable, allow, prefer, require, "
-        "verify-ca, verify-full",
+        description="SSL mode: disable, allow, prefer, require, verify-ca, verify-full",
     )
     schema_name: str = Field(
         default="omnimemory",
@@ -300,7 +302,7 @@ class EmbeddingSettings(BaseSettings):
         DIMENSION: Expected embedding vector dimension (default: 1024)
 
     Example:
-        export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8102
+        export OMNIMEMORY__EMBEDDING__SERVER_URL=http://localhost:8100
     """
 
     model_config = SettingsConfigDict(

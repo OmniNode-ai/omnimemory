@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Dispatch bridge handlers for OmniMemory domain.
 
@@ -174,8 +176,7 @@ def create_intent_classified_dispatch_handler(
         await consumer._handle_message(payload, retry_count=0)  # noqa: SLF001
 
         logger.info(
-            "Intent-classified event processed via dispatch engine "
-            "(correlation_id=%s)",
+            "Intent-classified event processed via dispatch engine (correlation_id=%s)",
             ctx_correlation_id,
         )
 
@@ -739,7 +740,7 @@ def create_dispatch_callback(
                 return
 
             # Narrow the type from Any (json.loads return) to dict[str, object].
-            payload: dict[str, object] = cast(dict[str, object], payload_dict)
+            payload: dict[str, object] = cast("dict[str, object]", payload_dict)
 
             # Extract correlation_id from payload if available.
             # Precedence (highest wins):

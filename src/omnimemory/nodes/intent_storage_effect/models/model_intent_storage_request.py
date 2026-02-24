@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Request model for intent storage operations.
 
@@ -13,7 +15,7 @@ from typing import Literal, Self
 from uuid import UUID
 
 from omnibase_core.models.intelligence import (
-    ModelIntentClassificationOutput,  # noqa: TC002
+    ModelIntentClassificationOutput,
 )
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 

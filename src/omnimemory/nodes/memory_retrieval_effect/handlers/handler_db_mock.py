@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Mock Database Handler for full-text search operations.
 
@@ -54,7 +56,7 @@ import re
 from typing import TYPE_CHECKING
 
 from omnibase_core.models.omnimemory import (
-    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+    ModelMemorySnapshot,
 )
 
 if TYPE_CHECKING:

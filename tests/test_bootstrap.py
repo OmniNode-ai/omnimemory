@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Tests for bootstrap initialization.
 
@@ -307,19 +309,19 @@ class TestBootstrapFailure:
             error = exc_info.value
             # Verify the cause attribute exists and is properly set
             assert hasattr(error, "cause"), "BootstrapError must have cause attribute"
-            assert (
-                error.cause is not None
-            ), "cause should be set when underlying error exists"
-            assert isinstance(
-                error.cause, OSError
-            ), f"cause should be OSError, got {type(error.cause)}"
+            assert error.cause is not None, (
+                "cause should be set when underlying error exists"
+            )
+            assert isinstance(error.cause, OSError), (
+                f"cause should be OSError, got {type(error.cause)}"
+            )
             assert error.config_block == "filesystem"
             # Verify error message indicates write failure
             assert "not writable" in str(error)
             # Verify Python standard exception chaining is also set
-            assert (
-                error.__cause__ is error.cause
-            ), "__cause__ should be set for proper Python exception chaining"
+            assert error.__cause__ is error.cause, (
+                "__cause__ should be set for proper Python exception chaining"
+            )
         finally:
             # Restore permissions for cleanup
             if read_only_dir.exists():
@@ -382,16 +384,16 @@ class TestBootstrapFailure:
             # Verify the cause attribute is set from mkdir failure
             assert hasattr(error, "cause"), "BootstrapError must have cause attribute"
             assert error.cause is not None, "cause should be set when mkdir fails"
-            assert isinstance(
-                error.cause, OSError
-            ), f"cause should be OSError, got {type(error.cause)}"
+            assert isinstance(error.cause, OSError), (
+                f"cause should be OSError, got {type(error.cause)}"
+            )
             assert error.config_block == "filesystem"
             # Verify error message indicates creation failure
             assert "Cannot create" in str(error)
             # Verify Python standard exception chaining is also set
-            assert (
-                error.__cause__ is error.cause
-            ), "__cause__ should be set for proper Python exception chaining"
+            assert error.__cause__ is error.cause, (
+                "__cause__ should be set for proper Python exception chaining"
+            )
         finally:
             # Restore permissions for cleanup
             if read_only_parent.exists():
@@ -425,9 +427,9 @@ class TestBootstrapFailure:
         assert error.cause is None, "cause should be None for validation errors"
         assert error.config_block == "filesystem"
         # Verify Python standard exception chaining is not set for validation errors
-        assert (
-            error.__cause__ is None
-        ), "__cause__ should be None when no underlying exception exists"
+        assert error.__cause__ is None, (
+            "__cause__ should be None when no underlying exception exists"
+        )
 
 
 class TestBootstrapIdempotency:

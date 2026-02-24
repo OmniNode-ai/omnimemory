@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 """I/O Audit CLI for ONEX Node Purity Enforcement.
 
 Detects forbidden I/O patterns in ONEX compute nodes through AST-based static

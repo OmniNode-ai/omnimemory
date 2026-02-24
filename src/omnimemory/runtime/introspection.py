@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Memory node introspection registration.
 
@@ -289,7 +291,7 @@ async def publish_memory_introspection(
 
             except Exception as e:
                 logger.warning(
-                    "Error publishing introspection for %s: %s " "(correlation_id=%s)",
+                    "Error publishing introspection for %s: %s (correlation_id=%s)",
                     descriptor.name,
                     str(e),
                     correlation_id,

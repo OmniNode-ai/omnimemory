@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Tests for P1C observability hooks.
 
@@ -622,17 +624,17 @@ class TestGetHandlerStatsFiltering:
             # Extract handler label from the key using labels_from_key
             # The counter has label_names=["operation", "status", "handler"]
             assert len(key) == 3, "Counter key should have 3 elements"
-            assert (
-                key[2] == "filesystem"
-            ), f"Expected handler='filesystem', got key={key}"
+            assert key[2] == "filesystem", (
+                f"Expected handler='filesystem', got key={key}"
+            )
 
         # Get stats for postgresql handler
         pg_stats = wrapper_pg.get_handler_stats()
         pg_operation_counts = pg_stats["operation_counts"]
         for key, count in pg_operation_counts.items():
-            assert (
-                key[2] == "postgresql"
-            ), f"Expected handler='postgresql', got key={key}"
+            assert key[2] == "postgresql", (
+                f"Expected handler='postgresql', got key={key}"
+            )
 
     @pytest.mark.asyncio
     async def test_handler_stats_histogram_filtering(self) -> None:

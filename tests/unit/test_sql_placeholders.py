@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for _sql_placeholders() function.
 
@@ -173,9 +175,9 @@ class TestSqlPlaceholdersSafetyValidation:
         ]
         result_upper = result.upper()
         for keyword in sql_keywords:
-            assert (
-                keyword not in result_upper
-            ), f"SQL keyword '{keyword}' found in output"
+            assert keyword not in result_upper, (
+                f"SQL keyword '{keyword}' found in output"
+            )
 
     def test_no_parentheses_in_output(self) -> None:
         """Test output contains no parentheses (could be function calls)."""
@@ -201,17 +203,17 @@ class TestSqlPlaceholdersSequentialValidity:
 
         for i, placeholder in enumerate(placeholders):
             expected_num = start + i
-            assert (
-                placeholder == f"${expected_num}"
-            ), f"Expected ${expected_num} at position {i}, got {placeholder}"
+            assert placeholder == f"${expected_num}", (
+                f"Expected ${expected_num} at position {i}, got {placeholder}"
+            )
 
     def test_no_duplicate_placeholders(self) -> None:
         """Test that no placeholder numbers are duplicated."""
         result = _sql_placeholders(100)
         placeholders = result.split(", ")
-        assert len(placeholders) == len(
-            set(placeholders)
-        ), "Duplicate placeholders found"
+        assert len(placeholders) == len(set(placeholders)), (
+            "Duplicate placeholders found"
+        )
 
     def test_no_gaps_in_sequence(self) -> None:
         """Test that there are no gaps in the placeholder sequence."""
@@ -220,6 +222,6 @@ class TestSqlPlaceholdersSequentialValidity:
         numbers = [int(p[1:]) for p in placeholders]  # Extract numbers after $
 
         for i in range(len(numbers) - 1):
-            assert (
-                numbers[i + 1] == numbers[i] + 1
-            ), f"Gap in sequence between {numbers[i]} and {numbers[i + 1]}"
+            assert numbers[i + 1] == numbers[i] + 1, (
+                f"Gap in sequence between {numbers[i]} and {numbers[i + 1]}"
+            )

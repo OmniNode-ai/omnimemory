@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Tests for database URL display utilities.
 
@@ -92,9 +94,9 @@ class TestSafeDbUrlDisplay:
 
     def test_ip_address_url(self) -> None:
         """Test URL with IP address host."""
-        url = "postgresql://dbadmin:secretpass@192.168.86.200:5436/omninode_bridge"
+        url = "postgresql://dbadmin:secretpass@203.0.113.5:5436/omninode_bridge"
         result = safe_db_url_display(url)
-        assert result == "192.168.86.200:5436/omninode_bridge"
+        assert result == "203.0.113.5:5436/omninode_bridge"
         assert "secretpass" not in result
         assert "dbadmin" not in result
 

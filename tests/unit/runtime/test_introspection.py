@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for memory node introspection registration.
 
@@ -111,9 +113,9 @@ class TestMemoryNodesStructure:
     def test_all_names_are_unique(self) -> None:
         """All node names in MEMORY_NODES should be unique."""
         names = [n.name for n in MEMORY_NODES]
-        assert len(names) == len(
-            set(names)
-        ), f"Duplicate names found: {[n for n in names if names.count(n) > 1]}"
+        assert len(names) == len(set(names)), (
+            f"Duplicate names found: {[n for n in names if names.count(n) > 1]}"
+        )
 
     @pytest.mark.unit
     def test_all_node_ids_are_unique(self) -> None:
@@ -127,9 +129,9 @@ class TestMemoryNodesStructure:
         for descriptor in MEMORY_NODES:
             first_call = descriptor.node_id
             second_call = descriptor.node_id
-            assert (
-                first_call == second_call
-            ), f"Non-deterministic node_id for {descriptor.name}"
+            assert first_call == second_call, (
+                f"Non-deterministic node_id for {descriptor.name}"
+            )
 
 
 # =============================================================================
@@ -586,9 +588,9 @@ class TestIntrospectionLifecycle:
         failures = [r for r in results if isinstance(r, RuntimeError)]
 
         assert len(successes) == 1, f"Expected exactly 1 success, got {len(successes)}"
-        assert (
-            len(failures) == 1
-        ), f"Expected exactly 1 RuntimeError, got {len(failures)}"
+        assert len(failures) == 1, (
+            f"Expected exactly 1 RuntimeError, got {len(failures)}"
+        )
         assert "already been called" in str(failures[0])
 
         # The successful result should have all nodes registered

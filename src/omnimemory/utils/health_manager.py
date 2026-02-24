@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 Comprehensive health check manager for OmniMemory ONEX architecture.
 
@@ -281,7 +284,7 @@ class HealthCheckManager:
                     if name in self._circuit_breakers:
                         circuit_breaker = self._circuit_breakers[name]
                         result = cast(
-                            HealthCheckResult, await circuit_breaker.call(check_func)
+                            "HealthCheckResult", await circuit_breaker.call(check_func)
                         )
                     else:
                         # Apply timeout directly

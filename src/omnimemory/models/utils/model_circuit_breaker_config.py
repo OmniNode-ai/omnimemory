@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 Circuit breaker configuration Pydantic model for OmniMemory ONEX architecture.
 

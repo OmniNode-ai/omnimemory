@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Mock Graph Handler for relationship traversal operations.
 
@@ -51,7 +53,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from omnibase_core.models.omnimemory import (
-    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+    ModelMemorySnapshot,
 )
 
 if TYPE_CHECKING:

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Graph memory configuration model for Graph Memory adapter.
 
@@ -35,7 +37,7 @@ class ModelGraphMemoryConfig(BaseModel):
         timeout_seconds: Query timeout in seconds. Defaults to 30.0.
         score_filter_multiplier: Multiplier for query limit when min_score
             filtering is used. Higher values fetch more candidates but
-            increase query cost. Defaults to 3.0. Range: 1.0-10.0.
+            increase query cost. Defaults to 3.0. Range: 1.0-10.0.  # onex-allow-internal-ip
         ensure_indexes: Whether to create indexes on memory_id during
             initialization. Defaults to True. Index creation is idempotent.
         max_retries: Maximum number of retry attempts for transient connection

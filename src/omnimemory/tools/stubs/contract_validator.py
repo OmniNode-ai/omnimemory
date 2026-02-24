@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 """Stub implementation of ProtocolContractValidator.
 
 This module provides a stub implementation of the ProtocolContractValidator

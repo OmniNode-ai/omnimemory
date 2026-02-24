@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 name: Test Suite
 
 on:
@@ -55,14 +58,14 @@ jobs:
   # migration-freeze| migration-freeze-check (pre-commit)| ./scripts/check_migration_freeze.sh [--ci]
   # lint            | ruff-format (pre-commit)          | ruff format --check src/ tests/
   # lint            | ruff (pre-commit)                 | ruff check src/ tests/
-  # lint            | mypy (pre-push)                   | mypy --show-error-codes --no-error-summary src/omnimemory
-  # pyright         | pyright (pre-push)                | pyright src/omnimemory
+  # lint            | mypy-type-check (pre-push)        | mypy --show-error-codes --no-error-summary src/omnimemory
+  # pyright         | pyright-type-check (pre-push)     | pyright src/omnimemory
   # onex-validation | validate-pydantic-patterns        | python scripts/validation/validate_pydantic_patterns.py src/
   # onex-validation | validate-single-class-per-file    | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
   # onex-validation | validate-enum-casing              | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
   # onex-validation | validate-no-backward-compatibility| python scripts/validation/validate_no_backward_compatibility.py -d src/
   # onex-validation | validate-secrets                  | python scripts/validation/validate_secrets.py src/
-  # onex-validation | validate-naming-conventions       | python scripts/validation/validate_naming.py src/
+  # onex-validation | onex-validate-naming              | python scripts/validation/validate_naming.py src/
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
   # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
   # onex-validation | validate-model-locations          | python scripts/validation/validate_model_locations.py src/
@@ -148,7 +151,7 @@ jobs:
       - name: Check ruff linting (includes import sorting)
         run: poetry run ruff check src/ tests/
 
-      # SYNC: Pre-commit hook 'mypy' at pre-push stage
+      # SYNC: Pre-commit hook 'mypy-type-check' at pre-push stage
       # Both pre-commit and CI use same flags for consistent output
       - name: Run mypy type checking (strict)
         run: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
@@ -197,7 +200,7 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
-      # SYNC: Pre-commit hook 'pyright' at pre-push stage
+      # SYNC: Pre-commit hook 'pyright-type-check' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
       - name: Run pyright type checking
         run: poetry run pyright src/omnimemory
@@ -266,7 +269,7 @@ jobs:
       - name: Validate secrets
         run: poetry run python scripts/validation/validate_secrets.py src/
 
-      # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-commit stage
+      # SYNC: Pre-commit hook 'onex-validate-naming' at pre-commit stage
       # Both local and CI run naming validation at the same stage for consistency
       - name: Validate naming conventions
         run: poetry run python scripts/validation/validate_naming.py src/

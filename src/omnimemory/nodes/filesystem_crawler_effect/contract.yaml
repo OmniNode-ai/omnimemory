@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
 ---
 # ONEX Contract: filesystem_crawler_effect
 # Walks configured filesystem path prefixes for .md files and emits document lifecycle events

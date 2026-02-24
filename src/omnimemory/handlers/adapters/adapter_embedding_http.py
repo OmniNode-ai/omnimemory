@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """HTTP-based embedding client adapter wrapping HandlerHttp.
 
@@ -23,7 +25,7 @@ Example::
     async def example():
         config = ModelEmbeddingHttpClientConfig(
             provider="local",
-            base_url="http://192.168.86.201:8002",
+            base_url="http://localhost:8100",  # set via LLM_EMBEDDING_URL env var in production
             model="gte-qwen2",
         )
         client = EmbeddingHttpClient(config)

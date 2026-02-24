@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Event mapper utility for intent event consumer.
 
 Maps incoming intent-classified events to storage requests.
