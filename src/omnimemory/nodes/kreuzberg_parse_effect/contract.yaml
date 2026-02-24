@@ -115,3 +115,29 @@ event_bus:
 handler_config:
   handler_class: "HandlerKreuzbergParse"
   handler_module: "omnimemory.nodes.kreuzberg_parse_effect.handler_kreuzberg_parse"
+
+# === CONFIGURATION FIELDS (ModelKreuzbergParseConfig) ===
+config_fields:
+  KREUZBERG_URL:
+    default: "http://localhost:8090"
+    description: "Base URL of the kreuzberg Docker service"
+  KREUZBERG_TEXT_STORE_PATH:
+    required: true
+    description: "Filesystem path where extracted text files are stored"
+  KREUZBERG_DOCUMENT_ROOT:
+    default: "/"
+    description: >
+      Root directory that source_ref paths must be confined to. Defaults to filesystem root (permissive
+      — still prevents .. traversal). Set to a tighter path in production (e.g. /data/documents).
+  KREUZBERG_PARSER_VERSION:
+    required: true
+    description: "Semver string identifying the kreuzberg parser version (e.g. '1.0.0')"
+  KREUZBERG_MAX_DOC_BYTES:
+    default: 50000000
+    description: "Maximum document size in bytes before emitting too_large parse failure"
+  KREUZBERG_TIMEOUT_MS:
+    default: 30000
+    description: "HTTP request timeout in milliseconds for kreuzberg extract calls"
+  KREUZBERG_INLINE_TEXT_MAX_CHARS:
+    default: 4096
+    description: "Maximum character length for inline text storage; longer texts use file://"

@@ -181,51 +181,50 @@ class HandlerKreuzbergParse:
         content_hash = event.content_fingerprint
         config = self._config
 
-        indexed_topic = f"{env_prefix}.{config.publish_topic_indexed}"
-        failed_topic = f"{env_prefix}.{config.publish_topic_parse_failed}"
+        indexed_topic = (
+            f"{env_prefix}.{config.publish_topic_indexed}"
+            if env_prefix
+            else config.publish_topic_indexed
+        )
+        failed_topic = (
+            f"{env_prefix}.{config.publish_topic_parse_failed}"
+            if env_prefix
+            else config.publish_topic_parse_failed
+        )
         now = datetime.now(tz=timezone.utc)
 
         # ------------------------------------------------------------------
-        # Step 1: Validate source path is within document root, then read bytes
+        # Step 1: Validate source path is within document root
         # ------------------------------------------------------------------
-        document_root = Path(config.text_store_path)
-        validated_path = _validate_source_path(source_url, document_root)
-        file_bytes: bytes = await asyncio.to_thread(validated_path.read_bytes)
-
-        # ------------------------------------------------------------------
-        # Step 2: Hard limit — too large
-        # ------------------------------------------------------------------
-        if len(file_bytes) > config.max_doc_bytes:
+        document_root = Path(config.document_root)
+        try:
+            validated_path = _validate_source_path(source_url, document_root)
+        except ValueError as exc:
             _log.warning(
-                "Document too large for kreuzberg",
-                extra={
-                    "source_url": source_url,
-                    "size_bytes": len(file_bytes),
-                    "max_doc_bytes": config.max_doc_bytes,
-                },
+                "Invalid source_ref path rejected",
+                extra={"source_url": source_url, "error": str(exc)},
             )
             failed_event = ModelDocumentParseFailedEvent(
                 correlation_id=event.correlation_id,
                 emitted_at_utc=now,
                 source_url=source_url,
                 content_hash=content_hash,
-                error_code="too_large",
-                error_detail=(
-                    f"Document size {len(file_bytes)} bytes exceeds "
-                    f"max_doc_bytes={config.max_doc_bytes}"
-                ),
+                error_code="parse_error",
+                error_detail=f"Invalid source_ref path: {exc}",
                 parser_version=config.parser_version,
             )
             await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
             return ModelKreuzbergParseResult(
                 indexed_count=0,
-                failed_count=0,
-                skipped_too_large_count=1,
+                failed_count=1,
+                skipped_too_large_count=0,
                 timeout_count=0,
             )
 
         # ------------------------------------------------------------------
-        # Step 3: Idempotency check — skip re-parse if text already stored
+        # Step 2: Idempotency check — skip re-parse if text already stored.
+        # This check uses only source_url (for the cache slug) and
+        # event.content_fingerprint, so no file read is required yet.
         # ------------------------------------------------------------------
         slug = _source_url_slug(source_url)
         text_store = Path(config.text_store_path)
@@ -268,7 +267,44 @@ class HandlerKreuzbergParse:
                 )
 
         # ------------------------------------------------------------------
-        # Step 4: Call kreuzberg POST /extract
+        # Step 3: Read file bytes (deferred until after idempotency check)
+        # ------------------------------------------------------------------
+        file_bytes: bytes = await asyncio.to_thread(validated_path.read_bytes)
+
+        # ------------------------------------------------------------------
+        # Step 4: Hard limit — too large
+        # ------------------------------------------------------------------
+        if len(file_bytes) > config.max_doc_bytes:
+            _log.warning(
+                "Document too large for kreuzberg",
+                extra={
+                    "source_url": source_url,
+                    "size_bytes": len(file_bytes),
+                    "max_doc_bytes": config.max_doc_bytes,
+                },
+            )
+            failed_event = ModelDocumentParseFailedEvent(
+                correlation_id=event.correlation_id,
+                emitted_at_utc=now,
+                source_url=source_url,
+                content_hash=content_hash,
+                error_code="too_large",
+                error_detail=(
+                    f"Document size {len(file_bytes)} bytes exceeds "
+                    f"max_doc_bytes={config.max_doc_bytes}"
+                ),
+                parser_version=config.parser_version,
+            )
+            await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
+            return ModelKreuzbergParseResult(
+                indexed_count=0,
+                failed_count=0,
+                skipped_too_large_count=1,
+                timeout_count=0,
+            )
+
+        # ------------------------------------------------------------------
+        # Step 5: Call kreuzberg POST /extract
         # ------------------------------------------------------------------
         filename = validated_path.name
         mime_type = _detect_mime_type(source_url)
@@ -328,12 +364,12 @@ class HandlerKreuzbergParse:
             )
 
         # ------------------------------------------------------------------
-        # Step 5: Extract text from response
+        # Step 6: Extract text from response
         # ------------------------------------------------------------------
         extracted_text = result.extracted_text
 
         # ------------------------------------------------------------------
-        # Step 6: Store text and compute extracted_text_ref
+        # Step 7: Store text and compute extracted_text_ref
         # ------------------------------------------------------------------
         # Write cache for idempotency on next call (always, regardless of branch).
         await asyncio.to_thread(
@@ -346,7 +382,7 @@ class HandlerKreuzbergParse:
             extracted_text_ref = f"file://{text_path.resolve()}"
 
         # ------------------------------------------------------------------
-        # Step 7: Emit document-indexed event
+        # Step 8: Emit document-indexed event
         # ------------------------------------------------------------------
         document_id = _compute_document_id(
             source_url, content_hash, config.parser_version

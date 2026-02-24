@@ -23,6 +23,11 @@ __all__ = [
     "call_kreuzberg_extract",
 ]
 
+# Prefix written as the first line of every cached text file.
+# Both read_cached_text and write_cached_text rely on this exact string; keeping
+# it at module level ensures they can never silently diverge.
+_FINGERPRINT_PREFIX = "fingerprint:"
+
 
 class KreuzbergTimeoutError(Exception):
     """Raised when the kreuzberg /extract request exceeds the configured timeout."""
@@ -116,8 +121,6 @@ def read_cached_text(text_path: Path) -> tuple[str, str] | None:
 
     Returns None if the file does not exist or cannot be parsed.
     """
-    _FINGERPRINT_PREFIX = "fingerprint:"
-
     if not text_path.exists():
         return None
     try:
@@ -141,7 +144,6 @@ def write_cached_text(text_path: Path, fingerprint: str, text: str) -> None:
         fingerprint: SHA-256 hex fingerprint of the source document content.
         text: Extracted text content to store.
     """
-    _FINGERPRINT_PREFIX = "fingerprint:"
     text_path.parent.mkdir(parents=True, exist_ok=True)
     text_path.write_text(
         f"{_FINGERPRINT_PREFIX}{fingerprint}\n{text}",

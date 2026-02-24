@@ -26,6 +26,14 @@ class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
         ...,
         description="Filesystem path where extracted text files are stored (KREUZBERG_TEXT_STORE_PATH)",
     )
+    document_root: str = Field(
+        default="/",
+        description=(
+            "Root directory that source_ref paths must be confined to. "
+            "Defaults to filesystem root (permissive — still prevents .. escapes from relative paths). "
+            "Set to a tighter path in production (KREUZBERG_DOCUMENT_ROOT)."
+        ),
+    )
     parser_version: str = Field(
         ...,
         description="Semver string identifying the kreuzberg parser version (e.g. '1.0.0')",

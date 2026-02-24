@@ -93,15 +93,19 @@ def _make_config(
     text_store_path: str,
     max_doc_bytes: int = 50_000_000,
     inline_text_max_chars: int = 4096,
+    document_root: str | None = None,
 ) -> ModelKreuzbergParseConfig:
-    return ModelKreuzbergParseConfig(
-        kreuzberg_url="http://localhost:8090",
-        text_store_path=text_store_path,
-        parser_version="1.0.0",
-        max_doc_bytes=max_doc_bytes,
-        timeout_ms=30_000,
-        inline_text_max_chars=inline_text_max_chars,
-    )
+    kwargs: dict[str, object] = {
+        "kreuzberg_url": "http://localhost:8090",
+        "text_store_path": text_store_path,
+        "parser_version": "1.0.0",
+        "max_doc_bytes": max_doc_bytes,
+        "timeout_ms": 30_000,
+        "inline_text_max_chars": inline_text_max_chars,
+    }
+    if document_root is not None:
+        kwargs["document_root"] = document_root
+    return ModelKreuzbergParseConfig(**kwargs)
 
 
 async def _run_handler(
@@ -346,3 +350,47 @@ async def test_kreuzberg_extraction_error_emits_parse_failed(tmp_path: Path) -> 
     assert "parse-failed" in topic
     assert payload["error_code"] == "parse_error"
     assert payload["source_url"] == source_ref
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_source_ref_path_traversal_emits_parse_failed(tmp_path: Path) -> None:
+    """Path traversal attempt (source_ref outside document_root) emits parse-failed.
+
+    Validates CRITICAL-2: ValueError from _validate_source_path is caught and
+    converted into a structured document-parse-failed event with error_code=parse_error.
+    """
+    config = _make_config(
+        text_store_path=str(tmp_path),
+        document_root=str(tmp_path),
+    )
+    # source_ref points to a sibling directory — outside tmp_path
+    outside_path = tmp_path.parent / "outside" / "doc.pdf"
+    event = _make_discovered_event(source_ref=str(outside_path))
+
+    handler = HandlerKreuzbergParse(config=config)
+    published: list[tuple[str, dict[str, object]]] = []
+
+    async def _cb(topic: str, payload: dict[str, object]) -> None:
+        published.append((topic, payload))
+
+    mock_extract = AsyncMock()
+
+    with (
+        patch(f"{_HANDLER_MOD}.read_cached_text", return_value=None),
+        patch(f"{_HANDLER_MOD}.call_kreuzberg_extract", mock_extract),
+    ):
+        await handler.process_event(
+            event=event,
+            env_prefix="dev",
+            publish_callback=_cb,
+        )
+
+    # kreuzberg must NOT be called — rejection happens before file read
+    mock_extract.assert_not_called()
+
+    assert len(published) == 1
+    topic, payload = published[0]
+    assert "parse-failed" in topic
+    assert payload["error_code"] == "parse_error"
+    assert payload["source_url"] == str(outside_path)
