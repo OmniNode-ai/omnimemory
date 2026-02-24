@@ -75,7 +75,9 @@ async def call_kreuzberg_extract(
 
     Raises:
         KreuzbergTimeoutError: If the request exceeds ``timeout_seconds``.
-        KreuzbergExtractionError: If kreuzberg returns a non-2xx response.
+        KreuzbergExtractionError: If kreuzberg returns a non-2xx response,
+            a transport-level failure occurs, or a request-side error such as
+            ``httpx.TooManyRedirects`` or ``httpx.InvalidURL`` is raised.
     """
     extract_url = f"{kreuzberg_url.rstrip('/')}/extract"
 
@@ -99,6 +101,11 @@ async def call_kreuzberg_extract(
         raise KreuzbergExtractionError(
             status_code=503,
             detail=f"kreuzberg transport error: {exc}",
+        ) from exc
+    except httpx.RequestError as exc:
+        raise KreuzbergExtractionError(
+            status_code=503,
+            detail=f"kreuzberg request error: {exc}",
         ) from exc
 
     try:
