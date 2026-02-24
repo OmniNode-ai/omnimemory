@@ -394,14 +394,26 @@ class HandlerKreuzbergParse:
         # Step 7: Store text and compute extracted_text_ref
         # ------------------------------------------------------------------
         # Write cache for idempotency on next call (always, regardless of branch).
-        await asyncio.to_thread(
-            write_cached_text, text_path, content_hash, extracted_text
-        )
+        try:
+            await asyncio.to_thread(
+                write_cached_text, text_path, content_hash, extracted_text
+            )
 
-        if len(extracted_text) < config.inline_text_max_chars:
+            if len(extracted_text) < config.inline_text_max_chars:
+                extracted_text_ref = extracted_text
+            else:
+                extracted_text_ref = f"file://{text_path.resolve()}"
+        except OSError as exc:
+            _log.warning(
+                "Failed to write kreuzberg text cache; using inline fallback",
+                extra={
+                    "source_url": source_url,
+                    "text_path": str(text_path),
+                    "error": str(exc),
+                },
+            )
+            # Extraction succeeded; only caching failed — inline the text directly.
             extracted_text_ref = extracted_text
-        else:
-            extracted_text_ref = f"file://{text_path.resolve()}"
 
         # ------------------------------------------------------------------
         # Step 8: Emit document-indexed event

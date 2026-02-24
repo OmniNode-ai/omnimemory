@@ -93,6 +93,11 @@ async def call_kreuzberg_extract(
             status_code=exc.response.status_code,
             detail=exc.response.text[:200],
         ) from exc
+    except httpx.TransportError as exc:
+        raise KreuzbergExtractionError(
+            status_code=503,
+            detail=f"kreuzberg transport error: {exc}",
+        ) from exc
 
     try:
         response_data = response.json()
