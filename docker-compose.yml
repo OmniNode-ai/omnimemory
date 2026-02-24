@@ -141,6 +141,22 @@ services:
           memory: ${VALKEY_MEMORY_RESERVATION:-128M}
     restart: unless-stopped
 
+  # Kreuzberg Document Parser (Text Extraction Service)
+  kreuzberg-parser:
+    image: ghcr.io/kreuzberg-dev/kreuzberg:core
+    container_name: omnimemory-kreuzberg-parser
+    ports:
+      - "${KREUZBERG_PORT:-8090}:8000"
+    networks:
+      - omnimemory-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 networks:
   omnimemory-network:
     driver: bridge

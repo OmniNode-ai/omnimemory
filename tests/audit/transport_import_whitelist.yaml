@@ -46,8 +46,14 @@ files:
     allowed_modules:
       - asyncpg
 
-  # Effect node client - effect nodes are the designated I/O boundary
+  # Effect node clients - effect nodes are the designated I/O boundary
   - path: "src/omnimemory/nodes/memory_retrieval_effect/clients/embedding_client.py"
     reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
+    allowed_modules:
+      - httpx
+
+  - path: "src/omnimemory/nodes/kreuzberg_parse_effect/clients/client_kreuzberg.py"
+    reason: "Kreuzberg effect client uses httpx for document extraction API calls; expected I/O boundary
+      (OMN-2733)"
     allowed_modules:
       - httpx

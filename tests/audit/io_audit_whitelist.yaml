@@ -36,3 +36,10 @@ files:
     reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
     allowed_rules:
       - "net-client"
+
+  - path: "src/omnimemory/nodes/kreuzberg_parse_effect/clients/client_kreuzberg.py"
+    reason: "Kreuzberg effect client: httpx for API calls, Path.read_text/write_text for idempotency cache
+      (OMN-2733)"
+    allowed_rules:
+      - "net-client"
+      - "file-io"
