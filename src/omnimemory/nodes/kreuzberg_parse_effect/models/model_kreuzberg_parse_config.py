@@ -4,7 +4,9 @@
 # Copyright (c) 2025 OmniNode Team
 """Handler configuration model for KreuzbergParseEffect node."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
@@ -34,6 +36,16 @@ class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
             "Set to a tighter path in production (KREUZBERG_DOCUMENT_ROOT)."
         ),
     )
+
+    @field_validator("document_root")
+    @classmethod
+    def validate_document_root_exists(cls, v: str) -> str:
+        if not Path(v).is_dir():
+            raise ValueError(
+                f"document_root '{v}' does not exist or is not a directory"
+            )
+        return v
+
     parser_version: str = Field(
         ...,
         description="Semver string identifying the kreuzberg parser version (e.g. '1.0.0')",

@@ -94,7 +94,13 @@ async def call_kreuzberg_extract(
             detail=exc.response.text[:200],
         ) from exc
 
-    response_data = response.json()
+    try:
+        response_data = response.json()
+    except (ValueError, httpx.DecodingError) as exc:
+        raise KreuzbergExtractionError(
+            status_code=response.status_code,
+            detail=f"kreuzberg returned non-JSON response: {exc}",
+        ) from exc
     if not isinstance(response_data, list):
         raise KreuzbergExtractionError(
             status_code=200,
@@ -107,10 +113,10 @@ async def call_kreuzberg_extract(
         )
     try:
         extracted_text = str(response_data[0]["content"])
-    except KeyError:
+    except (KeyError, TypeError):
         raise KreuzbergExtractionError(
             status_code=200,
-            detail="kreuzberg response item missing 'content' key",
+            detail="kreuzberg response item has unexpected format",
         )
 
     return KreuzbergExtractResult(extracted_text=extracted_text)
