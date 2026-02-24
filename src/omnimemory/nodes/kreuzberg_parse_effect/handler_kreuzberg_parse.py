@@ -412,8 +412,29 @@ class HandlerKreuzbergParse:
                     "error": str(exc),
                 },
             )
-            # Extraction succeeded; only caching failed — inline the text directly.
-            extracted_text_ref = extracted_text
+            # Extraction succeeded; only caching failed.
+            # Inline only if the text is small enough to fit safely in a Kafka event.
+            if len(extracted_text) < config.inline_text_max_chars:
+                extracted_text_ref = extracted_text
+            else:
+                failed_event = ModelDocumentParseFailedEvent(
+                    correlation_id=event.correlation_id,
+                    emitted_at_utc=now,
+                    source_url=source_url,
+                    content_hash=content_hash,
+                    error_code="parse_error",
+                    error_detail="cache write failed and text too large to inline",
+                    parser_version=config.parser_version,
+                )
+                await publish_callback(
+                    failed_topic, failed_event.model_dump(mode="json")
+                )
+                return ModelKreuzbergParseResult(
+                    indexed_count=0,
+                    failed_count=1,
+                    skipped_too_large_count=0,
+                    timeout_count=0,
+                )
 
         # ------------------------------------------------------------------
         # Step 8: Emit document-indexed event

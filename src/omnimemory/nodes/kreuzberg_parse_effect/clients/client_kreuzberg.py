@@ -21,6 +21,8 @@ __all__ = [
     "KreuzbergExtractionError",
     "KreuzbergTimeoutError",
     "call_kreuzberg_extract",
+    "read_cached_text",
+    "write_cached_text",
 ]
 
 # Prefix written as the first line of every cached text file.
@@ -117,14 +119,19 @@ async def call_kreuzberg_extract(
             detail="kreuzberg returned empty response array",
         )
     try:
-        extracted_text = str(response_data[0]["content"])
+        content = response_data[0]["content"]
     except (KeyError, TypeError):
         raise KreuzbergExtractionError(
             status_code=200,
             detail="kreuzberg response item has unexpected format",
         )
+    if content is None:
+        raise KreuzbergExtractionError(
+            status_code=200,
+            detail="kreuzberg returned null content",
+        )
 
-    return KreuzbergExtractResult(extracted_text=extracted_text)
+    return KreuzbergExtractResult(extracted_text=str(content))
 
 
 def read_cached_text(text_path: Path) -> tuple[str, str] | None:
