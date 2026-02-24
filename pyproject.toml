@@ -43,7 +43,7 @@ dependencies = [
 
     # Vector database support
     # Pinecone for vector memory storage
-    "pinecone-client>=4.1.0,<5.0.0",
+    "pinecone-client>=4.1.0,<7.0.0",
     # qdrant-client is a transitive dep; ceiling at <1.17.0 because 1.17.0 applies
     # PEP 604 union syntax to protobuf EnumTypeWrapper objects, causing TypeError at
     # import time under Python 3.12. Remove ceiling once fixed upstream.
