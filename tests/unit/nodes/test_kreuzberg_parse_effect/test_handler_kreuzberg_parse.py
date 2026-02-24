@@ -486,6 +486,59 @@ async def test_cache_write_oserror_too_large_emits_parse_failed(tmp_path: Path) 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_empty_env_prefix_uses_bare_topic_names(tmp_path: Path) -> None:
+    """env_prefix='' publishes to the bare topic name with no leading dot or prefix.
+
+    Validates the falsy-env_prefix branch at handler lines 184-193:
+        indexed_topic = config.publish_topic_indexed  (not f"dev.{...}")
+    """
+    config = _make_config(
+        text_store_path=str(tmp_path),
+        inline_text_max_chars=4096,
+    )
+    source_ref = str(tmp_path / "bare_topic_doc.md")
+    event = _make_discovered_event(source_ref=source_ref)
+
+    handler = HandlerKreuzbergParse(config=config)
+    published: list[tuple[str, dict[str, object]]] = []
+
+    async def _cb(topic: str, payload: dict[str, object]) -> None:
+        published.append((topic, payload))
+
+    with (
+        patch("pathlib.Path.read_bytes", return_value=b"# Hello\n"),
+        patch(f"{_HANDLER_MOD}.read_cached_text", return_value=None),
+        patch(f"{_HANDLER_MOD}.write_cached_text"),
+        patch(
+            f"{_HANDLER_MOD}.call_kreuzberg_extract",
+            AsyncMock(return_value=KreuzbergExtractResult(extracted_text="hello world")),
+        ),
+    ):
+        await handler.process_event(
+            event=event,
+            env_prefix="",
+            publish_callback=_cb,
+        )
+
+    assert len(published) == 1
+    topic, payload = published[0]
+
+    bare_indexed_topic = config.publish_topic_indexed
+    prefixed_indexed_topic = f"dev.{bare_indexed_topic}"
+
+    # Must publish to the bare topic — no prefix, no leading dot
+    assert topic == bare_indexed_topic, (
+        f"Expected bare topic {bare_indexed_topic!r}, got {topic!r}"
+    )
+    assert topic != prefixed_indexed_topic, (
+        f"Topic must not be prefixed with 'dev.', got {topic!r}"
+    )
+    assert not topic.startswith("."), f"Topic must not start with '.', got {topic!r}"
+    assert payload["parse_status"] == "ok"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_source_ref_path_traversal_emits_parse_failed(tmp_path: Path) -> None:
     """Path traversal attempt (source_ref outside document_root) emits parse-failed.
 
