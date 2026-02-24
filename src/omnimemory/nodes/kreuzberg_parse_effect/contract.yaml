@@ -37,13 +37,15 @@ published_events:
     full_topic_pattern: "{env}.onex.evt.omnimemory.document-indexed.v1"
     event_type: "DocumentIndexedKreuzberg"
     trigger: "Document successfully parsed by kreuzberg"
-    description: "Emitted after kreuzberg extracts text from a document. Carries extracted_text_ref (inline or file://) plus mime_type and parser_version."
+    description: "Emitted after kreuzberg extracts text from a document. Carries extracted_text_ref (inline
+      or file://) plus mime_type and parser_version."
 
   - topic_suffix: "onex.evt.omnimemory.document-parse-failed.v1"
     full_topic_pattern: "{env}.onex.evt.omnimemory.document-parse-failed.v1"
     event_type: "DocumentParseFailed"
     trigger: "Document too large, kreuzberg timeout, or kreuzberg HTTP error"
-    description: "Emitted when kreuzberg cannot parse a document. error_code distinguishes too_large, timeout, and parse_error."
+    description: "Emitted when kreuzberg cannot parse a document. error_code distinguishes too_large,
+      timeout, and parse_error."
 
 # =============================================================================
 # SUBSCRIBED EVENTS (Kafka) - Documentation Layer
