@@ -9,9 +9,9 @@ omnibase_core.contracts.navigation.
 
 .. note::
     Dependency note (OMN-2584): Replace with omnibase_core imports when available:
-      - ``PlanStep`` → ``omnibase_core.contracts.navigation.PlanStep``
+      - ``ModelPlanStep`` → ``omnibase_core.contracts.navigation.ModelPlanStep``
       - ``NavigationOutcome`` → ``omnibase_core.contracts.navigation.NavigationOutcome``
-      - ``NavigationSession`` → ``omnibase_core.contracts.navigation.NavigationSession``
+      - ``ModelNavigationSession`` → ``omnibase_core.contracts.navigation.ModelNavigationSession``
 
 .. versionadded:: 0.4.0
     Initial implementation for OMN-2584 Navigation History Storage.
@@ -24,10 +24,10 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class PlanStep(BaseModel):
+class ModelPlanStep(BaseModel):
     """A single executed step in a navigation plan.
 
     Represents one state transition in a backward-chaining plan produced by the
@@ -55,17 +55,17 @@ class PlanStep(BaseModel):
         description="Optional typed graph artifact metadata",
     )
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)
 
 
-class NavigationOutcomeTag(StrEnum):
+class EnumNavigationOutcomeTag(StrEnum):
     """Discriminator tag for navigation outcome union."""
 
     SUCCESS = "success"
     FAILURE = "failure"
 
 
-class NavigationOutcomeSuccess(BaseModel):
+class ModelNavigationOutcomeSuccess(BaseModel):
     """Successful navigation outcome.
 
     Attributes:
@@ -76,10 +76,10 @@ class NavigationOutcomeSuccess(BaseModel):
     tag: Literal["success"] = "success"
     reached_state_id: str = Field(description="Final state ID satisfying the goal")
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)
 
 
-class NavigationOutcomeFailure(BaseModel):
+class ModelNavigationOutcomeFailure(BaseModel):
     """Failed navigation outcome.
 
     Attributes:
@@ -97,14 +97,14 @@ class NavigationOutcomeFailure(BaseModel):
         description="Optional debug details (no user content)",
     )
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)
 
 
 # Union type for the outcome discriminator
-NavigationOutcome = NavigationOutcomeSuccess | NavigationOutcomeFailure
+NavigationOutcome = ModelNavigationOutcomeSuccess | ModelNavigationOutcomeFailure
 
 
-class NavigationSession(BaseModel):
+class ModelNavigationSession(BaseModel):
     """A completed navigation session with all execution metadata.
 
     Captures the full record of a backward-chaining navigation attempt:
@@ -130,7 +130,7 @@ class NavigationSession(BaseModel):
     )
     start_state_id: str = Field(description="Initial graph state identifier")
     end_state_id: str = Field(description="Final graph state identifier")
-    executed_steps: list[PlanStep] = Field(
+    executed_steps: list[ModelPlanStep] = Field(
         default_factory=list,
         description="Ordered plan steps executed during navigation",
     )
@@ -144,7 +144,7 @@ class NavigationSession(BaseModel):
         description="UTC timestamp when this session record was created"
     )
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)
 
     @property
     def is_successful(self) -> bool:

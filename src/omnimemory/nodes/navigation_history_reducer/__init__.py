@@ -7,7 +7,7 @@ to Qdrant, enabling retrieval-augmented navigation over prior execution paths.
 
 Node Type: REDUCER
 Handler:   HandlerNavigationHistoryReducer
-Writer:    NavigationHistoryWriter
+Writer:    HandlerNavigationHistoryWriter
 
 Routing:
 - Success → PostgreSQL (navigation_sessions) + Qdrant (navigation_paths)
@@ -23,7 +23,7 @@ Fire-and-forget pattern::
     )
 
 .. note::
-    Local type definitions (NavigationSession, PlanStep, NavigationOutcome) will
+    Local type definitions (ModelNavigationSession, ModelPlanStep, NavigationOutcome) will
     be replaced by imports from omnibase_core once OMN-2540 and OMN-2561 land.
 
 .. versionadded:: 0.4.0
@@ -32,13 +32,14 @@ Fire-and-forget pattern::
 
 from omnimemory.nodes.navigation_history_reducer.handlers import (
     HandlerNavigationHistoryReducer,
+    HandlerNavigationHistoryWriter,
 )
 from omnimemory.nodes.navigation_history_reducer.models import (
     ModelNavigationHistoryRequest,
     ModelNavigationHistoryResponse,
+    ModelNavigationSession,
+    ModelPlanStep,
     NavigationOutcome,
-    NavigationSession,
-    PlanStep,
 )
 from omnimemory.nodes.navigation_history_reducer.node_navigation_history_reducer import (
     NodeNavigationHistoryReducer,
@@ -49,11 +50,12 @@ __all__ = [
     "NodeNavigationHistoryReducer",
     # Handler
     "HandlerNavigationHistoryReducer",
+    "HandlerNavigationHistoryWriter",
     # Request / response models
     "ModelNavigationHistoryRequest",
     "ModelNavigationHistoryResponse",
     # Session domain types
-    "NavigationSession",
+    "ModelNavigationSession",
     "NavigationOutcome",
-    "PlanStep",
+    "ModelPlanStep",
 ]

@@ -57,3 +57,9 @@ files:
       (OMN-2733)"
     allowed_modules:
       - httpx
+
+  - path: "src/omnimemory/nodes/navigation_history_reducer/handlers/handler_navigation_history_reducer.py"
+    reason: "Phase 2 handler uses asyncpg and httpx directly; Phase 3 will inject via DI (OMN-2584)"
+    allowed_modules:
+      - asyncpg
+      - httpx

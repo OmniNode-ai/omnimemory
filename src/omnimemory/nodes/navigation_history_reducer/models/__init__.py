@@ -5,15 +5,21 @@
 from .model_navigation_history_request import ModelNavigationHistoryRequest
 from .model_navigation_history_response import ModelNavigationHistoryResponse
 from .model_navigation_session import (
+    EnumNavigationOutcomeTag,
+    ModelNavigationOutcomeFailure,
+    ModelNavigationOutcomeSuccess,
+    ModelNavigationSession,
+    ModelPlanStep,
     NavigationOutcome,
-    NavigationSession,
-    PlanStep,
 )
 
 __all__ = [
+    "EnumNavigationOutcomeTag",
+    "ModelNavigationOutcomeFailure",
+    "ModelNavigationOutcomeSuccess",
+    "ModelNavigationSession",
+    "ModelPlanStep",
     "NavigationOutcome",
-    "NavigationSession",
-    "PlanStep",
     "ModelNavigationHistoryRequest",
     "ModelNavigationHistoryResponse",
 ]

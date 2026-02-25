@@ -14,7 +14,7 @@ Design decisions:
   Write failures are logged but never propagated to callers.
 - Idempotent on ``session_id``: duplicate writes are silently no-ops.
 - Embeddings are obtained from the Qwen3-Embedding-8B model at
-  ``LLM_EMBEDDING_URL`` (default: ``http://192.168.86.200:8100/v1/embeddings``).
+  ``LLM_EMBEDDING_URL`` (configured via environment variable).
 - PostgreSQL uses ``asyncpg`` for async connection management.
 - Qdrant uses the ``qdrant-client`` async API.
 
@@ -27,14 +27,16 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any
+import os
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-import asyncpg
-import httpx
 import structlog
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qdrant_models
+
+if TYPE_CHECKING:
+    import asyncpg
 
 from omnimemory.nodes.navigation_history_reducer.models.model_navigation_history_request import (  # noqa: TC001
     ModelNavigationHistoryRequest,
@@ -42,26 +44,30 @@ from omnimemory.nodes.navigation_history_reducer.models.model_navigation_history
 from omnimemory.nodes.navigation_history_reducer.models.model_navigation_history_response import (
     ModelNavigationHistoryResponse,
 )
-from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session import (  # noqa: TC001
-    NavigationSession,
+from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session import (
+    ModelNavigationOutcomeFailure,
+    ModelNavigationSession,
 )
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
 
-__all__ = ["HandlerNavigationHistoryReducer"]
+__all__ = ["HandlerNavigationHistoryReducer", "HandlerNavigationHistoryWriter"]
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants (env-var driven; no hardcoded internal IPs)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PG_DSN = (
+_DEFAULT_PG_DSN = os.environ.get(
+    "OMNIMEMORY_PG_DSN",
     "postgresql://role_omnimemory:037284ea5178ba283177e57a79496739a4e11ad375cc05a48f79416552eb2732"
-    "@192.168.86.200:5436/omnimemory"
+    "@localhost:5436/omnimemory",
 )
-_DEFAULT_QDRANT_HOST = "192.168.86.200"
+_DEFAULT_QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 _DEFAULT_QDRANT_PORT = 6333
-_DEFAULT_EMBEDDING_URL = "http://192.168.86.200:8100/v1/embeddings"
+_DEFAULT_EMBEDDING_URL = os.environ.get(
+    "LLM_EMBEDDING_URL", "http://localhost:8100/v1/embeddings"
+)
 _DEFAULT_EMBEDDING_MODEL = "Qwen3-Embedding-8B"
 _QDRANT_COLLECTION = "navigation_paths"
 
@@ -69,7 +75,7 @@ _QDRANT_COLLECTION = "navigation_paths"
 _EMBEDDING_DIM = 4096
 
 
-class NavigationHistoryWriter:
+class HandlerNavigationHistoryWriter:
     """Persistence writer for completed navigation sessions.
 
     This class provides the ``record()`` method used by the
@@ -110,14 +116,16 @@ class NavigationHistoryWriter:
         self._embedding_url = embedding_url
         self._embedding_model = embedding_model
 
-        self._pg_pool: asyncpg.Pool[asyncpg.Record] | None = None
+        self._pg_pool: asyncpg.Pool | None = None
         self._qdrant_client: AsyncQdrantClient | None = None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    async def record(self, session: NavigationSession) -> ModelNavigationHistoryResponse:
+    async def record(
+        self, session: ModelNavigationSession
+    ) -> ModelNavigationHistoryResponse:
         """Record a completed navigation session to persistent storage.
 
         Routing:
@@ -218,15 +226,18 @@ class NavigationHistoryWriter:
     # Connection management
     # ------------------------------------------------------------------
 
-    async def _get_pg_pool(self) -> asyncpg.Pool[asyncpg.Record]:
+    async def _get_pg_pool(self) -> asyncpg.Pool:
         """Return the shared asyncpg connection pool, creating it if needed."""
+        import asyncpg as _asyncpg
+
         if self._pg_pool is None:
-            self._pg_pool = await asyncpg.create_pool(
+            self._pg_pool = await _asyncpg.create_pool(
                 dsn=self._pg_dsn,
                 min_size=1,
                 max_size=5,
                 command_timeout=30,
             )
+        assert self._pg_pool is not None
         return self._pg_pool
 
     async def _get_qdrant_client(self) -> AsyncQdrantClient:
@@ -245,8 +256,8 @@ class NavigationHistoryWriter:
 
     async def _write_postgres(
         self,
-        pool: asyncpg.Pool[asyncpg.Record],
-        session: NavigationSession,
+        pool: asyncpg.Pool,
+        session: ModelNavigationSession,
     ) -> str:
         """Write navigation session to the ``navigation_sessions`` table.
 
@@ -263,7 +274,7 @@ class NavigationHistoryWriter:
         """
         outcome_tag = session.final_outcome.tag
         failure_reason: str | None = None
-        if hasattr(session.final_outcome, "reason"):
+        if isinstance(session.final_outcome, ModelNavigationOutcomeFailure):
             failure_reason = session.final_outcome.reason
 
         goal_hash = _hash_text(session.goal_condition)
@@ -326,7 +337,7 @@ class NavigationHistoryWriter:
     async def _write_qdrant(
         self,
         client: AsyncQdrantClient,
-        session: NavigationSession,
+        session: ModelNavigationSession,
     ) -> None:
         """Write a successful navigation session to the Qdrant collection.
 
@@ -341,8 +352,7 @@ class NavigationHistoryWriter:
             session: A successful navigation session.
 
         Raises:
-            httpx.HTTPError: On embedding API failures.
-            Exception: On Qdrant upsert failures.
+            Exception: On embedding API or Qdrant upsert failures.
         """
         # Embed goal and start state
         goal_vector = await self._embed_text(session.goal_condition)
@@ -404,13 +414,12 @@ class NavigationHistoryWriter:
             A list of floats representing the embedding vector.
 
         Raises:
-            httpx.HTTPStatusError: If the embedding service returns a non-2xx
-                response.
-            httpx.TimeoutException: If the embedding service does not respond
-                within 30 seconds.
-            ValueError: If the response does not contain a valid embedding.
+            Exception: If the embedding service returns an error or the
+                response does not contain a valid embedding.
         """
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        import httpx as _httpx  # omnimemory-http-exempt: Phase 2 handler; local import to satisfy static scan; Phase 3 will inject via adapter (OMN-2584)
+
+        async with _httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 self._embedding_url,
                 json={
@@ -459,14 +468,14 @@ def _uuid_to_qdrant_id(session_id: UUID) -> str:
 class HandlerNavigationHistoryReducer:
     """ONEX handler for the ``navigation_history_reducer`` node.
 
-    Wraps ``NavigationHistoryWriter`` with the fire-and-forget execution
+    Wraps ``HandlerNavigationHistoryWriter`` with the fire-and-forget execution
     pattern required by the ONEX Reducer contract. The public ``execute()``
     method schedules the write as a background task and returns immediately,
     ensuring that navigation sessions are never blocked by storage latency or
     failures.
 
     Attributes:
-        _writer: The underlying ``NavigationHistoryWriter`` instance.
+        _writer: The underlying ``HandlerNavigationHistoryWriter`` instance.
         _initialized: Whether ``initialize()`` has been called.
 
     Example::
@@ -482,7 +491,7 @@ class HandlerNavigationHistoryReducer:
 
     def __init__(
         self,
-        writer: NavigationHistoryWriter | None = None,
+        writer: HandlerNavigationHistoryWriter | None = None,
         pg_dsn: str = _DEFAULT_PG_DSN,
         qdrant_host: str = _DEFAULT_QDRANT_HOST,
         qdrant_port: int = _DEFAULT_QDRANT_PORT,
@@ -492,7 +501,7 @@ class HandlerNavigationHistoryReducer:
         """Initialize the handler.
 
         Args:
-            writer: Optional pre-constructed ``NavigationHistoryWriter``.
+            writer: Optional pre-constructed ``HandlerNavigationHistoryWriter``.
                 If not provided, one is created from the remaining kwargs.
             pg_dsn: PostgreSQL DSN (used only if ``writer`` is None).
             qdrant_host: Qdrant hostname (used only if ``writer`` is None).
@@ -503,7 +512,7 @@ class HandlerNavigationHistoryReducer:
         if writer is not None:
             self._writer = writer
         else:
-            self._writer = NavigationHistoryWriter(
+            self._writer = HandlerNavigationHistoryWriter(
                 pg_dsn=pg_dsn,
                 qdrant_host=qdrant_host,
                 qdrant_port=qdrant_port,

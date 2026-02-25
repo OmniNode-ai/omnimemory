@@ -6,9 +6,9 @@ These tests require live PostgreSQL and Qdrant connections.
 Run with: pytest -m integration tests/integration/nodes/test_navigation_history_reducer_integration.py
 
 Environment:
-- PostgreSQL: 192.168.86.200:5436, database omnimemory
-- Qdrant: 192.168.86.200:6333 (or QDRANT_HOST/QDRANT_PORT env vars)
-- Embedding: 192.168.86.200:8100 (or EMBEDDING_URL env var)
+- PostgreSQL: configured via OMNIMEMORY_PG_DSN env var (default: localhost:5436)
+- Qdrant: configured via QDRANT_HOST / QDRANT_PORT env vars (default: localhost:6333)
+- Embedding: configured via LLM_EMBEDDING_URL env var (default: localhost:8100)
 
 Markers: integration
 """
@@ -29,32 +29,34 @@ from omnimemory.nodes.navigation_history_reducer.handlers import (
 )
 from omnimemory.nodes.navigation_history_reducer.handlers.handler_navigation_history_reducer import (
     _QDRANT_COLLECTION,
-    NavigationHistoryWriter,
+    HandlerNavigationHistoryWriter,
 )
 from omnimemory.nodes.navigation_history_reducer.models import (
     ModelNavigationHistoryRequest,
-    NavigationSession,
-    PlanStep,
+    ModelNavigationSession,
+    ModelPlanStep,
 )
 from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session import (
-    NavigationOutcomeFailure,
-    NavigationOutcomeSuccess,
+    ModelNavigationOutcomeFailure,
+    ModelNavigationOutcomeSuccess,
 )
 
 # ---------------------------------------------------------------------------
-# Connection defaults (override via env)
+# Connection defaults (override via env; no hardcoded internal IPs)
 # ---------------------------------------------------------------------------
 
 _PG_DSN = os.environ.get(
     "OMNIMEMORY_PG_DSN",
     (
         "postgresql://role_omnimemory:037284ea5178ba283177e57a79496739a4e11ad375cc05a48f79416552eb2732"
-        "@192.168.86.200:5436/omnimemory"
+        "@localhost:5436/omnimemory"
     ),
 )
-_QDRANT_HOST = os.environ.get("QDRANT_HOST", "192.168.86.200")
+_QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 _QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
-_EMBEDDING_URL = os.environ.get("EMBEDDING_URL", "http://192.168.86.200:8100/v1/embeddings")
+_EMBEDDING_URL = os.environ.get(
+    "LLM_EMBEDDING_URL", "http://localhost:8100/v1/embeddings"
+)
 
 pytestmark = pytest.mark.integration
 
@@ -65,8 +67,8 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def writer() -> NavigationHistoryWriter:
-    return NavigationHistoryWriter(
+def writer() -> HandlerNavigationHistoryWriter:
+    return HandlerNavigationHistoryWriter(
         pg_dsn=_PG_DSN,
         qdrant_host=_QDRANT_HOST,
         qdrant_port=_QDRANT_PORT,
@@ -74,21 +76,21 @@ def writer() -> NavigationHistoryWriter:
     )
 
 
-def _make_success_session() -> NavigationSession:
-    return NavigationSession(
+def _make_success_session() -> ModelNavigationSession:
+    return ModelNavigationSession(
         session_id=uuid4(),
         goal_condition="integration_test_goal_reach_state_Z",
         start_state_id="integration_test_state_A",
         end_state_id="integration_test_state_Z",
         executed_steps=[
-            PlanStep(
+            ModelPlanStep(
                 step_index=0,
                 from_state_id="integration_test_state_A",
                 to_state_id="integration_test_state_M",
                 action="transition_A_to_M",
                 executed_at=datetime(2026, 2, 24, 12, 0, 0, tzinfo=timezone.utc),
             ),
-            PlanStep(
+            ModelPlanStep(
                 step_index=1,
                 from_state_id="integration_test_state_M",
                 to_state_id="integration_test_state_Z",
@@ -96,20 +98,22 @@ def _make_success_session() -> NavigationSession:
                 executed_at=datetime(2026, 2, 24, 12, 0, 5, tzinfo=timezone.utc),
             ),
         ],
-        final_outcome=NavigationOutcomeSuccess(reached_state_id="integration_test_state_Z"),
+        final_outcome=ModelNavigationOutcomeSuccess(
+            reached_state_id="integration_test_state_Z"
+        ),
         graph_fingerprint="integration_test_fingerprint_abc123",
         created_at=datetime(2026, 2, 24, 12, 0, 10, tzinfo=timezone.utc),
     )
 
 
-def _make_failure_session() -> NavigationSession:
-    return NavigationSession(
+def _make_failure_session() -> ModelNavigationSession:
+    return ModelNavigationSession(
         session_id=uuid4(),
         goal_condition="integration_test_goal_reach_state_Z",
         start_state_id="integration_test_state_A",
         end_state_id="integration_test_state_B",
         executed_steps=[
-            PlanStep(
+            ModelPlanStep(
                 step_index=0,
                 from_state_id="integration_test_state_A",
                 to_state_id="integration_test_state_B",
@@ -117,7 +121,7 @@ def _make_failure_session() -> NavigationSession:
                 executed_at=datetime(2026, 2, 24, 12, 0, 0, tzinfo=timezone.utc),
             ),
         ],
-        final_outcome=NavigationOutcomeFailure(
+        final_outcome=ModelNavigationOutcomeFailure(
             reason="no_path_found",
             details="No route from state_B to state_Z in graph",
         ),
@@ -132,12 +136,16 @@ def _make_failure_session() -> NavigationSession:
 
 
 @pytest.mark.asyncio
-async def test_success_session_written_to_postgres(writer: NavigationHistoryWriter) -> None:
+async def test_success_session_written_to_postgres(
+    writer: HandlerNavigationHistoryWriter,
+) -> None:
     """Successful session: PostgreSQL row must exist after record()."""
     session = _make_success_session()
     response = await writer.record(session)
 
-    assert response.postgres_written is True, f"Expected postgres_written=True, got: {response}"
+    assert (
+        response.postgres_written is True
+    ), f"Expected postgres_written=True, got: {response}"
 
     # Verify row exists in PostgreSQL
     pool = await asyncpg.create_pool(dsn=_PG_DSN, min_size=1, max_size=2)
@@ -159,12 +167,16 @@ async def test_success_session_written_to_postgres(writer: NavigationHistoryWrit
 
 
 @pytest.mark.asyncio
-async def test_success_session_written_to_qdrant(writer: NavigationHistoryWriter) -> None:
+async def test_success_session_written_to_qdrant(
+    writer: HandlerNavigationHistoryWriter,
+) -> None:
     """Successful session: Qdrant point must exist after record()."""
     session = _make_success_session()
     response = await writer.record(session)
 
-    assert response.qdrant_written is True, f"Expected qdrant_written=True, got: {response}"
+    assert (
+        response.qdrant_written is True
+    ), f"Expected qdrant_written=True, got: {response}"
 
     qdrant = AsyncQdrantClient(host=_QDRANT_HOST, port=_QDRANT_PORT, timeout=30)
     try:
@@ -181,7 +193,9 @@ async def test_success_session_written_to_qdrant(writer: NavigationHistoryWriter
         # Cleanup: delete test Qdrant point and PostgreSQL row
         await qdrant.delete(
             collection_name=_QDRANT_COLLECTION,
-            points_selector=qdrant_models.PointIdsList(points=[str(session.session_id)]),
+            points_selector=qdrant_models.PointIdsList(
+                points=[str(session.session_id)]
+            ),
         )
         await qdrant.close()
 
@@ -195,7 +209,7 @@ async def test_success_session_written_to_qdrant(writer: NavigationHistoryWriter
 
 @pytest.mark.asyncio
 async def test_failure_session_written_to_postgres_only(
-    writer: NavigationHistoryWriter,
+    writer: HandlerNavigationHistoryWriter,
 ) -> None:
     """Failed session: PostgreSQL row must exist; Qdrant must NOT have a point."""
     session = _make_failure_session()
@@ -228,16 +242,16 @@ async def test_failure_session_written_to_postgres_only(
             collection_name=_QDRANT_COLLECTION,
             ids=[str(session.session_id)],
         )
-        assert len(results) == 0, (
-            f"Failure session must NOT appear in Qdrant, but found {len(results)} points"
-        )
+        assert (
+            len(results) == 0
+        ), f"Failure session must NOT appear in Qdrant, but found {len(results)} points"
     finally:
         await qdrant.close()
 
 
 @pytest.mark.asyncio
 async def test_duplicate_session_id_is_idempotent(
-    writer: NavigationHistoryWriter,
+    writer: HandlerNavigationHistoryWriter,
 ) -> None:
     """Duplicate writes with the same session_id must be no-ops."""
     session = _make_success_session()

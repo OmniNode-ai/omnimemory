@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelNavigationHistoryResponse(BaseModel):
@@ -53,4 +53,4 @@ class ModelNavigationHistoryResponse(BaseModel):
         description="Error description if status is 'error'",
     )
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)

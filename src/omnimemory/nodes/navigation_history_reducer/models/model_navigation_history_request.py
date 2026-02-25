@@ -8,10 +8,10 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session import (  # noqa: TC001
-    NavigationSession,
+    ModelNavigationSession,
 )
 
 
@@ -24,8 +24,8 @@ class ModelNavigationHistoryRequest(BaseModel):
             written to PostgreSQL only.
     """
 
-    session: NavigationSession = Field(
+    session: ModelNavigationSession = Field(
         description="Completed navigation session to record"
     )
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)

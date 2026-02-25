@@ -32,6 +32,13 @@ files:
     allowed_rules:
       - "net-client"
 
+  - path: "src/omnimemory/nodes/navigation_history_reducer/handlers/handler_navigation_history_reducer.py"
+    reason: "Phase 2 handler uses asyncpg and httpx directly; module-level env defaults use os.environ;
+      Phase 3 will inject via DI (OMN-2584)"
+    allowed_rules:
+      - "net-client"
+      - "env-access"
+
   - path: "src/omnimemory/nodes/memory_retrieval_effect/clients/embedding_client.py"
     reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
     allowed_rules:

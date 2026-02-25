@@ -18,19 +18,19 @@ import pytest
 
 from omnimemory.nodes.navigation_history_reducer.handlers.handler_navigation_history_reducer import (
     HandlerNavigationHistoryReducer,
-    NavigationHistoryWriter,
+    HandlerNavigationHistoryWriter,
     _hash_text,
     _uuid_to_qdrant_id,
 )
 from omnimemory.nodes.navigation_history_reducer.models import (
     ModelNavigationHistoryRequest,
     ModelNavigationHistoryResponse,
-    NavigationSession,
-    PlanStep,
+    ModelNavigationSession,
+    ModelPlanStep,
 )
 from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session import (
-    NavigationOutcomeFailure,
-    NavigationOutcomeSuccess,
+    ModelNavigationOutcomeFailure,
+    ModelNavigationOutcomeSuccess,
 )
 
 # ---------------------------------------------------------------------------
@@ -38,8 +38,8 @@ from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session
 # ---------------------------------------------------------------------------
 
 
-def _make_step(index: int = 0) -> PlanStep:
-    return PlanStep(
+def _make_step(index: int = 0) -> ModelPlanStep:
+    return ModelPlanStep(
         step_index=index,
         from_state_id=f"state_{index}",
         to_state_id=f"state_{index + 1}",
@@ -48,29 +48,29 @@ def _make_step(index: int = 0) -> PlanStep:
     )
 
 
-def _make_success_session(session_id: UUID | None = None) -> NavigationSession:
+def _make_success_session(session_id: UUID | None = None) -> ModelNavigationSession:
     sid = session_id or uuid4()
-    return NavigationSession(
+    return ModelNavigationSession(
         session_id=sid,
         goal_condition="reach_state_Z",
         start_state_id="state_A",
         end_state_id="state_Z",
         executed_steps=[_make_step(0), _make_step(1)],
-        final_outcome=NavigationOutcomeSuccess(reached_state_id="state_Z"),
+        final_outcome=ModelNavigationOutcomeSuccess(reached_state_id="state_Z"),
         graph_fingerprint="abc123fingerprint",
         created_at=datetime(2026, 2, 24, 12, 0, 0, tzinfo=timezone.utc),
     )
 
 
-def _make_failure_session(session_id: UUID | None = None) -> NavigationSession:
+def _make_failure_session(session_id: UUID | None = None) -> ModelNavigationSession:
     sid = session_id or uuid4()
-    return NavigationSession(
+    return ModelNavigationSession(
         session_id=sid,
         goal_condition="reach_state_Z",
         start_state_id="state_A",
         end_state_id="state_B",
         executed_steps=[_make_step(0)],
-        final_outcome=NavigationOutcomeFailure(
+        final_outcome=ModelNavigationOutcomeFailure(
             reason="no_path_found", details="No edges from state_B to state_Z"
         ),
         graph_fingerprint="abc123fingerprint",
@@ -85,7 +85,7 @@ def _make_failure_session(session_id: UUID | None = None) -> NavigationSession:
 
 @pytest.mark.unit
 class TestNavigationSessionModel:
-    """Tests for NavigationSession and related models."""
+    """Tests for ModelNavigationSession and related models."""
 
     def test_success_session_is_successful(self) -> None:
         session = _make_success_session()
@@ -100,13 +100,13 @@ class TestNavigationSessionModel:
         assert session.step_count == 2
 
     def test_empty_steps(self) -> None:
-        session = NavigationSession(
+        session = ModelNavigationSession(
             session_id=uuid4(),
             goal_condition="reach_Z",
             start_state_id="A",
             end_state_id="A",
             executed_steps=[],
-            final_outcome=NavigationOutcomeSuccess(reached_state_id="A"),
+            final_outcome=ModelNavigationOutcomeSuccess(reached_state_id="A"),
             graph_fingerprint="fp",
             created_at=datetime(2026, 2, 24, tzinfo=timezone.utc),
         )
@@ -124,12 +124,12 @@ class TestNavigationSessionModel:
             session.goal_condition = "other"  # type: ignore[misc]
 
     def test_failure_outcome_has_reason(self) -> None:
-        outcome = NavigationOutcomeFailure(reason="no_path_found")
+        outcome = ModelNavigationOutcomeFailure(reason="no_path_found")
         assert outcome.reason == "no_path_found"
         assert outcome.tag == "failure"
 
     def test_success_outcome_tag(self) -> None:
-        outcome = NavigationOutcomeSuccess(reached_state_id="Z")
+        outcome = ModelNavigationOutcomeSuccess(reached_state_id="Z")
         assert outcome.tag == "success"
 
 
@@ -185,7 +185,7 @@ class TestHandlerNavigationHistoryReducer:
 
     @pytest.mark.asyncio
     async def test_execute_delegates_to_writer(self) -> None:
-        mock_writer = AsyncMock(spec=NavigationHistoryWriter)
+        mock_writer = AsyncMock(spec=HandlerNavigationHistoryWriter)
         session = _make_success_session()
         expected_response = ModelNavigationHistoryResponse(
             session_id=session.session_id,
@@ -210,7 +210,7 @@ class TestHandlerNavigationHistoryReducer:
 
     @pytest.mark.asyncio
     async def test_execute_handles_writer_exception(self) -> None:
-        mock_writer = AsyncMock(spec=NavigationHistoryWriter)
+        mock_writer = AsyncMock(spec=HandlerNavigationHistoryWriter)
         mock_writer.record.side_effect = RuntimeError("database exploded")
 
         handler = HandlerNavigationHistoryReducer(writer=mock_writer)
@@ -227,7 +227,7 @@ class TestHandlerNavigationHistoryReducer:
 
     @pytest.mark.asyncio
     async def test_shutdown_calls_writer_close(self) -> None:
-        mock_writer = AsyncMock(spec=NavigationHistoryWriter)
+        mock_writer = AsyncMock(spec=HandlerNavigationHistoryWriter)
         handler = HandlerNavigationHistoryReducer(writer=mock_writer)
         await handler.initialize()
         await handler.shutdown()
@@ -236,13 +236,13 @@ class TestHandlerNavigationHistoryReducer:
 
 
 # ---------------------------------------------------------------------------
-# NavigationHistoryWriter tests (mocked external I/O)
+# HandlerNavigationHistoryWriter tests (mocked external I/O)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestNavigationHistoryWriterUnit:
-    """Unit tests for NavigationHistoryWriter with all I/O mocked."""
+class TestHandlerNavigationHistoryWriterUnit:
+    """Unit tests for HandlerNavigationHistoryWriter with all I/O mocked."""
 
     def _make_pg_pool_mock(self, conn: AsyncMock) -> MagicMock:
         """Build a mock asyncpg pool whose acquire() works as async context manager."""
@@ -256,7 +256,7 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_record_success_writes_postgres_and_qdrant(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         session = _make_success_session()
 
         mock_conn = AsyncMock()
@@ -281,7 +281,7 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_record_failure_writes_postgres_only(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         session = _make_failure_session()
 
         mock_conn = AsyncMock()
@@ -302,7 +302,7 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_record_idempotent_on_duplicate_session_id(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         session = _make_success_session()
 
         mock_conn = AsyncMock()
@@ -324,7 +324,7 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_postgres_failure_does_not_write_qdrant(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         session = _make_success_session()
 
         # Pool.acquire() raises when entering context
@@ -348,7 +348,7 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_qdrant_failure_returns_partial_success(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         session = _make_success_session()
 
         mock_conn = AsyncMock()
@@ -366,7 +366,7 @@ class TestNavigationHistoryWriterUnit:
 
         assert response.status == "error"
         assert response.postgres_written is True  # PostgreSQL succeeded
-        assert response.qdrant_written is False   # Qdrant failed
+        assert response.qdrant_written is False  # Qdrant failed
         assert "Qdrant write failed (PostgreSQL OK)" in (response.error_message or "")
 
     @pytest.mark.asyncio
@@ -374,7 +374,7 @@ class TestNavigationHistoryWriterUnit:
         self,
     ) -> None:
         """Critical invariant: failed paths MUST NOT appear in Qdrant."""
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         session = _make_failure_session()
 
         mock_conn = AsyncMock()
@@ -393,11 +393,9 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_embed_text_parses_response(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
         fake_vector = [0.1, 0.2, 0.3]
-        fake_response_json = {
-            "data": [{"embedding": fake_vector}]
-        }
+        fake_response_json = {"data": [{"embedding": fake_vector}]}
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
@@ -416,7 +414,7 @@ class TestNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_embed_text_raises_on_bad_response(self) -> None:
-        writer = NavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter()
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
