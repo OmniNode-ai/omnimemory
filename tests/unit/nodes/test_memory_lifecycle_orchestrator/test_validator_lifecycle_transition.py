@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for ValidatorLifecycleTransition.
 
@@ -446,9 +448,9 @@ class TestValidTransitionsConstant:
     def test_all_states_present_as_keys(self) -> None:
         """VALID_TRANSITIONS has an entry for every lifecycle state."""
         for state in EnumLifecycleState:
-            assert (
-                state in VALID_TRANSITIONS
-            ), f"State {state!r} missing from VALID_TRANSITIONS"
+            assert state in VALID_TRANSITIONS, (
+                f"State {state!r} missing from VALID_TRANSITIONS"
+            )
 
     def test_deleted_has_empty_transitions(self) -> None:
         """DELETED maps to an empty frozenset."""
@@ -457,6 +459,6 @@ class TestValidTransitionsConstant:
     def test_all_values_are_frozensets(self) -> None:
         """All values in VALID_TRANSITIONS are frozensets."""
         for state, destinations in VALID_TRANSITIONS.items():
-            assert isinstance(
-                destinations, frozenset
-            ), f"Expected frozenset for {state!r}, got {type(destinations).__name__}"
+            assert isinstance(destinations, frozenset), (
+                f"Expected frozenset for {state!r}, got {type(destinations).__name__}"
+            )

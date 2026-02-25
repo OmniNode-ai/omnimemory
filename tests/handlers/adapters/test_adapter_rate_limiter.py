@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for ProviderRateLimiter.
 
@@ -793,9 +795,9 @@ class TestProviderRateLimiterStress:
             # At exactly t=1060, cutoff = 1000, requests at t=1000 are NOT expired
             # (because cleanup uses `<` not `<=`)
             mock_time = 1060.0
-            assert (
-                await limiter.try_acquire() is False
-            ), "Requests at exact boundary should not be expired yet"
+            assert await limiter.try_acquire() is False, (
+                "Requests at exact boundary should not be expired yet"
+            )
 
             # Advance just past the boundary - now requests should expire
             mock_time = 1060.001
@@ -938,9 +940,9 @@ class TestProviderRateLimiterStress:
         successful = sum(1 for r in results if r is True)
         # 33 * 300 = 9900 tokens (under limit)
         # 34 * 300 = 10200 tokens (over limit)
-        assert (
-            successful == 33
-        ), f"Expected 33 successful (9900 tokens), got {successful}"
+        assert successful == 33, (
+            f"Expected 33 successful (9900 tokens), got {successful}"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(10)

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for HandlerFilesystemCrawler.
 
@@ -104,12 +106,10 @@ def make_mock_repo() -> MagicMock:
     return repo
 
 
-def make_publish_capture() -> (
-    tuple[
-        Callable[[str, dict[str, object]], Coroutine[object, object, None]],
-        list[PublishRecord],
-    ]
-):
+def make_publish_capture() -> tuple[
+    Callable[[str, dict[str, object]], Coroutine[object, object, None]],
+    list[PublishRecord],
+]:
     published: list[PublishRecord] = []
 
     async def capture(topic: str, payload: dict[str, object]) -> None:
@@ -514,7 +514,13 @@ class TestHandlerFilesystemCrawlerDiscovered:
 
         assert result.files_walked == 5
         assert result.discovered_count == 5
-        assert len(published) == 5
+        assert result.indexed_count == 5
+        # 5 document-discovered + 5 document-indexed = 10 events
+        assert len(published) == 10
+        discovered_topics = [t for t, _ in published if "document-discovered" in t]
+        indexed_topics = [t for t, _ in published if "document-indexed" in t]
+        assert len(discovered_topics) == 5
+        assert len(indexed_topics) == 5
 
 
 class TestHandlerFilesystemCrawlerMtimeFastPath:
@@ -878,10 +884,11 @@ class TestHandlerFilesystemCrawlerPublishErrors:
             publish_callback=failing_publish,
         )
 
-        # All 3 files were walked and attempted to publish
+        # All 3 files were walked and attempted to publish.
+        # Each file emits document-discovered + document-indexed = 2 publish calls.
         assert result.files_walked == 3
         assert result.discovered_count == 3
-        assert call_count == 3
+        assert call_count == 6
 
 
 class TestHandlerFilesystemCrawlerDocTypeAssignment:
@@ -1086,3 +1093,241 @@ class TestHandlerFilesystemCrawlerRecursive:
 
         assert result.files_walked == 1
         assert result.discovered_count == 1
+
+
+# =============================================================================
+# DocumentIndexed event tests (OMN-2717 -- CONTRACT_DRIFT fix)
+# =============================================================================
+
+
+class TestHandlerFilesystemCrawlerIndexedEvent:
+    """document-indexed.v1 is emitted after discovered and changed events.
+
+    Tests cover:
+    - Indexed event emitted after document-discovered for new files
+    - Indexed event emitted after document-changed for updated files
+    - No indexed event emitted for mtime-only touches (content unchanged)
+    - No indexed event emitted for document-removed events
+    - indexed_count in result reflects total indexed documents
+    - Indexed event carries correct source_ref, content_fingerprint, scope_ref
+    - Indexed event topic uses correct suffix (onex.evt.omnimemory.document-indexed.v1)
+    """
+
+    @pytest.mark.unit
+    async def test_new_file_emits_indexed_event(self, tmp_path: Path) -> None:
+        """New file emits both document-discovered and document-indexed."""
+        md_file = tmp_path / "new.md"
+        content = b"# New Document"
+        md_file.write_bytes(content)
+
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        result = await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        assert result.indexed_count == 1
+
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 1
+        topic, payload = indexed_events[0]
+        assert topic == "dev.onex.evt.omnimemory.document-indexed.v1"
+        assert payload["event_type"] == "DocumentIndexed"
+        assert payload["source_ref"] == str(md_file.resolve())
+        assert payload["content_fingerprint"] == _sha256(content)
+
+    @pytest.mark.unit
+    async def test_changed_file_emits_indexed_event(self, tmp_path: Path) -> None:
+        """Updated file emits both document-changed and document-indexed."""
+        md_file = tmp_path / "evolving.md"
+        old_content = b"old content"
+        new_content = b"new content"
+        md_file.write_bytes(new_content)
+
+        old_fp = _sha256(old_content)
+        old_mtime = md_file.stat().st_mtime - 10
+
+        prior = make_state(str(md_file.resolve()), old_fp, mtime=old_mtime)
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        repo.get_state = AsyncMock(return_value=prior)
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        result = await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        assert result.changed_count == 1
+        assert result.indexed_count == 1
+
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 1
+        topic, payload = indexed_events[0]
+        assert topic == "dev.onex.evt.omnimemory.document-indexed.v1"
+        assert payload["event_type"] == "DocumentIndexed"
+        assert payload["content_fingerprint"] == _sha256(new_content)
+
+    @pytest.mark.unit
+    async def test_mtime_only_touch_no_indexed_event(self, tmp_path: Path) -> None:
+        """mtime-only touch (content unchanged) must NOT emit indexed event."""
+        md_file = tmp_path / "touched.md"
+        content = b"same content"
+        md_file.write_bytes(content)
+        fp = _sha256(content)
+        old_mtime = md_file.stat().st_mtime - 5
+        prior = make_state(str(md_file.resolve()), fp, mtime=old_mtime)
+
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        repo.get_state = AsyncMock(return_value=prior)
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        result = await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        assert result.unchanged_count == 1
+        assert result.indexed_count == 0
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 0
+
+    @pytest.mark.unit
+    async def test_removed_file_no_indexed_event(self, tmp_path: Path) -> None:
+        """Removed files must NOT emit indexed event."""
+        ghost_path = str(tmp_path / "deleted.md")
+
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        ghost_state = make_state(ghost_path, _sha256(b"old"))
+        repo.get_state = AsyncMock(return_value=None)
+        repo.list_states_for_scope = AsyncMock(return_value=[ghost_state])
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        result = await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        assert result.removed_count == 1
+        assert result.indexed_count == 0
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 0
+
+    @pytest.mark.unit
+    async def test_indexed_event_scope_ref_matches_discovered(
+        self, tmp_path: Path
+    ) -> None:
+        """Indexed event carries the same scope_ref as the discovered event."""
+        (tmp_path / "doc.md").write_bytes(b"# Doc")
+        scope_mappings = [(str(tmp_path), "omninode/custom-scope")]
+
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/custom-scope",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+            scope_mappings=scope_mappings,
+        )
+
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 1
+        _, payload = indexed_events[0]
+        assert payload["scope_ref"] == "omninode/custom-scope"
+
+    @pytest.mark.unit
+    async def test_indexed_event_correlation_id_threaded(self, tmp_path: Path) -> None:
+        """Indexed event carries the same correlation_id as the crawl."""
+        (tmp_path / "a.md").write_bytes(b"content")
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        cid = uuid4()
+        await handler.crawl(
+            correlation_id=cid,
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 1
+        _, payload = indexed_events[0]
+        assert str(payload["correlation_id"]) == str(cid)
+
+    @pytest.mark.unit
+    async def test_indexed_count_equals_discovered_plus_changed(
+        self, tmp_path: Path
+    ) -> None:
+        """indexed_count == discovered_count + changed_count."""
+        # 2 new files (discovered)
+        (tmp_path / "new1.md").write_bytes(b"# New 1")
+        (tmp_path / "new2.md").write_bytes(b"# New 2")
+        # 1 changed file
+        changed_file = tmp_path / "changed.md"
+        changed_file.write_bytes(b"new content")
+        old_fp = _sha256(b"old content")
+        old_mtime = changed_file.stat().st_mtime - 5
+        prior = make_state(str(changed_file.resolve()), old_fp, mtime=old_mtime)
+
+        config = make_config(path_prefixes=[str(tmp_path)])
+        repo = make_mock_repo()
+
+        changed_source_ref = str(changed_file.resolve())
+
+        async def _get_state(
+            source_ref: str,
+            crawler_type: object,
+            scope_ref: str,
+        ) -> object:
+            if source_ref == changed_source_ref:
+                return prior
+            return None
+
+        repo.get_state = AsyncMock(side_effect=_get_state)
+        publish, published = make_publish_capture()
+        handler = HandlerFilesystemCrawler(config=config, crawl_state_repo=repo)
+
+        result = await handler.crawl(
+            correlation_id=uuid4(),
+            crawl_scope="omninode/test",
+            trigger_source="scheduled",
+            env_prefix="dev",
+            publish_callback=publish,
+        )
+
+        assert result.discovered_count == 2
+        assert result.changed_count == 1
+        assert result.indexed_count == 3  # 2 discovered + 1 changed
+
+        indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
+        assert len(indexed_events) == 3

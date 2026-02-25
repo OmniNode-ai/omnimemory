@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
 ---
 # ONEX Contract: filesystem_crawler_effect
 # Walks configured filesystem path prefixes for .md files and emits document lifecycle events
@@ -18,8 +20,9 @@ description: |
     1. mtime fast-path: if stat.st_mtime is unchanged, skip without re-hashing.
     2. If mtime changed: compute SHA-256(content). If hash also unchanged,
        update last_crawled_at_utc only.
-    3. Not in state table: emit document.discovered.v1.
-    4. State table entries not found in walk: emit document.removed.v1.
+    3. Not in state table: emit document.discovered.v1 + document.indexed.v1.
+    4. Content changed: emit document.changed.v1 + document.indexed.v1.
+    5. State table entries not found in walk: emit document.removed.v1.
 
   Consumer group (when wired to crawl-tick topic):
   {env}.omnimemory.filesystem_crawler_effect.consume.v1
@@ -49,6 +52,15 @@ published_events:
     description: "Emitted for files present in crawl state but absent from the current walk. Triggers
       immediate BLACKLISTED transition on ContextItems."
 
+  - topic_suffix: "onex.evt.omnimemory.document-indexed.v1"
+    full_topic_pattern: "{env}.onex.evt.omnimemory.document-indexed.v1"
+    event_type: "DocumentIndexed"
+    trigger: "Document successfully crawled and indexed (discovered or changed)"
+    description: "Emitted after a document is fully crawled and written to the index — once per document-discovered.v1
+      and once per document-changed.v1. Consumed by omniintelligence node_crawl_scheduler_effect to reset
+      the per-(source_ref, crawler_type) debounce window. Not emitted for mtime-only touches (no content
+      change) or removal events."
+
 # === EVENT TYPE CONFIGURATION ===
 event_type:
   version: {major: 1, minor: 0, patch: 0}
@@ -56,6 +68,7 @@ event_type:
     - "document_discovered"
     - "document_changed"
     - "document_removed"
+    - "document_indexed"
   event_categories: ["crawl", "document", "filesystem", "effect"]
   publish_events: true
   subscribe_events: true
@@ -81,6 +94,7 @@ event_bus:
     - "onex.evt.omnimemory.document-discovered.v1"
     - "onex.evt.omnimemory.document-changed.v1"
     - "onex.evt.omnimemory.document-removed.v1"
+    - "onex.evt.omnimemory.document-indexed.v1"
 
   # Metadata for subscribed topics
   subscribe_topic_metadata:
@@ -105,6 +119,12 @@ event_bus:
       schema_ref: "omnimemory.models.crawl.model_document_removed_event.ModelDocumentRemovedEvent"
       description: "Document removed event. Published for state table entries whose source_ref is absent
         from the current filesystem walk."
+
+    "onex.evt.omnimemory.document-indexed.v1":
+      schema_ref: "omnimemory.models.crawl.model_document_indexed_event.ModelDocumentIndexedEvent"
+      description: "Document indexed event. Published after a document is fully crawled and indexed. Emitted
+        once per document-discovered and once per document-changed event. Consumed by omniintelligence
+        node_crawl_scheduler_effect to reset the debounce window."
 
 # === HANDLER CONFIGURATION ===
 handler_config:

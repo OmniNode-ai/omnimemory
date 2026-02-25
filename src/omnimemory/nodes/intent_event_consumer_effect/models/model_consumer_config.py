@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Consumer configuration model for intent event consumer.
 
 Migrated from singular topic suffix fields to standard event_bus.subscribe_topics

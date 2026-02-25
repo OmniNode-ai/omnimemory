@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Memory Retrieval Handler - Routes requests to appropriate backend handlers.
 
@@ -50,7 +52,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from omnibase_core.models.omnimemory import (
-    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+    ModelMemorySnapshot,
 )
 
 from ..models import (

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Configuration model for the Intent Graph adapter.
 
 This module provides the configuration model for AdapterIntentGraph,
@@ -62,7 +65,7 @@ class ModelAdapterIntentGraphConfig(  # omnimemory-model-exempt: adapter config
         ge=0.1,
         le=300.0,
         description=(
-            "Connection and operation timeout in seconds. " "Range: 0.1-300.0 seconds."
+            "Connection and operation timeout in seconds. Range: 0.1-300.0 seconds."
         ),
     )
     session_node_label: str = Field(

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Comprehensive integration tests for memory_storage_effect node.
 
@@ -169,16 +171,16 @@ class TestStoreOperation:
 
         response = await adapter.execute(request)
 
-        assert (
-            response.status == "success"
-        ), f"Expected status 'success', got '{response.status}'"
+        assert response.status == "success", (
+            f"Expected status 'success', got '{response.status}'"
+        )
         assert response.snapshot is not None, "Expected snapshot in response"
-        assert (
-            response.snapshot.snapshot_id == sample_snapshot.snapshot_id
-        ), "Snapshot ID mismatch"
-        assert (
-            response.error_message is None
-        ), f"Unexpected error: {response.error_message}"
+        assert response.snapshot.snapshot_id == sample_snapshot.snapshot_id, (
+            "Snapshot ID mismatch"
+        )
+        assert response.error_message is None, (
+            f"Unexpected error: {response.error_message}"
+        )
 
     @pytest.mark.asyncio
     async def test_store_creates_file(
@@ -220,12 +222,12 @@ class TestStoreOperation:
             )
 
         error_message = str(exc_info.value)
-        assert (
-            "store" in error_message.lower()
-        ), f"Error should mention 'store': {error_message}"
-        assert (
-            "snapshot" in error_message.lower()
-        ), f"Error should mention 'snapshot': {error_message}"
+        assert "store" in error_message.lower(), (
+            f"Error should mention 'store': {error_message}"
+        )
+        assert "snapshot" in error_message.lower(), (
+            f"Error should mention 'snapshot': {error_message}"
+        )
 
     @pytest.mark.asyncio
     async def test_store_with_metadata(
@@ -247,9 +249,9 @@ class TestStoreOperation:
 
         response = await adapter.execute(request)
 
-        assert (
-            response.status == "success"
-        ), f"Expected status 'success', got '{response.status}'"
+        assert response.status == "success", (
+            f"Expected status 'success', got '{response.status}'"
+        )
 
     @pytest.mark.asyncio
     async def test_store_with_tags(
@@ -271,9 +273,9 @@ class TestStoreOperation:
 
         response = await adapter.execute(request)
 
-        assert (
-            response.status == "success"
-        ), f"Expected status 'success', got '{response.status}'"
+        assert response.status == "success", (
+            f"Expected status 'success', got '{response.status}'"
+        )
 
 
 # =============================================================================
@@ -310,13 +312,13 @@ class TestRetrieveOperation:
         )
         response = await adapter.execute(retrieve_request)
 
-        assert (
-            response.status == "success"
-        ), f"Expected status 'success', got '{response.status}'"
+        assert response.status == "success", (
+            f"Expected status 'success', got '{response.status}'"
+        )
         assert response.snapshot is not None, "Expected snapshot in response"
-        assert (
-            response.snapshot.snapshot_id == sample_snapshot.snapshot_id
-        ), "Snapshot ID mismatch"
+        assert response.snapshot.snapshot_id == sample_snapshot.snapshot_id, (
+            "Snapshot ID mismatch"
+        )
 
     @pytest.mark.asyncio
     async def test_retrieve_not_found(
@@ -336,9 +338,9 @@ class TestRetrieveOperation:
 
         response = await adapter.execute(request)
 
-        assert (
-            response.status == "not_found"
-        ), f"Expected status 'not_found', got '{response.status}'"
+        assert response.status == "not_found", (
+            f"Expected status 'not_found', got '{response.status}'"
+        )
         assert response.snapshot is None, "Should not return a snapshot"
 
     def test_retrieve_without_snapshot_id_raises_validation_error(
@@ -359,12 +361,12 @@ class TestRetrieveOperation:
             )
 
         error_message = str(exc_info.value)
-        assert (
-            "retrieve" in error_message.lower()
-        ), f"Error should mention 'retrieve': {error_message}"
-        assert (
-            "snapshot_id" in error_message.lower()
-        ), f"Error should mention 'snapshot_id': {error_message}"
+        assert "retrieve" in error_message.lower(), (
+            f"Error should mention 'retrieve': {error_message}"
+        )
+        assert "snapshot_id" in error_message.lower(), (
+            f"Error should mention 'snapshot_id': {error_message}"
+        )
 
 
 # =============================================================================
@@ -512,9 +514,9 @@ class TestDeleteOperation:
             )
         )
 
-        assert (
-            response.status == "success"
-        ), f"Expected status 'success', got '{response.status}'"
+        assert response.status == "success", (
+            f"Expected status 'success', got '{response.status}'"
+        )
 
     @pytest.mark.asyncio
     async def test_delete_removes_file(
@@ -599,9 +601,9 @@ class TestDeleteOperation:
             )
         )
 
-        assert (
-            response.status == "not_found"
-        ), f"Expected status 'not_found', got '{response.status}'"
+        assert response.status == "not_found", (
+            f"Expected status 'not_found', got '{response.status}'"
+        )
 
     def test_delete_without_snapshot_id_raises_validation_error(
         self,
@@ -621,12 +623,12 @@ class TestDeleteOperation:
             )
 
         error_message = str(exc_info.value)
-        assert (
-            "delete" in error_message.lower()
-        ), f"Error should mention 'delete': {error_message}"
-        assert (
-            "snapshot_id" in error_message.lower()
-        ), f"Error should mention 'snapshot_id': {error_message}"
+        assert "delete" in error_message.lower(), (
+            f"Error should mention 'delete': {error_message}"
+        )
+        assert "snapshot_id" in error_message.lower(), (
+            f"Error should mention 'snapshot_id': {error_message}"
+        )
 
 
 # =============================================================================
@@ -811,12 +813,12 @@ class TestUpdateOperation:
             )
 
         error_message = str(exc_info.value)
-        assert (
-            "update" in error_message.lower()
-        ), f"Error should mention 'update': {error_message}"
-        assert (
-            "snapshot" in error_message.lower()
-        ), f"Error should mention 'snapshot': {error_message}"
+        assert "update" in error_message.lower(), (
+            f"Error should mention 'update': {error_message}"
+        )
+        assert "snapshot" in error_message.lower(), (
+            f"Error should mention 'snapshot': {error_message}"
+        )
 
     @pytest.mark.asyncio
     async def test_update_preserves_snapshot_id(
@@ -973,9 +975,9 @@ class TestAdapterLifecycle:
 
         # Verify only one actual initialization occurred
         assert adapter.is_initialized
-        assert (
-            initialization_count == 1
-        ), f"Expected exactly 1 initialization, got {initialization_count}"
+        assert initialization_count == 1, (
+            f"Expected exactly 1 initialization, got {initialization_count}"
+        )
         assert adapter.snapshots_path.exists()
 
     @pytest.mark.asyncio
@@ -1381,9 +1383,9 @@ class TestSecurityValidation:
                     snapshot_id=malicious_id,
                 )
             )
-            assert (
-                response.status == "error"
-            ), f"Path traversal should be rejected: {malicious_id}"
+            assert response.status == "error", (
+                f"Path traversal should be rejected: {malicious_id}"
+            )
             assert (
                 "path" in response.error_message.lower()
                 or "invalid" in response.error_message.lower()
@@ -1504,9 +1506,9 @@ class TestPerformanceBenchmarks:
         elapsed_time = time.perf_counter() - start_time
 
         # Verify operation succeeded
-        assert (
-            response.status == "success"
-        ), f"Store operation failed: {response.error_message}"
+        assert response.status == "success", (
+            f"Store operation failed: {response.error_message}"
+        )
 
         # Verify performance threshold (CI-safe: 500ms)
         # Contract SLA is 100ms - see contract.yaml line 128
@@ -1553,9 +1555,9 @@ class TestPerformanceBenchmarks:
         elapsed_time = time.perf_counter() - start_time
 
         # Verify operation succeeded
-        assert (
-            response.status == "success"
-        ), f"Retrieve operation failed: {response.error_message}"
+        assert response.status == "success", (
+            f"Retrieve operation failed: {response.error_message}"
+        )
         assert response.snapshot is not None, "Expected snapshot in response"
 
         # Verify performance threshold (CI-safe: 500ms)
@@ -1603,9 +1605,9 @@ class TestPerformanceBenchmarks:
         elapsed_time = time.perf_counter() - start_time
 
         # Verify operation succeeded
-        assert (
-            response.status == "success"
-        ), f"Delete operation failed: {response.error_message}"
+        assert response.status == "success", (
+            f"Delete operation failed: {response.error_message}"
+        )
 
         # Verify performance threshold (CI-safe: 500ms)
         # Contract SLA is 100ms - see contract.yaml line 128
@@ -1650,9 +1652,9 @@ class TestPerformanceBenchmarks:
         elapsed_time = time.perf_counter() - start_time
 
         # Verify operation succeeded
-        assert (
-            response.status == "success"
-        ), f"List operation failed: {response.error_message}"
+        assert response.status == "success", (
+            f"List operation failed: {response.error_message}"
+        )
         assert response.snapshot_ids is not None
         assert len(response.snapshot_ids) == 10
 
@@ -1706,9 +1708,9 @@ class TestPerformanceBenchmarks:
         elapsed_time = time.perf_counter() - start_time
 
         # Verify operation succeeded
-        assert (
-            response.status == "success"
-        ), f"Update operation failed: {response.error_message}"
+        assert response.status == "success", (
+            f"Update operation failed: {response.error_message}"
+        )
 
         # Verify performance threshold (CI-safe: 500ms)
         # Contract SLA is 100ms - see contract.yaml line 128
@@ -1757,12 +1759,12 @@ class TestPerformanceBenchmarks:
         elapsed_time = time.perf_counter() - start_time
 
         # Verify operations succeeded
-        assert (
-            store_response.status == "success"
-        ), f"Store operation failed: {store_response.error_message}"
-        assert (
-            retrieve_response.status == "success"
-        ), f"Retrieve operation failed: {retrieve_response.error_message}"
+        assert store_response.status == "success", (
+            f"Store operation failed: {store_response.error_message}"
+        )
+        assert retrieve_response.status == "success", (
+            f"Retrieve operation failed: {retrieve_response.error_message}"
+        )
         assert retrieve_response.snapshot is not None
 
         # Verify performance threshold (2x CI threshold for round-trip)

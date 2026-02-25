@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Utilities for intent event consumer effect node."""
 
 from omnimemory.nodes.intent_event_consumer_effect.utils.util_event_mapper import (

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Memory Retrieval Response Model.
 
@@ -29,7 +31,7 @@ from __future__ import annotations
 from typing import Literal
 
 from omnibase_core.models.omnimemory import (
-    ModelMemorySnapshot,  # noqa: TC002 - Pydantic needs runtime access
+    ModelMemorySnapshot,
 )
 from pydantic import BaseModel, ConfigDict, Field
 

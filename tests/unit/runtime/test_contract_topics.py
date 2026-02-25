@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for contract-driven topic discovery.
 
@@ -231,9 +233,9 @@ class TestCollectPublishTopicsForDispatch:
         """All publish topics must be .evt. topics."""
         result = collect_publish_topics_for_dispatch()
         for key, value in result.items():
-            assert (
-                ".evt." in value
-            ), f"Publish topic '{key}' is not an event topic: {value}"
+            assert ".evt." in value, (
+                f"Publish topic '{key}' is not an event topic: {value}"
+            )
 
     def test_custom_node_packages_override(self) -> None:
         """Providing node_packages overrides the default list."""

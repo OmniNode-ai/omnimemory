@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Integration tests for AdapterGraphMemory with real Memgraph database.
 
@@ -476,9 +478,9 @@ class TestRealTraversal:
 
         # Direct neighbors of mem_a
         expected_direct = {test_graph_data["mem_b"], test_graph_data["mem_c"]}
-        assert found_ids.intersection(
-            expected_direct
-        ), f"Expected to find at least one of {expected_direct}, got {found_ids}"
+        assert found_ids.intersection(expected_direct), (
+            f"Expected to find at least one of {expected_direct}, got {found_ids}"
+        )
 
     @pytest.mark.asyncio
     async def test_find_related_with_depth_2(
@@ -586,9 +588,9 @@ class TestRealTraversal:
         if result.status == "success" and len(result.memories) > 1:
             # Results should be sorted by score descending
             scores = [m.score for m in result.memories]
-            assert scores == sorted(
-                scores, reverse=True
-            ), "Results should be sorted by score descending"
+            assert scores == sorted(scores, reverse=True), (
+                "Results should be sorted by score descending"
+            )
 
 
 # =============================================================================

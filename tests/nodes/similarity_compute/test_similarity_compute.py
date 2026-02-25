@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Comprehensive unit tests for the similarity_compute handler and node.
 
@@ -205,9 +207,9 @@ class TestCosineDistance:
         distance = handler.cosine_distance(vec_a, vec_b)
 
         expected = 1.0 - (math.sqrt(2) / 2)  # ~0.293
-        assert (
-            abs(distance - expected) < 1e-10
-        ), f"Expected distance ~{expected}, got {distance}"
+        assert abs(distance - expected) < 1e-10, (
+            f"Expected distance ~{expected}, got {distance}"
+        )
 
     def test_high_dimensional_vectors(
         self,
@@ -266,9 +268,9 @@ class TestCosineDistance:
 
         distance = handler.cosine_distance(vec_a, vec_b)
 
-        assert (
-            distance == 0.0
-        ), f"Identical vectors should have distance 0, got {distance}"
+        assert distance == 0.0, (
+            f"Identical vectors should have distance 0, got {distance}"
+        )
 
     def test_mixed_sign_components(
         self,
@@ -286,9 +288,9 @@ class TestCosineDistance:
         distance = handler.cosine_distance(vec_a, vec_b)
 
         # These are exactly opposite vectors
-        assert (
-            distance == 2.0
-        ), f"Opposite vectors should have distance 2, got {distance}"
+        assert distance == 2.0, (
+            f"Opposite vectors should have distance 2, got {distance}"
+        )
 
 
 # =============================================================================
@@ -433,9 +435,9 @@ class TestEuclideanDistance:
         distance_ab = handler.euclidean_distance(vec_a, vec_b)
         distance_ba = handler.euclidean_distance(vec_b, vec_a)
 
-        assert (
-            distance_ab == distance_ba
-        ), f"Distance not symmetric: {distance_ab} vs {distance_ba}"
+        assert distance_ab == distance_ba, (
+            f"Distance not symmetric: {distance_ab} vs {distance_ba}"
+        )
 
     def test_zero_vectors_valid_for_euclidean(
         self,
@@ -1053,9 +1055,9 @@ class TestPerformance:
         handler.cosine_distance(vec_a, vec_b)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        assert (
-            elapsed_ms < self.THRESHOLD_MS
-        ), f"Cosine distance took {elapsed_ms:.3f}ms, expected <{self.THRESHOLD_MS}ms"
+        assert elapsed_ms < self.THRESHOLD_MS, (
+            f"Cosine distance took {elapsed_ms:.3f}ms, expected <{self.THRESHOLD_MS}ms"
+        )
 
     @pytest.mark.skipif(IS_CI, reason="Sub-ms tests unreliable on shared CI runners")
     def test_euclidean_distance_sub_millisecond(
@@ -1098,9 +1100,9 @@ class TestPerformance:
         handler.compare(vec_a, vec_b, metric="cosine", threshold=0.5)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        assert (
-            elapsed_ms < self.THRESHOLD_MS
-        ), f"Compare operation took {elapsed_ms:.3f}ms, expected <{self.THRESHOLD_MS}ms"
+        assert elapsed_ms < self.THRESHOLD_MS, (
+            f"Compare operation took {elapsed_ms:.3f}ms, expected <{self.THRESHOLD_MS}ms"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.skipif(
@@ -1203,9 +1205,9 @@ class TestNumericalStability:
 
         distance = handler.cosine_distance(vec_a, vec_b)
 
-        assert (
-            abs(distance) < 1e-10
-        ), f"Identical vectors should have distance ~0, got {distance}"
+        assert abs(distance) < 1e-10, (
+            f"Identical vectors should have distance ~0, got {distance}"
+        )
 
     def test_euclidean_large_differences(
         self,

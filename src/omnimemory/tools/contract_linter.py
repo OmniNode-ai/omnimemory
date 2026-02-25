@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 """Contract Linter CLI for ONEX Node Contract Validation.
 
 Validates YAML contract files against the ONEX schema using the

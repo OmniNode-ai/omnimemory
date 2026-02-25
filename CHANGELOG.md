@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-24
+
+### Added
+- MIT LICENSE and SPDX copyright headers
+- CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
+- GitHub issue templates and PR template
+- `.github/dependabot.yml` for automated dependency updates
+- `no-internal-ips` pre-commit hook for CI enforcement
+
+### Changed
+- Bumped `omnibase-core` to 0.19.0, `omnibase-spi` to 0.12.0, `omnibase-infra` to 0.10.0
+- Replaced hardcoded internal IP addresses with environment variable defaults
+- Standardized pre-commit hook IDs to canonical names (`mypy-type-check`, `pyright-type-check`, `onex-validate-naming`, `onex-validate-clean-root`)
+
+### Fixed
+- Documentation cleanup: removed internal references, updated Quick Start section with `uv` commands
+- SPDX headers applied to all source files
+
 ## [0.3.0] - 2026-02-19
 
 ### Added

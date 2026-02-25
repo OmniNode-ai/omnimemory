@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 ModelPIIPatternConfig Pydantic model for OmniMemory ONEX architecture.
 

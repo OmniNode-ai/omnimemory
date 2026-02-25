@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Integration tests for EmbeddingHttpClient with real HandlerHttp.
 
@@ -14,7 +16,7 @@ Test Categories:
     - Envelope: Verify envelope format correctness for real HTTP calls
 
 Prerequisites:
-    - Embedding server running at EMBEDDING_SERVER_URL (default: http://192.168.86.201:8002)
+    - Embedding server running at EMBEDDING_SERVER_URL (default: http://localhost:8100)
     - omnibase_infra installed (dev dependency)
 
 Usage:
@@ -28,7 +30,7 @@ Usage:
     pytest -m integration -v
 
 Environment Variables:
-    EMBEDDING_SERVER_URL: Embedding server base URL (default: http://192.168.86.201:8002)
+    EMBEDDING_SERVER_URL: Embedding server base URL (default: http://localhost:8100)
     EMBEDDING_MODEL: Model name (default: gte-qwen2)
     EMBEDDING_DIMENSION: Expected dimension (default: 1024)
 
@@ -77,8 +79,8 @@ if TYPE_CHECKING:
 # Configuration
 # =============================================================================
 
-# Default embedding server settings (local GTE-Qwen2)
-DEFAULT_EMBEDDING_SERVER_URL = "http://192.168.86.201:8002"
+# Default embedding server settings (configure via EMBEDDING_SERVER_URL or LLM_EMBEDDING_URL env var)
+DEFAULT_EMBEDDING_SERVER_URL = "http://localhost:8100"
 DEFAULT_EMBEDDING_MODEL = "gte-qwen2"
 DEFAULT_EMBEDDING_DIMENSION = 1024
 
@@ -496,9 +498,9 @@ class TestRealBatchEmbedding:
         assert len(embeddings_seq) == len(embeddings_par)
         for seq_emb, par_emb in zip(embeddings_seq, embeddings_par, strict=True):
             for v1, v2 in zip(seq_emb, par_emb, strict=True):
-                assert (
-                    abs(v1 - v2) < 1e-6
-                ), "Sequential and parallel should produce same results"
+                assert abs(v1 - v2) < 1e-6, (
+                    "Sequential and parallel should produce same results"
+                )
 
 
 # =============================================================================

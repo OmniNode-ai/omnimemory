@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Subscription Handler for agent subscriptions and memory change notifications.
 
 This module provides the core subscription management functionality:
@@ -874,6 +877,8 @@ class HandlerSubscription:
         self,
         topic: str,
         event: ModelNotificationEvent,
+        *,
+        strict: bool = True,
     ) -> int:
         """Publish notification event to the event bus for subscriber consumption.
 
@@ -882,24 +887,33 @@ class HandlerSubscription:
         delivery to agents happens through their event bus consumers.
 
         Error Propagation:
-            Publish failures are propagated to callers rather than silently
-            swallowed. This is intentional -- silent failures masked delivery
-            problems and violated the principle of least surprise. Callers
-            that need fire-and-forget semantics should catch exceptions at
-            their own level.
+            By default (``strict=True``), publish failures are propagated to
+            callers. This is the recommended mode for production systems where
+            delivery guarantees matter.
+
+            Pass ``strict=False`` for fire-and-forget semantics: failures are
+            logged at WARNING level but the method returns 0 instead of raising.
+            Use this only when missing a notification is acceptable (e.g.,
+            best-effort audit events).
 
         Args:
             topic: The topic to notify (format: memory.<entity>.<event>).
             event: The notification event to publish.
+            strict: When True (default), propagate publish failures to the
+                caller. When False, log the failure at WARNING level and return
+                0 instead of raising.
 
         Returns:
-            Number of active subscribers for this topic.
+            Number of active subscribers for this topic. Returns 0 when there
+            are no subscribers or when a publish failure occurs with
+            ``strict=False``.
 
         Raises:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
-            Exception: If the event bus publish operation fails (propagated
-                intentionally; see Error Propagation above).
+            Exception: If the event bus publish operation fails and
+                ``strict=True`` (propagated intentionally; see Error
+                Propagation above).
         """
         _, _, publisher, config = self._ensure_initialized()
 
@@ -922,7 +936,7 @@ class HandlerSubscription:
         # Publish event via protocol adapter (ARCH-002 compliant)
         # Agents consume from this topic via consumer groups keyed by agent_id
         kafka_topic = config.kafka_notification_topic
-        event_payload = cast(dict[str, object], event.model_dump(mode="json"))
+        event_payload = cast("dict[str, object]", event.model_dump(mode="json"))
         try:
             await publisher.publish(
                 topic=kafka_topic,
@@ -936,8 +950,9 @@ class HandlerSubscription:
                 event.event_id,
                 exc,
             )
-            # Intentionally propagate: silent failures were a bug, not a feature.
-            raise
+            if strict:
+                raise
+            return 0
 
         await self._increment_metric("notifications_published")
 
@@ -1312,7 +1327,7 @@ class HandlerSubscription:
         if metadata_raw is not None:
             if isinstance(metadata_raw, dict):
                 # JSONB already parsed by driver (e.g., asyncpg)
-                metadata = cast(dict[str, str], metadata_raw)
+                metadata = cast("dict[str, str]", metadata_raw)
             elif isinstance(metadata_raw, str):
                 # JSON string needs parsing
                 metadata = json.loads(metadata_raw)
@@ -1331,7 +1346,7 @@ class HandlerSubscription:
                 created_at_raw.replace("Z", "+00:00")
             )
         else:
-            created_at_parsed = cast(datetime, created_at_raw)
+            created_at_parsed = cast("datetime", created_at_raw)
 
         updated_at_raw = row["updated_at"]
         if isinstance(updated_at_raw, str):
@@ -1339,7 +1354,7 @@ class HandlerSubscription:
                 updated_at_raw.replace("Z", "+00:00")
             )
         else:
-            updated_at_parsed = cast(datetime, updated_at_raw)
+            updated_at_parsed = cast("datetime", updated_at_raw)
 
         return ModelSubscription(
             id=str(row["id"]),
@@ -1598,7 +1613,7 @@ class HandlerSubscription:
         placeholders = _sql_placeholders(id_count)
         columns_str = ", ".join(columns)
         return (
-            f"SELECT {columns_str} FROM {table} WHERE {id_column} IN ({placeholders})"  # noqa: S608  # nosec B608
+            f"SELECT {columns_str} FROM {table} WHERE {id_column} IN ({placeholders})"  # nosec B608
         )
 
     async def _load_subscriptions(

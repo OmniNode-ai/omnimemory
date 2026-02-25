@@ -20,7 +20,7 @@ The `PIIType` enum defines all detectable PII categories:
 | `PHONE` | Phone numbers (US/International) | `+1-555-123-4567`, `(555) 123-4567` | 0.75-0.90 | Implemented |
 | `SSN` | Social Security Numbers | `123-45-6789`, `123456789` | 0.75-0.98 | Implemented |
 | `CREDIT_CARD` | Credit card numbers (Visa, MC, Amex, Discover) | `4111111111111111` | 0.90 | Implemented |
-| `IP_ADDRESS` | IPv4 and IPv6 addresses | `192.168.1.1`, `2001:0db8:...` | 0.90 | Implemented |
+| `IP_ADDRESS` | IPv4 and IPv6 addresses | `192.168.1.1`, `2001:0db8:...` | 0.90 | Implemented | <!-- onex-allow-internal-ip -->
 | `URL` | Web URLs | `https://example.com` | - | **Not Implemented** |
 | `API_KEY` | API keys and tokens | `sk-...`, `ghp_...`, `AIza...`, `AWS...` | 0.90-0.98 | Implemented |
 | `PASSWORD_HASH` | Password fields and hashes | `password=...` | 0.90 | Implemented |

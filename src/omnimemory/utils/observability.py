@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 Observability utilities for OmniMemory ONEX architecture.
 
@@ -779,7 +782,7 @@ class Histogram:
             if buckets[i] <= buckets[i - 1]:
                 raise ValueError(
                     f"Histogram buckets must be in strictly ascending order, "
-                    f"but bucket[{i}]={buckets[i]} <= bucket[{i-1}]={buckets[i-1]}"
+                    f"but bucket[{i}]={buckets[i]} <= bucket[{i - 1}]={buckets[i - 1]}"
                 )
 
         self.name = name
@@ -1731,7 +1734,7 @@ def inject_correlation_context_async(func: F) -> F:
             kwargs_keys=list(kwargs.keys()),
         )
         try:
-            result = await cast(Awaitable[object], func(*args, **kwargs))
+            result = await cast("Awaitable[object]", func(*args, **kwargs))
             logger.info(
                 f"async_function_completed_{func.__name__}", **context, success=True
             )

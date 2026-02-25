@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 Tests for concurrency utilities following ONEX standards.
 """
@@ -254,18 +257,18 @@ class TestRetryDecorator:
 
         # Use lenient tolerances to avoid CI flakiness
         # delay1 should be ~0.1s, delay2 should be ~0.2s (50% tolerance)
-        assert (
-            0.05 < delay1 < 0.20
-        ), f"First delay {delay1:.3f}s outside 0.05-0.20s range"
-        assert (
-            0.10 < delay2 < 0.40
-        ), f"Second delay {delay2:.3f}s outside 0.10-0.40s range"
+        assert 0.05 < delay1 < 0.20, (
+            f"First delay {delay1:.3f}s outside 0.05-0.20s range"
+        )
+        assert 0.10 < delay2 < 0.40, (
+            f"Second delay {delay2:.3f}s outside 0.10-0.40s range"
+        )
 
         # More importantly, verify exponential relationship: delay2 ~= 2x delay1
         backoff_ratio = delay2 / delay1
-        assert (
-            1.5 < backoff_ratio < 3.0
-        ), f"Backoff ratio {backoff_ratio:.2f} not in expected range 1.5-3.0"
+        assert 1.5 < backoff_ratio < 3.0, (
+            f"Backoff ratio {backoff_ratio:.2f} not in expected range 1.5-3.0"
+        )
 
 
 @pytest.mark.integration

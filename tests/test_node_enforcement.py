@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Contract enforcement tests - ONEX declarative node validation.
 
@@ -281,7 +283,9 @@ class TestContractEnforcement:
             pytest.skip(f"node.py not present (expected): {node_py_path}")
 
         result: SuperInitValidationResult = validate_super_init_pattern(node_py_path)
-        assert result.valid, f"node.py for {node_name} failed super().__init__(container) check: {result.error}"
+        assert result.valid, (
+            f"node.py for {node_name} failed super().__init__(container) check: {result.error}"
+        )
 
     def test_validate_contract_accepts_flat_format(self, tmp_path: Path) -> None:
         """Test that validator accepts flat format (no 'onex' wrapper)."""

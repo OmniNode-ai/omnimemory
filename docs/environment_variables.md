@@ -188,10 +188,9 @@ Set `OMNIMEMORY__EMBEDDING_ENABLED=true` to enable the real embedding server for
 **Example**:
 ```bash
 # Enable real embeddings with explicit server URL.
-# This repo uses LLM_EMBEDDING_URL=http://192.168.86.200:8100 (Qwen3-Embedding-8B-4bit
-# on M2 Ultra, port 8100). Always verify the value in .env before use.
+# Set LLM_EMBEDDING_URL to the URL of your embedding server.
 export OMNIMEMORY__EMBEDDING_ENABLED=true
-export OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8100
+export OMNIMEMORY__EMBEDDING__SERVER_URL=${LLM_EMBEDDING_URL:-http://localhost:8100}
 ```
 
 **Note**: When using `ModelHandlerQdrantMockConfig` with `use_real_embeddings=True`, the `embedding_server_url` must be provided explicitly (typically loaded from this environment variable). The handler will fail fast with a clear error if the URL is missing or invalid.
@@ -229,9 +228,9 @@ OMNIMEMORY__QDRANT__URL=http://localhost:6333
 OMNIMEMORY__QDRANT__COLLECTION_NAME=omnimemory_dev
 OMNIMEMORY__QDRANT__VECTOR_SIZE=1024
 
-# Embedding (for real semantic search - M2 Ultra, Qwen3-Embedding-8B-4bit)
+# Embedding (for real semantic search - configure LLM_EMBEDDING_URL in .env)
 OMNIMEMORY__EMBEDDING_ENABLED=true
-OMNIMEMORY__EMBEDDING__SERVER_URL=http://192.168.86.200:8100
+OMNIMEMORY__EMBEDDING__SERVER_URL=<LLM_EMBEDDING_URL>
 ```
 
 ### Production

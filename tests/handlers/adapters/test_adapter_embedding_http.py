@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for EmbeddingHttpClient.
 
@@ -53,7 +55,7 @@ def local_config() -> ModelEmbeddingHttpClientConfig:
     """Create a local provider configuration."""
     return ModelEmbeddingHttpClientConfig(
         provider=EnumEmbeddingProviderType.LOCAL,
-        base_url="http://192.168.86.201:8002",
+        base_url="http://localhost:8100",
         model="gte-qwen2",
         embedding_dimension=1024,
     )
@@ -145,9 +147,9 @@ class TestProtocolConformance:
         ):
             client = EmbeddingHttpClient(config)
 
-            assert isinstance(
-                client, ProtocolEmbeddingClient
-            ), "EmbeddingHttpClient must implement ProtocolEmbeddingClient protocol"
+            assert isinstance(client, ProtocolEmbeddingClient), (
+                "EmbeddingHttpClient must implement ProtocolEmbeddingClient protocol"
+            )
 
     def test_provider_rate_limiter_implements_protocol(self) -> None:
         """Verify ProviderRateLimiter conforms to ProtocolRateLimiter.
@@ -164,9 +166,9 @@ class TestProtocolConformance:
         )
         limiter = ProviderRateLimiter(config)
 
-        assert isinstance(
-            limiter, ProtocolRateLimiter
-        ), "ProviderRateLimiter must implement ProtocolRateLimiter protocol"
+        assert isinstance(limiter, ProtocolRateLimiter), (
+            "ProviderRateLimiter must implement ProtocolRateLimiter protocol"
+        )
 
 
 # =============================================================================
@@ -202,7 +204,7 @@ class TestModelEmbeddingHttpClientConfig:
         self, local_config: ModelEmbeddingHttpClientConfig
     ) -> None:
         """Test embed endpoint for local provider."""
-        assert local_config.embed_endpoint == "http://192.168.86.201:8002/embed"
+        assert local_config.embed_endpoint == "http://localhost:8100/embed"
 
     def test_embed_endpoint_openai(
         self, openai_config: ModelEmbeddingHttpClientConfig
@@ -401,7 +403,7 @@ class TestEmbeddingHttpClientEmbedding:
                 # Verify envelope structure
                 call_args = mock_handler.execute.call_args[0][0]
                 assert call_args["operation"] == "http.post"
-                assert call_args["payload"]["url"] == "http://192.168.86.201:8002/embed"
+                assert call_args["payload"]["url"] == "http://localhost:8100/embed"
                 assert call_args["payload"]["body"] == {"text": "Hello world"}
 
     @pytest.mark.asyncio
@@ -1178,9 +1180,9 @@ class TestEmbeddingHttpClientHealthCheck:
                 # Verify rate limit is still exhausted after health check
                 # (health check didn't consume any tokens)
                 remaining_after = rate_limiter.get_remaining()
-                assert (
-                    remaining_after == 0
-                ), f"Expected 0 remaining after health check, got {remaining_after}"
+                assert remaining_after == 0, (
+                    f"Expected 0 remaining after health check, got {remaining_after}"
+                )
 
     @pytest.mark.asyncio
     async def test_health_check_does_not_accumulate_in_rate_window(
@@ -1229,9 +1231,9 @@ class TestEmbeddingHttpClientHealthCheck:
 
                 # Also verify the internal window is empty (no entries added)
                 window_length = len(rate_limiter._request_window)
-                assert (
-                    window_length == 0
-                ), f"Expected empty rate window, but found {window_length} entries"
+                assert window_length == 0, (
+                    f"Expected empty rate window, but found {window_length} entries"
+                )
 
     @pytest.mark.asyncio
     async def test_health_check_with_correlation_id_for_tracing(

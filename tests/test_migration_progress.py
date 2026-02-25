@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Tests for migration progress tracking model.
 
 These tests validate error type extraction edge cases and migration tracking.

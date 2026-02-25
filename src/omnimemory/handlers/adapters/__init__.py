@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Memory Handler Adapters.
 
@@ -37,7 +39,7 @@ Example::
     # Embedding client (contract boundary for HTTP)
     embed_config = ModelEmbeddingHttpClientConfig(
         provider="local",
-        base_url="http://192.168.86.201:8002",
+        base_url="http://localhost:8100",  # set via LLM_EMBEDDING_URL env var in production
     )
     async with EmbeddingHttpClient(embed_config) as client:
         embedding = await client.get_embedding("Hello world")

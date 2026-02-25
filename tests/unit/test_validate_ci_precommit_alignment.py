@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for CI/pre-commit alignment validation.
 
@@ -250,9 +252,9 @@ class TestExpectedAlignmentsStructure:
     def test_all_entries_are_three_tuples(self) -> None:
         for i, entry in enumerate(EXPECTED_ALIGNMENTS):
             assert isinstance(entry, tuple), f"Entry {i} is not a tuple: {entry!r}"
-            assert (
-                len(entry) == 3
-            ), f"Entry {i} has {len(entry)} elements, expected 3: {entry!r}"
+            assert len(entry) == 3, (
+                f"Entry {i} has {len(entry)} elements, expected 3: {entry!r}"
+            )
 
     def test_all_entries_have_nonempty_strings(self) -> None:
         for i, (hook_id, ci_job, ci_desc) in enumerate(EXPECTED_ALIGNMENTS):
@@ -260,17 +262,17 @@ class TestExpectedAlignmentsStructure:
             assert hook_id.strip(), f"Entry {i}: hook_id is empty"
             assert isinstance(ci_job, str), f"Entry {i}: ci_job is not a string"
             assert ci_job.strip(), f"Entry {i}: ci_job is empty"
-            assert isinstance(
-                ci_desc, str
-            ), f"Entry {i}: ci_description is not a string"
+            assert isinstance(ci_desc, str), (
+                f"Entry {i}: ci_description is not a string"
+            )
             assert ci_desc.strip(), f"Entry {i}: ci_description is empty"
 
     def test_no_duplicate_hook_ids(self) -> None:
         hook_ids = [entry[0] for entry in EXPECTED_ALIGNMENTS]
         duplicates = [h for h in hook_ids if hook_ids.count(h) > 1]
-        assert (
-            not duplicates
-        ), f"Duplicate hook IDs in EXPECTED_ALIGNMENTS: {set(duplicates)}"
+        assert not duplicates, (
+            f"Duplicate hook IDs in EXPECTED_ALIGNMENTS: {set(duplicates)}"
+        )
 
 
 # =============================================================================
@@ -318,7 +320,8 @@ class TestPrecommitHooksCoveredByAlignments:
             "check-yaml",
             "check-toml",
             "debug-statements",
-            "clean-tmp-directory",
+            "onex-validate-clean-root",
+            "no-internal-ips",
         }
     )
 
@@ -501,9 +504,9 @@ class TestRequiredChecksManifest:
     REQUIRED_CHECKS_PATH = _REPO_ROOT / ".github" / "required-checks.yaml"
 
     def test_required_checks_file_exists(self) -> None:
-        assert (
-            self.REQUIRED_CHECKS_PATH.exists()
-        ), f"Required checks manifest not found: {self.REQUIRED_CHECKS_PATH}"
+        assert self.REQUIRED_CHECKS_PATH.exists(), (
+            f"Required checks manifest not found: {self.REQUIRED_CHECKS_PATH}"
+        )
 
     def test_required_checks_contains_ci_job_ids(self) -> None:
         content = self.REQUIRED_CHECKS_PATH.read_text(encoding="utf-8")

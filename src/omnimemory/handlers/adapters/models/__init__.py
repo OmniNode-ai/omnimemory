@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Models for adapter health checks, configuration, and domain objects.
 
 This package contains Pydantic models used by various adapters in the

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Valkey/Redis adapter for subscription caching.
 
 This module provides an adapter for Valkey (Redis-compatible) operations

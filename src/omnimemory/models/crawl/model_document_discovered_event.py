@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Document discovered event model for document ingestion pipeline."""
 
@@ -101,8 +103,7 @@ class ModelDocumentDiscoveredEvent(BaseModel):
         ...,
         min_length=1,
         description=(
-            "Resolved scope assignment for this document "
-            "(e.g. 'omninode/omnimemory')"
+            "Resolved scope assignment for this document (e.g. 'omninode/omnimemory')"
         ),
     )
     detected_doc_type: EnumDetectedDocType = Field(

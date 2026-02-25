@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for AdapterGraphMemory.
 
@@ -364,13 +366,13 @@ class TestCypherTemplates:
         for template in bidirectional_templates:
             normalized = template.replace(" ", "").replace("\n", "")
             # Should have undirected pattern -[r]- (not -[r]->)
-            assert (
-                "-[r]-" in normalized
-            ), f"Bidirectional template missing -[r]- pattern: {template[:80]}..."
+            assert "-[r]-" in normalized, (
+                f"Bidirectional template missing -[r]- pattern: {template[:80]}..."
+            )
             # Should NOT have directed outgoing pattern
-            assert (
-                "-[r]->" not in normalized
-            ), f"Bidirectional template has directed pattern -[r]->: {template[:80]}..."
+            assert "-[r]->" not in normalized, (
+                f"Bidirectional template has directed pattern -[r]->: {template[:80]}..."
+            )
 
     def test_outgoing_templates_use_directed_pattern(self) -> None:
         """Verify outgoing templates use -[r]-> directed pattern."""
@@ -383,9 +385,9 @@ class TestCypherTemplates:
         for template in outgoing_templates:
             normalized = template.replace(" ", "").replace("\n", "")
             # Should have directed outgoing pattern -[r]->
-            assert (
-                "-[r]->" in normalized
-            ), f"Outgoing template missing -[r]-> pattern: {template[:80]}..."
+            assert "-[r]->" in normalized, (
+                f"Outgoing template missing -[r]-> pattern: {template[:80]}..."
+            )
 
     def test_outgoing_templates_have_required_parameters(self) -> None:
         """Verify outgoing templates have required parameters."""
@@ -438,8 +440,7 @@ class TestCypherTemplates:
 
         for template, expected_label in templates_and_checks:
             assert expected_label in template, (
-                f"Template should contain {expected_label}, "
-                f"got: {template[:100]}..."
+                f"Template should contain {expected_label}, got: {template[:100]}..."
             )
             # Ensure default "Memory" label is NOT present
             assert ":Memory " not in template, (
@@ -887,9 +888,9 @@ class TestGetConnections:
         call_args = mock_handler.execute_query.call_args
         query = call_args[1]["query"]
         normalized_query = query.replace(" ", "").replace("\n", "")
-        assert (
-            "-[r]->" in normalized_query
-        ), f"Expected outgoing pattern -[r]-> in query: {query}"
+        assert "-[r]->" in normalized_query, (
+            f"Expected outgoing pattern -[r]-> in query: {query}"
+        )
 
     @pytest.mark.asyncio
     async def test_get_connections_outgoing_with_type_filter(
@@ -922,9 +923,9 @@ class TestGetConnections:
         call_args = mock_handler.execute_query.call_args
         query = call_args[1]["query"]
         normalized_query = query.replace(" ", "").replace("\n", "")
-        assert (
-            "-[r]->" in normalized_query
-        ), f"Expected outgoing pattern -[r]-> in query: {query}"
+        assert "-[r]->" in normalized_query, (
+            f"Expected outgoing pattern -[r]-> in query: {query}"
+        )
         # Verify type filter parameters are passed
         assert "relationship_types" in call_args[1]["parameters"]
 
@@ -967,9 +968,9 @@ class TestGetConnections:
         call_args = mock_handler.execute_query.call_args
         query = call_args[1]["query"]
         normalized_query = query.replace(" ", "").replace("\n", "")
-        assert (
-            "-[r]->" in normalized_query
-        ), f"Expected outgoing pattern -[r]-> when config.bidirectional=False: {query}"
+        assert "-[r]->" in normalized_query, (
+            f"Expected outgoing pattern -[r]-> when config.bidirectional=False: {query}"
+        )
 
     @pytest.mark.asyncio
     async def test_get_connections_param_overrides_config_default(
@@ -1011,9 +1012,9 @@ class TestGetConnections:
         query = call_args[1]["query"]
         normalized_query = query.replace(" ", "").replace("\n", "")
         # Bidirectional uses -[r]- without arrow
-        assert (
-            "-[r]-(" in normalized_query or "-[r]-(n" in normalized_query
-        ), f"Expected bidirectional pattern -[r]- when param=True: {query}"
+        assert "-[r]-(" in normalized_query or "-[r]-(n" in normalized_query, (
+            f"Expected bidirectional pattern -[r]- when param=True: {query}"
+        )
 
     @pytest.mark.asyncio
     async def test_get_connections_weight_zero_preserved(

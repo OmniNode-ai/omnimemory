@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Protocol adapters for omnimemory handler dependencies.
 
@@ -230,7 +232,7 @@ async def create_default_event_bus(
         raise RuntimeError(f"Failed to initialize event bus: {e}") from e
     # EventBusKafka satisfies ProtocolEventBusPublish (has async publish method)
     # but mypy cannot verify cross-package structural subtyping.
-    return cast(ProtocolEventBusPublish, event_bus)
+    return cast("ProtocolEventBusPublish", event_bus)
 
 
 __all__ = [

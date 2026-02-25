@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Graph Handler Adapter for relationship-based memory queries.
 
@@ -54,7 +56,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from typing import TypeVar
 from urllib.parse import urlparse
 
-from omnibase_core.container import ModelONEXContainer  # noqa: TC002 - used at runtime
+from omnibase_core.container import ModelONEXContainer
 from omnibase_infra.errors import (
     InfraConnectionError,
     InfraTimeoutError,

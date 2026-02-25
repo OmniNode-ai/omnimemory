@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 name: Test Suite
 
 on:
@@ -13,7 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  POETRY_VERSION: "2.2.1"
   PYTHON_VERSION: "3.12"
   CACHE_VERSION: "0.1.0"
 
@@ -45,8 +47,6 @@ jobs:
   # SHARED CONFIGURATION FILES (synchronized with .pre-commit-config.yaml):
   # - pyproject.toml: ruff [tool.ruff] (^0.8.0), mypy [tool.mypy] (^1.14.0), pyright (^1.1.390)
   # - pyrightconfig.json: pyright settings (typeCheckingMode: basic, python 3.12)
-  # VERSION SYNC: Poetry uses caret versions (allows updates), pre-commit pins exact versions
-  # (ruff v0.8.6, mypy v1.14.1, pyright v1.1.391) - both are within compatible ranges
   # NOTE: UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
   #
   # CI-TO-HOOK SYNCHRONIZATION MAP:
@@ -55,14 +55,14 @@ jobs:
   # migration-freeze| migration-freeze-check (pre-commit)| ./scripts/check_migration_freeze.sh [--ci]
   # lint            | ruff-format (pre-commit)          | ruff format --check src/ tests/
   # lint            | ruff (pre-commit)                 | ruff check src/ tests/
-  # lint            | mypy (pre-push)                   | mypy --show-error-codes --no-error-summary src/omnimemory
-  # pyright         | pyright (pre-push)                | pyright src/omnimemory
+  # lint            | mypy-type-check (pre-push)        | mypy --show-error-codes --no-error-summary src/omnimemory
+  # pyright         | pyright-type-check (pre-push)     | pyright src/omnimemory
   # onex-validation | validate-pydantic-patterns        | python scripts/validation/validate_pydantic_patterns.py src/
   # onex-validation | validate-single-class-per-file    | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
   # onex-validation | validate-enum-casing              | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
   # onex-validation | validate-no-backward-compatibility| python scripts/validation/validate_no_backward_compatibility.py -d src/
   # onex-validation | validate-secrets                  | python scripts/validation/validate_secrets.py src/
-  # onex-validation | validate-naming-conventions       | python scripts/validation/validate_naming.py src/
+  # onex-validation | onex-validate-naming              | python scripts/validation/validate_naming.py src/
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
   # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
   # onex-validation | validate-model-locations          | python scripts/validation/validate_model_locations.py src/
@@ -71,8 +71,6 @@ jobs:
   # io-audit        | io-audit                          | python -m omnimemory.audit
   #
   # IMPORTANT: When modifying any CI step, update the corresponding hook in .pre-commit-config.yaml
-  #
-  # POETRY VERSION: Must match POETRY_VERSION env var (currently 2.2.1)
   # =============================================================================
 
   # Phase 1 - Migration Freeze Enforcement
@@ -85,7 +83,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Needed for three-dot diff (merge-base with origin/main)
 
@@ -102,56 +100,28 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
-          # Restore-keys use prefix matching for better fallback:
-          # - First tries exact OS + Python + lock hash
-          # - Falls back to OS + Python (different lock hash)
-          # - Falls back to OS only (different Python version)
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            venv-${{ runner.os }}-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync
 
       # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
       # Both pre-commit and CI use --check for consistent validation
       - name: Check ruff formatting
-        run: poetry run ruff format --check src/ tests/
+        run: uv run ruff format --check src/ tests/
 
       # SYNC: Pre-commit hook 'ruff-check' at pre-commit stage
       # Both pre-commit and CI use check-only mode (no --fix)
       - name: Check ruff linting (includes import sorting)
-        run: poetry run ruff check src/ tests/
+        run: uv run ruff check src/ tests/
 
-      # SYNC: Pre-commit hook 'mypy' at pre-push stage
+      # SYNC: Pre-commit hook 'mypy-type-check' at pre-push stage
       # Both pre-commit and CI use same flags for consistent output
       - name: Run mypy type checking (strict)
-        run: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
+        run: uv run mypy --show-error-codes --no-error-summary src/omnimemory
 
   # Phase 1 - Pyright Type Checking
   pyright:
@@ -161,46 +131,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
-          # Restore-keys use prefix matching for better fallback:
-          # - First tries exact OS + Python + lock hash
-          # - Falls back to OS + Python (different lock hash)
-          # - Falls back to OS only (different Python version)
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            venv-${{ runner.os }}-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: uv sync
 
-      - name: Install project
-        run: poetry install --no-interaction
-
-      # SYNC: Pre-commit hook 'pyright' at pre-push stage
+      # SYNC: Pre-commit hook 'pyright-type-check' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
       - name: Run pyright type checking
-        run: poetry run pyright src/omnimemory
+        run: uv run pyright src/omnimemory
 
   # Phase 1 - ONEX Validation
   onex-validation:
@@ -210,76 +152,48 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
-          # Restore-keys use prefix matching for better fallback:
-          # - First tries exact OS + Python + lock hash
-          # - Falls back to OS + Python (different lock hash)
-          # - Falls back to OS only (different Python version)
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            venv-${{ runner.os }}-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
-        run: poetry run python scripts/validation/validate_pydantic_patterns.py src/
+        run: uv run python scripts/validation/validate_pydantic_patterns.py src/
 
       # SYNC: Pre-commit hook 'validate-single-class-per-file' at pre-commit stage
       - name: Validate single class per file
-        run: poetry run python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
+        run: uv run python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
 
       # SYNC: Pre-commit hook 'validate-enum-casing' at pre-commit stage
       - name: Validate enum casing
-        run: poetry run python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
+        run: uv run python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
 
       # SYNC: Pre-commit hook 'validate-no-backward-compatibility' at pre-commit stage
       - name: Validate no backward compatibility
-        run: poetry run python scripts/validation/validate_no_backward_compatibility.py -d src/
+        run: uv run python scripts/validation/validate_no_backward_compatibility.py -d src/
 
       # SYNC: Pre-commit hook 'validate-secrets' at pre-commit stage
       - name: Validate secrets
-        run: poetry run python scripts/validation/validate_secrets.py src/
+        run: uv run python scripts/validation/validate_secrets.py src/
 
-      # SYNC: Pre-commit hook 'validate-naming-conventions' at pre-commit stage
+      # SYNC: Pre-commit hook 'onex-validate-naming' at pre-commit stage
       # Both local and CI run naming validation at the same stage for consistency
       - name: Validate naming conventions
-        run: poetry run python scripts/validation/validate_naming.py src/
+        run: uv run python scripts/validation/validate_naming.py src/
 
       # SYNC: Pre-commit hook 'validate-http-imports' at pre-commit stage
       # Enforces HTTP import boundary - all HTTP calls must go through adapter layer
       - name: Validate HTTP import boundary
-        run: poetry run python scripts/validation/validate_http_imports.py src/
+        run: uv run python scripts/validation/validate_http_imports.py src/
 
       # SYNC: Pre-commit hook 'validate-kafka-imports' at pre-commit stage
       # Enforces ARCH-002 - runtime owns all Kafka plumbing, nodes use EventBus SPI
       - name: Validate Kafka import boundary (ARCH-002)
-        run: poetry run python scripts/validation/validate_kafka_imports.py src/
+        run: uv run python scripts/validation/validate_kafka_imports.py src/
 
       - name: ONEX validation summary
         if: always()
@@ -307,13 +221,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
 
       - name: Install PyYAML for transport import guard
         run: pip install pyyaml
@@ -331,37 +244,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            venv-${{ runner.os }}-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync
 
       - name: Find and validate contract YAML files
         run: |
@@ -373,7 +262,7 @@ jobs:
           echo "Found contract files:"
           echo "$contracts"
           echo ""
-          poetry run python -m omnimemory.tools.contract_linter --verbose $contracts
+          uv run python -m omnimemory.tools.contract_linter --verbose $contracts
 
   # Phase 1 - I/O Audit
   # SYNC: Pre-commit hook 'io-audit' at pre-commit stage
@@ -385,40 +274,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            venv-${{ runner.os }}-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync
 
       - name: Run I/O audit
-        run: poetry run python -m omnimemory.audit
+        run: uv run python -m omnimemory.audit
 
   # Phase 1 - Architecture Handshake Verification
   check-handshake:
@@ -429,13 +294,13 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Uses default GITHUB_TOKEN which has read access to public repos in the org.
       # Same pattern as omniclaude ci-cd.yml. If omnibase_core becomes private,
       # add: token: ${{ secrets.OMNIBASE_CORE_ACCESS_TOKEN }}
       - name: Checkout omnibase_core
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: OmniNode-ai/omnibase_core
           path: omnibase_core
@@ -478,45 +343,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ env.CACHE_VERSION }}
-          # Restore-keys use prefix matching for better fallback:
-          # - First tries exact OS + Python + lock hash
-          # - Falls back to OS + Python (different lock hash)
-          # - Falls back to OS only (different Python version)
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-            venv-${{ runner.os }}-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync
 
       - name: Run tests
         run: |
-          poetry run pytest tests/ \
+          uv run pytest tests/ \
             -n auto \
             --timeout=60 \
             --timeout-method=thread \
@@ -528,7 +365,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results
           path: junit.xml
@@ -536,7 +373,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: coverage.xml

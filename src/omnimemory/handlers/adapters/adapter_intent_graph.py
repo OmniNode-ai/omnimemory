@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Adapter for storing intent classifications in Memgraph.
 
@@ -444,7 +446,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                             "timeout_seconds": self._config.timeout_seconds,
                         }
                         if options:
-                            init_options.update(cast(Mapping[str, JsonType], options))
+                            init_options.update(cast("Mapping[str, JsonType]", options))
 
                         await self._handler.initialize(
                             connection_uri=connection_uri,
@@ -653,7 +655,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                     "intent_id": str(intent_id),
                     "intent_category": intent_category_str,
                     "confidence": confidence_val,
-                    "keywords": cast(list[JsonType], keywords_val),
+                    "keywords": cast("list[JsonType]", keywords_val),
                     "created_at_utc": timestamp_utc_str,
                     "timestamp_utc": timestamp_utc_str,
                     "correlation_id": str(parsed_correlation_id)

@@ -33,12 +33,60 @@
 - **Audit layer** — I/O audit logging via `audit/`
 - **Runtime plugin** — registered as `onex.domain_plugins` entry point (`PluginMemory`)
 
+## Infrastructure Ownership
+
+OmniMemory's `docker-compose.yml` owns the **memory-layer data services**. These are the services you need to run omnimemory locally:
+
+| Service | Container | Default Port | Purpose |
+|---------|-----------|--------------|---------|
+| Qdrant | `omnimemory-qdrant` | 6333 (HTTP), 6334 (gRPC) | Vector database for semantic memory |
+| Memgraph | `omnimemory-memgraph` | 7687 (Bolt), 7444 (HTTP) | Graph database for relationship/intent queries |
+| Valkey | `omnimemory-valkey` | 6379 | In-memory cache and session storage |
+| Kreuzberg | `omnimemory-kreuzberg-parser` | 8090 | Document text extraction service |
+
+**Not owned here** — these services are managed by other repositories:
+
+| Service | Owner Repository | Why |
+|---------|-----------------|-----|
+| Kafka / Redpanda | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) | Platform-wide event bus, shared by all services |
+| PostgreSQL | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) | Platform-wide relational database, shared by all services |
+
+If you need Kafka or Postgres, start the `omnibase_infra` stack first:
+```bash
+docker compose -f /path/to/omnibase_infra/docker/docker-compose.infra.yml up -d
+```
+
 ## Quick Start
 
-Install:
+### Memory services only
+
+To run just the omnimemory data services (Qdrant, Memgraph, Valkey, Kreuzberg):
+
 ```bash
-poetry add omnimemory
+git clone https://github.com/OmniNode-ai/omnimemory.git
+cd omnimemory
+
+# Start memory data services
+docker compose up -d
+
+# Verify all services are healthy
+docker compose ps
 ```
+
+Default service ports (all configurable via `.env`):
+- Qdrant REST: `localhost:6333`
+- Memgraph Bolt: `localhost:7687`
+- Valkey: `localhost:6379`
+- Kreuzberg parser: `localhost:8090`
+
+### Install and run tests
+
+```bash
+uv sync
+uv run pytest tests/ -m unit
+```
+
+For configuration options see [docs/environment_variables.md](docs/environment_variables.md).
 
 Minimal example using the intent handler:
 ```python
@@ -79,11 +127,6 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Run tests:
-```bash
-poetry run pytest
-```
-
 ## Directory Structure
 
 ```text
@@ -102,16 +145,18 @@ src/omnimemory/
 
 ## Development
 
-Uses [Poetry](https://python-poetry.org/) for package management.
+Uses [uv](https://docs.astral.sh/uv/) for package management.
 
 ```bash
-poetry install
-poetry run pytest tests/
-poetry run mypy src/omnimemory/
-poetry run ruff check src/ tests/
-poetry run ruff format src/ tests/
+uv sync
+uv run pytest tests/ -m unit
+uv run mypy src/omnimemory/ --strict
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 ```
 
 ## Documentation
 
 **Reference**: [docs/](docs/)
+
+Open an issue or email contact@omninode.ai.

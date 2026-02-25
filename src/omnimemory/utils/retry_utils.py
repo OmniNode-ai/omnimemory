@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """
 Retry utilities with exponential backoff following ONEX standards.
 
@@ -233,7 +236,7 @@ def retry_decorator(
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> T:
-            correlation_id = cast(UUID | None, kwargs.pop("correlation_id", None))
+            correlation_id = cast("UUID | None", kwargs.pop("correlation_id", None))
             return await retry_with_backoff(
                 func, effective_config, correlation_id, *args, **kwargs
             )
@@ -241,7 +244,7 @@ def retry_decorator(
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             # For sync functions, run in event loop
-            correlation_id = cast(UUID | None, kwargs.pop("correlation_id", None))
+            correlation_id = cast("UUID | None", kwargs.pop("correlation_id", None))
 
             async def async_operation() -> T:
                 return await retry_with_backoff(
@@ -261,9 +264,9 @@ def retry_decorator(
                 return asyncio.run(async_operation())
 
         if asyncio.iscoroutinefunction(func):
-            return cast(Callable[..., T], async_wrapper)
+            return cast("Callable[..., T]", async_wrapper)
         else:
-            return cast(Callable[..., T], sync_wrapper)
+            return cast("Callable[..., T]", sync_wrapper)
 
     return decorator
 

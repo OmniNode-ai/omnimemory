@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """OmniMemory ONEX Nodes - Core 8 Foundation.
 
@@ -12,9 +14,10 @@ COMPUTE (2):
 - semantic_analyzer_compute: Semantic analysis and embeddings
 - similarity_compute: Vector similarity calculations
 
-REDUCER (2):
+REDUCER (3):
 - memory_consolidator_reducer: Merge similar memories
 - statistics_reducer: Generate memory statistics
+- navigation_history_reducer: Persist navigation sessions (OMN-2584)
 
 ORCHESTRATOR (2):
 - memory_lifecycle_orchestrator: Full lifecycle management
@@ -38,6 +41,15 @@ from omnimemory.nodes.intent_event_consumer_effect import (
     HandlerIntentEventConsumer,
     ModelIntentEventConsumerConfig,
     ModelIntentEventConsumerHealth,
+)
+from omnimemory.nodes.navigation_history_reducer import (
+    HandlerNavigationHistoryReducer,
+    ModelNavigationHistoryRequest,
+    ModelNavigationHistoryResponse,
+    ModelNavigationSession,
+    ModelPlanStep,
+    NavigationOutcome,
+    NodeNavigationHistoryReducer,
 )
 
 __all__: list[str] = [
@@ -63,6 +75,13 @@ __all__: list[str] = [
     # Reducer nodes
     "memory_consolidator_reducer",
     "statistics_reducer",
+    "NodeNavigationHistoryReducer",
+    "HandlerNavigationHistoryReducer",
+    "ModelNavigationHistoryRequest",
+    "ModelNavigationHistoryResponse",
+    "ModelNavigationSession",
+    "ModelPlanStep",
+    "NavigationOutcome",
     # Orchestrator nodes
     "memory_lifecycle_orchestrator",
     "agent_coordinator_orchestrator",

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for HandlerSemanticCompute with mocked providers.
 
@@ -613,12 +615,12 @@ class TestAnalyze:
         # Should have entities - John and Google should be extracted
         # result.entities is list[str] containing entity names
         assert len(result.entities) > 0, "entities_only mode should extract entities"
-        assert (
-            "John" in result.entities
-        ), f"Expected 'John' in entities, got: {result.entities}"
-        assert (
-            "Google" in result.entities
-        ), f"Expected 'Google' in entities, got: {result.entities}"
+        assert "John" in result.entities, (
+            f"Expected 'John' in entities, got: {result.entities}"
+        )
+        assert "Google" in result.entities, (
+            f"Expected 'Google' in entities, got: {result.entities}"
+        )
 
     @pytest.mark.asyncio
     async def test_analyze_invalid_type_raises_error(
@@ -1266,9 +1268,9 @@ class TestSentenceStartingWordFiltering:
             result = await handler.extract_entities(content)
 
             entity_texts = [e.text for e in result.entities]
-            assert (
-                stopword not in entity_texts
-            ), f"'{stopword}' should not be extracted as entity"
+            assert stopword not in entity_texts, (
+                f"'{stopword}' should not be extracted as entity"
+            )
 
 
 # =============================================================================

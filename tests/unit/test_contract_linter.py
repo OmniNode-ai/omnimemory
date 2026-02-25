@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for the contract linter and ProtocolContractValidator stub.
 
@@ -548,9 +550,9 @@ class TestValidateContract:
         data = _make_valid_node_contract(node_type=node_type)
         path = _write_yaml(tmp_path, data, filename=f"contract_{node_type}.yaml")
         result = validate_contract(path)
-        assert (
-            result["is_valid"] is True
-        ), f"node_type '{node_type}' should be valid but got errors: {result['errors']}"
+        assert result["is_valid"] is True, (
+            f"node_type '{node_type}' should be valid but got errors: {result['errors']}"
+        )
 
     def test_fsm_subcontract_passes(self, tmp_path: Path) -> None:
         data = {"state_machine_name": "my_fsm", "states": ["ready", "done"]}

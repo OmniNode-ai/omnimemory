@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Integration tests for entry point discovery.
 
@@ -29,8 +31,7 @@ class TestEntryPointDiscovery:
         eps = entry_points(group="onex.domain_plugins")
         names = [ep.name for ep in eps]
         assert "memory" in names, (
-            f"'memory' not found in onex.domain_plugins entry points. "
-            f"Found: {names}"
+            f"'memory' not found in onex.domain_plugins entry points. Found: {names}"
         )
 
     def test_entry_point_loads_plugin_class(self) -> None:
@@ -48,7 +49,7 @@ class TestEntryPointDiscovery:
         assert matches, "No 'memory' entry point found"
         cls = matches[0].load()
         plugin = cls()
-        assert isinstance(
-            plugin, ProtocolDomainPlugin
-        ), f"Instance of {cls.__name__} does not satisfy ProtocolDomainPlugin"
+        assert isinstance(plugin, ProtocolDomainPlugin), (
+            f"Instance of {cls.__name__} does not satisfy ProtocolDomainPlugin"
+        )
         assert plugin.plugin_id == "memory"

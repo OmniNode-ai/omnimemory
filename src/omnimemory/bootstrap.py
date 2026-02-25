@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Bootstrap and initialization for OmniMemory service.
 
 Provides explicit, idempotent initialization that validates configuration

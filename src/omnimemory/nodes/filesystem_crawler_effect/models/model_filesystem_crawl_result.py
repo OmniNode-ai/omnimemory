@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Result model for a single filesystem crawl run."""
 
@@ -56,6 +58,15 @@ class ModelFilesystemCrawlResult(  # omnimemory-model-exempt: handler result
             "(1) symlink-escaped files rejected before files_walked is incremented, "
             "(2) files that exceeded max_file_size_bytes (counted in files_walked). "
             "These two categories are not distinguished in this field."
+        ),
+    )
+    indexed_count: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Number of document-indexed events emitted. Equals discovered_count + "
+            "changed_count (one indexed event per successfully indexed document). "
+            "Consumed by omniintelligence crawl_scheduler_effect to reset debounce windows."
         ),
     )
     removed_count: int = Field(

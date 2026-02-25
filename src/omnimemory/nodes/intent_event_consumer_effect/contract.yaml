@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
 ---
 # ONEX Contract: intent_event_consumer_effect
 # Consumes intent-classified events from omniintelligence and persists to graph storage

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Intent domain models for AdapterIntentGraph operations.
 
@@ -48,7 +50,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from omnibase_core.types.type_json import JsonType  # noqa: TC002
+from omnibase_core.types.type_json import JsonType
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [

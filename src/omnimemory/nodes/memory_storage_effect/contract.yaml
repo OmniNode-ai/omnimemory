@@ -1,6 +1,6 @@
----
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 OmniNode Team
+---
 
 # Memory Storage EFFECT - ONEX Contract
 # EFFECT node for memory CRUD operations across storage backends.

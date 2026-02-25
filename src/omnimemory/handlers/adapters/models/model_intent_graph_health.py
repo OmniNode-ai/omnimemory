@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """Health status model for the Intent Graph adapter.
 
 This module provides the Pydantic model for representing health check results

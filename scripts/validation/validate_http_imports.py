@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 """ONEX HTTP Import Boundary Enforcement.
 
 Ensures that direct HTTP client imports (httpx, requests, urllib3) are only
@@ -104,6 +107,8 @@ ALLOWED_PATHS = [
     # Legacy clients directory - allowed during migration
     # TODO: Remove this allowance after migration to adapters is complete
     "nodes/memory_retrieval_effect/clients/",
+    # Kreuzberg effect client - HTTP transport boundary for document extraction (OMN-2733)
+    "nodes/kreuzberg_parse_effect/clients/",
     # Tests can mock HTTP clients
     "tests/",
 ]

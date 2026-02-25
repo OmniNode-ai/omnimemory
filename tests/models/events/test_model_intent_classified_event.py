@@ -1,5 +1,6 @@
-# SPDX-FileCopyrightText: 2025-present OmniNode-ai <info@omninode.ai>
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 """Tests for ModelIntentClassifiedEvent JSON deserialization.
 
 These tests validate that the model correctly handles JSON-deserialized payloads

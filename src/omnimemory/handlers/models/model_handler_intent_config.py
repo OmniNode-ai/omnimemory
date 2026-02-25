@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
+
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for HandlerIntent.
 
@@ -105,7 +107,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
         ge=0.1,
         le=300.0,
         description=(
-            "Connection and operation timeout in seconds. " "Range: 0.1-300.0 seconds."
+            "Connection and operation timeout in seconds. Range: 0.1-300.0 seconds."
         ),
     )
     circuit_breaker_threshold: int = Field(
