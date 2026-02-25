@@ -53,7 +53,13 @@ _EMBEDDING_URL = os.environ.get(
     "LLM_EMBEDDING_URL", "http://localhost:8100/v1/embeddings"
 )
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.environ.get("OMNIMEMORY_PG_DSN"),
+        reason="OMNIMEMORY_PG_DSN not set — requires live PostgreSQL (skipped in CI without infra)",
+    ),
+]
 
 
 # ---------------------------------------------------------------------------
