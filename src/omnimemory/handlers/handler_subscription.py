@@ -877,6 +877,8 @@ class HandlerSubscription:
         self,
         topic: str,
         event: ModelNotificationEvent,
+        *,
+        strict: bool = True,
     ) -> int:
         """Publish notification event to the event bus for subscriber consumption.
 
@@ -885,24 +887,33 @@ class HandlerSubscription:
         delivery to agents happens through their event bus consumers.
 
         Error Propagation:
-            Publish failures are propagated to callers rather than silently
-            swallowed. This is intentional -- silent failures masked delivery
-            problems and violated the principle of least surprise. Callers
-            that need fire-and-forget semantics should catch exceptions at
-            their own level.
+            By default (``strict=True``), publish failures are propagated to
+            callers. This is the recommended mode for production systems where
+            delivery guarantees matter.
+
+            Pass ``strict=False`` for fire-and-forget semantics: failures are
+            logged at WARNING level but the method returns 0 instead of raising.
+            Use this only when missing a notification is acceptable (e.g.,
+            best-effort audit events).
 
         Args:
             topic: The topic to notify (format: memory.<entity>.<event>).
             event: The notification event to publish.
+            strict: When True (default), propagate publish failures to the
+                caller. When False, log the failure at WARNING level and return
+                0 instead of raising.
 
         Returns:
-            Number of active subscribers for this topic.
+            Number of active subscribers for this topic. Returns 0 when there
+            are no subscribers or when a publish failure occurs with
+            ``strict=False``.
 
         Raises:
             RuntimeError: If handler is not initialized.
             ValueError: If event.topic does not match the topic argument.
-            Exception: If the event bus publish operation fails (propagated
-                intentionally; see Error Propagation above).
+            Exception: If the event bus publish operation fails and
+                ``strict=True`` (propagated intentionally; see Error
+                Propagation above).
         """
         _, _, publisher, config = self._ensure_initialized()
 
@@ -939,8 +950,9 @@ class HandlerSubscription:
                 event.event_id,
                 exc,
             )
-            # Intentionally propagate: silent failures were a bug, not a feature.
-            raise
+            if strict:
+                raise
+            return 0
 
         await self._increment_metric("notifications_published")
 
