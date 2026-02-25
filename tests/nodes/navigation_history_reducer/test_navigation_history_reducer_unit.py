@@ -260,8 +260,8 @@ class TestHandlerNavigationHistoryWriterUnit:
         session = _make_success_session()
 
         mock_conn = AsyncMock()
-        mock_conn.fetchval.return_value = None  # Not a duplicate
-        mock_conn.execute.return_value = None
+        # fetchval returns the inserted session_id (non-None = new row inserted)
+        mock_conn.fetchval.return_value = str(session.session_id)
 
         mock_qdrant = AsyncMock()
         mock_qdrant.upsert.return_value = None
@@ -276,7 +276,7 @@ class TestHandlerNavigationHistoryWriterUnit:
         assert response.postgres_written is True
         assert response.qdrant_written is True
         assert response.idempotent_skip is False
-        mock_conn.execute.assert_called_once()
+        mock_conn.fetchval.assert_called_once()
         mock_qdrant.upsert.assert_called_once()
 
     @pytest.mark.asyncio
@@ -285,8 +285,8 @@ class TestHandlerNavigationHistoryWriterUnit:
         session = _make_failure_session()
 
         mock_conn = AsyncMock()
-        mock_conn.fetchval.return_value = None
-        mock_conn.execute.return_value = None
+        # fetchval returns the inserted session_id (non-None = new row inserted)
+        mock_conn.fetchval.return_value = str(session.session_id)
 
         mock_qdrant = AsyncMock()
         writer._pg_pool = self._make_pg_pool_mock(mock_conn)  # type: ignore[assignment]
@@ -297,7 +297,7 @@ class TestHandlerNavigationHistoryWriterUnit:
         assert response.status == "success"
         assert response.postgres_written is True
         assert response.qdrant_written is False  # Failure: no Qdrant write
-        mock_conn.execute.assert_called_once()
+        mock_conn.fetchval.assert_called_once()
         mock_qdrant.upsert.assert_not_called()  # Critical invariant
 
     @pytest.mark.asyncio
@@ -306,8 +306,8 @@ class TestHandlerNavigationHistoryWriterUnit:
         session = _make_success_session()
 
         mock_conn = AsyncMock()
-        # Simulate existing row
-        mock_conn.fetchval.return_value = str(session.session_id)
+        # Simulate duplicate: ON CONFLICT DO NOTHING returns None (no row inserted)
+        mock_conn.fetchval.return_value = None
 
         mock_qdrant = AsyncMock()
         writer._pg_pool = self._make_pg_pool_mock(mock_conn)  # type: ignore[assignment]
@@ -319,7 +319,6 @@ class TestHandlerNavigationHistoryWriterUnit:
         assert response.idempotent_skip is True
         assert response.postgres_written is False
         assert response.qdrant_written is False
-        mock_conn.execute.assert_not_called()
         mock_qdrant.upsert.assert_not_called()
 
     @pytest.mark.asyncio
@@ -352,8 +351,8 @@ class TestHandlerNavigationHistoryWriterUnit:
         session = _make_success_session()
 
         mock_conn = AsyncMock()
-        mock_conn.fetchval.return_value = None
-        mock_conn.execute.return_value = None
+        # fetchval returns the inserted session_id (non-None = new row inserted)
+        mock_conn.fetchval.return_value = str(session.session_id)
 
         mock_qdrant = AsyncMock()
         mock_qdrant.upsert.side_effect = Exception("Qdrant unavailable")
@@ -378,8 +377,8 @@ class TestHandlerNavigationHistoryWriterUnit:
         session = _make_failure_session()
 
         mock_conn = AsyncMock()
-        mock_conn.fetchval.return_value = None
-        mock_conn.execute.return_value = None
+        # fetchval returns the inserted session_id (non-None = new row inserted)
+        mock_conn.fetchval.return_value = str(session.session_id)
 
         mock_qdrant = AsyncMock()
         writer._pg_pool = self._make_pg_pool_mock(mock_conn)  # type: ignore[assignment]

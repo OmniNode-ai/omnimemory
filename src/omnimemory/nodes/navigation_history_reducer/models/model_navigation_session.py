@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -50,7 +50,7 @@ class ModelPlanStep(BaseModel):
     to_state_id: str = Field(description="Target graph state identifier")
     action: str = Field(description="Description of the action taken")
     executed_at: datetime = Field(description="UTC timestamp of step execution")
-    metadata: dict[str, Any] | None = Field(
+    metadata: dict[str, str | int | float | bool] | None = Field(
         default=None,
         description="Optional typed graph artifact metadata",
     )

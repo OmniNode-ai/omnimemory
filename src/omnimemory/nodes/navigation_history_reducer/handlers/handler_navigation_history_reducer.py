@@ -28,7 +28,7 @@ import hashlib
 import json
 import logging
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -58,13 +58,9 @@ __all__ = ["HandlerNavigationHistoryReducer", "HandlerNavigationHistoryWriter"]
 # Constants (env-var driven; no hardcoded internal IPs)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PG_DSN = os.environ.get(
-    "OMNIMEMORY_PG_DSN",
-    "postgresql://role_omnimemory:037284ea5178ba283177e57a79496739a4e11ad375cc05a48f79416552eb2732"
-    "@localhost:5436/omnimemory",
-)
+_DEFAULT_PG_DSN = os.environ.get("OMNIMEMORY_PG_DSN", "")
 _DEFAULT_QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
-_DEFAULT_QDRANT_PORT = 6333
+_DEFAULT_QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 _DEFAULT_EMBEDDING_URL = os.environ.get(
     "LLM_EMBEDDING_URL", "http://localhost:8100/v1/embeddings"
 )
@@ -292,14 +288,11 @@ class HandlerNavigationHistoryWriter:
         )
 
         async with pool.acquire() as conn:
-            existing = await conn.fetchval(
-                "SELECT session_id FROM navigation_sessions WHERE session_id = $1",
-                str(session.session_id),
-            )
-            if existing is not None:
-                return "idempotent"
-
-            await conn.execute(
+            # Single-statement insert with conflict guard — eliminates the
+            # TOCTOU race between a SELECT existence check and the INSERT.
+            # Returns the inserted session_id on success, or nothing if the
+            # row already exists (concurrent duplicate write).
+            inserted = await conn.fetchval(
                 """
                 INSERT INTO navigation_sessions (
                     session_id,
@@ -314,6 +307,8 @@ class HandlerNavigationHistoryWriter:
                     steps_json,
                     created_at
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                ON CONFLICT (session_id) DO NOTHING
+                RETURNING session_id
                 """,
                 str(session.session_id),
                 goal_hash,
@@ -328,6 +323,8 @@ class HandlerNavigationHistoryWriter:
                 session.created_at,
             )
 
+        if inserted is None:
+            return "idempotent"
         return "written"
 
     # ------------------------------------------------------------------
@@ -359,7 +356,7 @@ class HandlerNavigationHistoryWriter:
         start_vector = await self._embed_text(session.start_state_id)
 
         # Payload stored alongside the vectors — typed graph artifacts only
-        payload: dict[str, Any] = {
+        payload: dict[str, str | int | list[dict[str, str | int]]] = {
             "session_id": str(session.session_id),
             "goal_condition": session.goal_condition,
             "goal_hash": _hash_text(session.goal_condition),

@@ -16,6 +16,7 @@ Markers: integration
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -45,13 +46,7 @@ from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session
 # Connection defaults (override via env; no hardcoded internal IPs)
 # ---------------------------------------------------------------------------
 
-_PG_DSN = os.environ.get(
-    "OMNIMEMORY_PG_DSN",
-    (
-        "postgresql://role_omnimemory:037284ea5178ba283177e57a79496739a4e11ad375cc05a48f79416552eb2732"
-        "@localhost:5436/omnimemory"
-    ),
-)
+_PG_DSN = os.environ.get("OMNIMEMORY_PG_DSN", "")
 _QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 _QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 _EMBEDDING_URL = os.environ.get(
@@ -67,13 +62,17 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def writer() -> HandlerNavigationHistoryWriter:
-    return HandlerNavigationHistoryWriter(
+async def writer() -> AsyncGenerator[HandlerNavigationHistoryWriter, None]:
+    instance = HandlerNavigationHistoryWriter(
         pg_dsn=_PG_DSN,
         qdrant_host=_QDRANT_HOST,
         qdrant_port=_QDRANT_PORT,
         embedding_url=_EMBEDDING_URL,
     )
+    try:
+        yield instance
+    finally:
+        await instance.close()
 
 
 def _make_success_session() -> ModelNavigationSession:

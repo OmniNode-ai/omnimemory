@@ -46,10 +46,10 @@ from omnimemory.nodes.navigation_history_reducer import (
     HandlerNavigationHistoryReducer,
     ModelNavigationHistoryRequest,
     ModelNavigationHistoryResponse,
+    ModelNavigationSession,
+    ModelPlanStep,
     NavigationOutcome,
-    NavigationSession,
     NodeNavigationHistoryReducer,
-    PlanStep,
 )
 
 __all__: list[str] = [
@@ -79,9 +79,9 @@ __all__: list[str] = [
     "HandlerNavigationHistoryReducer",
     "ModelNavigationHistoryRequest",
     "ModelNavigationHistoryResponse",
-    "NavigationSession",
+    "ModelNavigationSession",
+    "ModelPlanStep",
     "NavigationOutcome",
-    "PlanStep",
     # Orchestrator nodes
     "memory_lifecycle_orchestrator",
     "agent_coordinator_orchestrator",

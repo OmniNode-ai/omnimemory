@@ -33,7 +33,7 @@ from qdrant_client.http.exceptions import UnexpectedResponse
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-QDRANT_HOST = os.environ.get("QDRANT_HOST", "192.168.86.200")
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "navigation_paths"
 
@@ -54,55 +54,58 @@ async def create_collection() -> None:
     client = AsyncQdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=30)
 
     try:
-        existing = await client.get_collections()
-        existing_names = {c.name for c in existing.collections}
-
-        if COLLECTION_NAME in existing_names:
-            logger.info(
-                "Collection '%s' already exists — no action required.", COLLECTION_NAME
+        try:
+            await client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config={
+                    "goal": qdrant_models.VectorParams(
+                        size=EMBEDDING_DIM,
+                        distance=qdrant_models.Distance.COSINE,
+                    ),
+                    "start_state": qdrant_models.VectorParams(
+                        size=EMBEDDING_DIM,
+                        distance=qdrant_models.Distance.COSINE,
+                    ),
+                },
+                # Payload indexes for filtered search
+                optimizers_config=qdrant_models.OptimizersConfigDiff(
+                    indexing_threshold=1000,
+                ),
             )
-            return
-
-        await client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config={
-                "goal": qdrant_models.VectorParams(
-                    size=EMBEDDING_DIM,
-                    distance=qdrant_models.Distance.COSINE,
-                ),
-                "start_state": qdrant_models.VectorParams(
-                    size=EMBEDDING_DIM,
-                    distance=qdrant_models.Distance.COSINE,
-                ),
-            },
-            # Payload indexes for filtered search
-            optimizers_config=qdrant_models.OptimizersConfigDiff(
-                indexing_threshold=1000,
-            ),
-        )
-        logger.info("Created collection '%s' with named vectors.", COLLECTION_NAME)
+            logger.info("Created collection '%s' with named vectors.", COLLECTION_NAME)
+        except UnexpectedResponse as exc:
+            # 409 Conflict means the collection was created concurrently — treat as success.
+            if exc.status_code == 409:
+                logger.info(
+                    "Collection '%s' already exists (created concurrently) — no action required.",
+                    COLLECTION_NAME,
+                )
+                return
+            logger.error("Qdrant API error during collection creation: %s", exc)
+            sys.exit(1)
 
         # Create payload indexes for common filter patterns
-        await client.create_payload_index(
-            collection_name=COLLECTION_NAME,
-            field_name="outcome",
-            field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
-        )
-        await client.create_payload_index(
-            collection_name=COLLECTION_NAME,
-            field_name="graph_fingerprint",
-            field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
-        )
-        await client.create_payload_index(
-            collection_name=COLLECTION_NAME,
-            field_name="start_state_id",
-            field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
-        )
-        logger.info("Created payload indexes on outcome, graph_fingerprint, start_state_id.")
+        try:
+            await client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="outcome",
+                field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
+            )
+            await client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="graph_fingerprint",
+                field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
+            )
+            await client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="start_state_id",
+                field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
+            )
+            logger.info("Created payload indexes on outcome, graph_fingerprint, start_state_id.")
+        except UnexpectedResponse as exc:
+            logger.error("Qdrant API error during index creation: %s", exc)
+            sys.exit(1)
 
-    except UnexpectedResponse as exc:
-        logger.error("Qdrant API error: %s", exc)
-        sys.exit(1)
     finally:
         await client.close()
 
