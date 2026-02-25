@@ -143,9 +143,9 @@ async def test_success_session_written_to_postgres(
     session = _make_success_session()
     response = await writer.record(session)
 
-    assert (
-        response.postgres_written is True
-    ), f"Expected postgres_written=True, got: {response}"
+    assert response.postgres_written is True, (
+        f"Expected postgres_written=True, got: {response}"
+    )
 
     # Verify row exists in PostgreSQL
     pool = await asyncpg.create_pool(dsn=_PG_DSN, min_size=1, max_size=2)
@@ -174,9 +174,9 @@ async def test_success_session_written_to_qdrant(
     session = _make_success_session()
     response = await writer.record(session)
 
-    assert (
-        response.qdrant_written is True
-    ), f"Expected qdrant_written=True, got: {response}"
+    assert response.qdrant_written is True, (
+        f"Expected qdrant_written=True, got: {response}"
+    )
 
     qdrant = AsyncQdrantClient(host=_QDRANT_HOST, port=_QDRANT_PORT, timeout=30)
     try:
@@ -242,9 +242,9 @@ async def test_failure_session_written_to_postgres_only(
             collection_name=_QDRANT_COLLECTION,
             ids=[str(session.session_id)],
         )
-        assert (
-            len(results) == 0
-        ), f"Failure session must NOT appear in Qdrant, but found {len(results)} points"
+        assert len(results) == 0, (
+            f"Failure session must NOT appear in Qdrant, but found {len(results)} points"
+        )
     finally:
         await qdrant.close()
 
