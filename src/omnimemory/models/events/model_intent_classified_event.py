@@ -39,4 +39,10 @@ class ModelIntentClassifiedEvent(BaseModel):
         default=(),
         description="Extracted keywords (forward-compatible with OMN-1626)",
     )
-    timestamp: datetime = Field(..., description="Event timestamp")
+    emitted_at: datetime = Field(
+        ...,
+        description=(
+            "Timestamp when the event was emitted (UTC). "
+            "Aligns with omniintelligence ModelIntentClassifiedEnvelope.emitted_at."
+        ),
+    )

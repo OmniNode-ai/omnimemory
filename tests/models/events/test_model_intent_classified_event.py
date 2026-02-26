@@ -34,7 +34,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
           "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
           "intent_category": "debugging",
           "confidence": 0.85,
-          "timestamp": "2026-01-27T15:30:00+00:00"
+          "emitted_at": "2026-01-27T15:30:00+00:00"
         }
         """
         data = json.loads(raw_json)
@@ -59,7 +59,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
             "intent_category": "debugging",
             "confidence": 0.85,
-            "timestamp": "2026-01-27T15:30:00+00:00",
+            "emitted_at": "2026-01-27T15:30:00+00:00",
             "new_field_from_future": "should be ignored",
             "another_unknown_field": {"nested": "data"},
         }
@@ -77,7 +77,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
             "intent_category": "code_generation",
             "confidence": 0.92,
-            "timestamp": "2026-01-27T16:00:00+00:00",
+            "emitted_at": "2026-01-27T16:00:00+00:00",
             "keywords": ["python", "fastapi", "async"],
         }
         event = ModelIntentClassifiedEvent.model_validate(data)
@@ -92,7 +92,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440002",
             "intent_category": "testing",
             "confidence": 0.75,
-            "timestamp": "2026-01-27T17:00:00+00:00",
+            "emitted_at": "2026-01-27T17:00:00+00:00",
         }
         event = ModelIntentClassifiedEvent.model_validate(data)
 
@@ -149,7 +149,7 @@ class TestModelIntentClassifiedEventValidation:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
             "intent_category": "debugging",
             "confidence": 1.5,
-            "timestamp": "2026-01-27T15:30:00+00:00",
+            "emitted_at": "2026-01-27T15:30:00+00:00",
         }
         with pytest.raises(ValueError):
             ModelIntentClassifiedEvent.model_validate(data)
@@ -162,7 +162,7 @@ class TestModelIntentClassifiedEventValidation:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
             "intent_category": "debugging",
             "confidence": -0.1,
-            "timestamp": "2026-01-27T15:30:00+00:00",
+            "emitted_at": "2026-01-27T15:30:00+00:00",
         }
         with pytest.raises(ValueError):
             ModelIntentClassifiedEvent.model_validate(data)
@@ -175,7 +175,7 @@ class TestModelIntentClassifiedEventValidation:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
             "intent_category": "debugging",
             "confidence": 0.85,
-            "timestamp": "2026-01-27T15:30:00+00:00",
+            "emitted_at": "2026-01-27T15:30:00+00:00",
         }
         with pytest.raises(ValueError):
             ModelIntentClassifiedEvent.model_validate(data)
@@ -188,7 +188,7 @@ class TestModelIntentClassifiedEventValidation:
             "correlation_id": "not-a-valid-uuid",
             "intent_category": "debugging",
             "confidence": 0.85,
-            "timestamp": "2026-01-27T15:30:00+00:00",
+            "emitted_at": "2026-01-27T15:30:00+00:00",
         }
         with pytest.raises(ValueError):
             ModelIntentClassifiedEvent.model_validate(data)
