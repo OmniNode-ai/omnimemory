@@ -26,7 +26,7 @@ class TestMapEventToStorageRequest:
             correlation_id=UUID("550e8400-e29b-41d4-a716-446655440000"),
             intent_category="debugging",
             confidence=0.85,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
         result = map_event_to_storage_request(event)
@@ -49,7 +49,7 @@ class TestMapEventToStorageRequest:
             intent_category="code_review",
             confidence=0.92,
             keywords=("pull", "request", "review"),
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
         result = map_event_to_storage_request(event)
@@ -68,7 +68,7 @@ class TestMapEventToStorageRequest:
             intent_category="code_generation",  # Valid EnumIntentCategory value
             confidence=0.77,
             keywords=("add", "feature"),
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
         result = map_event_to_storage_request(event)
@@ -91,7 +91,7 @@ class TestMapEventToStorageRequest:
             intent_category="explanation",
             confidence=0.65,
             keywords=[],
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
         result = map_event_to_storage_request(event)
@@ -112,7 +112,7 @@ class TestModelIntentClassifiedEvent:
             correlation_id=UUID("880e8400-e29b-41d4-a716-446655440003"),
             intent_category="testing",
             confidence=0.5,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
         assert event.keywords == ()
@@ -126,7 +126,7 @@ class TestModelIntentClassifiedEvent:
                 correlation_id=UUID("990e8400-e29b-41d4-a716-446655440004"),
                 intent_category="testing",
                 confidence=1.5,  # Invalid - > 1.0
-                timestamp=datetime.now(timezone.utc),
+                emitted_at=datetime.now(timezone.utc),
             )
 
     def test_validates_confidence_range_too_low(self) -> None:
@@ -137,7 +137,7 @@ class TestModelIntentClassifiedEvent:
                 correlation_id=UUID("990e8400-e29b-41d4-a716-446655440005"),
                 intent_category="testing",
                 confidence=-0.1,  # Invalid - < 0.0
-                timestamp=datetime.now(timezone.utc),
+                emitted_at=datetime.now(timezone.utc),
             )
 
     def test_validates_session_id_not_empty(self) -> None:
@@ -148,7 +148,7 @@ class TestModelIntentClassifiedEvent:
                 correlation_id=UUID("aa0e8400-e29b-41d4-a716-446655440005"),
                 intent_category="testing",
                 confidence=0.5,
-                timestamp=datetime.now(timezone.utc),
+                emitted_at=datetime.now(timezone.utc),
             )
 
     def test_validates_intent_category_not_empty(self) -> None:
@@ -159,7 +159,7 @@ class TestModelIntentClassifiedEvent:
                 correlation_id=UUID("bb0e8400-e29b-41d4-a716-446655440006"),
                 intent_category="",  # Invalid - empty string
                 confidence=0.5,
-                timestamp=datetime.now(timezone.utc),
+                emitted_at=datetime.now(timezone.utc),
             )
 
     def test_event_type_defaults_to_intent_classified(self) -> None:
@@ -169,7 +169,7 @@ class TestModelIntentClassifiedEvent:
             correlation_id=UUID("cc0e8400-e29b-41d4-a716-446655440007"),
             intent_category="testing",
             confidence=0.5,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
         assert event.event_type == "IntentClassified"
@@ -182,7 +182,7 @@ class TestModelIntentClassifiedEvent:
             correlation_id=UUID("dd0e8400-e29b-41d4-a716-446655440008"),
             intent_category="testing",
             confidence=0.0,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
         assert event_zero.confidence == 0.0
 
@@ -192,6 +192,6 @@ class TestModelIntentClassifiedEvent:
             correlation_id=UUID("ee0e8400-e29b-41d4-a716-446655440009"),
             intent_category="testing",
             confidence=1.0,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
         assert event_one.confidence == 1.0

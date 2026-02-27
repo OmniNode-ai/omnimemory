@@ -111,7 +111,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
             "correlation_id": None,
             "intent_category": "debugging",
             "confidence": 0.9,
-            "timestamp": "2026-01-27T18:00:00+00:00",
+            "emitted_at": "2026-01-27T18:00:00+00:00",
         }
         event = ModelIntentClassifiedEvent.model_validate(data)
 
@@ -129,7 +129,7 @@ class TestModelIntentClassifiedEventJsonDeserialization:
             "session_id": "sess-no-corr",
             "intent_category": "debugging",
             "confidence": 0.88,
-            "timestamp": "2026-01-27T18:30:00+00:00",
+            "emitted_at": "2026-01-27T18:30:00+00:00",
         }
         event = ModelIntentClassifiedEvent.model_validate(data)
 

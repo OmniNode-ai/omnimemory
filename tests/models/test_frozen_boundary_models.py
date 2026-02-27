@@ -159,7 +159,7 @@ class TestModelIntentClassifiedEventFrozen:
             correlation_id=uuid4(),
             intent_category="debugging",
             confidence=0.85,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
 
     def test_rejects_field_mutation(self) -> None:
@@ -180,7 +180,7 @@ class TestModelIntentClassifiedEventFrozen:
             correlation_id=uuid4(),
             intent_category="debugging",
             confidence=0.85,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
             future_field="from upstream v2",  # type: ignore[call-arg]
         )
         assert not hasattr(event, "future_field")
@@ -660,7 +660,7 @@ class TestFrozenModelCopySafety:
             correlation_id=uuid4(),
             intent_category="debugging",
             confidence=0.85,
-            timestamp=datetime.now(timezone.utc),
+            emitted_at=datetime.now(timezone.utc),
         )
         copy = original.model_copy(update={"session_id": "sess-copy-002"})
         assert original.session_id == "sess-copy-001"

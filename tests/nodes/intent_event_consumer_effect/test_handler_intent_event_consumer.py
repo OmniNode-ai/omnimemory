@@ -72,7 +72,7 @@ def create_valid_message(
         "intent_category": intent_category,
         "confidence": confidence,
         "keywords": ["test", "keyword"],
-        "timestamp": datetime.now(timezone.utc),
+        "emitted_at": datetime.now(timezone.utc),
     }
 
 
