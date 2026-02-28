@@ -492,3 +492,115 @@ class TestNoHardcodedTopics:
             "get_topic_suffixes should have been removed from "
             "RegistryIntentQueryEffect -- topics are now contract-driven"
         )
+
+    def test_registry_has_no_topic_string_constants(self) -> None:
+        """RegistryIntentQueryEffect must not define any topic string constants.
+
+        Topic strings must live in contract.yaml, not in Python registry code.
+        This validates OMN-1538 acceptance criterion: no hardcoded topic strings
+        in Python code.
+        """
+        import inspect
+
+        from omnimemory.nodes.intent_query_effect.registry import (
+            RegistryIntentQueryEffect,
+        )
+
+        source = inspect.getsource(RegistryIntentQueryEffect)
+        # Topic strings follow the pattern onex.<kind>.<service>.<event>.<version>
+        assert "onex.cmd." not in source, (
+            "Found hardcoded onex.cmd.* topic in RegistryIntentQueryEffect -- "
+            "topics must be declared in contract.yaml"
+        )
+        assert "onex.evt." not in source, (
+            "Found hardcoded onex.evt.* topic in RegistryIntentQueryEffect -- "
+            "topics must be declared in contract.yaml"
+        )
+
+
+# =============================================================================
+# Tests: OMN-1538 -- Topic validation at contract load time
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestContractTopicValidation:
+    """Validate that intent_query_effect contract topics conform to ONEX naming.
+
+    Acceptance criterion (OMN-1538, AC3): Topics validated against ONEX
+    convention at contract load time via ModelEventBusSubcontract.
+    """
+
+    def test_intent_query_effect_subscribe_topics_are_valid_onex_names(self) -> None:
+        """Subscribe topics in intent_query_effect contract must pass ONEX validation."""
+        from omnibase_core.validation import validate_topic_suffix
+
+        topics = collect_subscribe_topics_from_contracts(
+            node_packages=["omnimemory.nodes.intent_query_effect"],
+        )
+        assert len(topics) >= 1, (
+            "intent_query_effect must declare at least 1 subscribe topic"
+        )
+        for topic in topics:
+            result = validate_topic_suffix(topic)
+            assert result.is_valid, (
+                f"Subscribe topic '{topic}' in intent_query_effect contract.yaml "
+                f"does not conform to ONEX naming convention: {result.error_message}"
+            )
+
+    def test_intent_query_effect_publish_topics_are_valid_onex_names(self) -> None:
+        """Publish topics in intent_query_effect contract must pass ONEX validation."""
+        from omnibase_core.validation import validate_topic_suffix
+
+        result = collect_publish_topics_for_dispatch(
+            node_packages=["omnimemory.nodes.intent_query_effect"],
+        )
+        assert result, "intent_query_effect must declare at least 1 publish topic"
+        for _key, topic in result.items():
+            validation = validate_topic_suffix(topic)
+            assert validation.is_valid, (
+                f"Publish topic '{topic}' in intent_query_effect contract.yaml "
+                f"does not conform to ONEX naming convention: {validation.error_message}"
+            )
+
+    def test_intent_query_effect_subscribe_topic_is_cmd_kind(self) -> None:
+        """Subscribe topics for intent_query_effect must be .cmd. (command) topics."""
+        topics = collect_subscribe_topics_from_contracts(
+            node_packages=["omnimemory.nodes.intent_query_effect"],
+        )
+        for topic in topics:
+            assert ".cmd." in topic, (
+                f"Subscribe topic '{topic}' must use .cmd. kind "
+                f"(intent_query_effect subscribes to commands)"
+            )
+
+    def test_intent_query_effect_publish_topic_is_evt_kind(self) -> None:
+        """Publish topics for intent_query_effect must be .evt. (event) topics."""
+        result = collect_publish_topics_for_dispatch(
+            node_packages=["omnimemory.nodes.intent_query_effect"],
+        )
+        for _key, topic in result.items():
+            assert ".evt." in topic, (
+                f"Publish topic '{topic}' must use .evt. kind "
+                f"(intent_query_effect publishes response events)"
+            )
+
+    def test_intent_query_effect_subscribe_topic_has_omnimemory_domain(self) -> None:
+        """Subscribe topic must be in omnimemory domain."""
+        topics = collect_subscribe_topics_from_contracts(
+            node_packages=["omnimemory.nodes.intent_query_effect"],
+        )
+        for topic in topics:
+            assert "omnimemory" in topic, (
+                f"Subscribe topic '{topic}' must be in the omnimemory domain"
+            )
+
+    def test_intent_query_effect_publish_topic_has_omnimemory_domain(self) -> None:
+        """Publish topic must be in omnimemory domain."""
+        result = collect_publish_topics_for_dispatch(
+            node_packages=["omnimemory.nodes.intent_query_effect"],
+        )
+        for _key, topic in result.items():
+            assert "omnimemory" in topic, (
+                f"Publish topic '{topic}' must be in the omnimemory domain"
+            )
