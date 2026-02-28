@@ -856,7 +856,7 @@ class HandlerMemoryArchive:
                 ),
             )
 
-        # Step 1: Read memory content (with optimistic lock check)
+        # Read memory with optimistic lock check: returns None on revision mismatch
         try:
             memory = await self._read_memory(
                 command.memory_id,
@@ -932,7 +932,7 @@ class HandlerMemoryArchive:
                 ),
             )
 
-        # Step 2: Validate state - only EXPIRED memories can be archived
+        # Guard: only EXPIRED memories may be archived; reject any other lifecycle state
         if memory.lifecycle_state != EnumLifecycleState.EXPIRED:
             return ModelMemoryArchiveResult(
                 memory_id=command.memory_id,
@@ -943,7 +943,7 @@ class HandlerMemoryArchive:
                 ),
             )
 
-        # Step 3: Build archive record
+        # Build immutable archive record from memory snapshot before any I/O
         record = ModelArchiveRecord(
             memory_id=memory.id,
             content=memory.content,
@@ -955,17 +955,17 @@ class HandlerMemoryArchive:
             metadata=memory.metadata,
         )
 
-        # Step 4: Serialize and compress (offloaded to thread pool for large payloads)
+        # Offload compression to thread pool to avoid blocking the event loop on large payloads
         compressed_bytes = await self._serialize_for_archive_async(record)
 
-        # Step 5: Determine archive path
         archive_path = command.archive_path or self._get_archive_path(
             command.memory_id,
             now,
         )
 
-        # Step 5b: Validate archive path to prevent directory traversal attacks
-        # Custom paths must be within the allowed archive base directory
+        # Validate custom archive paths to prevent directory traversal attacks.
+        # Generated paths (via _get_archive_path) are always within the base; only
+        # caller-supplied paths need validation.
         if command.archive_path is not None:
             validation_error = self._validate_archive_path(command.archive_path)
             if validation_error is not None:
@@ -983,7 +983,7 @@ class HandlerMemoryArchive:
                     error_message=validation_error,
                 )
 
-        # Step 6: Write atomically
+        # Atomic write: temp file → fsync → rename (prevents partial/corrupt archives)
         try:
             bytes_written = await self._write_archive_atomic(
                 archive_path,
@@ -1005,7 +1005,7 @@ class HandlerMemoryArchive:
                 error_message=f"Archive write failed: {e}",
             )
 
-        # Step 7: Update database state
+        # Update DB state AFTER successful filesystem write — archive file is the source of truth
         try:
             updated = await self._mark_archived(
                 command.memory_id,

@@ -193,9 +193,7 @@ class HandlerKreuzbergParse:
         )
         now = datetime.now(tz=timezone.utc)
 
-        # ------------------------------------------------------------------
-        # Step 1: Validate source path is within document root
-        # ------------------------------------------------------------------
+        # Reject paths outside document_root before any filesystem access
         document_root = Path(config.document_root)
         if str(document_root) == "/":
             _log.warning(
@@ -226,11 +224,8 @@ class HandlerKreuzbergParse:
                 timeout_count=0,
             )
 
-        # ------------------------------------------------------------------
-        # Step 2: Idempotency check — skip re-parse if text already stored.
-        # This check uses only source_url (for the cache slug) and
-        # event.content_fingerprint, so no file read is required yet.
-        # ------------------------------------------------------------------
+        # Idempotency: skip kreuzberg call if we already have a matching cache entry.
+        # Cache lookup uses only source_url slug and content_fingerprint — no file read yet.
         slug = _source_url_slug(source_url)
         text_store = Path(config.text_store_path)
         text_path = text_store / f"{slug}.txt"
@@ -271,9 +266,7 @@ class HandlerKreuzbergParse:
                     timeout_count=0,
                 )
 
-        # ------------------------------------------------------------------
-        # Step 3: Read file bytes (deferred until after idempotency check)
-        # ------------------------------------------------------------------
+        # Deferred file read: only read bytes if idempotency check missed (cache cold or stale)
         try:
             file_bytes: bytes = await asyncio.to_thread(validated_path.read_bytes)
         except OSError as exc:
@@ -298,9 +291,7 @@ class HandlerKreuzbergParse:
                 timeout_count=0,
             )
 
-        # ------------------------------------------------------------------
-        # Step 4: Hard limit — too large
-        # ------------------------------------------------------------------
+        # Reject oversized documents before calling kreuzberg to avoid wasting HTTP bandwidth
         if len(file_bytes) > config.max_doc_bytes:
             _log.warning(
                 "Document too large for kreuzberg",
@@ -330,9 +321,6 @@ class HandlerKreuzbergParse:
                 timeout_count=0,
             )
 
-        # ------------------------------------------------------------------
-        # Step 5: Call kreuzberg POST /extract
-        # ------------------------------------------------------------------
         filename = validated_path.name
         mime_type = _detect_mime_type(source_url)
         timeout_seconds = config.timeout_ms / 1000.0
@@ -390,15 +378,9 @@ class HandlerKreuzbergParse:
                 timeout_count=0,
             )
 
-        # ------------------------------------------------------------------
-        # Step 6: Extract text from response
-        # ------------------------------------------------------------------
         extracted_text = result.extracted_text
 
-        # ------------------------------------------------------------------
-        # Step 7: Store text and compute extracted_text_ref
-        # ------------------------------------------------------------------
-        # Write cache for idempotency on next call (always, regardless of branch).
+        # Write cache for idempotency on next call regardless of inline vs file-ref branch.
         try:
             await asyncio.to_thread(
                 write_cached_text, text_path, content_hash, extracted_text
@@ -441,9 +423,6 @@ class HandlerKreuzbergParse:
                     timeout_count=0,
                 )
 
-        # ------------------------------------------------------------------
-        # Step 8: Emit document-indexed event
-        # ------------------------------------------------------------------
         document_id = _compute_document_id(
             source_url, content_hash, config.parser_version
         )
