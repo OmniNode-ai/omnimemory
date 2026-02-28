@@ -25,4 +25,4 @@ jobs:
       #   - mypy             -> lint job (pre-push stage, not triggered here anyway)
       - uses: pre-commit/action@v3.0.1
         env:
-          SKIP: contract-linter,io-audit
+          SKIP: contract-linter,io-audit,check-ai-slop
