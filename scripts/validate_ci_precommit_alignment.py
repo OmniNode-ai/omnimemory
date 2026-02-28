@@ -71,6 +71,8 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ),
     ("contract-linter", "contract-validation", "contract_linter"),
     ("io-audit", "io-audit", "io_audit"),
+    # AI-slop pattern checker
+    ("check-ai-slop", "ai-slop-check", "check_ai_slop.py"),
 ]
 
 

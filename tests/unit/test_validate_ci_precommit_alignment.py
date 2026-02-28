@@ -570,7 +570,7 @@ class TestAlignmentCount:
         Update the expected count here when legitimately adding or removing
         alignment entries.
         """
-        expected_count = 17
+        expected_count = 18
         assert len(EXPECTED_ALIGNMENTS) == expected_count, (
             f"EXPECTED_ALIGNMENTS has {len(EXPECTED_ALIGNMENTS)} entries, "
             f"expected {expected_count}. If you added or removed entries, "
