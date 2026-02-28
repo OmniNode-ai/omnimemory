@@ -137,7 +137,7 @@ When using the `asyncpg` driver (used internally for health checks and lifecycle
 OMNIMEMORY_DB_URL=postgresql://omnimemory:dev_password@localhost:5432/omnimemory_dev
 
 # Remote shared infrastructure (OmniNode standard)
-OMNIMEMORY_DB_URL=postgresql://postgres:secret@<db-host>:<db-port>/omninode_bridge
+OMNIMEMORY_DB_URL=postgresql://postgres:secret@<db-host>:<db-port>/omnimemory
 ```
 
 > **Breaking change (0.2.0 → 0.3.0)**: The database connection URL is now read **exclusively** from `OMNIMEMORY_DB_URL`. Any previous mechanism for supplying the database URL no longer applies. Update your `.env` file to include this variable before upgrading.
@@ -301,9 +301,9 @@ def safe_db_url_display(url: str) -> str: ...
 ```python
 from omnimemory.utils import safe_db_url_display
 
-url = "postgresql://omnimemory:super_secret@<db-host>:5436/omninode_bridge"
+url = "postgresql://omnimemory:super_secret@<db-host>:5436/omnimemory"
 print(safe_db_url_display(url))
-# Output: <db-host>:5436/omninode_bridge
+# Output: <db-host>:5436/omnimemory
 ```
 
 **Edge cases**:
@@ -311,7 +311,7 @@ print(safe_db_url_display(url))
 | Input | Output |
 |-------|--------|
 | `postgresql://user:pass@localhost:5432/mydb` | `localhost:5432/mydb` |
-| `postgresql://user:pass@<db-host>:5436/omninode_bridge` | `<db-host>:5436/omninode_bridge` |
+| `postgresql://user:pass@<db-host>:5436/omnimemory` | `<db-host>:5436/omnimemory` |
 | `postgresql://user:pass@[::1]:5432/mydb` (IPv6) | `[::1]:5432/mydb` |
 | `postgresql://host_only/mydb` (no port) | `host_only/mydb` |
 | `https://not-a-db-url` (wrong scheme) | `(unparseable URL)` |
