@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-02-28
+
+### Added
+- Contract topic validation tests for `intent_query_effect` (OMN-1538, #95)
+- AI-slop checker Phase 2 rollout (#97)
+
+### Changed
+- Replace omninode_bridge db references with omnimemory in docs (#96)
+- Replace Step N narration with intent comments in handler docs (#98)
+
+### Dependencies
+- `omnibase-core` bumped to >=0.22.0,<0.23.0 (was ==0.21.0)
+- `omnibase-spi` bumped to >=0.15.0,<0.16.0 (was ==0.14.0)
+- `omnibase-infra` bumped to >=0.13.0,<0.14.0 (was >=0.11.0,<0.12.0)
+- Removed `[tool.uv] override-dependencies` (no longer needed with omnibase-infra>=0.13.0)
+
 ## [0.6.0] - 2026-02-27
 
 ### Changed
