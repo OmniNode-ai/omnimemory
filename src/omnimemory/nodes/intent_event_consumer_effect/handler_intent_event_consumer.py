@@ -296,7 +296,7 @@ class HandlerIntentEventConsumer:
         async handler. In production, use an event loop runner.
 
         Threading Model:
-            This method handles two scenarios:
+            Behaviour depends on whether a running event loop exists:
 
             1. **No running event loop** (e.g., called from a synchronous
                consumer thread): Creates a new event loop via ``asyncio.run()``.
