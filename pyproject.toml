@@ -61,7 +61,7 @@ dependencies = [
     # ONEX dependencies - versioned releases from PyPI
     "omnibase-core>=0.22.0,<0.23.0",
     "omnibase-spi>=0.15.0,<0.16.0",
-    "omnibase-infra>=0.13.0,<0.14.0",
+    "omnibase-infra>=0.14.0,<0.15.0",
 
     # Logging and monitoring
     # Version ^23.3.0 required for compatibility with omnibase-infra (requires ^23.2.0)
@@ -347,4 +347,4 @@ markers = [
 ]
 
 [tool.uv]
-# No override-dependencies needed — omnibase-infra>=0.13.0 now allows omnibase-core>=0.22.0 and omnibase-spi>=0.15.0.
+# No override-dependencies needed — omnibase-infra>=0.14.0 allows omnibase-core>=0.22.0 and omnibase-spi>=0.15.0.
