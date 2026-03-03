@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
+from omnibase_core.enums.intelligence import EnumIntentClass
 from omnibase_core.models.primitives import ModelSemVer
 from pydantic import BaseModel, ValidationError
 
@@ -188,7 +189,8 @@ class TestModelIntentClassifiedEventFrozen:
     def test_construction_succeeds(self) -> None:
         event = self._make_event()
         assert event.session_id == "sess-001"
-        assert event.intent_category == "debugging"
+        # "debugging" normalizes to EnumIntentClass.BUGFIX via alias map (OMN-3248)
+        assert event.intent_class == EnumIntentClass.BUGFIX
 
 
 @pytest.mark.unit

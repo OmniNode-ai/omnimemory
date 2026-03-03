@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
+from omnibase_core.enums.intelligence import EnumIntentCategory, EnumIntentClass
 
 from omnimemory.models.events import ModelIntentClassifiedEvent
 from omnimemory.nodes.intent_event_consumer_effect.utils import (
@@ -35,7 +36,8 @@ class TestMapEventToStorageRequest:
         assert result.session_id == "session_123"
         assert result.correlation_id == UUID("550e8400-e29b-41d4-a716-446655440000")
         assert result.intent_data is not None
-        assert result.intent_data.intent_category == "debugging"
+        # "debugging" → EnumIntentClass.BUGFIX → "bugfix" → not in EnumIntentCategory → UNKNOWN (OMN-3248)
+        assert result.intent_data.intent_category == EnumIntentCategory.UNKNOWN
         assert result.intent_data.confidence == 0.85
         assert isinstance(result.intent_data.keywords, list)
         assert result.intent_data.keywords == []
@@ -77,8 +79,9 @@ class TestMapEventToStorageRequest:
         assert result.session_id == event.session_id
         assert result.correlation_id == event.correlation_id
         assert result.intent_data is not None
-        # intent_category is a str in the local ModelIntentClassificationOutput
-        assert result.intent_data.intent_category == event.intent_category
+        # "code_generation" → EnumIntentClass.FEATURE → "feature" → not in EnumIntentCategory → UNKNOWN (OMN-3248)
+        assert result.intent_data.intent_category == EnumIntentCategory.UNKNOWN
+        assert event.intent_class == EnumIntentClass.FEATURE
         assert result.intent_data.confidence == event.confidence
         assert result.intent_data.keywords == list(event.keywords)
 

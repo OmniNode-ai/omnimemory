@@ -20,18 +20,21 @@ def map_event_to_storage_request(
 ) -> ModelIntentStorageRequest:
     """Map incoming classified event to storage request.
 
+    Uses ``event.intent_class.value`` (the canonical field) as the intent
+    category string for storage. ``EnumIntentClass`` values (e.g. ``"bugfix"``,
+    ``"feature"``) may not have a 1:1 match with ``EnumIntentCategory`` — unknown
+    values fall back to ``EnumIntentCategory.UNKNOWN`` for forward compatibility.
+
     Args:
         event: The incoming intent-classified event from omniintelligence.
 
     Returns:
         A storage request ready for HandlerIntentStorageAdapter.
-
-    Note:
-        Unknown intent_category values (from newer omniintelligence versions) are
-        mapped to EnumIntentCategory.UNKNOWN for forward compatibility.
     """
     try:
-        intent_category: EnumIntentCategory = EnumIntentCategory(event.intent_category)
+        intent_category: EnumIntentCategory = EnumIntentCategory(
+            event.intent_class.value  # Canonical: use .value at boundary (OMN-3248)
+        )
     except ValueError:
         intent_category = EnumIntentCategory.UNKNOWN
 

@@ -10,6 +10,7 @@ from Kafka, where UUIDs and datetimes arrive as strings rather than native types
 import json
 
 import pytest
+from omnibase_core.enums.intelligence import EnumIntentClass
 
 from omnimemory.models.events.model_intent_classified_event import (
     ModelIntentClassifiedEvent,
@@ -42,7 +43,8 @@ class TestModelIntentClassifiedEventJsonDeserialization:
 
         assert str(event.correlation_id) == "550e8400-e29b-41d4-a716-446655440000"
         assert event.session_id == "sess-123"
-        assert event.intent_category == "debugging"
+        # "debugging" maps to EnumIntentClass.BUGFIX via _INTENT_CLASS_ALIASES (OMN-3248)
+        assert event.intent_class == EnumIntentClass.BUGFIX
         assert event.confidence == 0.85
         assert event.event_type == "IntentClassified"
 
@@ -192,3 +194,47 @@ class TestModelIntentClassifiedEventValidation:
         }
         with pytest.raises(ValueError):
             ModelIntentClassifiedEvent.model_validate(data)
+
+
+@pytest.mark.unit
+class TestModelIntentClassifiedEventFieldNormalization:
+    """Tests for OMN-3248: intent_class / intent_category field split and normalization."""
+
+    _BASE: dict[str, object] = {
+        "event_type": "IntentClassified",
+        "session_id": "sess-omn-3248",
+        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+        "confidence": 0.85,
+        "emitted_at": "2026-01-27T15:30:00+00:00",
+    }
+
+    def _payload(self, **extra: object) -> dict[str, object]:
+        return {**self._BASE, **extra}
+
+    def test_parses_canonical_intent_class(self) -> None:
+        """New wire format: ``intent_class`` present → parsed directly."""
+        m = ModelIntentClassifiedEvent.model_validate(
+            self._payload(intent_class="feature")
+        )
+        assert m.intent_class == EnumIntentClass.FEATURE
+
+    def test_parses_legacy_intent_category(self) -> None:
+        """Legacy wire format: ``intent_category`` present → normalized to intent_class."""
+        m = ModelIntentClassifiedEvent.model_validate(
+            self._payload(intent_category="feature")
+        )
+        assert m.intent_class == EnumIntentClass.FEATURE
+
+    def test_both_fields_canonical_wins(self) -> None:
+        """When both fields present, ``intent_class`` wins over ``intent_category``."""
+        m = ModelIntentClassifiedEvent.model_validate(
+            self._payload(intent_class="feature", intent_category="bugfix")
+        )
+        assert m.intent_class == EnumIntentClass.FEATURE
+
+    def test_alias_normalization(self) -> None:
+        """Legacy alias ``feat`` maps to ``EnumIntentClass.FEATURE``."""
+        m = ModelIntentClassifiedEvent.model_validate(
+            self._payload(intent_category="feat")
+        )
+        assert m.intent_class == EnumIntentClass.FEATURE

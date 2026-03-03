@@ -342,14 +342,18 @@ class HandlerIntentEventConsumer:
         """
         correlation_id: UUID | None = None
         session_id: str | None = None
-        intent_category: str | None = None
+        intent_category: str | None = (
+            None  # str value of intent_class, used at emission boundary
+        )
 
         try:
             # Parse the event
             event = ModelIntentClassifiedEvent.model_validate(message)
             correlation_id = event.correlation_id
             session_id = event.session_id
-            intent_category = event.intent_category
+            intent_category = (
+                event.intent_class.value
+            )  # Canonical: use .value at boundary
 
             logger.debug(
                 "Processing intent-classified event",
@@ -357,7 +361,7 @@ class HandlerIntentEventConsumer:
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "correlation_id": str(correlation_id),
                     "session_id": session_id,
-                    "intent_category": intent_category,
+                    "intent_class": event.intent_class.value,
                 },
             )
 
@@ -380,7 +384,7 @@ class HandlerIntentEventConsumer:
                 if session_id and intent_category and correlation_id:
                     failed_event = ModelIntentStoredEvent.from_error(
                         session_ref=session_id,  # Map at boundary
-                        intent_category=intent_category,
+                        intent_category=intent_category,  # str value of intent_class
                         error_message="Circuit breaker open",
                         correlation_id=correlation_id,
                     )
@@ -414,7 +418,7 @@ class HandlerIntentEventConsumer:
                 # Maps session_id -> session_ref at the emission boundary
                 stored_event = ModelIntentStoredEvent.create(
                     session_ref=event.session_id,  # Map at boundary
-                    intent_category=event.intent_category,
+                    intent_category=event.intent_class.value,  # Canonical: .value at emission boundary
                     intent_id=result.intent_id,
                     confidence=event.confidence,
                     keywords=list(
