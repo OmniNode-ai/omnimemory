@@ -25,7 +25,7 @@ Usage:
     >>> # Use domain-specific models for memory operations
 """
 
-__version__ = "0.6.1"
+__version__ = "0.6.2"
 __author__ = "OmniNode-ai"
 __email__ = "contact@omninode.ai"
 
