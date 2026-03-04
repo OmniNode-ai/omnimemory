@@ -238,3 +238,43 @@ class TestModelIntentClassifiedEventFieldNormalization:
             self._payload(intent_category="feat")
         )
         assert m.intent_class == EnumIntentClass.FEATURE
+
+    def test_uppercase_intent_class_normalized(self) -> None:
+        """Uppercase ``intent_class`` values from legacy omniintelligence enum are accepted.
+
+        The legacy omniintelligence local EnumIntentClass used uppercase values
+        (e.g. ``FEATURE = "FEATURE"``), while the canonical omnibase_core enum
+        uses lowercase (``FEATURE = "feature"``).  The model_validator must
+        casefold the wire value so both are accepted (OMN-3248 boundary fix).
+        """
+        m = ModelIntentClassifiedEvent.model_validate(
+            self._payload(intent_class="FEATURE")
+        )
+        assert m.intent_class == EnumIntentClass.FEATURE
+
+    def test_all_uppercase_intent_class_values_normalized(self) -> None:
+        """All eight uppercase intent_class values from legacy wire format are accepted."""
+        cases: list[tuple[str, EnumIntentClass]] = [
+            ("REFACTOR", EnumIntentClass.REFACTOR),
+            ("BUGFIX", EnumIntentClass.BUGFIX),
+            ("FEATURE", EnumIntentClass.FEATURE),
+            ("ANALYSIS", EnumIntentClass.ANALYSIS),
+            ("CONFIGURATION", EnumIntentClass.CONFIGURATION),
+            ("DOCUMENTATION", EnumIntentClass.DOCUMENTATION),
+            ("MIGRATION", EnumIntentClass.MIGRATION),
+            ("SECURITY", EnumIntentClass.SECURITY),
+        ]
+        for wire_value, expected in cases:
+            m = ModelIntentClassifiedEvent.model_validate(
+                self._payload(intent_class=wire_value)
+            )
+            assert m.intent_class == expected, (
+                f"Expected {expected!r} for wire value {wire_value!r}, got {m.intent_class!r}"
+            )
+
+    def test_both_fields_canonical_wins_with_uppercase(self) -> None:
+        """When both fields present, uppercase ``intent_class`` wins and is normalized."""
+        m = ModelIntentClassifiedEvent.model_validate(
+            self._payload(intent_class="FEATURE", intent_category="bugfix")
+        )
+        assert m.intent_class == EnumIntentClass.FEATURE

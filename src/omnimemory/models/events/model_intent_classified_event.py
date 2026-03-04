@@ -74,7 +74,10 @@ class ModelIntentClassifiedEvent(BaseModel):
        ``intent_class`` wins; ``intent_category`` is discarded.
     2. Only ``intent_category`` present → normalized via alias map, mapped to
        the nearest ``EnumIntentClass`` value, and stored as ``intent_class``.
-    3. Only ``intent_class`` present → used as-is.
+    3. Only ``intent_class`` present → casefolded and normalized via alias map
+       so that uppercase wire values (e.g. ``'FEATURE'`` from the legacy
+       omniintelligence enum) are accepted alongside the canonical lowercase
+       omnibase_core values (e.g. ``'feature'``).
 
     Handler rule: internal code uses ``event.intent_class`` (Enum);
     emitted payloads use ``event.intent_class.value`` (string). No mixing.
@@ -131,10 +134,15 @@ class ModelIntentClassifiedEvent(BaseModel):
         Resolution rules:
         1. Both ``intent_class`` and ``intent_category`` present: canonical
            ``intent_class`` wins; ``intent_category`` is discarded to prevent
-           silent corruption.
+           silent corruption. The retained ``intent_class`` value is still
+           casefolded so uppercase legacy values (e.g. ``'FEATURE'``) are
+           accepted.
         2. Only ``intent_category`` present: normalized via ``_INTENT_CLASS_ALIASES``,
            then resolved against ``EnumIntentClass``; falls back to ANALYSIS.
-        3. Only ``intent_class`` present: passed through unchanged (Pydantic validates).
+        3. Only ``intent_class`` present: casefolded and normalized via
+           ``_INTENT_CLASS_ALIASES`` so that uppercase wire values from the
+           legacy omniintelligence enum (e.g. ``'FEATURE'``) are accepted
+           alongside canonical lowercase omnibase_core values (``'feature'``).
 
         Args:
             values: Raw incoming dict from the wire payload.
@@ -147,8 +155,15 @@ class ModelIntentClassifiedEvent(BaseModel):
         has_category = "intent_category" in values
 
         if has_class and has_category:
-            # Canonical wins — discard legacy to prevent silent corruption
+            # Canonical wins — discard legacy to prevent silent corruption.
+            # Still casefold the retained value to handle uppercase legacy enums.
             values.pop("intent_category")
+            raw_class = str(values["intent_class"])
+            if hasattr(values["intent_class"], "value"):
+                raw_class = values["intent_class"].value  # type: ignore[union-attr]
+            values["intent_class"] = _normalize_to_intent_class(
+                raw_class.casefold().strip()
+            ).value
             return values
 
         if has_category and not has_class:
@@ -159,6 +174,17 @@ class ModelIntentClassifiedEvent(BaseModel):
                     "provide a non-empty string or use intent_class directly"
                 )
             values["intent_class"] = _normalize_to_intent_class(raw).value
+            return values
+
+        if has_class:
+            # Casefold to handle uppercase values from legacy omniintelligence enum
+            # (e.g. 'FEATURE' → 'feature') while preserving canonical lowercase values.
+            raw_class = str(values["intent_class"])
+            if hasattr(values["intent_class"], "value"):
+                raw_class = values["intent_class"].value  # type: ignore[union-attr]
+            values["intent_class"] = _normalize_to_intent_class(
+                raw_class.casefold().strip()
+            ).value
 
         return values
 
