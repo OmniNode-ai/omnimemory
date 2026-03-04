@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Retry utilities with exponential backoff following ONEX standards.
+"""Retry utilities with exponential backoff following ONEX standards.
 
-This module provides retry decorators and utilities for handling transient
 failures in OmniMemory operations with configurable backoff strategies.
 """
 

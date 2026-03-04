@@ -4,9 +4,8 @@
 # Copyright (c) 2025 OmniNode Team
 """Comprehensive unit tests for the similarity_compute handler and node.
 
-This module provides exhaustive testing for the similarity_compute ONEX COMPUTE
-node, covering all operations (cosine_distance, euclidean_distance, compare),
-validation edge cases, performance requirements, and numerical stability.
+Covers all operations (cosine_distance, euclidean_distance, compare),
+validation edge cases, performance, and numerical stability.
 
 Test Categories:
     1. TestCosineDistance: Cosine distance calculation tests

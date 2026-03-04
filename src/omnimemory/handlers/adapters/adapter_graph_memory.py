@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Graph Handler Adapter for relationship-based memory queries.
 
-This module provides an adapter that wraps a ``ProtocolGraphDatabaseHandler``
 from omnibase_spi to support memory-specific graph operations. It enables
 "memories related to X" queries via graph traversal, translating between
 memory domain concepts and graph database operations.

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for the memory retrieval handler.
 
-This module contains the Pydantic configuration model for
 HandlerMemoryRetrieval.
 
 .. versionadded:: 0.1.0

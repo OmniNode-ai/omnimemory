@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for the mock graph handler.
 
-This module contains the Pydantic configuration model for
 HandlerGraphMock.
 
 .. versionadded:: 0.1.0

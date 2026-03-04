@@ -442,13 +442,13 @@ Beyond settings validation, the `bootstrap()` function performs runtime validati
 ```python
 from omnimemory import load_settings, bootstrap
 
-# Step 1: Load and validate settings from environment
+# Load and validate settings from environment
 settings = load_settings()  # Validates env vars, raises ValidationError on failure
 
-# Step 2: Convert to config model
+# Convert to config model
 config = settings.to_config()
 
-# Step 3: Bootstrap validates runtime requirements
+# Bootstrap validates runtime requirements
 result = await bootstrap(config)
 
 if result.success:

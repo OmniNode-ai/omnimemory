@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Concurrency-related Pydantic models for OmniMemory ONEX architecture.
-
-This module contains models for connection pool configuration.
-"""
+"""Concurrency-related Pydantic models for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

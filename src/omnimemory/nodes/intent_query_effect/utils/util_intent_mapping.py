@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Utilities for mapping between local intent models and event payloads.
 
-This module provides mapping functions to convert between
 ModelIntentRecord (from omnimemory.handlers.adapters.models) and the
 event payload models used for Kafka event transmission.
 

@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Migration status enumerations for ONEX compliance.
+"""Migration status enumerations for ONEX compliance.
 
-This module contains all migration-related enum types following ONEX standards.
 All enums inherit from (str, Enum) for proper Pydantic serialization.
 """
 

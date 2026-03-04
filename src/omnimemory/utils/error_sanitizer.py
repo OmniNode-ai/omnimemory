@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Enhanced error sanitization utility for OmniMemory ONEX architecture.
+"""Enhanced error sanitization utility for OmniMemory ONEX architecture.
 
-This module provides comprehensive error sanitization to prevent information
 disclosure while maintaining useful debugging information for developers.
 """
 

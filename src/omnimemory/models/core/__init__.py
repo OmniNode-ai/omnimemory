@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Core foundation models for OmniMemory following ONEX standards.
+"""Core foundation models for OmniMemory following ONEX standards.
 
-This module provides core types, enums, and base models that are used
 throughout the OmniMemory system.
 """
 

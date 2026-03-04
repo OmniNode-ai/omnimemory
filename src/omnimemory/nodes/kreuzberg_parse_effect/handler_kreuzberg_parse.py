@@ -5,7 +5,6 @@
 """KreuzbergParse handler: calls kreuzberg HTTP service to extract text from documents.
 
 Architecture:
-    This handler implements the kreuzberg parse step described in OMN-2733.
     It consumes document-discovered and document-changed events, calls the
     kreuzberg REST API to extract plain text, and emits either
     document-indexed (kreuzberg variant) or document-parse-failed events.

@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Scoring and tier management models for ContextItem promotion.
+"""Scoring and tier management models for ContextItem promotion.
 
-This module contains the models that drive the ContextItem tier lifecycle:
 - ModelContextPolicyConfig: session-level retrieval policy
 - ModelContextItemStats: per-item accumulated usage statistics
 - ModelPromotionDecision: output of the promotion evaluation engine

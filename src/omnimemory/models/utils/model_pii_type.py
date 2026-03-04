@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-PIIType enum for OmniMemory ONEX architecture.
-
-This module contains the PIIType enumeration for PII classification.
-"""
+"""PIIType enum for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

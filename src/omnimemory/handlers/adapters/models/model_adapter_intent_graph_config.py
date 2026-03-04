@@ -3,7 +3,6 @@
 
 """Configuration model for the Intent Graph adapter.
 
-This module provides the configuration model for AdapterIntentGraph,
 which stores intent classification results in Memgraph. The configuration
 controls timeouts, node labels, relationship types, and query limits.
 

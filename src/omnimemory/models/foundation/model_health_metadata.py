@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-ONEX-compliant typed models for health check metadata.
+"""ONEX-compliant typed models for health check metadata.
 
-This module provides strongly typed replacements for Dict[str, Any] patterns
 in health management, ensuring type safety and validation.
 """
 

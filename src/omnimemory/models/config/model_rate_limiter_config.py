@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Rate limiter configuration model following ONEX standards.
 
-This module provides the configuration model for provider-scoped rate limiting
 of external API calls. Used by ProviderRateLimiter in the adapters layer.
 
 Example::

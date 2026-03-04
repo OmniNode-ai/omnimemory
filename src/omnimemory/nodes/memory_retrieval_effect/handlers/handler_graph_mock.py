@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Mock Graph Handler for relationship traversal operations.
 
-This module provides a mock handler that simulates `HandlerGraph` behavior
 for graph-based memory traversal. It allows development and testing of the
 memory_retrieval_effect node without requiring a running Neo4j/Memgraph instance.
 
@@ -95,7 +94,6 @@ class HandlerGraphRelationship:
 class HandlerGraphMock:
     """Mock handler that simulates HandlerGraph for relationship traversal.
 
-    This handler provides a development-friendly interface for testing
     graph traversal functionality without requiring a real graph database.
     It maintains an in-memory graph structure and supports BFS traversal.
 

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory connection model for Graph Memory adapter.
 
-This module contains the ModelMemoryConnection Pydantic model representing
 a connection (relationship) between two memories in the graph.
 
 .. versionadded:: 0.1.0

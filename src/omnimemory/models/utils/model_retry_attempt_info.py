@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Retry attempt information model for OmniMemory ONEX architecture.
-
-This module contains the model for tracking individual retry attempts.
-"""
+"""Retry attempt information model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

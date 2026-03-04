@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """HTTP-based embedding client adapter wrapping HandlerHttp.
 
-This module provides an embedding client that wraps `HandlerHttp` from
 omnibase_infra to enforce the contract boundary principle: all external
 HTTP calls must go through this adapter layer.
 

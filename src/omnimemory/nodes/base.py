@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Base node classes for ONEX 4-Node Architecture.
 
-This module provides the foundational base classes for all ONEX nodes
 in omnimemory. Following ONEX patterns, the base class is minimal and
 only provides container injection - all business logic lives in handlers.
 

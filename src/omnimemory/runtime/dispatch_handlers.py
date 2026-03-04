@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Dispatch bridge handlers for OmniMemory domain.
 
-This module provides bridge handlers that adapt between the MessageDispatchEngine
 handler signature and existing OmniMemory domain handlers. It also defines
 topic alias mappings needed because ONEX canonical topic naming uses ``.cmd.``
 and ``.evt.`` segments, which EnumMessageCategory.from_topic() does not yet

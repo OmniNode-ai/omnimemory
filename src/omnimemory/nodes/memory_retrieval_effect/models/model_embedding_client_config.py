@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for the embedding client.
 
-This module contains the Pydantic configuration model for
 EmbeddingClient.
 
 .. versionadded:: 0.1.0

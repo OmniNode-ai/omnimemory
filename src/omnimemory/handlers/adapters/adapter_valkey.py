@@ -3,7 +3,6 @@
 
 """Valkey/Redis adapter for subscription caching.
 
-This module provides an adapter for Valkey (Redis-compatible) operations
 used by the subscription handler for fast topic->subscriber lookups.
 
 Valkey is a fork of Redis with full API compatibility. The redis-py library

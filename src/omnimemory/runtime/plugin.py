@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory domain plugin for kernel-level initialization.
 
-This module provides the PluginMemory class, which implements
 ProtocolDomainPlugin for the Memory domain. It encapsulates all
 Memory-specific initialization code for kernel bootstrap.
 

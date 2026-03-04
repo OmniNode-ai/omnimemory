@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-ONEX-compliant typed models for migration progress summaries.
+"""ONEX-compliant typed models for migration progress summaries.
 
-This module provides strongly typed replacements for Dict[str, Any] patterns
 in progress reporting, ensuring type safety and validation.
 """
 

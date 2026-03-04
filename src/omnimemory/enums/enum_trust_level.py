@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Trust and decay function enumerations for ONEX compliance.
-
-This module contains trust scoring and time decay enum types following ONEX standards.
-"""
+"""Trust and decay function enumerations for ONEX compliance."""
 
 from enum import Enum
 

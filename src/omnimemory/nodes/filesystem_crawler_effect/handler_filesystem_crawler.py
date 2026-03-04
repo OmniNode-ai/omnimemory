@@ -5,7 +5,6 @@
 """FilesystemCrawler handler: walks path prefixes and emits document lifecycle events.
 
 Architecture:
-    This handler implements the Filesystem crawler described in the OmniMemory
     Document Ingestion Pipeline design (§5 Crawl State and Change Detection).
 
     Change Detection Strategy (two-stage):

@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Typed Collections for ONEX Foundation Architecture
+"""Typed Collections for ONEX Foundation Architecture
 
-This module provides strongly typed Pydantic models to replace generic types
 like Dict[str, Any], List[str], and List[Dict[str, Any]] throughout the codebase.
 
 All models follow ONEX standards with:

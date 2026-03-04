@@ -3,7 +3,6 @@
 
 """Subscription Handler for agent subscriptions and memory change notifications.
 
-This module provides the core subscription management functionality:
 - subscribe(): Register agent subscriptions to memory topics
 - unsubscribe(): Remove agent subscriptions
 - notify(): Publish notification events to the event bus for subscriber consumption

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Graph memory health model for Graph Memory adapter.
 
-This module contains the ModelGraphMemoryHealth Pydantic model representing
 the health status information for the graph memory adapter.
 
 .. versionadded:: 0.1.0

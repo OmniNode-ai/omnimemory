@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Resource management utilities for OmniMemory ONEX architecture.
+"""Resource management utilities for OmniMemory ONEX architecture.
 
-This module provides:
 - Async context managers for proper resource cleanup
 - Circuit breaker patterns for external service resilience
 - Connection pool management and exhaustion handling

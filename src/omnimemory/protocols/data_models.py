@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Data Models for OmniMemory ONEX Architecture
+"""Data Models for OmniMemory ONEX Architecture
 
-This module contains all Pydantic data models used throughout the OmniMemory system,
 following ONEX contract-driven development patterns with strong typing and validation.
 
 All models support result patterns with ModelBaseResult composition and provide

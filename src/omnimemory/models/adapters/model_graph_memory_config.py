@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Graph memory configuration model for Graph Memory adapter.
 
-This module contains the ModelGraphMemoryConfig Pydantic model representing
 the configuration for the Graph Memory adapter.
 
 .. versionadded:: 0.1.0

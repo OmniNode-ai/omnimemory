@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Circuit breaker configuration Pydantic model for OmniMemory ONEX architecture.
-
-This module contains the configuration model for circuit breaker behavior.
-"""
+"""Circuit breaker configuration Pydantic model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

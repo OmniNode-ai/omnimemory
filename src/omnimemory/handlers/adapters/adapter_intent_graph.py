@@ -1346,7 +1346,6 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
     async def get_health_details(self) -> ModelIntentGraphHealth:
         """Get detailed health status of the graph connection.
 
-        This method provides richer health information than health_check(),
         including session/intent counts and timestamps. Use this when you
         need more than a simple healthy/unhealthy indicator.
 

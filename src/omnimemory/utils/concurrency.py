@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Concurrency utilities for OmniMemory ONEX architecture.
+"""Concurrency utilities for OmniMemory ONEX architecture.
 
-This module provides:
 - Advanced semaphore patterns for rate-limited operations
 - Proper locking mechanisms for shared resources
 - Connection pool management and exhaustion handling

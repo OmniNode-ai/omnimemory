@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Resource health check model for OmniMemory ONEX architecture.
-
-This module contains the ModelResourceHealthCheck class.
-"""
+"""Resource health check model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

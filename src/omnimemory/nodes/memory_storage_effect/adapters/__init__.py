@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Storage Effect Handlers.
 
-This module provides handler adapters for memory storage CRUD operations.
 The primary handler is the FileSystem adapter which wraps `HandlerFileSystem`
 from omnibase_infra to store memory snapshots as JSON files.
 

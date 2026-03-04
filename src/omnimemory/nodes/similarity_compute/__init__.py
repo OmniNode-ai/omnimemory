@@ -6,7 +6,6 @@
 
 Vector similarity calculations and ranking.
 
-This node provides pure compute operations for comparing vectors using
 various distance metrics (cosine, euclidean). It performs NO I/O operations.
 
 Components:

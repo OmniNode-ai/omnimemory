@@ -4,8 +4,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for HandlerSemanticCompute with mocked providers.
 
-This module provides comprehensive testing for the semantic compute handler,
-using fake provider implementations to test the handler logic in isolation.
+Uses fake provider implementations to test handler logic in isolation.
 
 Test Categories:
     1. TestFakeProviders: Verify fake providers work correctly

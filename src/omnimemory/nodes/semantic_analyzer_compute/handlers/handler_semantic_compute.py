@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Semantic compute handler for semantic analysis operations.
 
-This handler provides pure compute operations for semantic analysis,
 embedding generation, and entity extraction. It depends on provider
 protocols for I/O abstraction, keeping the handler testable and the
 architecture clean.
@@ -479,7 +478,6 @@ class HandlerSemanticComputePolicy:
 class HandlerSemanticCompute:
     """Pure compute handler for semantic analysis operations.
 
-    This handler provides semantic analysis capabilities including:
     - Embedding generation via ProtocolEmbeddingProvider
     - Entity extraction (heuristic or LLM-backed)
     - Full semantic analysis combining embeddings, entities, and topics
@@ -1257,7 +1255,6 @@ class HandlerSemanticCompute:
     def _extract_entities_heuristic(self, content: str) -> list[ModelSemanticEntity]:
         """Extract entities using simple capitalization-based heuristics.
 
-        This method provides deterministic entity extraction without external
         dependencies. It identifies capitalized words as potential named entities
         and filters common sentence-starting words to reduce false positives.
 

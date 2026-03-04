@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Environment-based secrets provider implementation.
 
-This module provides the EnvSecretsProvider class that implements
 ProtocolSecretsProvider using environment variables as the backend.
 
 All secrets are returned as SecretStr to prevent accidental exposure in

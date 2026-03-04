@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Migration progress tracking model for OmniMemory ONEX architecture.
+"""Migration progress tracking model for OmniMemory ONEX architecture.
 
-This module provides models for tracking migration progress across the system:
 - Progress tracking with detailed metrics
 - Status monitoring and error tracking
 - Estimated completion time calculation

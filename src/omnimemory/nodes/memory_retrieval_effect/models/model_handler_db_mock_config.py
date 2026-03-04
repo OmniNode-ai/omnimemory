@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for the mock database handler.
 
-This module contains the Pydantic configuration model for
 HandlerDbMock.
 
 .. versionadded:: 0.1.0

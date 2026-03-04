@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Foundation domain models for OmniMemory following ONEX standards.
+"""Foundation domain models for OmniMemory following ONEX standards.
 
-This module provides foundation models for base implementations,
 error handling, migration progress tracking, and system-level operations.
 """
 

@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Structured log entry Pydantic model for OmniMemory ONEX architecture.
-
-This module contains the ModelStructuredLogEntry model for structured logging.
-"""
+"""Structured log entry Pydantic model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

@@ -3,7 +3,6 @@
 
 """Health status model for the Intent Graph adapter.
 
-This module provides the Pydantic model for representing health check results
 from the AdapterIntentGraph, which stores intent classification results in Memgraph.
 """
 

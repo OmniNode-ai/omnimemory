@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Mock Database Handler for full-text search operations.
 
-This module provides a mock handler that simulates `HandlerDb` behavior
 for full-text SQL search. It allows development and testing of the
 memory_retrieval_effect node without requiring a running PostgreSQL instance.
 
@@ -83,7 +82,6 @@ __all__ = [
 class HandlerDbMock:
     """Mock handler that simulates HandlerDb for full-text search.
 
-    This handler provides a development-friendly interface for testing
     full-text search functionality without requiring a real PostgreSQL instance.
     It uses substring and word matching to simulate SQL LIKE and FTS behavior.
 

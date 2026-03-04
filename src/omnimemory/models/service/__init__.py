@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Service domain models for OmniMemory following ONEX standards.
+"""Service domain models for OmniMemory following ONEX standards.
 
-This module provides models for service configurations, orchestration,
 and coordination in the ONEX 4-node architecture.
 """
 

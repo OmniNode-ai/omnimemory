@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-ModelPIIDetectionResult Pydantic model for OmniMemory ONEX architecture.
-
-This module contains the model for PII detection scan results.
-"""
+"""ModelPIIDetectionResult Pydantic model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-ONEX-compliant typed models for audit logging metadata.
+"""ONEX-compliant typed models for audit logging metadata.
 
-This module provides strongly typed replacements for Dict[str, Any] patterns
 in audit logging, ensuring type safety and validation.
 """
 

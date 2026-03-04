@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Observability utilities for OmniMemory ONEX architecture.
+"""Observability utilities for OmniMemory ONEX architecture.
 
-This module provides:
 - ContextVar integration for correlation ID tracking
 - Distributed tracing support
 - Enhanced logging with correlation context

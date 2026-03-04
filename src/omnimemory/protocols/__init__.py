@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-OmniMemory Protocol Definitions
+"""OmniMemory Protocol Definitions
 
-This module contains all protocol definitions for the OmniMemory system,
 following ONEX 4-node architecture patterns and contract-driven development.
 
 All protocols use typing.Protocol for structural typing and avoid isinstance

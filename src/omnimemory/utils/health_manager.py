@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Comprehensive health check manager for OmniMemory ONEX architecture.
+"""Comprehensive health check manager for OmniMemory ONEX architecture.
 
-This module provides:
 - Aggregated health checks from all dependencies
 - Async gathering with failure isolation
 - Circuit breaker integration for health checks

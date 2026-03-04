@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Pure compute handler for vector similarity operations.
 
-This module provides a compute-only handler for calculating vector similarity
 and distance metrics. It performs NO I/O operations - all computation is done
 using pure Python math operations for portability and predictability.
 
@@ -156,7 +155,6 @@ class ModelSimilarityComputeMetadata(  # omnimemory-model-exempt: handler metada
 class HandlerSimilarityCompute:
     """Pure compute handler for vector similarity operations.
 
-    This handler provides efficient, numerically stable implementations of
     common vector similarity and distance metrics. It performs NO I/O
     operations - all computation uses pure Python math.
 
@@ -516,7 +514,6 @@ class HandlerSimilarityCompute:
     ) -> ModelSimilarityResult:
         """Compare two vectors and return a full result object.
 
-        This method provides a unified interface for vector comparison,
         returning a structured result with distance, similarity (for cosine),
         and optional match determination based on a threshold.
 

@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Health check configuration model for OmniMemory ONEX architecture.
-
-This module contains the ModelHealthCheckConfig class and DependencyType enum.
-"""
+"""Health check configuration model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

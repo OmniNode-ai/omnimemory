@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for HandlerIntent.
 
-This module provides the configuration model for HandlerIntent, which manages
 intent storage and query operations against a graph database. The configuration
 controls connection settings, circuit breaker behavior, and query limits.
 

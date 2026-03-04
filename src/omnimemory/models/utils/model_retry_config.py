@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Retry configuration model for OmniMemory ONEX architecture.
-
-This module contains the configuration model for retry behavior.
-"""
+"""Retry configuration model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Retrieval Effect - ONEX Node (Core 8 Foundation).
 
-This node provides semantic, temporal, and contextual search operations
 for memory retrieval across multiple backends:
 
 - **Semantic Search**: Vector similarity search via Qdrant

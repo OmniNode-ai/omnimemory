@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-ModelPIIPatternConfig Pydantic model for OmniMemory ONEX architecture.
-
-This module contains the configuration model for PII pattern matching.
-"""
+"""ModelPIIPatternConfig Pydantic model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

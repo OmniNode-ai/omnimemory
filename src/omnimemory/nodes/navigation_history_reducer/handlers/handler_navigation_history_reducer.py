@@ -74,7 +74,6 @@ _EMBEDDING_DIM = 4096
 class HandlerNavigationHistoryWriter:
     """Persistence writer for completed navigation sessions.
 
-    This class provides the ``record()`` method used by the
     ``NodeNavigationHistoryReducer`` to durably store navigation sessions
     after they complete. All I/O is async; the public ``record()`` method
     is intended to be called fire-and-forget via ``asyncio.create_task()``.

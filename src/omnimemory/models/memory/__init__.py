@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Memory domain models for OmniMemory following ONEX standards.
+"""Memory domain models for OmniMemory following ONEX standards.
 
-This module provides models for memory storage, retrieval, persistence,
 and management operations in the ONEX 4-node architecture.
 """
 

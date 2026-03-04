@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Adapter models for OmniMemory handler adapters.
 
-This module provides Pydantic models used by handler adapters,
 following ONEX naming conventions (all models prefixed with "Model").
 
 Graph Memory Models:

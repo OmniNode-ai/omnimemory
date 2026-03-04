@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Configuration models for OmniMemory storage backends and policies.
+"""Configuration models for OmniMemory storage backends and policies.
 
-This module provides composable configuration models for each storage backend,
 following the ONEX pattern of focused, single-responsibility config objects.
 
 Backend Configs:

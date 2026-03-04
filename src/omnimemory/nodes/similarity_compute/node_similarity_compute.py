@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Similarity Compute Node - ONEX COMPUTE node for vector similarity.
 
-This module provides the ONEX-compliant COMPUTE node for vector similarity
 calculations. Following ONEX patterns, the node is a thin wrapper around
 the handler - all business logic lives in the handler.
 

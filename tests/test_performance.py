@@ -4,8 +4,7 @@
 """
 Performance benchmark tests for OmniMemory.
 
-This module contains performance benchmarks to ensure OmniMemory meets
-its performance targets as specified in CLAUDE.md:
+Targets from CLAUDE.md:
 - Memory Operations: <100ms response time (95th percentile)
 - Throughput: 1M+ operations per hour sustained
 - Vector Search: <50ms semantic similarity queries

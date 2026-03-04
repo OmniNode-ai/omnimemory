@@ -4,9 +4,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Unit tests for HandlerIntent with mocked adapter.
 
-This module provides comprehensive testing for the HandlerIntent handler,
-using mock implementations to test the handler logic in isolation without
-requiring real database connections.
+Uses mock implementations to test handler logic in isolation.
 
 Test Categories:
     1. TestLifecycle: Handler initialization and shutdown

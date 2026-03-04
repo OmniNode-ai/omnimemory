@@ -6,7 +6,6 @@
 
 Semantic analysis, embedding generation, and entity extraction.
 
-This node provides compute operations for semantic analysis including:
 - Embedding generation via injected ProtocolEmbeddingProvider
 - Entity extraction (heuristic or LLM-backed)
 - Full semantic analysis combining embeddings, entities, and topics

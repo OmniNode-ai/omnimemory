@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Handler for archiving memories to cold storage.
 
-This module provides the HandlerMemoryArchive handler that moves EXPIRED
 memories to filesystem archive with atomic writes and gzip compression.
 
 Archive Format:

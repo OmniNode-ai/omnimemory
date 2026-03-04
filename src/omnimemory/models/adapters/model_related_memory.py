@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Related memory model for Graph Memory adapter.
 
-This module contains the ModelRelatedMemory Pydantic model representing
 a memory found through relationship traversal in the graph.
 
 .. versionadded:: 0.1.0

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Semantic Analyzer Compute Node - ONEX COMPUTE node for semantic analysis.
 
-This module provides the ONEX-compliant COMPUTE node for semantic analysis
 operations. Following ONEX patterns, the node is a thin wrapper around
 the handler - all business logic lives in the handler.
 
@@ -60,7 +59,6 @@ __all__ = [
 class NodeSemanticAnalyzerCompute(BaseComputeNode):
     """COMPUTE node for semantic analysis operations.
 
-    This node provides semantic analysis capabilities including embedding
     generation, entity extraction, and full semantic analysis. It wraps
     the HandlerSemanticCompute handler and provides a consistent ONEX
     interface.

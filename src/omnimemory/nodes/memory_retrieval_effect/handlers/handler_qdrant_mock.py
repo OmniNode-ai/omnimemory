@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Mock Qdrant Handler for semantic search operations.
 
-This module provides a mock handler that simulates `HandlerQdrant` behavior
 for semantic similarity search. It allows development and testing of the
 memory_retrieval_effect node without requiring a running Qdrant instance.
 
@@ -98,7 +97,6 @@ __all__ = [
 class HandlerQdrantMock:
     """Mock handler that simulates HandlerQdrant for semantic search.
 
-    This handler provides a development-friendly interface for testing
     semantic search functionality without requiring a real Qdrant instance.
     It uses simple text similarity (word overlap) to simulate vector similarity.
 
@@ -383,7 +381,6 @@ class HandlerQdrantMock:
     async def _get_embedding(self, text: str) -> list[float]:
         """Get embedding for text, using real embeddings if configured.
 
-        This method provides a unified interface for embedding generation.
         When use_real_embeddings is enabled and the embedding client is
         available, it will use the MLX embedding server. Otherwise, it
         uses deterministic mock embeddings.

@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-ModelPIIMatch Pydantic model for OmniMemory ONEX architecture.
-
-This module contains the model for representing a detected PII match.
-"""
+"""ModelPIIMatch Pydantic model for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

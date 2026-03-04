@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Intent Query Effect - ONEX Node.
 
-This node provides event-driven intent query operations via Kafka,
 supporting multiple query types:
 
 - **Distribution Query**: Get intent distribution across categories

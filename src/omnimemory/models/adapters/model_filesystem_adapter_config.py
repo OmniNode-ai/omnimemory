@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for the FileSystem adapter.
 
-This module contains the Pydantic configuration model for
 HandlerFileSystemAdapter.
 
 .. versionadded:: 0.1.0

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Connections result model for Graph Memory adapter.
 
-This module contains the ModelConnectionsResult Pydantic model representing
 the result of a get_connections operation in the graph.
 
 .. versionadded:: 0.1.0

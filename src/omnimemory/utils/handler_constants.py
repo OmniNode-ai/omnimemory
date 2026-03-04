@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Constants for semantic compute handler operations.
 
-This module contains internal constants used by the semantic compute handler
 for entity extraction, complexity scoring, and text analysis. These constants
 are implementation details and should not be exported from the handlers package.
 

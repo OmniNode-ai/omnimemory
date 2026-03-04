@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Subscription domain models for OmniMemory following ONEX standards.
+"""Subscription domain models for OmniMemory following ONEX standards.
 
-This module provides models for agent subscriptions and notification events
 for the memory change notification system.
 
 Delivery Mechanism:

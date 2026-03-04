@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Handler for memory expiration with optimistic locking.
 
-This module implements the core expiration logic for the memory lifecycle
 orchestrator. It performs state transitions from ACTIVE to EXPIRED using
 optimistic concurrency control to handle concurrent access safely.
 

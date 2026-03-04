@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Async embedding client for MLX embedding server.
 
-This module provides an async client for generating text embeddings via the
 MLX Qwen3-Embedding server. The client supports connection pooling, automatic
 retries with exponential backoff, and configurable timeouts.
 

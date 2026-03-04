@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """FileSystem Handler Adapter for memory storage operations.
 
-This module provides an adapter that wraps `HandlerFileSystem` from omnibase_infra
 to implement memory CRUD operations for storing, retrieving, and managing memory
 snapshots as JSON files on the filesystem.
 

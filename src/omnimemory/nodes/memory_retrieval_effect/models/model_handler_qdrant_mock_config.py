@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Configuration model for the mock Qdrant handler.
 
-This module contains the Pydantic configuration model for
 HandlerQdrantMock.
 
 .. versionadded:: 0.1.0

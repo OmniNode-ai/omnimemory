@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Retrieval Handler - Routes requests to appropriate backend handlers.
 
-This module provides the main handler for the memory_retrieval_effect node,
 routing requests to the appropriate handler based on the operation type:
 - search: Routes to Qdrant handler for semantic similarity search
 - search_text: Routes to Database handler for full-text search
@@ -74,7 +73,6 @@ __all__ = [
 class HandlerMemoryRetrieval:
     """Main handler for memory retrieval operations.
 
-    This handler provides a unified interface for all memory retrieval
     operations, routing requests to the appropriate backend handler based
     on the operation type.
 

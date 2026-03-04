@@ -1,10 +1,8 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Compatibility imports for ONEX type definitions.
+"""Compatibility imports for ONEX type definitions.
 
-This module provides type aliases that work correctly with mypy by using
 simple type definitions that avoid conditional type alias issues.
 """
 

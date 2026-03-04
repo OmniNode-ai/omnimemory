@@ -21,7 +21,6 @@ from omnimemory.nodes.navigation_history_reducer.handlers import (
 class NodeNavigationHistoryReducer(BaseReducerNode):
     """ONEX Reducer node: persists completed navigation sessions.
 
-    This node is responsible for the durable storage of navigation history.
     It receives completed ``NavigationSession`` records from the navigation
     planner and delegates all persistence logic to
     ``HandlerNavigationHistoryReducer``.

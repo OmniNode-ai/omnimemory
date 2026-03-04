@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory domain handler wiring for kernel initialization.
 
-This module provides the wire_memory_handlers function that imports,
 validates, and (where possible) instantiates memory domain handlers
 during plugin initialization.
 

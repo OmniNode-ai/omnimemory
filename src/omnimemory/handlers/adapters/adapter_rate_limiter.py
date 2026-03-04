@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Provider-scoped rate limiter for external API calls.
 
-This module provides a rate limiter keyed by (provider, model) to support
 different rate limits for different endpoints. Local endpoints typically
 have no rate limits while cloud providers (OpenAI) have strict limits.
 

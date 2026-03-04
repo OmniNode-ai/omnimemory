@@ -4,10 +4,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Shared fixtures for integration tests.
 
-This module provides reusable fixtures for integration tests that require
-unique identifiers for test isolation.
-
-These fixtures are shared across:
+Shared across:
 - test_handler_subscription.py
 - test_node_agent_coordinator.py
 """

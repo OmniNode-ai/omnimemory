@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""
-Audit-related Pydantic models for OmniMemory ONEX architecture.
-
-This module contains models for audit event tracking.
-"""
+"""Audit-related Pydantic models for OmniMemory ONEX architecture."""
 
 from __future__ import annotations
 

@@ -3,7 +3,6 @@
 
 """Event models for Kafka message processing.
 
-This module contains Pydantic models for:
 - Incoming events from omniintelligence (intent classification)
 - Crawl tick commands for the document ingestion pipeline (OMN-2426)
 
