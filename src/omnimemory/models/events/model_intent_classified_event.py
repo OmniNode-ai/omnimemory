@@ -160,7 +160,7 @@ class ModelIntentClassifiedEvent(BaseModel):
             values.pop("intent_category")
             raw_class = str(values["intent_class"])
             if hasattr(values["intent_class"], "value"):
-                raw_class = values["intent_class"].value  # type: ignore[union-attr]
+                raw_class = values["intent_class"].value
             values["intent_class"] = _normalize_to_intent_class(
                 raw_class.casefold().strip()
             ).value
@@ -181,7 +181,7 @@ class ModelIntentClassifiedEvent(BaseModel):
             # (e.g. 'FEATURE' → 'feature') while preserving canonical lowercase values.
             raw_class = str(values["intent_class"])
             if hasattr(values["intent_class"], "value"):
-                raw_class = values["intent_class"].value  # type: ignore[union-attr]
+                raw_class = values["intent_class"].value
             values["intent_class"] = _normalize_to_intent_class(
                 raw_class.casefold().strip()
             ).value
