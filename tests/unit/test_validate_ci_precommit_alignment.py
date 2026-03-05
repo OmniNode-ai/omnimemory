@@ -323,6 +323,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "onex-validate-clean-root",
             "no-internal-ips",
             "no-planning-docs",
+            "no-env-file",
         }
     )
 
