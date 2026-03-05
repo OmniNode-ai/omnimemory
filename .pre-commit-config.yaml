@@ -394,6 +394,27 @@ repos:
         pass_filenames: true
         stages: [pre-commit]
 
+      # --------------------------------------------------------------------------
+      # Environment File Protection (OMN-3695.5)
+      # Validates: No .env files staged (except .env.example)
+      # Purpose: Prevents accidental commits of .env files to the repository.
+      #          All environment config must go in ~/.omnibase/.env (shared single
+      #          source of truth across all repos).
+      # --------------------------------------------------------------------------
+      - id: no-env-file
+        name: Reject committed .env files (except .env.example)
+        entry: >
+          bash -c ' BLOCKED_FILES=$(git diff --cached --name-only | grep -E "(^|/)\\.env([._-].+)?$" |
+          grep -v "\\.env\\.example" || true); if [ -n "$BLOCKED_FILES" ]; then
+            echo "BLOCKED: .env file staged — use ~/.omnibase/.env instead. Run: git reset HEAD <file>";
+            echo "$BLOCKED_FILES";
+            exit 1;
+          fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
 # Configuration
 default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
