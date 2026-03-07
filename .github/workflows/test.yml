@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Needed for three-dot diff (merge-base with origin/main)
 
@@ -101,7 +101,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -132,7 +132,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -153,7 +153,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -222,10 +222,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -245,7 +245,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -275,7 +275,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -295,13 +295,13 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       # Uses default GITHUB_TOKEN which has read access to public repos in the org.
       # Same pattern as omniclaude ci-cd.yml. If omnibase_core becomes private,
       # add: token: ${{ secrets.OMNIBASE_CORE_ACCESS_TOKEN }}
       - name: Checkout omnibase_core
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           repository: OmniNode-ai/omnibase_core
           path: omnibase_core
@@ -344,7 +344,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -438,11 +438,11 @@ jobs:
     name: AI-Slop Pattern Check (strict, PR diff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Compute changed Python/Markdown files vs PR base
