@@ -107,7 +107,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
       # Both pre-commit and CI use --check for consistent validation
@@ -138,7 +138,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       # SYNC: Pre-commit hook 'pyright-type-check' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
@@ -159,7 +159,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
@@ -251,7 +251,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Find and validate contract YAML files
         run: |
@@ -281,7 +281,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Run I/O audit
         run: uv run python -m omnimemory.audit
@@ -350,7 +350,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Run tests
         run: |
