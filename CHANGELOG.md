@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-03-07
+
+### Fixed
+- Pin actions/checkout@v4 and actions/setup-python@v5 for CI stability (OMN-3809)
+- Normalize uppercase intent_class wire values in model_validator (OMN-3248)
+- Normalize intent_class/intent_category field split with model_validator (OMN-3248)
+
+### Changed
+- Relax ONEX version bounds to allow 2 minor bumps (OMN-3710)
+- Clean up boilerplate_docstring AI-slop violations and enable --strict (OMN-3668)
+- Add --strict AI-slop checker and dependabot github-actions (OMN-3662)
+- Add no-planning-docs pre-commit hook (OMN-3620)
+- Add no-env-file pre-commit hook (OMN-3704)
+
+### Dependencies
+- `omnibase-core` pinned to ==0.24.0
+- `omnibase-spi` pinned to ==0.15.1
+- `omnibase-infra` pinned to ==0.16.0
+- `qdrant-client` updated requirement
+- `pytest-cov` updated requirement
+- `structlog` updated requirement
+- Bump actions/upload-artifact from 6 to 7
+- Bump actions/setup-python from 5 to 6
+- Bump actions/checkout from 4 to 6
+
 ## [0.6.2] - 2026-03-04
 
 ### Dependencies
