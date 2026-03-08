@@ -484,7 +484,7 @@ class HandlerFileSystemAdapter:
             # Extract specific error from result if available
             error_msg = "Write operation failed"
             if result.result:
-                error_msg = result.result.get("error", error_msg)
+                error_msg = str(result.result.get("error", error_msg))
             return ModelMemoryStorageResponse(
                 status="error",
                 error_message=error_msg,
@@ -613,7 +613,7 @@ class HandlerFileSystemAdapter:
             # Other non-success statuses are errors
             error_msg = "Read operation failed"
             if result.result:
-                error_msg = result.result.get("error", error_msg)
+                error_msg = str(result.result.get("error", error_msg))
             return ModelMemoryStorageResponse(
                 status="error",
                 error_message=error_msg,
@@ -770,8 +770,8 @@ class HandlerFileSystemAdapter:
 
             # Differentiate between error types from result
             if result.result:
-                result_status = result.result.get("status", "error")
-                error_msg = result.result.get("error", "Delete operation failed")
+                result_status = str(result.result.get("status", "error"))
+                error_msg = str(result.result.get("error", "Delete operation failed"))
 
                 # Handle specific status codes from handler
                 if result_status == "not_found":
@@ -941,8 +941,8 @@ class HandlerFileSystemAdapter:
             # IMPORTANT: Non-success status is an ERROR, not empty list
             # This ensures we distinguish "empty directory" from "failed to list"
             if result.result:
-                result_status = result.result.get("status", "error")
-                error_msg = result.result.get("error", "List operation failed")
+                result_status = str(result.result.get("status", "error"))
+                error_msg = str(result.result.get("error", "List operation failed"))
 
                 # Handle specific statuses
                 if result_status == "not_found":
