@@ -264,7 +264,7 @@ class TransportImportChecker(ast.NodeVisitor):
 
     def _extract_root_module(self, module_name: str) -> str:
         """Extract the root module from a potentially dotted module path."""
-        return module_name.split(".")[0]
+        return module_name.split(".", maxsplit=1)[0]
 
     def _is_type_checking_guard(self, node: ast.If) -> bool:
         """Detect if an If node is a TYPE_CHECKING guard.

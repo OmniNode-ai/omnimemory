@@ -106,9 +106,9 @@ ALLOWED_PATHS = [
     "handlers/adapters/",
     # Legacy clients directory - allowed during migration
     # TODO: Remove this allowance after migration to adapters is complete
-    "nodes/memory_retrieval_effect/clients/",
+    "nodes/node_memory_retrieval_effect/clients/",
     # Kreuzberg effect client - HTTP transport boundary for document extraction (OMN-2733)
-    "nodes/kreuzberg_parse_effect/clients/",
+    "nodes/node_kreuzberg_parse_effect/clients/",
     # Tests can mock HTTP clients
     "tests/",
 ]

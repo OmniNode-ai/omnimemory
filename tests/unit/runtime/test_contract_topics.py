@@ -174,14 +174,14 @@ class TestCollectSubscribeTopics:
     def test_custom_node_packages_override(self) -> None:
         """Providing node_packages overrides the default list."""
         topics = collect_subscribe_topics_from_contracts(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         assert topics == [EXPECTED_INTENT_QUERY_REQUESTED]
 
     def test_node_with_empty_subscribe_returns_nothing(self) -> None:
         """Nodes with empty subscribe_topics contribute nothing."""
         topics = collect_subscribe_topics_from_contracts(
-            node_packages=["omnimemory.nodes.intent_storage_effect"],
+            node_packages=["omnimemory.nodes.node_intent_storage_effect"],
         )
         assert topics == []
 
@@ -255,7 +255,7 @@ class TestCollectPublishTopicsForDispatch:
     def test_custom_node_packages_override(self) -> None:
         """Providing node_packages overrides the default list."""
         result = collect_publish_topics_for_dispatch(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         assert result == {
             "intent_query": "onex.evt.omnimemory.intent-query-response.v1"
@@ -381,27 +381,28 @@ class TestDeriveDispatchKey:
     def test_strips_effect_suffix(self) -> None:
         """_effect suffix should be stripped."""
         assert (
-            _derive_dispatch_key("omnimemory.nodes.intent_query_effect")
+            _derive_dispatch_key("omnimemory.nodes.node_intent_query_effect")
             == "intent_query"
         )
 
     def test_strips_orchestrator_suffix(self) -> None:
         """_orchestrator suffix should be stripped."""
         assert (
-            _derive_dispatch_key("omnimemory.nodes.memory_lifecycle_orchestrator")
+            _derive_dispatch_key("omnimemory.nodes.node_memory_lifecycle_orchestrator")
             == "memory_lifecycle"
         )
 
     def test_strips_compute_suffix(self) -> None:
         """_compute suffix should be stripped."""
         assert (
-            _derive_dispatch_key("omnimemory.nodes.similarity_compute") == "similarity"
+            _derive_dispatch_key("omnimemory.nodes.node_similarity_compute")
+            == "similarity"
         )
 
     def test_strips_reducer_suffix(self) -> None:
         """_reducer suffix should be stripped."""
         assert (
-            _derive_dispatch_key("omnimemory.nodes.memory_consolidator_reducer")
+            _derive_dispatch_key("omnimemory.nodes.node_memory_consolidator_reducer")
             == "memory_consolidator"
         )
 
@@ -422,49 +423,49 @@ class TestNodePackageRegistry:
     def test_contains_intent_event_consumer(self) -> None:
         """intent_event_consumer_effect must be in the package list."""
         assert (
-            "omnimemory.nodes.intent_event_consumer_effect"
+            "omnimemory.nodes.node_intent_event_consumer_effect"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_intent_query(self) -> None:
         """intent_query_effect must be in the package list."""
         assert (
-            "omnimemory.nodes.intent_query_effect"
+            "omnimemory.nodes.node_intent_query_effect"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_intent_storage(self) -> None:
         """intent_storage_effect must be in the package list."""
         assert (
-            "omnimemory.nodes.intent_storage_effect"
+            "omnimemory.nodes.node_intent_storage_effect"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_memory_retrieval(self) -> None:
         """memory_retrieval_effect must be in the package list."""
         assert (
-            "omnimemory.nodes.memory_retrieval_effect"
+            "omnimemory.nodes.node_memory_retrieval_effect"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_memory_storage(self) -> None:
         """memory_storage_effect must be in the package list."""
         assert (
-            "omnimemory.nodes.memory_storage_effect"
+            "omnimemory.nodes.node_memory_storage_effect"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_memory_lifecycle(self) -> None:
         """memory_lifecycle_orchestrator must be in the package list."""
         assert (
-            "omnimemory.nodes.memory_lifecycle_orchestrator"
+            "omnimemory.nodes.node_memory_lifecycle_orchestrator"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_filesystem_crawler(self) -> None:
         """filesystem_crawler_effect must be in the package list."""
         assert (
-            "omnimemory.nodes.filesystem_crawler_effect"
+            "omnimemory.nodes.node_filesystem_crawler_effect"
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
@@ -484,7 +485,7 @@ class TestNoHardcodedTopics:
 
     def test_registry_has_no_get_topic_suffixes(self) -> None:
         """RegistryIntentQueryEffect must not have get_topic_suffixes method."""
-        from omnimemory.nodes.intent_query_effect.registry import (
+        from omnimemory.nodes.node_intent_query_effect.registry import (
             RegistryIntentQueryEffect,
         )
 
@@ -502,7 +503,7 @@ class TestNoHardcodedTopics:
         """
         import inspect
 
-        from omnimemory.nodes.intent_query_effect.registry import (
+        from omnimemory.nodes.node_intent_query_effect.registry import (
             RegistryIntentQueryEffect,
         )
 
@@ -536,7 +537,7 @@ class TestContractTopicValidation:
         from omnibase_core.validation import validate_topic_suffix
 
         topics = collect_subscribe_topics_from_contracts(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         assert len(topics) >= 1, (
             "intent_query_effect must declare at least 1 subscribe topic"
@@ -553,7 +554,7 @@ class TestContractTopicValidation:
         from omnibase_core.validation import validate_topic_suffix
 
         result = collect_publish_topics_for_dispatch(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         assert result, "intent_query_effect must declare at least 1 publish topic"
         for _key, topic in result.items():
@@ -566,7 +567,7 @@ class TestContractTopicValidation:
     def test_intent_query_effect_subscribe_topic_is_cmd_kind(self) -> None:
         """Subscribe topics for intent_query_effect must be .cmd. (command) topics."""
         topics = collect_subscribe_topics_from_contracts(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         for topic in topics:
             assert ".cmd." in topic, (
@@ -577,7 +578,7 @@ class TestContractTopicValidation:
     def test_intent_query_effect_publish_topic_is_evt_kind(self) -> None:
         """Publish topics for intent_query_effect must be .evt. (event) topics."""
         result = collect_publish_topics_for_dispatch(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         for _key, topic in result.items():
             assert ".evt." in topic, (
@@ -588,7 +589,7 @@ class TestContractTopicValidation:
     def test_intent_query_effect_subscribe_topic_has_omnimemory_domain(self) -> None:
         """Subscribe topic must be in omnimemory domain."""
         topics = collect_subscribe_topics_from_contracts(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         for topic in topics:
             assert "omnimemory" in topic, (
@@ -598,7 +599,7 @@ class TestContractTopicValidation:
     def test_intent_query_effect_publish_topic_has_omnimemory_domain(self) -> None:
         """Publish topic must be in omnimemory domain."""
         result = collect_publish_topics_for_dispatch(
-            node_packages=["omnimemory.nodes.intent_query_effect"],
+            node_packages=["omnimemory.nodes.node_intent_query_effect"],
         )
         for _key, topic in result.items():
             assert "omnimemory" in topic, (

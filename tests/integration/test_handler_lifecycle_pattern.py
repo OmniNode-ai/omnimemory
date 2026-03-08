@@ -33,7 +33,7 @@ from __future__ import annotations
 import pytest
 from omnibase_core.container import ModelONEXContainer
 
-from omnimemory.nodes.similarity_compute.handlers import (
+from omnimemory.nodes.node_similarity_compute.handlers import (
     HandlerSimilarityCompute,
     ModelHandlerSimilarityComputeConfig,
 )

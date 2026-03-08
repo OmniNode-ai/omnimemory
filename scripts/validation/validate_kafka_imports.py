@@ -233,10 +233,7 @@ def main() -> int:
         print("instead of importing Kafka clients directly.")
         return 1
 
-    print(
-        f"No Kafka import violations found. "
-        f"Checked {len(files_to_check)} file(s)."
-    )
+    print(f"No Kafka import violations found. Checked {len(files_to_check)} file(s).")
     return 0
 
 

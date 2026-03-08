@@ -27,7 +27,7 @@ from __future__ import annotations
 import pytest
 
 from omnimemory.enums import EnumLifecycleState
-from omnimemory.nodes.memory_lifecycle_orchestrator.validators import (
+from omnimemory.nodes.node_memory_lifecycle_orchestrator.validators import (
     VALID_TRANSITIONS,
     ModelTransitionValidationResult,
     ValidatorLifecycleTransition,

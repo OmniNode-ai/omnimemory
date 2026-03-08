@@ -40,13 +40,13 @@ logger = logging.getLogger(__name__)
 # the memory_lifecycle_orchestrator also subscribes to Kafka topics.
 
 _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES: list[str] = [
-    "omnimemory.nodes.intent_event_consumer_effect",
-    "omnimemory.nodes.intent_query_effect",
-    "omnimemory.nodes.intent_storage_effect",
-    "omnimemory.nodes.memory_retrieval_effect",
-    "omnimemory.nodes.memory_storage_effect",
-    "omnimemory.nodes.memory_lifecycle_orchestrator",
-    "omnimemory.nodes.filesystem_crawler_effect",  # OMN-2901: crawl-tick.v1 subscription
+    "omnimemory.nodes.node_intent_event_consumer_effect",
+    "omnimemory.nodes.node_intent_query_effect",
+    "omnimemory.nodes.node_intent_storage_effect",
+    "omnimemory.nodes.node_memory_retrieval_effect",
+    "omnimemory.nodes.node_memory_storage_effect",
+    "omnimemory.nodes.node_memory_lifecycle_orchestrator",
+    "omnimemory.nodes.node_filesystem_crawler_effect",  # OMN-2901: crawl-tick.v1 subscription
 ]
 
 
@@ -111,8 +111,8 @@ def collect_publish_topics_for_dispatch(
     The dispatch key is derived from the package name by stripping the
     ``omnimemory.nodes.`` prefix and any trailing ``_effect`` /
     ``_orchestrator`` suffix.  For example:
-        - ``omnimemory.nodes.intent_query_effect`` -> ``"intent_query"``
-        - ``omnimemory.nodes.memory_lifecycle_orchestrator`` -> ``"memory_lifecycle"``
+        - ``omnimemory.nodes.node_intent_query_effect`` -> ``"intent_query"``
+        - ``omnimemory.nodes.node_memory_lifecycle_orchestrator`` -> ``"memory_lifecycle"``
 
     Only the first publish topic per contract is used in the returned dict.
     Use ``collect_all_publish_topics()`` if you need the full list.
@@ -264,9 +264,9 @@ def _derive_dispatch_key(package: str) -> str:
         Short dispatch key string.
 
     Examples:
-        >>> _derive_dispatch_key("omnimemory.nodes.intent_query_effect")
+        >>> _derive_dispatch_key("omnimemory.nodes.node_intent_query_effect")
         'intent_query'
-        >>> _derive_dispatch_key("omnimemory.nodes.memory_lifecycle_orchestrator")
+        >>> _derive_dispatch_key("omnimemory.nodes.node_memory_lifecycle_orchestrator")
         'memory_lifecycle'
     """
     tail = package.rsplit(".", 1)[-1]
@@ -274,6 +274,8 @@ def _derive_dispatch_key(package: str) -> str:
         if tail.endswith(suffix):
             tail = tail[: -len(suffix)]
             break
+    if tail.startswith("node_"):
+        tail = tail[len("node_") :]
     return tail
 
 

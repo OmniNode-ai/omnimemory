@@ -25,19 +25,19 @@ import pytest
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qdrant_models
 
-from omnimemory.nodes.navigation_history_reducer.handlers import (
+from omnimemory.nodes.node_navigation_history_reducer.handlers import (
     HandlerNavigationHistoryReducer,
 )
-from omnimemory.nodes.navigation_history_reducer.handlers.handler_navigation_history_reducer import (
+from omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer import (
     _QDRANT_COLLECTION,
     HandlerNavigationHistoryWriter,
 )
-from omnimemory.nodes.navigation_history_reducer.models import (
+from omnimemory.nodes.node_navigation_history_reducer.models import (
     ModelNavigationHistoryRequest,
     ModelNavigationSession,
     ModelPlanStep,
 )
-from omnimemory.nodes.navigation_history_reducer.models.model_navigation_session import (
+from omnimemory.nodes.node_navigation_history_reducer.models.model_navigation_session import (
     ModelNavigationOutcomeFailure,
     ModelNavigationOutcomeSuccess,
 )

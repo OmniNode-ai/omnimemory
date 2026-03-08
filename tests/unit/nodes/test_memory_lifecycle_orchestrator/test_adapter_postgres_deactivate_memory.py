@@ -31,12 +31,12 @@ from uuid import UUID
 import pytest
 from omnibase_core.container import ModelONEXContainer
 
-from omnimemory.nodes.memory_lifecycle_orchestrator.adapters import (
+from omnimemory.nodes.node_memory_lifecycle_orchestrator.adapters import (
     AdapterPostgresDeactivateMemory,
     ModelDeactivateAdapterHealth,
     ModelDeactivateAdapterMetadata,
 )
-from omnimemory.nodes.memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
+from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
     ModelExpireMemoryCommand,
     ModelMemoryExpireResult,
 )

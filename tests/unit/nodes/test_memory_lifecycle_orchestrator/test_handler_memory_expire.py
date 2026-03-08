@@ -35,7 +35,7 @@ from omnibase_core.container import ModelONEXContainer
 from pydantic import ValidationError
 
 from omnimemory.enums import EnumLifecycleState
-from omnimemory.nodes.memory_lifecycle_orchestrator.handlers import (
+from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers import (
     HandlerMemoryExpire,
     ModelExpireMemoryCommand,
     ModelMemoryCurrentState,

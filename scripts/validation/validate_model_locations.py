@@ -65,9 +65,9 @@ ALLOWED_PATHS = [
     # Primary models directory
     "src/omnimemory/models/",
     # Node-specific models (ONEX pattern)
-    "nodes/memory_retrieval_effect/models/",
-    "nodes/memory_storage_effect/models/",
-    "nodes/similarity_compute/models/",
+    "nodes/node_memory_retrieval_effect/models/",
+    "nodes/node_memory_storage_effect/models/",
+    "nodes/node_similarity_compute/models/",
     # Protocol definitions (interfaces and base models)
     "src/omnimemory/protocols/",
     # Tests can have models for fixtures/mocks
@@ -169,7 +169,9 @@ class PydanticModelVisitor(ast.NodeVisitor):
             is_exempt = False
             start_line = node.lineno - 1  # 0-indexed
             # Scan from class start to the line ending with ":" (class signature end)
-            for line_idx in range(start_line, min(start_line + 10, len(self.source_lines))):
+            for line_idx in range(
+                start_line, min(start_line + 10, len(self.source_lines))
+            ):
                 line = self.source_lines[line_idx]
                 if EXEMPTION_PATTERN.search(line):
                     is_exempt = True

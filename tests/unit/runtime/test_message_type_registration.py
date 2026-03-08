@@ -212,16 +212,16 @@ class TestHandlerIds:
     """Verify handler_id assignments match node directory names."""
 
     HANDLER_MAP = {
-        "ModelIntentClassifiedEvent": ("intent_event_consumer_effect",),
-        "ModelIntentStorageRequest": ("intent_storage_effect",),
-        "ModelIntentStorageResponse": ("intent_storage_effect",),
-        "ModelMemoryRetrievalRequest": ("memory_retrieval_effect",),
-        "ModelMemoryRetrievalResponse": ("memory_retrieval_effect",),
-        "ModelMemoryStorageRequest": ("memory_storage_effect",),
-        "ModelMemoryStorageResponse": ("memory_storage_effect",),
-        "ModelAgentCoordinatorRequest": ("agent_coordinator_orchestrator",),
-        "ModelAgentCoordinatorResponse": ("agent_coordinator_orchestrator",),
-        "ModelNotificationEvent": ("agent_coordinator_orchestrator",),
+        "ModelIntentClassifiedEvent": ("node_intent_event_consumer_effect",),
+        "ModelIntentStorageRequest": ("node_intent_storage_effect",),
+        "ModelIntentStorageResponse": ("node_intent_storage_effect",),
+        "ModelMemoryRetrievalRequest": ("node_memory_retrieval_effect",),
+        "ModelMemoryRetrievalResponse": ("node_memory_retrieval_effect",),
+        "ModelMemoryStorageRequest": ("node_memory_storage_effect",),
+        "ModelMemoryStorageResponse": ("node_memory_storage_effect",),
+        "ModelAgentCoordinatorRequest": ("node_agent_coordinator_orchestrator",),
+        "ModelAgentCoordinatorResponse": ("node_agent_coordinator_orchestrator",),
+        "ModelNotificationEvent": ("node_agent_coordinator_orchestrator",),
     }
 
     @pytest.mark.parametrize(
@@ -291,11 +291,11 @@ class TestStartupValidation:
     ) -> None:
         """validate_startup with all handler IDs available returns no errors."""
         all_handler_ids = {
-            "intent_event_consumer_effect",
-            "intent_storage_effect",
-            "memory_retrieval_effect",
-            "memory_storage_effect",
-            "agent_coordinator_orchestrator",
+            "node_intent_event_consumer_effect",
+            "node_intent_storage_effect",
+            "node_memory_retrieval_effect",
+            "node_memory_storage_effect",
+            "node_agent_coordinator_orchestrator",
         }
         errors = frozen_registry.validate_startup(
             available_handler_ids=all_handler_ids,
@@ -306,7 +306,7 @@ class TestStartupValidation:
         self, frozen_registry: RegistryMessageType
     ) -> None:
         """validate_startup reports missing handlers when subset provided."""
-        partial_handlers = {"intent_event_consumer_effect"}
+        partial_handlers = {"node_intent_event_consumer_effect"}
         errors = frozen_registry.validate_startup(
             available_handler_ids=partial_handlers,
         )

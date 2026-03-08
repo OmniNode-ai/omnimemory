@@ -62,7 +62,7 @@ try:
         ModelNotificationEvent,
         ModelNotificationEventPayload,
     )
-    from omnimemory.nodes.agent_coordinator_orchestrator import (
+    from omnimemory.nodes.node_agent_coordinator_orchestrator import (
         EnumAgentCoordinatorAction,
         ModelAgentCoordinatorRequest,
         ModelAgentCoordinatorResponse,
@@ -108,7 +108,7 @@ class NodeAgentCoordinatorOrchestrator:
 
     Note:
         This is a test-only implementation. The production node should be
-        located at omnimemory/nodes/agent_coordinator_orchestrator/node.py.
+        located at omnimemory/nodes/node_agent_coordinator_orchestrator/node.py.
     """
 
     def __init__(self, config: ModelHandlerSubscriptionConfig) -> None:

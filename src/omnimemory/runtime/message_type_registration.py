@@ -189,7 +189,7 @@ def register_memory_message_types(
         # 1. Intent classification event consumed from omniintelligence
         registry.register_simple(
             message_type="ModelIntentClassifiedEvent",
-            handler_id="intent_event_consumer_effect",
+            handler_id="node_intent_event_consumer_effect",
             category=EnumMessageCategory.EVENT,
             domain=MEMORY_DOMAIN,
             description=(
@@ -206,7 +206,7 @@ def register_memory_message_types(
         # 2. Intent storage request (command input)
         registry.register_simple(
             message_type="ModelIntentStorageRequest",
-            handler_id="intent_storage_effect",
+            handler_id="node_intent_storage_effect",
             category=EnumMessageCategory.COMMAND,
             domain=MEMORY_DOMAIN,
             description="Intent storage request command input",
@@ -216,7 +216,7 @@ def register_memory_message_types(
         # 3. Intent storage response (event output)
         registry.register_simple(
             message_type="ModelIntentStorageResponse",
-            handler_id="intent_storage_effect",
+            handler_id="node_intent_storage_effect",
             category=EnumMessageCategory.EVENT,
             domain=MEMORY_DOMAIN,
             description="Intent storage response event output",
@@ -230,7 +230,7 @@ def register_memory_message_types(
         # 4. Memory retrieval request (command input)
         registry.register_simple(
             message_type="ModelMemoryRetrievalRequest",
-            handler_id="memory_retrieval_effect",
+            handler_id="node_memory_retrieval_effect",
             category=EnumMessageCategory.COMMAND,
             domain=MEMORY_DOMAIN,
             description="Memory retrieval request command consumed from Kafka",
@@ -240,7 +240,7 @@ def register_memory_message_types(
         # 5. Memory retrieval response (event output)
         registry.register_simple(
             message_type="ModelMemoryRetrievalResponse",
-            handler_id="memory_retrieval_effect",
+            handler_id="node_memory_retrieval_effect",
             category=EnumMessageCategory.EVENT,
             domain=MEMORY_DOMAIN,
             description="Memory retrieval response event output",
@@ -254,7 +254,7 @@ def register_memory_message_types(
         # 6. Memory storage request (command input)
         registry.register_simple(
             message_type="ModelMemoryStorageRequest",
-            handler_id="memory_storage_effect",
+            handler_id="node_memory_storage_effect",
             category=EnumMessageCategory.COMMAND,
             domain=MEMORY_DOMAIN,
             description="Memory storage CRUD request command input",
@@ -264,7 +264,7 @@ def register_memory_message_types(
         # 7. Memory storage response (event output)
         registry.register_simple(
             message_type="ModelMemoryStorageResponse",
-            handler_id="memory_storage_effect",
+            handler_id="node_memory_storage_effect",
             category=EnumMessageCategory.EVENT,
             domain=MEMORY_DOMAIN,
             description="Memory storage CRUD response event output",
@@ -278,7 +278,7 @@ def register_memory_message_types(
         # 8. Agent coordinator request (command input)
         registry.register_simple(
             message_type="ModelAgentCoordinatorRequest",
-            handler_id="agent_coordinator_orchestrator",
+            handler_id="node_agent_coordinator_orchestrator",
             category=EnumMessageCategory.COMMAND,
             domain=MEMORY_DOMAIN,
             description=(
@@ -291,7 +291,7 @@ def register_memory_message_types(
         # 9. Agent coordinator response (event output)
         registry.register_simple(
             message_type="ModelAgentCoordinatorResponse",
-            handler_id="agent_coordinator_orchestrator",
+            handler_id="node_agent_coordinator_orchestrator",
             category=EnumMessageCategory.EVENT,
             domain=MEMORY_DOMAIN,
             description="Agent coordinator response with operation result",
@@ -301,7 +301,7 @@ def register_memory_message_types(
         # 10. Notification event (published by coordinator to Kafka)
         registry.register_simple(
             message_type="ModelNotificationEvent",
-            handler_id="agent_coordinator_orchestrator",
+            handler_id="node_agent_coordinator_orchestrator",
             category=EnumMessageCategory.EVENT,
             domain=MEMORY_DOMAIN,
             description=(

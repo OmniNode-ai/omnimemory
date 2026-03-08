@@ -89,17 +89,17 @@ class _NodeDescriptor:
 
 MEMORY_NODES: tuple[_NodeDescriptor, ...] = (
     # Orchestrators
-    _NodeDescriptor("memory_lifecycle_orchestrator", EnumNodeKind.ORCHESTRATOR),
-    _NodeDescriptor("agent_coordinator_orchestrator", EnumNodeKind.ORCHESTRATOR),
+    _NodeDescriptor("node_memory_lifecycle_orchestrator", EnumNodeKind.ORCHESTRATOR),
+    _NodeDescriptor("node_agent_coordinator_orchestrator", EnumNodeKind.ORCHESTRATOR),
     # Compute nodes
-    _NodeDescriptor("similarity_compute", EnumNodeKind.COMPUTE),
-    _NodeDescriptor("semantic_analyzer_compute", EnumNodeKind.COMPUTE),
+    _NodeDescriptor("node_similarity_compute", EnumNodeKind.COMPUTE),
+    _NodeDescriptor("node_semantic_analyzer_compute", EnumNodeKind.COMPUTE),
     # Effect nodes
-    _NodeDescriptor("intent_event_consumer_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("intent_query_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("intent_storage_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("memory_retrieval_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("memory_storage_effect", EnumNodeKind.EFFECT),
+    _NodeDescriptor("node_intent_event_consumer_effect", EnumNodeKind.EFFECT),
+    _NodeDescriptor("node_intent_query_effect", EnumNodeKind.EFFECT),
+    _NodeDescriptor("node_intent_storage_effect", EnumNodeKind.EFFECT),
+    _NodeDescriptor("node_memory_retrieval_effect", EnumNodeKind.EFFECT),
+    _NodeDescriptor("node_memory_storage_effect", EnumNodeKind.EFFECT),
 )
 
 

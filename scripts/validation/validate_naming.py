@@ -228,7 +228,7 @@ def get_ancestor_typed_directory(filepath: Path) -> str | None:
     """Check if any ancestor is a typed directory.
 
     This helps identify files that are deeply nested within a typed directory
-    (e.g., nodes/memory_storage_effect/adapters/) where the top-level type
+    (e.g., nodes/node_memory_storage_effect/adapters/) where the top-level type
     should still influence validation behavior.
 
     Returns the first ancestor typed directory name, or None.

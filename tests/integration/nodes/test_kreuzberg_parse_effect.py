@@ -33,14 +33,14 @@ import pytest
 from omnimemory.models.crawl.model_document_discovered_event import (
     ModelDocumentDiscoveredEvent,
 )
-from omnimemory.nodes.kreuzberg_parse_effect.clients.client_kreuzberg import (
+from omnimemory.nodes.node_kreuzberg_parse_effect.clients.client_kreuzberg import (
     KreuzbergExtractionError,
     KreuzbergExtractResult,
 )
-from omnimemory.nodes.kreuzberg_parse_effect.handler_kreuzberg_parse import (
+from omnimemory.nodes.node_kreuzberg_parse_effect.handler_kreuzberg_parse import (
     HandlerKreuzbergParse,
 )
-from omnimemory.nodes.kreuzberg_parse_effect.models.model_kreuzberg_parse_config import (
+from omnimemory.nodes.node_kreuzberg_parse_effect.models.model_kreuzberg_parse_config import (
     ModelKreuzbergParseConfig,
 )
 
@@ -50,7 +50,7 @@ from omnimemory.nodes.kreuzberg_parse_effect.models.model_kreuzberg_parse_config
 
 _FAKE_FINGERPRINT = "b" * 64
 _FAKE_CONTENT_BLOB_REF = "sha256:" + "b" * 64
-_HANDLER_MOD = "omnimemory.nodes.kreuzberg_parse_effect.handler_kreuzberg_parse"
+_HANDLER_MOD = "omnimemory.nodes.node_kreuzberg_parse_effect.handler_kreuzberg_parse"
 
 
 # ---------------------------------------------------------------------------

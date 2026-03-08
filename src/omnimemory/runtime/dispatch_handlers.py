@@ -229,7 +229,7 @@ def create_intent_query_dispatch_handler(
         context: ProtocolHandlerContext,
     ) -> str:
         """Bridge handler: envelope -> HandlerIntentQuery.execute()."""
-        from omnimemory.nodes.intent_query_effect.models import (
+        from omnimemory.nodes.node_intent_query_effect.models import (
             ModelIntentQueryRequestedEvent,
         )
 
@@ -413,8 +413,10 @@ def create_memory_retrieval_dispatch_handler(
     Returns:
         Async handler function with signature (envelope, context) -> str.
     """
-    from omnimemory.nodes.memory_retrieval_effect.handlers import HandlerMemoryRetrieval
-    from omnimemory.nodes.memory_retrieval_effect.models import (
+    from omnimemory.nodes.node_memory_retrieval_effect.handlers import (
+        HandlerMemoryRetrieval,
+    )
+    from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
         ModelMemoryRetrievalRequest,
     )

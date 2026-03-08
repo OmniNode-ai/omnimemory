@@ -98,12 +98,12 @@ logger = logging.getLogger(__name__)
 # scanning those contracts via importlib.resources.
 #
 # Source contracts:
-#   - intent_event_consumer_effect/contract.yaml
-#   - intent_query_effect/contract.yaml
-#   - intent_storage_effect/contract.yaml
-#   - memory_retrieval_effect/contract.yaml
-#   - memory_storage_effect/contract.yaml
-#   - memory_lifecycle_orchestrator/contract.yaml
+#   - node_intent_event_consumer_effect/contract.yaml
+#   - node_intent_query_effect/contract.yaml
+#   - node_intent_storage_effect/contract.yaml
+#   - node_memory_retrieval_effect/contract.yaml
+#   - node_memory_storage_effect/contract.yaml
+#   - node_memory_lifecycle_orchestrator/contract.yaml
 
 MEMORY_SUBSCRIBE_TOPICS: list[str] = collect_subscribe_topics_from_contracts()
 """All input topics the memory plugin subscribes to (contract-driven)."""

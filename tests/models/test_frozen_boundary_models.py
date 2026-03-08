@@ -72,10 +72,10 @@ from omnimemory.models.utils.model_circuit_breaker_stats_response import (
     ModelCircuitBreakerStatsResponse,
 )
 from omnimemory.models.utils.model_correlation_context import ModelCorrelationContext
-from omnimemory.nodes.memory_retrieval_effect.models.model_memory_retrieval_request import (
+from omnimemory.nodes.node_memory_retrieval_effect.models.model_memory_retrieval_request import (
     ModelMemoryRetrievalRequest,
 )
-from omnimemory.nodes.memory_retrieval_effect.models.model_memory_retrieval_response import (
+from omnimemory.nodes.node_memory_retrieval_effect.models.model_memory_retrieval_response import (
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
 )

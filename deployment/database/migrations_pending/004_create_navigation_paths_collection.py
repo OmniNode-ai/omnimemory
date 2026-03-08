@@ -35,7 +35,9 @@ logger = logging.getLogger(__name__)
 
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
-QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") or os.environ.get("QDRANT__SERVICE__API_KEY")
+QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") or os.environ.get(
+    "QDRANT__SERVICE__API_KEY"
+)
 COLLECTION_NAME = "navigation_paths"
 
 # Qwen3-Embedding-8B produces 4096-dimensional vectors.
@@ -53,7 +55,13 @@ async def create_collection() -> None:
     - ``start_state``: Embedding of the start-state identifier.
     """
     # https=False keeps plain HTTP even when api_key is set (localhost dev setup).
-    client = AsyncQdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, api_key=QDRANT_API_KEY, https=False, timeout=30)
+    client = AsyncQdrantClient(
+        host=QDRANT_HOST,
+        port=QDRANT_PORT,
+        api_key=QDRANT_API_KEY,
+        https=False,
+        timeout=30,
+    )
 
     try:
         try:
@@ -103,7 +111,9 @@ async def create_collection() -> None:
                 field_name="start_state_id",
                 field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
             )
-            logger.info("Created payload indexes on outcome, graph_fingerprint, start_state_id.")
+            logger.info(
+                "Created payload indexes on outcome, graph_fingerprint, start_state_id."
+            )
         except UnexpectedResponse as exc:
             logger.error("Qdrant API error during index creation: %s", exc)
             sys.exit(1)

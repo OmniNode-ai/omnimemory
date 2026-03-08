@@ -7,21 +7,21 @@
 This package contains the Core 8 ONEX-compliant nodes for omnimemory:
 
 EFFECT (2):
-- memory_storage_effect: CRUD operations to storage backends
-- memory_retrieval_effect: Semantic/temporal/contextual search
+- node_memory_storage_effect: CRUD operations to storage backends
+- node_memory_retrieval_effect: Semantic/temporal/contextual search
 
 COMPUTE (2):
-- semantic_analyzer_compute: Semantic analysis and embeddings
-- similarity_compute: Vector similarity calculations
+- node_semantic_analyzer_compute: Semantic analysis and embeddings
+- node_similarity_compute: Vector similarity calculations
 
 REDUCER (3):
-- memory_consolidator_reducer: Merge similar memories
-- statistics_reducer: Generate memory statistics
-- navigation_history_reducer: Persist navigation sessions (OMN-2584)
+- node_memory_consolidator_reducer: Merge similar memories
+- node_statistics_reducer: Generate memory statistics
+- node_navigation_history_reducer: Persist navigation sessions (OMN-2584)
 
 ORCHESTRATOR (2):
-- memory_lifecycle_orchestrator: Full lifecycle management
-- agent_coordinator_orchestrator: Cross-agent coordination
+- node_memory_lifecycle_orchestrator: Full lifecycle management
+- node_agent_coordinator_orchestrator: Cross-agent coordination
 """
 
 from omnimemory.nodes.base import (
@@ -32,17 +32,17 @@ from omnimemory.nodes.base import (
     BaseReducerNode,
     ContainerType,
 )
-from omnimemory.nodes.filesystem_crawler_effect import (
+from omnimemory.nodes.node_filesystem_crawler_effect import (
     HandlerFilesystemCrawler,
     ModelFilesystemCrawlerConfig,
     ModelFilesystemCrawlResult,  # omnimemory-model-exempt: handler result
 )
-from omnimemory.nodes.intent_event_consumer_effect import (
+from omnimemory.nodes.node_intent_event_consumer_effect import (
     HandlerIntentEventConsumer,
     ModelIntentEventConsumerConfig,
     ModelIntentEventConsumerHealth,
 )
-from omnimemory.nodes.navigation_history_reducer import (
+from omnimemory.nodes.node_navigation_history_reducer import (
     HandlerNavigationHistoryReducer,
     ModelNavigationHistoryRequest,
     ModelNavigationHistoryResponse,
@@ -61,8 +61,8 @@ __all__: list[str] = [
     "BaseOrchestratorNode",
     "ContainerType",
     # Effect nodes
-    "memory_storage_effect",
-    "memory_retrieval_effect",
+    "node_memory_storage_effect",
+    "node_memory_retrieval_effect",
     "HandlerIntentEventConsumer",
     "ModelIntentEventConsumerConfig",
     "ModelIntentEventConsumerHealth",
@@ -70,11 +70,11 @@ __all__: list[str] = [
     "ModelFilesystemCrawlResult",
     "ModelFilesystemCrawlerConfig",
     # Compute nodes
-    "semantic_analyzer_compute",
-    "similarity_compute",
+    "node_semantic_analyzer_compute",
+    "node_similarity_compute",
     # Reducer nodes
-    "memory_consolidator_reducer",
-    "statistics_reducer",
+    "node_memory_consolidator_reducer",
+    "node_statistics_reducer",
     "NodeNavigationHistoryReducer",
     "HandlerNavigationHistoryReducer",
     "ModelNavigationHistoryRequest",
@@ -83,6 +83,6 @@ __all__: list[str] = [
     "ModelPlanStep",
     "NavigationOutcome",
     # Orchestrator nodes
-    "memory_lifecycle_orchestrator",
-    "agent_coordinator_orchestrator",
+    "node_memory_lifecycle_orchestrator",
+    "node_agent_coordinator_orchestrator",
 ]

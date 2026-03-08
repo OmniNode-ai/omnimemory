@@ -36,29 +36,29 @@ files:
       - redis
 
   # Pre-existing handler violations (Phase 3 will refactor to DI)
-  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_archive.py"
+  - path: "src/omnimemory/nodes/node_memory_lifecycle_orchestrator/handlers/handler_memory_archive.py"
     reason: "Pre-existing handler uses asyncpg directly; Phase 3 will inject via DI"
     allowed_modules:
       - asyncpg
 
-  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_expire.py"
+  - path: "src/omnimemory/nodes/node_memory_lifecycle_orchestrator/handlers/handler_memory_expire.py"
     reason: "Pre-existing handler uses asyncpg directly; Phase 3 will inject via DI"
     allowed_modules:
       - asyncpg
 
   # Effect node clients - effect nodes are the designated I/O boundary
-  - path: "src/omnimemory/nodes/memory_retrieval_effect/clients/embedding_client.py"
+  - path: "src/omnimemory/nodes/node_memory_retrieval_effect/clients/embedding_client.py"
     reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
     allowed_modules:
       - httpx
 
-  - path: "src/omnimemory/nodes/kreuzberg_parse_effect/clients/client_kreuzberg.py"
+  - path: "src/omnimemory/nodes/node_kreuzberg_parse_effect/clients/client_kreuzberg.py"
     reason: "Kreuzberg effect client uses httpx for document extraction API calls; expected I/O boundary
       (OMN-2733)"
     allowed_modules:
       - httpx
 
-  - path: "src/omnimemory/nodes/navigation_history_reducer/handlers/handler_navigation_history_reducer.py"
+  - path: "src/omnimemory/nodes/node_navigation_history_reducer/handlers/handler_navigation_history_reducer.py"
     reason: "Phase 2 handler uses asyncpg and httpx directly; Phase 3 will inject via DI (OMN-2584)"
     allowed_modules:
       - asyncpg

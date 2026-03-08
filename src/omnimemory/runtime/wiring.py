@@ -41,12 +41,12 @@ logger = logging.getLogger(__name__)
 # (containers, adapters) so most are verify-only.
 _HANDLER_SPECS: list[tuple[str, str, bool]] = [
     (
-        "omnimemory.nodes.intent_event_consumer_effect.handler_intent_event_consumer",
+        "omnimemory.nodes.node_intent_event_consumer_effect.handler_intent_event_consumer",
         "HandlerIntentEventConsumer",
         False,  # Requires config + storage_adapter
     ),
     (
-        "omnimemory.nodes.intent_query_effect.handlers.handler_intent_query",
+        "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query",
         "HandlerIntentQuery",
         False,  # Requires ModelONEXContainer
     ),

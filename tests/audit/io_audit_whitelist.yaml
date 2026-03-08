@@ -21,30 +21,30 @@ files:
   # Add entries here as effect nodes are implemented that require specific I/O
 
   # Pre-existing violations from Phase 2 handlers (Phase 3 will refactor these)
-  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_archive.py"
+  - path: "src/omnimemory/nodes/node_memory_lifecycle_orchestrator/handlers/handler_memory_archive.py"
     reason: "Pre-existing handler uses asyncpg and os.environ directly; Phase 3 will inject via DI"
     allowed_rules:
       - "net-client"
       - "env-access"
 
-  - path: "src/omnimemory/nodes/memory_lifecycle_orchestrator/handlers/handler_memory_expire.py"
+  - path: "src/omnimemory/nodes/node_memory_lifecycle_orchestrator/handlers/handler_memory_expire.py"
     reason: "Pre-existing handler uses asyncpg directly; Phase 3 will inject via DI"
     allowed_rules:
       - "net-client"
 
-  - path: "src/omnimemory/nodes/navigation_history_reducer/handlers/handler_navigation_history_reducer.py"
+  - path: "src/omnimemory/nodes/node_navigation_history_reducer/handlers/handler_navigation_history_reducer.py"
     reason: "Phase 2 handler uses asyncpg and httpx directly; module-level env defaults use os.environ;
       Phase 3 will inject via DI (OMN-2584)"
     allowed_rules:
       - "net-client"
       - "env-access"
 
-  - path: "src/omnimemory/nodes/memory_retrieval_effect/clients/embedding_client.py"
+  - path: "src/omnimemory/nodes/node_memory_retrieval_effect/clients/embedding_client.py"
     reason: "Effect client uses httpx for embedding API calls; expected I/O boundary"
     allowed_rules:
       - "net-client"
 
-  - path: "src/omnimemory/nodes/kreuzberg_parse_effect/clients/client_kreuzberg.py"
+  - path: "src/omnimemory/nodes/node_kreuzberg_parse_effect/clients/client_kreuzberg.py"
     reason: "Kreuzberg effect client: httpx for API calls, Path.read_text/write_text for idempotency cache
       (OMN-2733)"
     allowed_rules:

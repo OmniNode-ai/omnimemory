@@ -18,7 +18,7 @@ Subpackages:
 
 Note:
     HandlerSemanticCompute now lives in its node's handlers directory following ONEX patterns:
-    ``omnimemory.nodes.semantic_analyzer_compute.handlers.handler_semantic_compute``
+    ``omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute``
 
     It is re-exported here for import convenience.
 
@@ -93,7 +93,7 @@ from omnimemory.handlers.models import ModelHandlerIntentConfig
 from omnimemory.models.config import ModelHandlerSemanticComputeConfig
 
 # Re-export from node's handlers directory for import convenience
-from omnimemory.nodes.semantic_analyzer_compute.handlers import (
+from omnimemory.nodes.node_semantic_analyzer_compute.handlers import (
     HandlerSemanticCompute,
     HandlerSemanticComputePolicy,
 )
