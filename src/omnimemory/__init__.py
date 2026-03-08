@@ -25,7 +25,13 @@ Usage:
     >>> # Use domain-specific models for memory operations
 """
 
-__version__ = "0.6.2"
+# Do not hardcode versions here; version is sourced from distribution metadata.
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("omninode-memory")
+except PackageNotFoundError:
+    __version__ = "0.0.0-dev"
 __author__ = "OmniNode-ai"
 __email__ = "contact@omninode.ai"
 
