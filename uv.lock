@@ -1846,7 +1846,7 @@ wheels = [
 
 [[package]]
 name = "omninode-memory"
-version = "0.6.4"
+version = "0.6.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1904,7 +1904,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.120.1,<1.0.0" },
     { name = "httpx", specifier = ">=0.28.0,<1.0.0" },
     { name = "mcp", specifier = ">=1.8.0,<2.0.0" },
-    { name = "omnibase-core", specifier = "==0.24.0" },
+    { name = "omnibase-core", specifier = ">=0.24.0,<0.25.0" },
     { name = "omnibase-infra", specifier = "==0.16.0" },
     { name = "omnibase-spi", specifier = "==0.15.1" },
     { name = "pinecone-client", specifier = ">=4.1.0,<7.0.0" },
