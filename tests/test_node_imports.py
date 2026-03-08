@@ -93,20 +93,20 @@ class TestNodeStructure:
     NODES_WITH_ALLOWED_HANDLERS: set[str] = {
         # COMPUTE node: Pure math computation handler for vector similarity.
         # Not an infrastructure handler - performs no I/O operations.
-        "similarity_compute",
+        "node_similarity_compute",
         # COMPUTE node: Pure semantic analysis computation handler.
         # Delegates I/O to provider protocols, handler contains only pure logic.
-        "semantic_analyzer_compute",
+        "node_semantic_analyzer_compute",
         # EFFECT node with MOCK handlers: Temporary mock implementations for
         # development/testing. Will be removed when omnibase_infra is integrated.
         # TODO: Remove from exclusion list when migrating to real handlers.
-        "memory_retrieval_effect",
+        "node_memory_retrieval_effect",
         # ORCHESTRATOR node with domain-specific lifecycle handlers:
         # - handler_memory_tick: TTL evaluation and event emission
         # - handler_memory_expire: ACTIVE->EXPIRED with optimistic locking
         # - handler_memory_archive: Archive to cold storage with gzip compression
         # These contain memory-domain logic (not generic infrastructure).
-        "memory_lifecycle_orchestrator",
+        "node_memory_lifecycle_orchestrator",
     }
 
     @pytest.mark.parametrize("node_name", CORE_8_NODES)

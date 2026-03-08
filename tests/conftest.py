@@ -64,14 +64,14 @@ if TYPE_CHECKING:
 
 # Core 8 node names - shared across node-related test modules
 CORE_8_NODES: list[str] = [
-    "memory_storage_effect",
-    "memory_retrieval_effect",
-    "semantic_analyzer_compute",
-    "similarity_compute",
-    "memory_consolidator_reducer",
-    "statistics_reducer",
-    "memory_lifecycle_orchestrator",
-    "agent_coordinator_orchestrator",
+    "node_memory_storage_effect",
+    "node_memory_retrieval_effect",
+    "node_semantic_analyzer_compute",
+    "node_similarity_compute",
+    "node_memory_consolidator_reducer",
+    "node_statistics_reducer",
+    "node_memory_lifecycle_orchestrator",
+    "node_agent_coordinator_orchestrator",
 ]
 
 # Node directory path - use Path(__file__) for CWD independence

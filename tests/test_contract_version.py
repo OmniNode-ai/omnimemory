@@ -39,9 +39,9 @@ MAX_REASONABLE_VERSION_COMPONENT: int = 10000
 # NOTE: This list tracks specific contracts from the migration. For comprehensive
 # contract validation, use get_all_contracts() which dynamically discovers all contracts.
 MIGRATED_CONTRACTS: list[str] = [
-    "memory_retrieval_effect",
-    "memory_storage_effect",
-    "similarity_compute",
+    "node_memory_retrieval_effect",
+    "node_memory_storage_effect",
+    "node_similarity_compute",
 ]
 
 
@@ -61,7 +61,7 @@ def get_all_contracts(nodes_dir: Path | None = None) -> list[str]:
     Example:
         >>> contracts = get_all_contracts()
         >>> print(contracts)
-        ['memory_retrieval_effect', 'memory_storage_effect', 'similarity_compute']
+        ['node_memory_retrieval_effect', 'node_memory_storage_effect', 'node_similarity_compute']
     """
     base = nodes_dir if nodes_dir is not None else NODES_DIR
     if not base.exists():
@@ -215,11 +215,15 @@ class TestContractVersionField:
     @pytest.mark.parametrize(
         ("node_name", "expected_type"),
         [
-            ("memory_retrieval_effect", "EFFECT"),
-            ("memory_storage_effect", "EFFECT"),
-            ("similarity_compute", "COMPUTE"),
+            ("node_memory_retrieval_effect", "EFFECT"),
+            ("node_memory_storage_effect", "EFFECT"),
+            ("node_similarity_compute", "COMPUTE"),
         ],
-        ids=["memory_retrieval_effect", "memory_storage_effect", "similarity_compute"],
+        ids=[
+            "node_memory_retrieval_effect",
+            "node_memory_storage_effect",
+            "node_similarity_compute",
+        ],
     )
     def test_node_type_values(
         self, contract_data: MappingResultDict, node_name: str, expected_type: str
@@ -281,11 +285,15 @@ class TestContractVersionField:
     @pytest.mark.parametrize(
         ("node_name", "expected_version"),
         [
-            ("memory_retrieval_effect", {"major": 0, "minor": 2, "patch": 0}),
-            ("memory_storage_effect", {"major": 0, "minor": 2, "patch": 0}),
-            ("similarity_compute", {"major": 0, "minor": 1, "patch": 0}),
+            ("node_memory_retrieval_effect", {"major": 0, "minor": 2, "patch": 0}),
+            ("node_memory_storage_effect", {"major": 0, "minor": 2, "patch": 0}),
+            ("node_similarity_compute", {"major": 0, "minor": 1, "patch": 0}),
         ],
-        ids=["memory_retrieval_effect", "memory_storage_effect", "similarity_compute"],
+        ids=[
+            "node_memory_retrieval_effect",
+            "node_memory_storage_effect",
+            "node_similarity_compute",
+        ],
     )
     def test_contract_version_values(
         self,
