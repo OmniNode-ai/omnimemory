@@ -324,6 +324,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "no-internal-ips",
             "no-planning-docs",
             "no-env-file",
+            "validate-string-versions",
         }
     )
 
