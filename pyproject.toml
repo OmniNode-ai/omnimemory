@@ -61,7 +61,7 @@ dependencies = [
     # ONEX dependencies - versioned releases from PyPI
     "omnibase-core>=0.24.0,<0.25.0",
     "omnibase-spi==0.15.1",
-    "omnibase-infra==0.16.0",
+    "omnibase-infra==0.16.1",
 
     # Logging and monitoring
     # Version ^23.3.0 required for compatibility with omnibase-infra (requires ^23.2.0)
