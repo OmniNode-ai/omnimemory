@@ -132,7 +132,7 @@ class ProtocolIntentGraphAdapter(Protocol):
         successful initialization is a no-op.
 
         Args:
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             options: Additional connection options passed to the underlying
                 graph handler.

@@ -9,7 +9,7 @@ controls connection settings, circuit breaker behavior, and query limits.
 
 Example:
     >>> config = ModelHandlerIntentConfig(
-    ...     connection_uri="bolt://localhost:7687",
+    ...     connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
     ...     timeout_seconds=60.0,
     ...     circuit_breaker_threshold=3,
     ... )
@@ -36,7 +36,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
     and query limits for intent storage and retrieval operations.
 
     Attributes:
-        connection_uri: Graph database connection URI (e.g., "bolt://localhost:7687").
+        connection_uri: Graph database connection URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
         auth_username: Optional username for database authentication.
         auth_password: Optional password for database authentication.
         timeout_seconds: Connection and operation timeout in seconds.
@@ -60,7 +60,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
         json_schema_extra={
             "examples": [
                 {
-                    "connection_uri": "bolt://localhost:7687",
+                    "connection_uri": "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
                     "auth_username": "neo4j",
                     "auth_password": "<secret>",
                     "timeout_seconds": 30.0,
@@ -84,7 +84,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
         min_length=1,
         description=(
             "Graph database connection URI. "
-            "Example: 'bolt://localhost:7687' or 'bolt://memgraph:7687'."
+            "Example: 'bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}' or 'bolt://memgraph:7687'."
         ),
     )
     auth_username: str | None = Field(
@@ -178,11 +178,11 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
 
         Example:
             >>> import os
-            >>> os.environ["HANDLER_INTENT_CONNECTION_URI"] = "bolt://localhost:7687"
+            >>> os.environ["HANDLER_INTENT_CONNECTION_URI"] = "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}"
             >>> os.environ["HANDLER_INTENT_TIMEOUT_SECONDS"] = "45.0"
             >>> config = ModelHandlerIntentConfig.from_env()
             >>> config.connection_uri
-            'bolt://localhost:7687'
+            'bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}'
             >>> config.timeout_seconds
             45.0
         """
@@ -228,7 +228,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
 
         Example:
             >>> config = ModelHandlerIntentConfig(
-            ...     connection_uri="bolt://localhost:7687",
+            ...     connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
             ...     auth_username="neo4j",
             ...     auth_password="<secret>",  # noqa: S106
             ... )

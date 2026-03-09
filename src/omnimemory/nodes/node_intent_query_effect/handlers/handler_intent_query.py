@@ -19,7 +19,7 @@ Example::
     container = ModelONEXContainer()
     handler = HandlerIntentQuery(container)
     await handler.initialize(
-        connection_uri="bolt://localhost:7687",
+        connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
         auth=("user", "password"),
     )
     response = await handler.execute(request_event)
@@ -226,7 +226,7 @@ class HandlerIntentQuery:
 
         # Initialize (creates and owns adapter internally)
         await handler.initialize(
-            connection_uri=os.getenv("MEMGRAPH_URI", "bolt://localhost:7687"),
+            connection_uri=os.getenv("MEMGRAPH_URI", "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}"),
             auth=(os.getenv("MEMGRAPH_USER", ""), os.getenv("MEMGRAPH_PASSWORD", "")),
         )
 
@@ -290,7 +290,7 @@ class HandlerIntentQuery:
         Thread-safe initialization using asyncio.Lock.
 
         Args:
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             config: Optional handler configuration. Uses defaults if not provided.
             adapter_config: Optional adapter configuration. Uses defaults if not provided.

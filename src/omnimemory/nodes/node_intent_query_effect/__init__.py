@@ -30,7 +30,7 @@ Example::
 
         # Initialize handler (creates and owns adapter internally)
         await handler.initialize(
-            connection_uri=os.getenv("MEMGRAPH_URI", "bolt://localhost:7687"),
+            connection_uri=os.getenv("MEMGRAPH_URI", "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}"),
             auth=(os.getenv("MEMGRAPH_USER", ""), os.getenv("MEMGRAPH_PASSWORD", "")),
         )
 

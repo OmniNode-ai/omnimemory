@@ -419,6 +419,25 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      # --------------------------------------------------------------------------
+      # Bolt URI Hardcode Guard (OMN-4314)
+      # Validates: No bolt://localhost literal strings in production Python source.
+      # Scope: src/ (non-test files). Test files exempt (*test_*, *conftest*, */tests/*).
+      # Purpose: Catches the class of bug where a developer hardcodes
+      #          connection_uri="bolt://localhost:7687" in production code.
+      #          bolt://localhost resolves to the container itself inside Docker,
+      #          not the Memgraph service (omnibase-infra-memgraph). Always read
+      #          OMNIMEMORY_MEMGRAPH_HOST/PORT from environment instead.
+      # Parallel to: kafka-no-hardcoded-fallback in omnibase_infra
+      # --------------------------------------------------------------------------
+      - id: no-hardcoded-bolt-fallback
+        name: "No hardcoded bolt://localhost URIs"
+        language: script
+        entry: scripts/check_no_hardcoded_bolt.sh
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+
 # Configuration
 default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]

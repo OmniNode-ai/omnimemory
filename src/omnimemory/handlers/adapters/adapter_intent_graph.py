@@ -33,7 +33,7 @@ Example::
         config = ModelAdapterIntentGraphConfig(timeout_seconds=30.0)
         adapter = AdapterIntentGraph(config)
         await adapter.initialize(
-            connection_uri="bolt://localhost:7687",
+            connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
         )
 
         # Store an intent (classification already happened upstream)
@@ -327,7 +327,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
             )
             adapter = AdapterIntentGraph(config)
             await adapter.initialize(
-                connection_uri="bolt://localhost:7687",
+                connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
             )
 
             # Store intent classification (classification happened upstream)
@@ -434,7 +434,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
         successful initialization is a no-op.
 
         Args:
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             options: Additional connection options passed to the graph handler.
 

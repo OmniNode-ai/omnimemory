@@ -24,7 +24,7 @@ Example::
         # Verify handler is ready
         if not handler.is_initialized:
             await handler.initialize(
-                connection_uri="bolt://localhost:7687",
+                connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
             )
 
         # Store an intent
@@ -167,7 +167,7 @@ class ProtocolHandlerIntent(Protocol):
         initialization should be a no-op.
 
         Args:
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             options: Additional configuration options. Common options include:
                 - timeout_seconds: Operation timeout (default: 30.0)

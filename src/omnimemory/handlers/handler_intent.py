@@ -40,7 +40,7 @@ Example::
     handler = HandlerIntent(container)
 
     await handler.initialize(
-        connection_uri="bolt://localhost:7687",
+        connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
     )
 
     # Store an intent
@@ -212,7 +212,7 @@ class HandlerIntent:
         container = ModelONEXContainer()
         handler = HandlerIntent(container)
 
-        await handler.initialize(connection_uri="bolt://localhost:7687")
+        await handler.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
         result = await handler.store_intent(
             session_id="sess_123",
@@ -287,7 +287,7 @@ class HandlerIntent:
         initialization is a no-op.
 
         Args:
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             options: Additional configuration options:
                 - timeout_seconds: Operation timeout (default: 30.0)

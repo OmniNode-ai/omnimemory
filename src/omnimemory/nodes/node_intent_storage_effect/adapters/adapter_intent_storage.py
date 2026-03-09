@@ -20,7 +20,7 @@ Example::
 
     async def example():
         adapter = HandlerIntentStorageAdapter()
-        await adapter.initialize(connection_uri="bolt://localhost:7687")
+        await adapter.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
         # Store an intent
         request = ModelIntentStorageRequest(
@@ -133,7 +133,7 @@ class HandlerIntentStorageAdapter:
 
     async def initialize(
         self,
-        connection_uri: str = "bolt://localhost:7687",
+        connection_uri: str = "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
         auth: tuple[str, str] | None = None,
         *,
         options: Mapping[str, object] | None = None,

@@ -65,7 +65,7 @@ class RegistryIntentQueryEffect:
         >>> container = ModelONEXContainer()
         >>> handler = await RegistryIntentQueryEffect.create_and_initialize(
         ...     container=container,
-        ...     connection_uri="bolt://localhost:7687",
+        ...     connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
         ... )
 
     .. versionadded:: 0.1.0
@@ -93,7 +93,7 @@ class RegistryIntentQueryEffect:
         Example:
             >>> container = ModelONEXContainer()
             >>> handler = RegistryIntentQueryEffect.create_handler(container)
-            >>> await handler.initialize(connection_uri="bolt://localhost:7687")
+            >>> await handler.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
         .. versionadded:: 0.1.0
 
@@ -123,7 +123,7 @@ class RegistryIntentQueryEffect:
 
         Args:
             container: ONEX container for dependency injection.
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             config: Optional handler configuration. Uses defaults if not provided.
             adapter_config: Optional adapter configuration. Uses defaults if not provided.
@@ -136,7 +136,7 @@ class RegistryIntentQueryEffect:
             >>> container = ModelONEXContainer()
             >>> handler = await RegistryIntentQueryEffect.create_and_initialize(
             ...     container=container,
-            ...     connection_uri="bolt://localhost:7687",
+            ...     connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
             ...     config=ModelHandlerIntentQueryConfig(timeout_seconds=30.0),
             ... )
             >>> response = await handler.execute(request)

@@ -45,7 +45,7 @@ Example::
     async def example():
         config = ModelIntentEventConsumerConfig()
         storage_adapter = HandlerIntentStorageAdapter()
-        await storage_adapter.initialize(connection_uri="bolt://localhost:7687")
+        await storage_adapter.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
         consumer = HandlerIntentEventConsumer(
             config=config,
@@ -135,7 +135,7 @@ class HandlerIntentEventConsumer:
 
         config = ModelIntentEventConsumerConfig()
         storage = HandlerIntentStorageAdapter()
-        await storage.initialize(connection_uri="bolt://localhost:7687")
+        await storage.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
         consumer = HandlerIntentEventConsumer(config, storage)
         await consumer.initialize(event_bus_subscribe, "dev")

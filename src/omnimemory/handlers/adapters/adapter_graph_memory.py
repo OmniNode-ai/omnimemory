@@ -24,7 +24,7 @@ Example::
         config = ModelGraphMemoryConfig(max_depth=5)
         adapter = AdapterGraphMemory(config)
         await adapter.initialize(
-            connection_uri="bolt://localhost:7687",
+            connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
             auth=("neo4j", "password"),
         )
 
@@ -396,7 +396,7 @@ class AdapterGraphMemory:
             config = ModelGraphMemoryConfig(max_depth=3)
             adapter = AdapterGraphMemory(config)
             await adapter.initialize(
-                connection_uri="bolt://localhost:7687",
+                connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
             )
 
             # Find related memories up to 2 hops away
@@ -453,7 +453,7 @@ class AdapterGraphMemory:
         the handler for memory queries.
 
         Args:
-            connection_uri: Graph database URI (e.g., "bolt://localhost:7687").
+            connection_uri: Graph database URI (e.g., "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}").
             auth: Optional (username, password) tuple for authentication.
             options: Additional connection options passed to the graph handler.
 

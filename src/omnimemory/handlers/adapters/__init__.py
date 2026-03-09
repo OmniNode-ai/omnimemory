@@ -34,7 +34,7 @@ Example::
     # Graph adapter
     config = ModelGraphMemoryConfig(max_depth=3)
     adapter = AdapterGraphMemory(config)
-    await adapter.initialize(connection_uri="bolt://localhost:7687")
+    await adapter.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
     # Embedding client (contract boundary for HTTP)
     embed_config = ModelEmbeddingHttpClientConfig(
@@ -47,7 +47,7 @@ Example::
     # Intent graph adapter
     intent_config = ModelAdapterIntentGraphConfig(timeout_seconds=30.0)
     intent_adapter = AdapterIntentGraph(intent_config)
-    await intent_adapter.initialize(connection_uri="bolt://localhost:7687")
+    await intent_adapter.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
     # Valkey adapter for caching
     valkey_config = AdapterValkeyConfig(host="localhost", port=6379)
