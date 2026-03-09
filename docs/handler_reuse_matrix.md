@@ -27,7 +27,6 @@ This document maps existing handlers from `omnibase_infra` to the Core 8 memory 
 | `HandlerFileSystem` | `handler_filesystem` | Secure file I/O | read_file, write_file, list_directory | MEDIUM - persistent storage |
 | `HandlerGraph` | `handler_graph` | Graph database (Neo4j/Memgraph) | execute_query, create_node, traverse | HIGH - relationship memory |
 | `HandlerHttp` | `handler_http` | HTTP REST client | GET, POST | MEDIUM - external LLM calls |
-| `HandlerConsul` | `handler_consul` | Service discovery | register, deregister, health | LOW - infrastructure only |
 | `HandlerVault` | `handler_vault` | Secrets management | read, write secrets | LOW - security only |
 | `HandlerMcp` | `handler_mcp` | MCP protocol | MCP operations | LOW - agent communication |
 | `HandlerManifestPersistence` | `handler_manifest_persistence` | Manifest storage | persist manifests | LOW - specialized |
@@ -43,7 +42,6 @@ This document maps existing handlers from `omnibase_infra` to the Core 8 memory 
 
 | Handler Class | Module | Purpose | Reuse Potential |
 |---------------|--------|---------|-----------------|
-| `HandlerServiceDiscoveryConsul` | `handler_service_discovery_consul` | Consul discovery | LOW - infrastructure |
 | `HandlerServiceDiscoveryMock` | `handler_service_discovery_mock` | Mock discovery | HIGH - testing patterns |
 
 ### Node-Specific Handlers (`omnibase_infra.nodes.node_registration_orchestrator.handlers`)
@@ -61,8 +59,6 @@ This document maps existing handlers from `omnibase_infra` to the Core 8 memory 
 |---------------|--------|---------|-----------------|
 | `HandlerPostgresUpsert` | `handler_postgres_upsert` | PostgreSQL upsert | HIGH - storage patterns |
 | `HandlerPostgresDeactivate` | `handler_postgres_deactivate` | PostgreSQL deactivation | MEDIUM - lifecycle |
-| `HandlerConsulRegister` | `handler_consul_register` | Consul registration | LOW - infrastructure |
-| `HandlerConsulDeregister` | `handler_consul_deregister` | Consul deregistration | LOW - infrastructure |
 | `HandlerPartialRetry` | `handler_partial_retry` | Retry logic | HIGH - resilience patterns |
 
 ### Runtime Handlers (`omnibase_infra.runtime`)
@@ -321,7 +317,6 @@ Handler access must be controlled at multiple layers.
 | **handler_http.py** | Bearer tokens / API keys | Endpoint-specific | Rotate keys; use short-lived tokens |
 | **handler_graph.py** | Connection credentials | Label-based access control | Restrict node/edge type access |
 | **handler_vault.py** | Vault token | Policy-based | Use AppRole for services |
-| **handler_consul.py** | ACL token | Service-level policies | Read-only for most operations |
 
 #### Implementation Pattern
 
