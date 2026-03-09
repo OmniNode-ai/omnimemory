@@ -325,6 +325,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "no-planning-docs",
             "no-env-file",
             "validate-string-versions",
+            "no-hardcoded-bolt-fallback",
         }
     )
 
