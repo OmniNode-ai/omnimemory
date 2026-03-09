@@ -76,6 +76,7 @@ if TYPE_CHECKING:
 
     from omnimemory.runtime.introspection import MemoryNodeIntrospectionProxy
 
+from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
     ModelDomainPluginResult,
@@ -107,6 +108,34 @@ logger = logging.getLogger(__name__)
 
 MEMORY_SUBSCRIBE_TOPICS: list[str] = collect_subscribe_topics_from_contracts()
 """All input topics the memory plugin subscribes to (contract-driven)."""
+
+
+async def _probe_tcp_reachable(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Return True if a TCP connection to host:port succeeds within timeout.
+
+    Uses stdlib asyncio only — no Memgraph SDK, no bolt protocol handshake.
+    A successful TCP connect is sufficient to confirm the service is up and
+    accepting connections on the expected port.
+
+    Args:
+        host: Hostname or IP address to probe.
+        port: TCP port number to connect to.
+        timeout: Maximum seconds to wait for connection (default: 5.0).
+
+    Returns:
+        True if connection succeeded and was cleanly closed; False on any
+        OSError (connection refused, host unreachable) or asyncio.TimeoutError.
+    """
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=timeout,
+        )
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (OSError, TimeoutError):
+        return False
 
 
 class PluginMemory:
@@ -181,6 +210,44 @@ class PluginMemory:
             )
             return False
         return True
+
+    async def validate_handshake(
+        self,
+        config: ModelDomainPluginConfig,
+    ) -> ModelHandshakeResult:
+        """Probe Memgraph TCP reachability before consumers subscribe to Kafka.
+
+        Uses a pure asyncio TCP connection (no Memgraph SDK) to verify that the
+        Memgraph service is reachable before wiring Kafka consumers. Without this
+        check, PluginMemory default-passes handshake and proceeds to subscribe to
+        Kafka topics even when Memgraph is down — causing all messages to route
+        to DLQ with no visible startup error.
+
+        B1 check: Memgraph TCP reachability via OMNIMEMORY_MEMGRAPH_HOST/PORT.
+
+        Returns:
+            ModelHandshakeResult: Passed if Memgraph is reachable or plugin is
+            inactive. Failed with error message if probe times out or is refused.
+        """
+        if not os.getenv("OMNIMEMORY_ENABLED"):
+            return ModelHandshakeResult.default_pass(self.plugin_id)
+
+        host = os.getenv("OMNIMEMORY_MEMGRAPH_HOST", "localhost")
+        port = int(os.getenv("OMNIMEMORY_MEMGRAPH_PORT", "7687"))
+
+        reachable = await _probe_tcp_reachable(host, port)
+        if not reachable:
+            return ModelHandshakeResult.failed(
+                plugin_id=self.plugin_id,
+                error_message=(
+                    f"Memgraph unreachable at {host}:{port}. "
+                    f"The omnimemory profile must be running and reachable on "
+                    f"omnibase-infra-network before PluginMemory may subscribe to Kafka. "
+                    f"Locally: run infra-up-memory, then infra-up-runtime."
+                ),
+            )
+
+        return ModelHandshakeResult.all_passed(self.plugin_id)
 
     async def initialize(
         self,
