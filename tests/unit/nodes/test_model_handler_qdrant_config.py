@@ -47,7 +47,9 @@ def test_rejects_invalid_url() -> None:
 def test_retrieval_config_requires_qdrant_config_when_not_stub() -> None:
     """ModelHandlerMemoryRetrievalConfig raises ValidationError when use_stub_handlers=False without qdrant_config."""
     with pytest.raises(ValidationError):
-        ModelHandlerMemoryRetrievalConfig(use_stub_handlers=False)  # missing qdrant_config
+        ModelHandlerMemoryRetrievalConfig(
+            use_stub_handlers=False
+        )  # missing qdrant_config
 
 
 @pytest.mark.unit
@@ -75,6 +77,10 @@ def test_retrieval_config_production_mode_with_qdrant_config() -> None:
 def test_qdrant_config_port_bounds() -> None:
     """ModelHandlerQdrantConfig rejects out-of-range ports."""
     with pytest.raises(ValidationError):
-        ModelHandlerQdrantConfig(embedding_server_url="http://localhost:8100", qdrant_port=0)
+        ModelHandlerQdrantConfig(
+            embedding_server_url="http://localhost:8100", qdrant_port=0
+        )
     with pytest.raises(ValidationError):
-        ModelHandlerQdrantConfig(embedding_server_url="http://localhost:8100", qdrant_port=65536)
+        ModelHandlerQdrantConfig(
+            embedding_server_url="http://localhost:8100", qdrant_port=65536
+        )

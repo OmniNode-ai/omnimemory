@@ -142,7 +142,9 @@ class HandlerMemoryRetrieval:
 
             if self._config.use_stub_handlers:
                 # Initialize stub (mock) handlers
-                self._qdrant_handler = HandlerQdrantMock(self._config.qdrant_mock_config)
+                self._qdrant_handler = HandlerQdrantMock(
+                    self._config.qdrant_mock_config
+                )
                 self._db_handler = HandlerDbMock(self._config.db_config)
                 self._graph_handler = HandlerGraphMock(self._config.graph_config)
 

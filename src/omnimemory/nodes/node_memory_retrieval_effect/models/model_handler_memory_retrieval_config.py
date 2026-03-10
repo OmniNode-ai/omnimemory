@@ -15,14 +15,16 @@ HandlerMemoryRetrieval.
 
 from __future__ import annotations
 
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .model_handler_db_mock_config import ModelHandlerDbMockConfig
 from .model_handler_graph_mock_config import ModelHandlerGraphMockConfig
-from .model_handler_qdrant_config import ModelHandlerQdrantConfig
 from .model_handler_qdrant_mock_config import ModelHandlerQdrantMockConfig
+
+if TYPE_CHECKING:
+    from .model_handler_qdrant_config import ModelHandlerQdrantConfig
 
 __all__ = [
     "ModelHandlerMemoryRetrievalConfig",
@@ -80,7 +82,5 @@ class ModelHandlerMemoryRetrievalConfig(BaseModel):
             ValueError: If use_stub_handlers is False but qdrant_config is None.
         """
         if not self.use_stub_handlers and self.qdrant_config is None:
-            raise ValueError(
-                "qdrant_config is required when use_stub_handlers=False"
-            )
+            raise ValueError("qdrant_config is required when use_stub_handlers=False")
         return self
