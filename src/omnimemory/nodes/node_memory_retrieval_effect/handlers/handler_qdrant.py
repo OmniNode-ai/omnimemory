@@ -126,7 +126,7 @@ class HandlerQdrant:
             self._qdrant_client = qdrant_client.QdrantClient(
                 host=self._config.qdrant_host,
                 port=self._config.qdrant_port,
-                timeout=self._config.qdrant_timeout_seconds,
+                timeout=int(self._config.qdrant_timeout_seconds),
             )
 
             # Create collection if it does not exist
