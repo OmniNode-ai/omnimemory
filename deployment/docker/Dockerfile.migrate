@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 OmniNode Team
+#
+# Dockerfile.migrate — omnimemory database migration image
+#
+# Ownership: omnimemory repo owns all migration SQL artifacts.
+# This image is pulled by the k8s/migrations/omnimemory-migrate.yaml
+# initContainer and used by the omnimemory migration Job.
+#
+# Build context: repo root (docker build -f deployment/docker/Dockerfile.migrate .)
+#
+# Note: omnimemory migrations are at deployment/database/migrations/ (no forward/ subdir).
+
+FROM alpine:3.19
+
+COPY deployment/database/migrations/*.sql /migrations/
