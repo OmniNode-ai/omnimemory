@@ -449,7 +449,9 @@ class AdapterValkey:
         """
         return f"{self._config.key_prefix}{key}"
 
-    async def _ensure_awaited(self, result: _T | Awaitable[_T]) -> _T:
+    async def _ensure_awaited(  # stub-ok: redis-py-awaitable-helper-deferred
+        self, result: _T | Awaitable[_T]
+    ) -> _T:
         """Ensure a Redis result is awaited if it's an awaitable.
 
         **Why This Helper Exists**

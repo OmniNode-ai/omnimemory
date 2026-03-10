@@ -1107,7 +1107,7 @@ class MetricsRegistry:
 
             return cls._instance
 
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # stub-ok: singleton-noop-init-by-design
         """No-op init - all initialization done in __new__ under lock."""
         # Initialization is done in __new__ to ensure thread safety
 
