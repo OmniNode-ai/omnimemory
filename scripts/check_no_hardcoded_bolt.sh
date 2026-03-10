@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+
 # Reject bolt://localhost literal strings in production Python source.
 # Docstrings (triple-quoted blocks) and test files are exempt.
 # This is the memory-pipeline equivalent of kafka-no-hardcoded-fallback.

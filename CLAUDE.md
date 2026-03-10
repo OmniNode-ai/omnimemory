@@ -13,7 +13,8 @@
 5. [Forbidden Patterns](#forbidden-patterns)
 6. [Required Patterns](#required-patterns)
 7. [Model Exemption Pattern](#model-exemption-pattern)
-8. [Documentation](#documentation)
+8. [SPDX Headers](#spdx-headers)
+9. [Documentation](#documentation)
 
 ---
 
@@ -213,6 +214,17 @@ class MyHandlerConfig(  # omnimemory-model-exempt: handler config
 | `archive record format` | Archive/storage record format |
 
 All other models belong in `src/omnimemory/models/<domain>/`.
+
+---
+
+## SPDX Headers
+
+All source files in `src/`, `tests/`, `scripts/`, `examples/` require MIT SPDX headers.
+Canonical spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`
+
+- Stamp missing headers: `onex spdx fix src tests scripts examples`
+- Check without writing: `onex spdx fix --check src tests scripts examples`
+- Bypass a file: add `# spdx-skip: <reason>` in the first 10 lines
 
 ---
 

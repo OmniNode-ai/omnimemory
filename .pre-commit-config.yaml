@@ -438,6 +438,20 @@ repos:
         types: [python]
         stages: [pre-commit]
 
+      # --------------------------------------------------------------------------
+      # SPDX Header Enforcement (ONEX canonical)
+      # Validates: All eligible source files carry MIT SPDX headers
+      # Scope: src/, tests/, scripts/, examples/ (py, sh, bash, yml, yaml, toml)
+      # --------------------------------------------------------------------------
+      - id: validate-spdx-headers
+        name: ONEX SPDX Header Requirement
+        entry: uv run onex spdx validate
+        language: system
+        pass_filenames: true
+        files: ^(src|tests|scripts|examples)/.*\.(py|sh|bash|yml|yaml|toml)$
+        exclude: ^(archived/|archive/)
+        stages: [pre-commit]
+
 # Configuration
 default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
