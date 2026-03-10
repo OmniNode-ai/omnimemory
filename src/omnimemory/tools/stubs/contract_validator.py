@@ -67,7 +67,7 @@ class ProtocolContractValidator:
         "orchestrator_generic": (),
     }
 
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # stub-ok: contract-validator-stub-init
         """Initialize the contract validator."""
 
     def validate_contract_file(

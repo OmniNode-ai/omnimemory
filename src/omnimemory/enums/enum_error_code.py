@@ -31,15 +31,21 @@ except ImportError:
 
         def get_component(self) -> str:
             """Get the component identifier for this error code."""
-            raise NotImplementedError("Subclasses must implement get_component()")
+            raise NotImplementedError(  # stub-ok: abstract-base-fallback
+                "Subclasses must implement get_component()"
+            )
 
         def get_number(self) -> int:
             """Get the numeric identifier for this error code."""
-            raise NotImplementedError("Subclasses must implement get_number()")
+            raise NotImplementedError(  # stub-ok: abstract-base-fallback
+                "Subclasses must implement get_number()"
+            )
 
         def get_description(self) -> str:
             """Get a human-readable description for this error code."""
-            raise NotImplementedError("Subclasses must implement get_description()")
+            raise NotImplementedError(  # stub-ok: abstract-base-fallback
+                "Subclasses must implement get_description()"
+            )
 
         def get_exit_code(self) -> int:
             """Get the appropriate CLI exit code for this error."""

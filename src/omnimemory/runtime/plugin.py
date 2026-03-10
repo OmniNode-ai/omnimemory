@@ -389,7 +389,7 @@ class PluginMemory:
                 duration_seconds=duration,
             )
 
-    async def wire_dispatchers(
+    async def wire_dispatchers(  # stub-ok: dispatcher-wiring-todo-deferred
         self,
         config: ModelDomainPluginConfig,
     ) -> ModelDomainPluginResult:

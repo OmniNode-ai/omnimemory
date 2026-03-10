@@ -83,7 +83,9 @@ class PIIDetector:
         )
         return pattern
 
-    def _initialize_patterns(self) -> dict[PIIType, list[ModelPIIPatternConfig]]:
+    def _initialize_patterns(  # stub-ok: pii-url-person-address-deferred
+        self,
+    ) -> dict[PIIType, list[ModelPIIPatternConfig]]:
         """Initialize regex patterns for different PII types using configuration.
 
         Note: The following PIIType values do NOT have patterns implemented:
@@ -196,7 +198,9 @@ class PIIDetector:
             ],
         }
 
-    def _load_common_names(self) -> set[str]:
+    def _load_common_names(  # stub-ok: pii-person-name-detection-deferred
+        self,
+    ) -> set[str]:
         """Load common first and last names for person name detection.
 
         TODO: This name database is loaded but not actively used for detection.
