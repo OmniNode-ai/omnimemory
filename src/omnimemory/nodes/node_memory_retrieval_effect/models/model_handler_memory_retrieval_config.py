@@ -72,7 +72,7 @@ class ModelHandlerMemoryRetrievalConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_qdrant_config_required_for_production(self) -> Self:
+    def validate_qdrant_config_required_for_production(self) -> Self:  # stub-ok  # fmt: skip
         """Validate that qdrant_config is provided when use_stub_handlers is False.
 
         Returns:
@@ -84,3 +84,11 @@ class ModelHandlerMemoryRetrievalConfig(BaseModel):
         if not self.use_stub_handlers and self.qdrant_config is None:
             raise ValueError("qdrant_config is required when use_stub_handlers=False")
         return self
+
+
+# Resolve forward reference for ModelHandlerQdrantConfig at runtime.
+# The TYPE_CHECKING import above satisfies static analysis; this import
+# is required so Pydantic can resolve the annotation during model_rebuild().
+from .model_handler_qdrant_config import ModelHandlerQdrantConfig  # noqa: TC001
+
+ModelHandlerMemoryRetrievalConfig.model_rebuild()

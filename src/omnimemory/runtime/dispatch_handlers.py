@@ -392,7 +392,7 @@ def create_lifecycle_dispatch_handler(
 # =============================================================================
 
 
-def create_memory_retrieval_dispatch_handler(
+def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handlers field name — fully implemented
     *,
     correlation_id: UUID | None = None,
 ) -> Callable[
