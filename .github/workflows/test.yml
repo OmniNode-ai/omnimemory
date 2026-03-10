@@ -34,12 +34,12 @@ jobs:
   #
   # Phase 2 - Full Test Suite (after Phase 1 completes):
   #   - test: Run all tests (depends on lint, pyright, onex-validation)
-  #   Note: check-handshake runs independently and is evaluated in test-summary,
+  #   Note: check-handshake runs independently and is evaluated in ci-summary,
   #   NOT in test's needs, because it may be skipped on fork PRs and GitHub Actions
   #   propagates skipped status to dependent jobs.
   #
   # Phase 3 - Aggregation:
-  #   - test-summary: Aggregates all job results
+  #   - ci-summary: Aggregates all job results
   #
   # CONFIGURATION SYNC NOTE:
   # These validations are synchronized with .pre-commit-config.yaml
@@ -381,8 +381,8 @@ jobs:
           retention-days: 7
 
   # Phase 3 - Aggregation
-  test-summary:
-    name: Test Summary
+  ci-summary:
+    name: CI Summary
     runs-on: ubuntu-latest
     needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test]
     if: always()
