@@ -58,8 +58,8 @@ def handler() -> HandlerMemoryRetrieval:
         Configured HandlerMemoryRetrieval instance with mock handlers.
     """
     config = ModelHandlerMemoryRetrievalConfig(
-        use_mock_handlers=True,
-        qdrant_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
+        use_stub_handlers=True,
+        qdrant_mock_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
         db_config=ModelHandlerDbMockConfig(case_sensitive=False),
         graph_config=ModelHandlerGraphMockConfig(bidirectional=True),
     )

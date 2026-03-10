@@ -140,9 +140,9 @@ class HandlerMemoryRetrieval:
             if self._initialized:
                 return
 
-            if self._config.use_mock_handlers:
-                # Initialize mock handlers
-                self._qdrant_handler = HandlerQdrantMock(self._config.qdrant_config)
+            if self._config.use_stub_handlers:
+                # Initialize stub (mock) handlers
+                self._qdrant_handler = HandlerQdrantMock(self._config.qdrant_mock_config)
                 self._db_handler = HandlerDbMock(self._config.db_config)
                 self._graph_handler = HandlerGraphMock(self._config.graph_config)
 
@@ -152,11 +152,11 @@ class HandlerMemoryRetrieval:
                     self._graph_handler.initialize(),
                 )
 
-                logger.info("Memory retrieval handler initialized with mock handlers")
+                logger.info("Memory retrieval handler initialized with stub handlers")
             else:
-                # TODO: Initialize real handlers from omnibase_infra
+                # stub-ok: OMN-4475 — HandlerQdrant production wiring deferred to Task 5
                 raise NotImplementedError(
-                    "Real handlers not yet implemented. Set use_mock_handlers=True"
+                    "Production handlers not yet implemented. Set use_stub_handlers=True"
                 )
 
             self._initialized = True

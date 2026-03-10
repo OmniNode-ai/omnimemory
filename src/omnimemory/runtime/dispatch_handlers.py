@@ -401,8 +401,8 @@ def create_memory_retrieval_dispatch_handler(
 ]:
     """Create a dispatch handler for memory-retrieval-requested commands.
 
-    Delegates to HandlerMemoryRetrieval (initialized with mock backends via
-    use_mock_handlers=True). Returns a serialised JSON response string.
+    Delegates to HandlerMemoryRetrieval (initialized with stub backends via
+    use_stub_handlers=True). Returns a serialised JSON response string.
 
     The handler initialises HandlerMemoryRetrieval lazily on first call so
     that container startup is not blocked by backend initialisation.
@@ -426,7 +426,7 @@ def create_memory_retrieval_dispatch_handler(
     async def _get_retrieval_handler() -> HandlerMemoryRetrieval:
         nonlocal _retrieval_handler
         if _retrieval_handler is None:
-            config = ModelHandlerMemoryRetrievalConfig(use_mock_handlers=True)
+            config = ModelHandlerMemoryRetrievalConfig(use_stub_handlers=True)
             _retrieval_handler = HandlerMemoryRetrieval(config)
             await _retrieval_handler.initialize()
         return _retrieval_handler
