@@ -306,7 +306,7 @@ def _check_line_level_skip_patterns(
     return False, None
 
 
-def _check_skip_patterns(
+def _check_skip_patterns(  # stub-ok: docstring uses 'xxxx' as example secret string, not a FIXME marker
     line: str,
     patterns: list[tuple[re.Pattern[str], str]],
     filepath: Path,
