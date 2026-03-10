@@ -326,6 +326,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "no-env-file",
             "validate-string-versions",
             "no-hardcoded-bolt-fallback",
+            "validate-spdx-headers",
         }
     )
 
