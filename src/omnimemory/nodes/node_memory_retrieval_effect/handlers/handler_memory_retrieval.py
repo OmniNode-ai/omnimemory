@@ -112,7 +112,7 @@ class HandlerMemoryRetrieval:
             config: The handler configuration. If None, defaults are used.
         """
         self._config = config or ModelHandlerMemoryRetrievalConfig()
-        self._qdrant_handler: HandlerQdrantMock | None = None
+        self._qdrant_handler: HandlerQdrantMock | object | None = None
         self._db_handler: HandlerDbMock | None = None
         self._graph_handler: HandlerGraphMock | None = None
         self._initialized = False
@@ -156,9 +156,31 @@ class HandlerMemoryRetrieval:
 
                 logger.info("Memory retrieval handler initialized with stub handlers")
             else:
-                # stub-ok: OMN-4475 — HandlerQdrant production wiring deferred to Task 5
-                raise NotImplementedError(
-                    "Production handlers not yet implemented. Set use_stub_handlers=True"
+                # Production mode: wire real HandlerQdrant; DB and graph remain stubs.
+                from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_qdrant import (
+                    HandlerQdrant,
+                )
+
+                assert (
+                    self._config.qdrant_config is not None
+                )  # enforced by model_validator
+                self._qdrant_handler = HandlerQdrant(self._config.qdrant_config)
+                # DB and graph handlers: not yet implemented. Using stub handlers.
+                # TODO: replace once HandlerDb and HandlerGraph are available (OMN-4476)
+                self._db_handler = HandlerDbMock(self._config.db_config)
+                self._graph_handler = HandlerGraphMock(self._config.graph_config)
+                logger.warning(
+                    "HandlerMemoryRetrieval: DB and graph subsystems are still using "
+                    "stub handlers. Qdrant (semantic search) is real. "
+                    "DB (full-text) and graph (relationships) remain stubs."
+                )
+                await asyncio.gather(
+                    self._qdrant_handler.initialize(),
+                    self._db_handler.initialize(),
+                    self._graph_handler.initialize(),
+                )
+                logger.info(
+                    "HandlerMemoryRetrieval initialized: Qdrant=real, DB=stub, Graph=stub"
                 )
 
             self._initialized = True
