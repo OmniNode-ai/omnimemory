@@ -1,3 +1,19 @@
+## v0.7.1 (2026-03-13)
+
+### Features
+_(none)_
+
+### Bug Fixes
+- fix(cleanup): fix hardcoded Kafka fallback port 9092 → 19092 (OMN-4847) (#152)
+- fix(migrations): backfill NULL checksums and enforce NOT NULL on schema_migrations [OMN-4701] (#148)
+
+### Other Changes
+- chore(pre-commit): add kafka-no-hardcoded-fallback hook [OMN-4860] (#153)
+- chore(pre-commit): standardize ruff + yamlfmt versions [OMN-4858] (#151)
+- ci(standards): add version pin compliance check [OMN-4809] (#150)
+- chore(deps): bump omnibase-core/spi/infra pins to current approved versions [OMN-4799] (#149)
+- chore(deps): bump omnibase_infra to 0.18.0 (#147)
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
