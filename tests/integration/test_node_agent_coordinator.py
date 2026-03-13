@@ -307,6 +307,7 @@ async def orchestrator_node(
         db_dsn=test_db_dsn,
         valkey_host=test_valkey_host,
         valkey_port=test_valkey_port,
+        kafka_bootstrap_servers="localhost:19092",  # kafka-fallback-ok
     )
     node = NodeAgentCoordinatorOrchestrator(config)
     await node.initialize()
@@ -735,6 +736,7 @@ class TestOrchestratorErrorHandling:
             db_dsn=test_db_dsn,
             valkey_host=test_valkey_host,
             valkey_port=test_valkey_port,
+            kafka_bootstrap_servers="localhost:19092",  # kafka-fallback-ok
         )
         node = NodeAgentCoordinatorOrchestrator(config)
 

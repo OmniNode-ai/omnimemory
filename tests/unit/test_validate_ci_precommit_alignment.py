@@ -326,6 +326,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "no-env-file",
             "validate-string-versions",
             "no-hardcoded-bolt-fallback",
+            "kafka-no-hardcoded-fallback",
             "validate-spdx-headers",
             "check-stub-implementations",
         }
