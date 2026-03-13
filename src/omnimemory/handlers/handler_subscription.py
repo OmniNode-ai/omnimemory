@@ -61,7 +61,7 @@ Example::
         db_dsn=os.environ["OMNIMEMORY_DB_URL"],
         valkey_host="localhost",
         valkey_port=6379,
-        kafka_bootstrap_servers="localhost:19092",
+        kafka_bootstrap_servers=os.environ["KAFKA_BOOTSTRAP_SERVERS"],
     )
     handler = HandlerSubscription(container)
     await handler.initialize(config)
@@ -299,7 +299,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
         description="Optional Valkey password",
     )
     kafka_bootstrap_servers: str = Field(
-        default="localhost:19092",
+        ...,
         description="Event bus bootstrap servers, comma-separated (Kafka endpoint)",
     )
     cache_ttl_seconds: int = Field(

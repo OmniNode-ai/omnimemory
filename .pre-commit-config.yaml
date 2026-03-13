@@ -444,6 +444,19 @@ repos:
         stages: [pre-commit]
 
       # --------------------------------------------------------------------------
+      # Kafka Hardcoded Fallback Guard (OMN-4860, mirrors omnibase_infra OMN-3554)
+      # Validates: No hardcoded localhost:9092 or private-IP Kafka addresses in src/
+      # Purpose: Prevents reintroduction of hardcoded broker addresses after T2-M fix
+      # --------------------------------------------------------------------------
+      - id: kafka-no-hardcoded-fallback
+        name: Reject hardcoded Kafka broker address fallbacks
+        entry: bash scripts/validation/check_kafka_no_hardcoded_fallback.sh
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+
+      # --------------------------------------------------------------------------
       # SPDX Header Enforcement (ONEX canonical)
       # Validates: All eligible source files carry MIT SPDX headers
       # Scope: src/, tests/, scripts/, examples/ (py, sh, bash, yml, yaml, toml)
