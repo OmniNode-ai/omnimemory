@@ -380,43 +380,16 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
-  # ---------------------------------------------------------------------------
-  # Phase 1 - Version Pin Compliance Check (OMN-4809)
-  # ---------------------------------------------------------------------------
-  # Verifies that this repo's dependency pins are compliant with the shared
-  # version matrix defined in omni_home/standards/version-matrix.yaml.
-  # Depends on OMN-4803 (check_version_pins.py must exist in omni_home main).
-  version-pin-check:
-    name: Version Pin Compliance
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Checkout omni_home standards
-        uses: actions/checkout@v6
-        with:
-          repository: OmniNode-ai/omni_home
-          path: omni_home
-          sparse-checkout: |
-            standards/
-          sparse-checkout-cone-mode: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Check version pin compliance
-        run: python omni_home/standards/check_version_pins.py --repo omnimemory --root omni_home
+  # NOTE: Version Pin Compliance check (OMN-4809) removed — prerequisite
+  # OMN-4803 (check_version_pins.py in omni_home/standards/) not yet shipped,
+  # and cross-repo checkout of private OmniNode-ai/omni_home requires a PAT.
+  # Re-add when OMN-4803 lands and a CROSS_REPO_TOKEN secret is configured.
 
   # Phase 3 - Aggregation
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test, version-pin-check]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test]
     if: always()
 
     steps:
