@@ -1,3 +1,9 @@
+## v0.7.2 (2026-03-13)
+
+### Other Changes
+- ci: remove premature version-pin-check job that breaks CI (OMN-4809) (#156)
+- chore(deps): bump omnibase-core to 0.27.0, omnibase-infra to 0.20.0
+
 ## v0.7.1 (2026-03-13)
 
 ### Features
