@@ -1,6 +1,6 @@
 # CLAUDE.md - OmniMemory
 
-> **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: uv | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
+> **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: uv (hatchling backend) | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
 
 ---
 
@@ -49,7 +49,7 @@ OmniMemory explicitly does **NOT**:
 
 ```bash
 # Setup
-uv sync
+uv sync --group dev
 pre-commit install
 pre-commit install --hook-type pre-push
 
@@ -61,10 +61,10 @@ uv run ruff check --fix src/ tests/
 uv run mypy src/omnimemory
 
 # Testing
-uv run pytest                    # All tests
-uv run pytest -m unit            # Unit tests only
-uv run pytest -m integration     # Integration tests
-uv run pytest --cov              # With coverage report
+uv run pytest                        # All tests
+uv run pytest -m unit                # Unit tests only
+uv run pytest -m integration         # Integration tests
+uv run pytest --cov                  # With coverage report
 
 # Pre-commit validation
 pre-commit run --all-files
