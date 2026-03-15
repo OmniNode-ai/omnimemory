@@ -217,7 +217,7 @@ ignore = [
     "N806",      # Variable in function should be lowercase
     "PTH123",    # Use Path.open() instead of open()
     "TID252",    # Prefer absolute imports over relative from parent
-    "T201",      # print() found (use logging instead)
+    # T201 (print) is NOT ignored — enforced per standardization plan
     "S311",      # Random not suitable for crypto (acceptable for non-crypto)
     "RUF022",    # __all__ is not sorted
     "RUF012",    # Mutable class attrs should be ClassVar
@@ -269,6 +269,11 @@ known-first-party = ["omnimemory"]
 "src/omnimemory/audit/*" = [
     "N802",  # AST visitor methods use CamelCase (visit_Import, visit_Call, etc.)
 ]
+# CLI entry points — intentional print() for user-facing output
+"src/omnimemory/audit/__main__.py" = ["T201"]
+"src/omnimemory/tools/contract_linter.py" = ["T201"]
+# Performance benchmark test — uses print() for results output
+"tests/test_performance.py" = ["T201"]
 # Test-only rules - acceptable in test files
 "tests/**/*" = [
     "SLF001",  # Private member accessed (tests need to verify internals)
@@ -329,9 +334,15 @@ warn_untyped_fields = true
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["src", "."]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--tb=short",
+]
 # Filter deprecation warnings from third-party libraries we can't fix
 filterwarnings = [
     # Google protobuf PyType_Spec metaclass warning - upstream issue, can't fix

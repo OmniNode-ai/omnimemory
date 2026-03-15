@@ -158,7 +158,7 @@ repos:
       - id: mypy-type-check
         name: mypy (type checking - strict)
         # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
-        entry: poetry run mypy --show-error-codes --no-error-summary src/omnimemory
+        entry: uv run mypy --show-error-codes --no-error-summary src/omnimemory
         language: system
         types: [python]
         pass_filenames: false
@@ -347,7 +347,7 @@ repos:
       - id: contract-linter
         name: ONEX Contract Linter
         description: Validates node contract YAML files. Requires Poetry (poetry install).
-        entry: poetry run python -m omnimemory.tools.contract_linter
+        entry: uv run python -m omnimemory.tools.contract_linter
         language: system
         pass_filenames: true
         # SYNC: CI uses `find src/omnimemory -name contract.yaml` with graceful
@@ -367,7 +367,7 @@ repos:
       - id: io-audit
         name: I/O Audit (ONEX node purity)
         description: Audits node purity for forbidden I/O. Requires Poetry (poetry install).
-        entry: poetry run python -m omnimemory.audit
+        entry: uv run python -m omnimemory.audit
         language: system
         pass_filenames: false
         types: [python]
