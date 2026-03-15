@@ -23,6 +23,7 @@ jobs:
       #   - contract-linter  -> contract-validation job
       #   - io-audit         -> io-audit job
       #   - mypy             -> lint job (pre-push stage, not triggered here anyway)
+      #   - onex-validate-links -> requires uv (not available in pre-commit CI env)
       - uses: pre-commit/action@v3.0.1
         env:
-          SKIP: contract-linter,io-audit,check-ai-slop
+          SKIP: contract-linter,io-audit,check-ai-slop,onex-validate-links

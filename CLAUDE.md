@@ -1,6 +1,6 @@
 # CLAUDE.md - OmniMemory
 
-> **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: Poetry | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
+> **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: uv | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
 
 ---
 
@@ -49,22 +49,22 @@ OmniMemory explicitly does **NOT**:
 
 ```bash
 # Setup
-poetry install
+uv sync
 pre-commit install
 pre-commit install --hook-type pre-push
 
 # Format and lint
-poetry run ruff format src/ tests/
-poetry run ruff check --fix src/ tests/
+uv run ruff format src/ tests/
+uv run ruff check --fix src/ tests/
 
 # Type checking
-poetry run mypy src/omnimemory
+uv run mypy src/omnimemory
 
 # Testing
-poetry run pytest                    # All tests
-poetry run pytest -m unit            # Unit tests only
-poetry run pytest -m integration     # Integration tests
-poetry run pytest --cov              # With coverage report
+uv run pytest                    # All tests
+uv run pytest -m unit            # Unit tests only
+uv run pytest -m integration     # Integration tests
+uv run pytest --cov              # With coverage report
 
 # Pre-commit validation
 pre-commit run --all-files
@@ -77,12 +77,12 @@ pre-commit run --all-files --hook-stage pre-push
 
 ## Package Manager
 
-This repository uses **Poetry** for dependency management. All Python commands must be run via `poetry run`.
+This repository uses **uv** for dependency management. All Python commands must be run via `uv run`.
 
 ```bash
-poetry install          # Install all dependencies
-poetry run <command>    # Run command in venv
-poetry lock             # Regenerate lockfile
+uv sync          # Install all dependencies
+uv run <command>    # Run command in venv
+uv lock              # Regenerate lockfile
 ```
 
 ---
@@ -247,4 +247,4 @@ For project overview, mission, and technology stack, see `README.md`.
 
 ---
 
-**Python**: 3.12+ | **Package Manager**: Poetry | **ONEX**: 4.0+
+**Python**: 3.12+ | **Package Manager**: uv | **ONEX**: 4.0+
