@@ -8,19 +8,9 @@
 
 **Memory persistence, recall, and semantic retrieval for the OmniNode platform.** OmniMemory provides ONEX-compliant nodes and handlers for storing agent context, indexing embeddings, querying intent graphs, and managing the full memory lifecycle across distributed omni agents.
 
-## Four-Node Architecture
+## Architecture
 
-```text
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     EFFECT      │───▶│     COMPUTE     │───▶│     REDUCER     │───▶│  ORCHESTRATOR   │
-│  (store/fetch)  │    │ (embed/analyze) │    │  (consolidate)  │    │  (coordinate)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-- **EFFECT**: Memory storage, retrieval, and intent query against external backends
-- **COMPUTE**: Semantic analysis, similarity scoring, embedding generation
-- **REDUCER**: Memory consolidation, statistics aggregation, lifecycle state management
-- **ORCHESTRATOR**: Agent coordination, multi-step memory lifecycle workflows
+Follows the [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/omnibase_core/blob/main/docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md) (EFFECT, COMPUTE, REDUCER, ORCHESTRATOR) applied to memory operations.
 
 ## What This Repo Provides
 
