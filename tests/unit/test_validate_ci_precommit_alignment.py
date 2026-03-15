@@ -329,6 +329,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "kafka-no-hardcoded-fallback",
             "validate-spdx-headers",
             "check-stub-implementations",
+            "onex-validate-links",
         }
     )
 
