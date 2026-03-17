@@ -15,18 +15,12 @@ Architecture:
     - Staleness detection for health monitoring
 
 Topic Naming:
-    Full topic names are constructed as ``{env_prefix}.{topic_suffix}`` where:
-
-    - ``env_prefix`` is a deployment realm (e.g., ``"dev"``, ``"staging"``,
-      ``"prod"``) that isolates environments on the same cluster.
-    - ``topic_suffix`` contains the ``onex.`` namespace and event path
-      (e.g., ``onex.evt.omnimemory.intent-stored.v1``).
-
-    Resulting topic example: ``dev.onex.evt.omnimemory.intent-stored.v1``
+    Topics use canonical ONEX format directly (no environment prefix).
+    Example: ``onex.evt.omnimemory.intent-stored.v1``
 
 Consumer Group:
     Derived from node identity per ADR:
-    ``{env_prefix}.omnimemory.intent_event_consumer_effect.consume.v1``
+    ``omnimemory.intent_event_consumer_effect.consume.v1``
 
 Contract Format:
     Uses standard ``event_bus.subscribe_topics`` contract format (OMN-1746)
@@ -56,7 +50,6 @@ Example::
         # (event_bus.subscribe is injected by the runtime layer)
         await consumer.initialize(
             subscribe_callback=event_bus.subscribe,
-            env_prefix="dev",
         )
 
         # Run until shutdown
@@ -111,14 +104,12 @@ class HandlerIntentEventConsumer:
     """Event bus consumer for intent-classified events.
 
     Consumer group is derived from node identity per ADR:
-    ``{env_prefix}.{service}.{node_name}.{purpose}.{version}``
+    ``{service}.{node_name}.{purpose}.{version}``
 
-    Example: ``dev.omnimemory.intent_event_consumer_effect.consume.v1``
+    Example: ``omnimemory.intent_event_consumer_effect.consume.v1``
 
-    The ``env_prefix`` parameter is a deployment realm (e.g., ``"dev"``,
-    ``"staging"``, ``"prod"``) that isolates environments on the same event bus
-    cluster. It is separate from the ``onex.`` namespace embedded in topic
-    suffixes.
+    Topics use canonical ONEX format directly (no environment prefix per
+    OMN-5214).
 
     Topic configuration uses list-based fields matching the standard
     ``event_bus.subscribe_topics`` contract format (OMN-1746). The first
@@ -174,7 +165,7 @@ class HandlerIntentEventConsumer:
 
         # Event bus publish callback (set during initialize)
         self._publish_callback: Callable[[str, dict[str, object]], None] | None = None
-        self._env_prefix: str = "dev"
+        # env_prefix removed in OMN-5214 — topics are canonical ONEX names
 
         # Track pending tasks to prevent garbage collection (RUF006)
         self._pending_tasks: set[asyncio.Task[None]] = set()
@@ -207,19 +198,17 @@ class HandlerIntentEventConsumer:
         subscribe_callback: Callable[
             [str, Callable[[dict[str, object]], None]], Callable[[], None]
         ],
-        env_prefix: str = "dev",
         publish_callback: Callable[[str, dict[str, object]], None] | None = None,
     ) -> None:
         """Initialize event bus subscriptions for all configured subscribe_topics.
 
-        Subscribes to each topic in ``config.subscribe_topics``, constructing
-        full topic names as ``{env_prefix}.{topic_suffix}``.
+        Subscribes to each topic in ``config.subscribe_topics`` using the
+        canonical ONEX topic names directly (no environment prefix).
 
         Args:
             subscribe_callback: Function to subscribe to an event bus topic.
                 Signature: (topic, handler) -> unsubscribe_fn.
                 Injected by the runtime layer (e.g., EventBusKafka.subscribe).
-            env_prefix: Environment prefix for topic names (e.g., "dev", "staging").
             publish_callback: Optional callback for publishing events.
                 Signature: (topic, message_dict) -> None
         """
@@ -240,12 +229,11 @@ class HandlerIntentEventConsumer:
                 "consumer would initialize with no subscriptions"
             )
 
-        self._env_prefix = env_prefix
         self._publish_callback = publish_callback
 
         failed_topics: list[tuple[str, str]] = []
         for topic_suffix in self._config.subscribe_topics:
-            full_topic = f"{env_prefix}.{topic_suffix}"
+            full_topic = topic_suffix
             try:
                 unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
             except Exception as e:
@@ -268,7 +256,7 @@ class HandlerIntentEventConsumer:
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
                     "topic": full_topic,
-                    "env_prefix": env_prefix,
+                    "topic_canonical": full_topic,
                 },
             )
 
@@ -556,7 +544,7 @@ class HandlerIntentEventConsumer:
             return
 
         publish_topic = self._config.publish_topics[0]
-        topic = f"{self._env_prefix}.{publish_topic}"
+        topic = publish_topic
         try:
             self._publish_callback(topic, event.model_dump(mode="json"))
             logger.debug(
@@ -615,7 +603,7 @@ class HandlerIntentEventConsumer:
             )
             return
 
-        topic = f"{self._env_prefix}.{dlq_topic}"
+        topic = dlq_topic
         dlq_message = {
             "original_message": message,
             "failure_reason": reason,
