@@ -129,7 +129,7 @@ class HandlerIntentEventConsumer:
         await storage.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
         consumer = HandlerIntentEventConsumer(config, storage)
-        await consumer.initialize(event_bus_subscribe, "dev")
+        await consumer.initialize(event_bus_subscribe)
     """
 
     def __init__(

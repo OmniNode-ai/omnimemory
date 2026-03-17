@@ -919,7 +919,7 @@ async def _publish_event(
 
     Args:
         publish_callback: Caller-supplied async publish function.
-        topic: Full topic name (env prefix already applied).
+        topic: Full canonical ONEX topic name.
         payload: Serialized event dict.
         correlation_id: Used in error log for traceability.
     """
