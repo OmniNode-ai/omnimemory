@@ -216,7 +216,7 @@ class TestCreateMemoryDispatchEngine:
             intent_consumer=mock_intent_consumer,
             intent_query_handler=mock_intent_query_handler,
             publish_topics={
-                "intent_query": "dev.onex.evt.omnimemory.intent-query-response.v1",
+                "intent_query": "onex.evt.omnimemory.intent-query-response.v1",
             },
         )
         assert engine.is_frozen
@@ -432,7 +432,7 @@ class TestIntentQueryDispatchHandler:
         )
 
         publish_callback = MagicMock()
-        publish_topic = "dev.onex.evt.omnimemory.intent-query-response.v1"
+        publish_topic = "onex.evt.omnimemory.intent-query-response.v1"
 
         handler = create_intent_query_dispatch_handler(
             query_handler=mock_intent_query_handler,
@@ -511,7 +511,7 @@ class TestIntentQueryDispatchHandler:
         )
 
         async_publish_callback = AsyncMock()
-        publish_topic = "dev.onex.evt.omnimemory.intent-query-response.v1"
+        publish_topic = "onex.evt.omnimemory.intent-query-response.v1"
 
         handler = create_intent_query_dispatch_handler(
             query_handler=mock_intent_query_handler,

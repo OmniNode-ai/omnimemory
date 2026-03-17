@@ -50,7 +50,6 @@ Example::
             correlation_id=uuid4(),
             crawl_scope="omninode/omnimemory",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publisher,
         )
         print(f"discovered={result.discovered_count}")
@@ -353,7 +352,6 @@ class HandlerFilesystemCrawler:
         correlation_id: UUID,
         crawl_scope: str,
         trigger_source: TriggerSource,
-        env_prefix: str,
         publish_callback: Callable[
             [str, dict[str, object]], Coroutine[object, object, None]
         ],
@@ -373,9 +371,8 @@ class HandlerFilesystemCrawler:
             correlation_id: Threaded from the originating crawl tick command.
             crawl_scope: Scope string from the crawl tick command.
             trigger_source: What triggered this crawl run.
-            env_prefix: Deployment environment prefix (e.g. "dev").
             publish_callback: Async callback for publishing events.
-                Signature: (full_topic, message_dict) -> Coroutine[..., None].
+                Signature: (topic, message_dict) -> Coroutine[..., None].
             scope_mappings: Optional list of (path_prefix, scope_ref) pairs
                 for scope resolution. If None, DEFAULT_SCOPE_REF is used
                 for all files.
@@ -607,7 +604,7 @@ class HandlerFilesystemCrawler:
                     )
                     await _publish_event(
                         publish_callback,
-                        f"{env_prefix}.{self._config.publish_topic_discovered}",
+                        self._config.publish_topic_discovered,
                         discovered_event.model_dump(mode="json"),
                         correlation_id,
                     )
@@ -626,7 +623,7 @@ class HandlerFilesystemCrawler:
                     )
                     await _publish_event(
                         publish_callback,
-                        f"{env_prefix}.{self._config.publish_topic_indexed}",
+                        self._config.publish_topic_indexed,
                         indexed_event.model_dump(mode="json"),
                         correlation_id,
                     )
@@ -682,7 +679,7 @@ class HandlerFilesystemCrawler:
                     )
                     await _publish_event(
                         publish_callback,
-                        f"{env_prefix}.{self._config.publish_topic_changed}",
+                        self._config.publish_topic_changed,
                         changed_event.model_dump(mode="json"),
                         correlation_id,
                     )
@@ -701,7 +698,7 @@ class HandlerFilesystemCrawler:
                     )
                     await _publish_event(
                         publish_callback,
-                        f"{env_prefix}.{self._config.publish_topic_indexed}",
+                        self._config.publish_topic_indexed,
                         indexed_event.model_dump(mode="json"),
                         correlation_id,
                     )
@@ -744,7 +741,6 @@ class HandlerFilesystemCrawler:
                 emitted_at_utc=now_utc,
                 crawl_scope=crawl_scope,
                 trigger_source=trigger_source,
-                env_prefix=env_prefix,
                 publish_callback=publish_callback,
                 resolved_mappings=resolved_mappings,
             )
@@ -789,7 +785,6 @@ class HandlerFilesystemCrawler:
         emitted_at_utc: datetime,
         crawl_scope: str,
         trigger_source: TriggerSource,
-        env_prefix: str,
         publish_callback: Callable[
             [str, dict[str, object]], Coroutine[object, object, None]
         ],
@@ -816,7 +811,6 @@ class HandlerFilesystemCrawler:
             emitted_at_utc: UTC datetime when the crawl run started.
             crawl_scope: Scope string from the originating crawl tick command.
             trigger_source: What triggered the crawl run.
-            env_prefix: Environment prefix for topic construction.
             publish_callback: Async publish callback.
             resolved_mappings: Scope mappings for source_type resolution.
 
@@ -874,7 +868,7 @@ class HandlerFilesystemCrawler:
                     )
                     await _publish_event(
                         publish_callback,
-                        f"{env_prefix}.{self._config.publish_topic_removed}",
+                        self._config.publish_topic_removed,
                         removed_event.model_dump(mode="json"),
                         correlation_id,
                     )

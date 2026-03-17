@@ -133,7 +133,6 @@ async def _run_handler(
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -297,13 +296,11 @@ async def test_idempotent_crawl_no_duplicate_events(tmp_path: Path) -> None:
         # First call
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
         # Second call — same event, same fingerprint
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 

@@ -139,20 +139,18 @@ class TestInitialization:
         """Consumer should report initialized after initialize() is called.
 
         Verifies that all topics in subscribe_topics are subscribed to
-        with the correct env prefix.
+        using bare canonical ONEX topic names.
         """
         config = ModelIntentEventConsumerConfig()
         storage = create_mock_storage_adapter()
         subscribe_fn, subscriptions = create_mock_subscribe()
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         assert consumer.is_initialized is True
         assert len(subscriptions) == 1
-        assert (
-            subscriptions[0][0] == "test.onex.evt.omniintelligence.intent-classified.v1"
-        )
+        assert subscriptions[0][0] == "onex.evt.omniintelligence.intent-classified.v1"
 
     @pytest.mark.asyncio
     async def test_consumer_subscribes_to_multiple_topics(self) -> None:
@@ -167,16 +165,12 @@ class TestInitialization:
         subscribe_fn, subscriptions = create_mock_subscribe()
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         assert consumer.is_initialized is True
         assert len(subscriptions) == 2
-        assert (
-            subscriptions[0][0] == "test.onex.evt.omniintelligence.intent-classified.v1"
-        )
-        assert (
-            subscriptions[1][0] == "test.onex.evt.omniintelligence.intent-classified.v2"
-        )
+        assert subscriptions[0][0] == "onex.evt.omniintelligence.intent-classified.v1"
+        assert subscriptions[1][0] == "onex.evt.omniintelligence.intent-classified.v2"
 
     @pytest.mark.asyncio
     async def test_initialize_idempotent(self) -> None:
@@ -188,11 +182,11 @@ class TestInitialization:
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
 
         # First initialization
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
         assert len(subscriptions) == 1
 
         # Second initialization should be a no-op
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
         assert len(subscriptions) == 1  # Still 1, not 2
         assert consumer.is_initialized is True
 
@@ -206,9 +200,7 @@ class TestInitialization:
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
 
         with pytest.raises(ValueError, match="subscribe_topics must not be empty"):
-            await consumer.initialize(
-                subscribe_callback=subscribe_fn, env_prefix="test"
-            )
+            await consumer.initialize(subscribe_callback=subscribe_fn)
 
         assert consumer.is_initialized is False
         assert len(subscriptions) == 0
@@ -233,15 +225,13 @@ class TestInitialization:
             return MagicMock()
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
-        await consumer.initialize(
-            subscribe_callback=subscribe_with_failure, env_prefix="test"
-        )
+        await consumer.initialize(subscribe_callback=subscribe_with_failure)
 
         # Should be initialized with 2 of 3 topics
         assert consumer.is_initialized is True
         assert len(subscriptions) == 2
-        assert subscriptions[0][0] == "test.onex.evt.topic-good.v1"
-        assert subscriptions[1][0] == "test.onex.evt.topic-good2.v1"
+        assert subscriptions[0][0] == "onex.evt.topic-good.v1"
+        assert subscriptions[1][0] == "onex.evt.topic-good2.v1"
 
     @pytest.mark.asyncio
     async def test_initialize_all_subscriptions_fail_raises(self) -> None:
@@ -260,9 +250,7 @@ class TestInitialization:
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
 
         with pytest.raises(RuntimeError, match="All topic subscriptions failed"):
-            await consumer.initialize(
-                subscribe_callback=subscribe_always_fails, env_prefix="test"
-            )
+            await consumer.initialize(subscribe_callback=subscribe_always_fails)
 
         assert consumer.is_initialized is False
 
@@ -289,7 +277,7 @@ class TestMessageProcessing:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         message = create_valid_message()
         await consumer._handle_message(message, retry_count=0)
@@ -316,7 +304,6 @@ class TestMessageProcessing:
         subscribe_fn, _ = create_mock_subscribe()
         await consumer.initialize(
             subscribe_callback=subscribe_fn,
-            env_prefix="test",
             publish_callback=mock_publish,
         )
 
@@ -356,7 +343,6 @@ class TestMessageProcessing:
         subscribe_fn, _ = create_mock_subscribe()
         await consumer.initialize(
             subscribe_callback=subscribe_fn,
-            env_prefix="test",
             publish_callback=mock_publish,
         )
 
@@ -406,7 +392,6 @@ class TestUUIDValidation:
         subscribe_fn, _ = create_mock_subscribe()
         await consumer.initialize(
             subscribe_callback=subscribe_fn,
-            env_prefix="test",
             publish_callback=mock_publish,
         )
 
@@ -461,7 +446,7 @@ class TestRetryLogic:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         message = create_valid_message()
 
@@ -491,7 +476,7 @@ class TestRetryLogic:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Invalid message
         invalid_message: MessagePayload = {"garbage": "data"}
@@ -515,7 +500,7 @@ class TestRetryLogic:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         message = create_valid_message()
         await consumer._handle_message(message, retry_count=0)
@@ -547,7 +532,7 @@ class TestCircuitBreaker:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Process messages until circuit opens (need 3 failures)
         # Each storage failure records a circuit breaker failure
@@ -578,7 +563,6 @@ class TestCircuitBreaker:
         subscribe_fn, _ = create_mock_subscribe()
         await consumer.initialize(
             subscribe_callback=subscribe_fn,
-            env_prefix="test",
             publish_callback=mock_publish,
         )
 
@@ -635,7 +619,7 @@ class TestHealthCheck:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Process a message successfully
         message = create_valid_message()
@@ -659,7 +643,7 @@ class TestHealthCheck:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Set last consume timestamp to be old
         consumer._last_consume_timestamp = datetime.now(timezone.utc) - timedelta(
@@ -682,7 +666,7 @@ class TestHealthCheck:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Never consume any messages
         health = await consumer.health_check()
@@ -699,7 +683,7 @@ class TestHealthCheck:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Manually open the circuit breaker
         consumer._circuit_breaker.state = CircuitBreakerState.OPEN
@@ -747,7 +731,6 @@ class TestEventEmission:
         subscribe_fn, _ = create_mock_subscribe()
         await consumer.initialize(
             subscribe_callback=subscribe_fn,
-            env_prefix="test",
             publish_callback=mock_publish,
         )
 
@@ -786,7 +769,6 @@ class TestEventEmission:
         subscribe_fn, _ = create_mock_subscribe()
         await consumer.initialize(
             subscribe_callback=subscribe_fn,
-            env_prefix="test",
             publish_callback=mock_publish,
         )
 
@@ -824,7 +806,7 @@ class TestStopCleanup:
             return unsubscribe_mock
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
-        await consumer.initialize(subscribe_callback=mock_subscribe, env_prefix="test")
+        await consumer.initialize(subscribe_callback=mock_subscribe)
 
         assert consumer.is_initialized is True
 
@@ -854,7 +836,7 @@ class TestStopCleanup:
             return mock
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
-        await consumer.initialize(subscribe_callback=mock_subscribe, env_prefix="test")
+        await consumer.initialize(subscribe_callback=mock_subscribe)
 
         assert consumer.is_initialized is True
         assert len(unsubscribe_mocks) == 2
@@ -875,7 +857,7 @@ class TestStopCleanup:
 
         consumer = HandlerIntentEventConsumer(config=config, storage_adapter=storage)
         subscribe_fn, _ = create_mock_subscribe()
-        await consumer.initialize(subscribe_callback=subscribe_fn, env_prefix="test")
+        await consumer.initialize(subscribe_callback=subscribe_fn)
 
         # Multiple stop calls should be safe
         await consumer.stop()

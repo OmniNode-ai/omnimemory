@@ -45,7 +45,7 @@ Example::
         parser_version="1.0.0",
     )
     handler = HandlerKreuzbergParse(config=config)
-    await handler.process_event(event=event, env_prefix="dev", publish_callback=cb)
+    await handler.process_event(event=event, publish_callback=cb)
 
 .. versionadded:: 0.5.0
     Initial implementation for OMN-2733.
@@ -159,7 +159,6 @@ class HandlerKreuzbergParse:
     async def process_event(
         self,
         event: ModelDocumentDiscoveredEvent | ModelDocumentChangedEvent,
-        env_prefix: str,
         publish_callback: Callable[[str, dict[str, object]], Coroutine[Any, Any, None]],
     ) -> ModelKreuzbergParseResult:
         """Process a single document discovered or changed event.
@@ -167,8 +166,6 @@ class HandlerKreuzbergParse:
         Args:
             event: The triggering document event carrying source_ref and
                 content_fingerprint.
-            env_prefix: Environment prefix used to build fully-qualified
-                topic names (e.g. "dev", "prod").
             publish_callback: Async callable that accepts (topic, payload_dict)
                 and publishes the message to the event bus.
 
@@ -180,16 +177,8 @@ class HandlerKreuzbergParse:
         content_hash = event.content_fingerprint
         config = self._config
 
-        indexed_topic = (
-            f"{env_prefix}.{config.publish_topic_indexed}"
-            if env_prefix
-            else config.publish_topic_indexed
-        )
-        failed_topic = (
-            f"{env_prefix}.{config.publish_topic_parse_failed}"
-            if env_prefix
-            else config.publish_topic_parse_failed
-        )
+        indexed_topic = config.publish_topic_indexed
+        failed_topic = config.publish_topic_parse_failed
         now = datetime.now(tz=timezone.utc)
 
         # Reject paths outside document_root before any filesystem access

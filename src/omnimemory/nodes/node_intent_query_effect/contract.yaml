@@ -100,9 +100,8 @@ performance:
 # NOTE: Using version per ModelEventTypeSubcontract from omnibase_core
 #
 # Topic Naming Convention:
-#   - These are SUFFIXES only (no env prefix like "dev.")
-#   - Runtime composes full topic: f"{topic_env_prefix}.{suffix}"
-#   - Example: dev.onex.cmd.omnimemory.intent-query-requested.v1
+#   - Topics use bare canonical ONEX names (no env prefix)
+#   - Example: onex.cmd.omnimemory.intent-query-requested.v1
 #
 # Invocation Mode: SUBSCRIPTION
 #   - This node subscribes to request topics (runtime dispatches inbound)

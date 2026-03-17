@@ -143,7 +143,6 @@ async def _run_handler(
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -181,7 +180,6 @@ async def test_too_large_file_emits_parse_failed(tmp_path: Path) -> None:
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -306,13 +304,11 @@ async def test_idempotent_second_call_no_reparse(tmp_path: Path) -> None:
         # First call
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
         # Second call — same event
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -375,7 +371,6 @@ async def test_source_file_oserror_emits_parse_failed(tmp_path: Path) -> None:
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -424,7 +419,6 @@ async def test_cache_write_oserror_inline_fallback(tmp_path: Path) -> None:
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -472,7 +466,6 @@ async def test_cache_write_oserror_too_large_emits_parse_failed(tmp_path: Path) 
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
@@ -486,12 +479,8 @@ async def test_cache_write_oserror_too_large_emits_parse_failed(tmp_path: Path) 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_empty_env_prefix_uses_bare_topic_names(tmp_path: Path) -> None:
-    """env_prefix='' publishes to the bare topic name with no leading dot or prefix.
-
-    Validates the falsy-env_prefix branch at handler lines 184-193:
-        indexed_topic = config.publish_topic_indexed  (not f"dev.{...}")
-    """
+async def test_bare_topic_names_used(tmp_path: Path) -> None:
+    """Handler publishes to bare canonical ONEX topic names without any prefix."""
     config = _make_config(
         text_store_path=str(tmp_path),
         inline_text_max_chars=4096,
@@ -518,7 +507,6 @@ async def test_empty_env_prefix_uses_bare_topic_names(tmp_path: Path) -> None:
     ):
         await handler.process_event(
             event=event,
-            env_prefix="",
             publish_callback=_cb,
         )
 
@@ -526,14 +514,10 @@ async def test_empty_env_prefix_uses_bare_topic_names(tmp_path: Path) -> None:
     topic, payload = published[0]
 
     bare_indexed_topic = config.publish_topic_indexed
-    prefixed_indexed_topic = f"dev.{bare_indexed_topic}"
 
-    # Must publish to the bare topic — no prefix, no leading dot
+    # Must publish to the bare topic -- no prefix, no leading dot
     assert topic == bare_indexed_topic, (
         f"Expected bare topic {bare_indexed_topic!r}, got {topic!r}"
-    )
-    assert topic != prefixed_indexed_topic, (
-        f"Topic must not be prefixed with 'dev.', got {topic!r}"
     )
     assert not topic.startswith("."), f"Topic must not start with '.', got {topic!r}"
     assert payload["parse_status"] == "ok"
@@ -569,7 +553,6 @@ async def test_source_ref_path_traversal_emits_parse_failed(tmp_path: Path) -> N
     ):
         await handler.process_event(
             event=event,
-            env_prefix="dev",
             publish_callback=_cb,
         )
 
