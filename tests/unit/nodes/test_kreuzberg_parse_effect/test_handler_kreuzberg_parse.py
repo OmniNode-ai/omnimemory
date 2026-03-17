@@ -479,8 +479,8 @@ async def test_cache_write_oserror_too_large_emits_parse_failed(tmp_path: Path) 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_publishes_to_canonical_topic_names(tmp_path: Path) -> None:
-    """Handler publishes to canonical ONEX topic names (no env prefix, OMN-5214)."""
+async def test_bare_topic_names_used(tmp_path: Path) -> None:
+    """Handler publishes to bare canonical ONEX topic names without any prefix."""
     config = _make_config(
         text_store_path=str(tmp_path),
         inline_text_max_chars=4096,
@@ -513,11 +513,13 @@ async def test_publishes_to_canonical_topic_names(tmp_path: Path) -> None:
     assert len(published) == 1
     topic, payload = published[0]
 
-    # Must publish to the canonical topic (no env prefix)
-    assert topic == config.publish_topic_indexed
-    assert not topic.startswith("dev."), (
-        f"Topic must not have env prefix, got {topic!r}"
+    bare_indexed_topic = config.publish_topic_indexed
+
+    # Must publish to the bare topic -- no prefix, no leading dot
+    assert topic == bare_indexed_topic, (
+        f"Expected bare topic {bare_indexed_topic!r}, got {topic!r}"
     )
+    assert not topic.startswith("."), f"Topic must not start with '.', got {topic!r}"
     assert payload["parse_status"] == "ok"
 
 

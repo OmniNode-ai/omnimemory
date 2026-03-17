@@ -139,7 +139,7 @@ class TestInitialization:
         """Consumer should report initialized after initialize() is called.
 
         Verifies that all topics in subscribe_topics are subscribed to
-        using canonical ONEX topic names.
+        using bare canonical ONEX topic names.
         """
         config = ModelIntentEventConsumerConfig()
         storage = create_mock_storage_adapter()

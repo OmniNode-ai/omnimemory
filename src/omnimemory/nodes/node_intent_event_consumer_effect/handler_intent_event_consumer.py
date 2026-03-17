@@ -15,7 +15,7 @@ Architecture:
     - Staleness detection for health monitoring
 
 Topic Naming:
-    Topics use canonical ONEX format directly (no environment prefix).
+    Topic names use bare canonical ONEX format without environment prefixes.
     Example: ``onex.evt.omnimemory.intent-stored.v1``
 
 Consumer Group:
@@ -108,9 +108,6 @@ class HandlerIntentEventConsumer:
 
     Example: ``omnimemory.intent_event_consumer_effect.consume.v1``
 
-    Topics use canonical ONEX format directly (no environment prefix per
-    OMN-5214).
-
     Topic configuration uses list-based fields matching the standard
     ``event_bus.subscribe_topics`` contract format (OMN-1746). The first
     entry in each list is used as the primary topic. Both single topic
@@ -165,7 +162,6 @@ class HandlerIntentEventConsumer:
 
         # Event bus publish callback (set during initialize)
         self._publish_callback: Callable[[str, dict[str, object]], None] | None = None
-        # env_prefix removed in OMN-5214 — topics are canonical ONEX names
 
         # Track pending tasks to prevent garbage collection (RUF006)
         self._pending_tasks: set[asyncio.Task[None]] = set()
@@ -202,8 +198,8 @@ class HandlerIntentEventConsumer:
     ) -> None:
         """Initialize event bus subscriptions for all configured subscribe_topics.
 
-        Subscribes to each topic in ``config.subscribe_topics`` using the
-        canonical ONEX topic names directly (no environment prefix).
+        Subscribes to each topic in ``config.subscribe_topics`` using bare
+        canonical ONEX topic names.
 
         Args:
             subscribe_callback: Function to subscribe to an event bus topic.
@@ -232,21 +228,20 @@ class HandlerIntentEventConsumer:
         self._publish_callback = publish_callback
 
         failed_topics: list[tuple[str, str]] = []
-        for topic_suffix in self._config.subscribe_topics:
-            full_topic = topic_suffix
+        for topic in self._config.subscribe_topics:
             try:
-                unsubscribe = subscribe_callback(full_topic, self._handle_message_sync)
+                unsubscribe = subscribe_callback(topic, self._handle_message_sync)
             except Exception as e:
                 logger.error(
                     "Failed to subscribe to topic",
                     extra={
                         "handler": HANDLER_ID_INTENT_CONSUMER,
-                        "topic": full_topic,
+                        "topic": topic,
                         "error": str(e),
                         "error_type": type(e).__name__,
                     },
                 )
-                failed_topics.append((full_topic, str(e)))
+                failed_topics.append((topic, str(e)))
                 continue
 
             self._unsubscribe_fns.append(unsubscribe)
@@ -255,8 +250,7 @@ class HandlerIntentEventConsumer:
                 "Kafka subscription initialized",
                 extra={
                     "handler": HANDLER_ID_INTENT_CONSUMER,
-                    "topic": full_topic,
-                    "topic_canonical": full_topic,
+                    "topic": topic,
                 },
             )
 
@@ -543,8 +537,7 @@ class HandlerIntentEventConsumer:
             )
             return
 
-        publish_topic = self._config.publish_topics[0]
-        topic = publish_topic
+        topic = self._config.publish_topics[0]
         try:
             self._publish_callback(topic, event.model_dump(mode="json"))
             logger.debug(

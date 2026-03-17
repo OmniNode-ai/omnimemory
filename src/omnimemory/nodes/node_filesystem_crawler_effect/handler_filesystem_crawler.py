@@ -372,7 +372,7 @@ class HandlerFilesystemCrawler:
             crawl_scope: Scope string from the crawl tick command.
             trigger_source: What triggered this crawl run.
             publish_callback: Async callback for publishing events.
-                Signature: (full_topic, message_dict) -> Coroutine[..., None].
+                Signature: (topic, message_dict) -> Coroutine[..., None].
             scope_mappings: Optional list of (path_prefix, scope_ref) pairs
                 for scope resolution. If None, DEFAULT_SCOPE_REF is used
                 for all files.
