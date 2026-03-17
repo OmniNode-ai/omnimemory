@@ -351,7 +351,6 @@ class TestHandlerFilesystemCrawlerNoPathPrefixes:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -377,7 +376,6 @@ class TestHandlerFilesystemCrawlerNonExistentPrefix:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -406,7 +404,6 @@ class TestHandlerFilesystemCrawlerDiscovered:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -420,7 +417,7 @@ class TestHandlerFilesystemCrawlerDiscovered:
         assert len(discovered_events) == 1
 
         topic, payload = discovered_events[0]
-        assert topic == "dev.onex.evt.omnimemory.document-discovered.v1"
+        assert topic == "onex.evt.omnimemory.document-discovered.v1"
         assert payload["event_type"] == "DocumentDiscovered"
         assert payload["content_fingerprint"] == _sha256(content)
         assert payload["source_ref"] == str(md_file.resolve())
@@ -444,7 +441,6 @@ class TestHandlerFilesystemCrawlerDiscovered:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -466,7 +462,6 @@ class TestHandlerFilesystemCrawlerDiscovered:
             correlation_id=cid,
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -487,7 +482,6 @@ class TestHandlerFilesystemCrawlerDiscovered:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -508,7 +502,6 @@ class TestHandlerFilesystemCrawlerDiscovered:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -549,7 +542,6 @@ class TestHandlerFilesystemCrawlerMtimeFastPath:
                 correlation_id=uuid4(),
                 crawl_scope="omninode/test",
                 trigger_source="scheduled",
-                env_prefix="dev",
                 publish_callback=publish,
             )
 
@@ -580,7 +572,6 @@ class TestHandlerFilesystemCrawlerMtimeFastPath:
                 correlation_id=uuid4(),
                 crawl_scope="omninode/test",
                 trigger_source="scheduled",
-                env_prefix="dev",
                 publish_callback=publish,
             )
 
@@ -613,7 +604,6 @@ class TestHandlerFilesystemCrawlerChanged:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -624,7 +614,7 @@ class TestHandlerFilesystemCrawlerChanged:
         assert len(changed_events) == 1
 
         topic, payload = changed_events[0]
-        assert topic == "dev.onex.evt.omnimemory.document-changed.v1"
+        assert topic == "onex.evt.omnimemory.document-changed.v1"
         assert payload["event_type"] == "DocumentChanged"
         assert payload["content_fingerprint"] == _sha256(new_content)
         assert payload["previous_content_fingerprint"] == old_fp
@@ -653,7 +643,6 @@ class TestHandlerFilesystemCrawlerChanged:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -686,7 +675,6 @@ class TestHandlerFilesystemCrawlerRemoved:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -696,7 +684,7 @@ class TestHandlerFilesystemCrawlerRemoved:
         assert len(removed_events) == 1
 
         topic, payload = removed_events[0]
-        assert topic == "dev.onex.evt.omnimemory.document-removed.v1"
+        assert topic == "onex.evt.omnimemory.document-removed.v1"
         assert payload["event_type"] == "DocumentRemoved"
         assert payload["source_ref"] == ghost_path
 
@@ -723,7 +711,6 @@ class TestHandlerFilesystemCrawlerRemoved:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -748,7 +735,6 @@ class TestHandlerFilesystemCrawlerFileLimits:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -771,7 +757,6 @@ class TestHandlerFilesystemCrawlerFileLimits:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -805,7 +790,6 @@ class TestHandlerFilesystemCrawlerReadErrors:
                 correlation_id=uuid4(),
                 crawl_scope="omninode/test",
                 trigger_source="scheduled",
-                env_prefix="dev",
                 publish_callback=publish,
             )
 
@@ -844,7 +828,6 @@ class TestHandlerFilesystemCrawlerSymlinkEscape:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -880,7 +863,6 @@ class TestHandlerFilesystemCrawlerPublishErrors:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=failing_publish,
         )
 
@@ -908,7 +890,6 @@ class TestHandlerFilesystemCrawlerDocTypeAssignment:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -928,7 +909,6 @@ class TestHandlerFilesystemCrawlerDocTypeAssignment:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -952,7 +932,6 @@ class TestHandlerFilesystemCrawlerSourceType:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -972,7 +951,6 @@ class TestHandlerFilesystemCrawlerSourceType:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -994,7 +972,6 @@ class TestHandlerFilesystemCrawlerPriorityHints:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1014,7 +991,6 @@ class TestHandlerFilesystemCrawlerPriorityHints:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1037,7 +1013,6 @@ class TestHandlerFilesystemCrawlerScopeMappings:
             correlation_id=uuid4(),
             crawl_scope="omninode/custom-scope",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
             scope_mappings=scope_mappings,
         )
@@ -1065,7 +1040,6 @@ class TestHandlerFilesystemCrawlerRecursive:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1087,7 +1061,6 @@ class TestHandlerFilesystemCrawlerRecursive:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1129,7 +1102,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1138,7 +1110,7 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
         indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
         assert len(indexed_events) == 1
         topic, payload = indexed_events[0]
-        assert topic == "dev.onex.evt.omnimemory.document-indexed.v1"
+        assert topic == "onex.evt.omnimemory.document-indexed.v1"
         assert payload["event_type"] == "DocumentIndexed"
         assert payload["source_ref"] == str(md_file.resolve())
         assert payload["content_fingerprint"] == _sha256(content)
@@ -1165,7 +1137,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1175,7 +1146,7 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
         indexed_events = [(t, p) for t, p in published if "document-indexed" in t]
         assert len(indexed_events) == 1
         topic, payload = indexed_events[0]
-        assert topic == "dev.onex.evt.omnimemory.document-indexed.v1"
+        assert topic == "onex.evt.omnimemory.document-indexed.v1"
         assert payload["event_type"] == "DocumentIndexed"
         assert payload["content_fingerprint"] == _sha256(new_content)
 
@@ -1199,7 +1170,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1225,7 +1195,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1251,7 +1220,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=uuid4(),
             crawl_scope="omninode/custom-scope",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
             scope_mappings=scope_mappings,
         )
@@ -1275,7 +1243,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=cid,
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
@@ -1321,7 +1288,6 @@ class TestHandlerFilesystemCrawlerIndexedEvent:
             correlation_id=uuid4(),
             crawl_scope="omninode/test",
             trigger_source="scheduled",
-            env_prefix="dev",
             publish_callback=publish,
         )
 
