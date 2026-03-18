@@ -192,19 +192,21 @@ class PluginMemory:
     def should_activate(self, config: ModelDomainPluginConfig) -> bool:
         """Check if Memory should activate based on environment.
 
-        Returns True if OMNIMEMORY_ENABLED is set, indicating the memory
+        Returns True if OMNIMEMORY_MEMGRAPH_HOST is set (connection config
+        presence) or legacy OMNIMEMORY_ENABLED is set, indicating the memory
         domain should be activated for this kernel instance.
 
         Args:
             config: Plugin configuration (not used for this check).
 
         Returns:
-            True if OMNIMEMORY_ENABLED environment variable is set.
+            True if memory connection config or legacy flag is present.
         """
-        enabled = os.getenv("OMNIMEMORY_ENABLED")
-        if not enabled:
+        memgraph_host = os.getenv("OMNIMEMORY_MEMGRAPH_HOST")
+        legacy_flag = os.getenv("OMNIMEMORY_ENABLED")
+        if not memgraph_host and not legacy_flag:
             logger.debug(
-                "Memory plugin inactive: OMNIMEMORY_ENABLED not set "
+                "Memory plugin inactive: OMNIMEMORY_MEMGRAPH_HOST not set "
                 "(correlation_id=%s)",
                 config.correlation_id,
             )
@@ -229,7 +231,9 @@ class PluginMemory:
             ModelHandshakeResult: Passed if Memgraph is reachable or plugin is
             inactive. Failed with error message if probe times out or is refused.
         """
-        if not os.getenv("OMNIMEMORY_ENABLED"):
+        if not os.getenv("OMNIMEMORY_MEMGRAPH_HOST") and not os.getenv(
+            "OMNIMEMORY_ENABLED"
+        ):
             return ModelHandshakeResult.default_pass(self.plugin_id)
 
         host = os.getenv("OMNIMEMORY_MEMGRAPH_HOST", "localhost")
@@ -808,7 +812,9 @@ class PluginMemory:
         Returns:
             Status string indicating enabled state.
         """
-        enabled = os.getenv("OMNIMEMORY_ENABLED", "")
+        enabled = os.getenv("OMNIMEMORY_MEMGRAPH_HOST", "") or os.getenv(
+            "OMNIMEMORY_ENABLED", ""
+        )
         if not enabled:
             return "disabled"
         topics_count = len(MEMORY_SUBSCRIBE_TOPICS)
