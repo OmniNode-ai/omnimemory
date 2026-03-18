@@ -370,16 +370,38 @@ class MemoryServiceSettings(BaseSettings):
     # Backend enablement flags
     postgres_enabled: bool = Field(
         default=False,
-        description="Enable PostgreSQL backend",
+        description="Enable PostgreSQL backend (legacy; prefer setting OMNIMEMORY_DB_URL)",
     )
     qdrant_enabled: bool = Field(
         default=False,
-        description="Enable Qdrant backend",
+        description="Enable Qdrant backend (legacy; prefer setting OMNIMEMORY__QDRANT__URL)",
     )
     embedding_enabled: bool = Field(
         default=False,
         description="Enable real embedding server (requires EMBEDDING__SERVER_URL)",
     )
+
+    @property
+    def postgres_active(self) -> bool:
+        """Infer PostgreSQL activation from OMNIMEMORY_DB_URL presence or explicit flag.
+
+        This eliminates the need for a separate OMNIMEMORY__POSTGRES_ENABLED
+        env var when the connection URL is already configured. [OMN-5362]
+        """
+        import os
+
+        return self.postgres_enabled or bool(os.getenv("OMNIMEMORY_DB_URL"))
+
+    @property
+    def qdrant_active(self) -> bool:
+        """Infer Qdrant activation from OMNIMEMORY__QDRANT__URL presence or explicit flag.
+
+        This eliminates the need for a separate OMNIMEMORY__QDRANT_ENABLED
+        env var when the Qdrant URL is already configured. [OMN-5362]
+        """
+        import os
+
+        return self.qdrant_enabled or bool(os.getenv("OMNIMEMORY__QDRANT__URL"))
 
     # Service-level settings
     service_name: str = Field(
@@ -421,13 +443,13 @@ class MemoryServiceSettings(BaseSettings):
         postgres_config: ModelPostgresConfig | None = None
         qdrant_config: ModelQdrantConfig | None = None
 
-        if self.postgres_enabled:
+        if self.postgres_active:
             # BaseSettings loads required fields from environment variables
             # pyright doesn't understand pydantic-settings env var loading
             postgres_settings = PostgresSettings()  # pyright: ignore[reportCallIssue]
             postgres_config = postgres_settings.to_config()
 
-        if self.qdrant_enabled:
+        if self.qdrant_active:
             qdrant_settings = QdrantSettings()
             qdrant_config = qdrant_settings.to_config()
 
