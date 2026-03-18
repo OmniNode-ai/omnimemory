@@ -356,7 +356,9 @@ def detect_expected_prefix_from_bases(
     return None, None
 
 
-def validate_file(filepath: Path) -> list[Violation]:  # stub-ok: docstring uses ModelXxx/ServiceXxx as naming examples, not TODO markers
+def validate_file(  # stub-ok: docstring uses ModelXxx/ServiceXxx as naming examples, not TODO markers
+    filepath: Path,
+) -> list[Violation]:
     """Validate a single Python file.
 
     Validates:
