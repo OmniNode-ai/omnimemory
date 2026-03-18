@@ -330,6 +330,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "validate-spdx-headers",
             "check-stub-implementations",
             "onex-validate-links",
+            "no-hardcoded-topics",
         }
     )
 
