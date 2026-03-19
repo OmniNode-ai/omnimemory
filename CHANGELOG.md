@@ -1,3 +1,19 @@
+## v0.9.0 (2026-03-19)
+
+### Added
+- feat(ci): deploy CodeQL security scanning to omnimemory [OMN-5424] (#179)
+- feat: add onex.node_package entry point for contract discovery [OMN-5370] (#177)
+- feat: PluginMemory.should_activate() infers from OMNIMEMORY_MEMGRAPH_HOST [OMN-5359] (#175)
+- feat: infer OMNIMEMORY__POSTGRES_ENABLED and QDRANT_ENABLED from connection URLs [OMN-5362] (#176)
+
+### Fixed
+- fix: remove env_prefix topic prefixing from handlers [OMN-5214] (#171, #172)
+
+### Changed
+- ci(omnimemory): add ruff UP007 standards compliance workflow [OMN-5132] (#178)
+- chore: wire no-hardcoded-topics pre-commit hook [OMN-5259] (#174)
+- chore(deps): bump omnibase-core to 0.29.0, omnibase-spi to 0.18.0, omnibase-infra to 0.22.0
+
 ## v0.7.2 (2026-03-13)
 
 ### Other Changes
