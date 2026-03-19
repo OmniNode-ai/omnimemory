@@ -366,8 +366,3 @@ override-dependencies = [
     "omnibase-core==0.29.0",
     "omnibase-spi==0.18.0",
 ]
-
-[tool.uv.sources]
-omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", branch = "release/v0.29.0" }
-omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", branch = "release/v0.18.0" }
-omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", branch = "release/v0.22.0" }
