@@ -1,3 +1,8 @@
+## v0.9.1 (2026-03-20)
+
+### Changed
+- chore(deps): remove temporary uv.sources release branch refs (#181)
+
 ## v0.9.0 (2026-03-19)
 
 ### Added
