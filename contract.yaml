@@ -1,8 +1,16 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 ---
+# Package-level architecture contract — NOT a node contract.
+# Validated under reduced rule set per Contract Class Doctrine.
+# Individual node contracts live under src/omnimemory/nodes/*/contract.yaml
+
 # OmniMemory Contract Definition
 # ONEX 4.0 Compliant Architecture Contract
+
+name: omnimemory
+description: "Advanced memory management system following ONEX 4-node architecture"
+node_version: {major: 1, minor: 0, patch: 0}
 
 # Contract schema version - tracks the contract format itself
 # Follows semantic versioning: MAJOR.MINOR.PATCH using ModelSemVer structured format
