@@ -331,6 +331,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "check-stub-implementations",
             "onex-validate-links",
             "no-hardcoded-topics",
+            "no-untracked-todos",
         }
     )
 
