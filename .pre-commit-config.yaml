@@ -78,12 +78,14 @@
 repos:
   # No hardcoded ONEX topic strings — sourced from onex_change_control (OMN-5259)
   - repo: https://github.com/OmniNode-ai/onex_change_control
-    rev: 39a09ffb2432b8b7d3f47b334b869b55c9cb4fc6  # pragma: allowlist secret
+    rev: 8d7e85bc00e7f1b1306d1cb40949be1ab6e7e91a  # pragma: allowlist secret
     hooks:
       - id: no-hardcoded-topics
         # Pre-existing violations — pending migration to canonical topic constants
         exclude: >-
           ^src/omnimemory/nodes/(node_filesystem_crawler_effect|node_intent_event_consumer_effect|node_kreuzberg_parse_effect)/models/
+        stages: [pre-commit]
+      - id: no-untracked-todos
         stages: [pre-commit]
 
   # Stub implementation detection — sourced from omnibase_core (OMN-4472)
