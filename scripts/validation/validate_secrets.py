@@ -211,8 +211,8 @@ SKIP_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "Explicit placeholder: 'REPLACE_ME' (exact match)",
     ),
     (
-        # Matches: "TODO_ADD_REAL_KEY", "TODO-replace-secret"
-        # Requires TODO followed by separator, not just containing TODO
+        # Matches: "TODO_ADD_REAL_KEY", "TODO-replace-secret"  # TODO_FORMAT_EXEMPT: describes regex pattern for placeholder detection
+        # Requires a placeholder marker followed by separator, not just containing it  # TODO_FORMAT_EXEMPT: describes regex pattern
         re.compile(r'["\']TODO[-_][A-Z_-]+["\']', re.IGNORECASE),
         "Explicit placeholder: 'TODO_...' or 'TODO-...'",
     ),
@@ -306,7 +306,7 @@ def _check_line_level_skip_patterns(
     return False, None
 
 
-def _check_skip_patterns(  # stub-ok: docstring uses 'xxxx' as example secret string, not a FIXME marker
+def _check_skip_patterns(  # stub-ok: docstring uses 'xxxx' as example secret string, not a marker  # TODO_FORMAT_EXEMPT: function doc references marker names
     line: str,
     patterns: list[tuple[re.Pattern[str], str]],
     filepath: Path,

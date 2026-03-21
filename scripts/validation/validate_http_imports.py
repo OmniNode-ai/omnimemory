@@ -105,7 +105,7 @@ ALLOWED_PATHS = [
     # Adapter layer - the only allowed exit hatch
     "handlers/adapters/",
     # Legacy clients directory - allowed during migration
-    # TODO: Remove this allowance after migration to adapters is complete
+    # TODO(OMN-5694): Remove this allowance after migration to adapters is complete
     "nodes/node_memory_retrieval_effect/clients/",
     # Kreuzberg effect client - HTTP transport boundary for document extraction (OMN-2733)
     "nodes/node_kreuzberg_parse_effect/clients/",

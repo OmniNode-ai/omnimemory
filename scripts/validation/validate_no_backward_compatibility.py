@@ -69,7 +69,7 @@ PATTERNS = [
         "Legacy comment found - migrate to new patterns",
     ),
     (
-        # TODO to remove deprecated code
+        # Marker to remove deprecated code  # TODO_FORMAT_EXEMPT: describes detection pattern for cleanup markers
         re.compile(r"#\s*TODO:\s*(remove|delete).*\bdeprecated\b", re.IGNORECASE),
         "TODO to remove deprecated code - do it now",
     ),
