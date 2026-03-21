@@ -38,8 +38,8 @@ class PIIType(str, Enum):
     SSN = "ssn"
     CREDIT_CARD = "credit_card"
     IP_ADDRESS = "ip_address"
-    URL = "url"  # TODO: Implement URL detection patterns
+    URL = "url"  # TODO(OMN-5762): Implement URL detection patterns
     API_KEY = "api_key"
     PASSWORD_HASH = "password_hash"  # noqa: S105  # Not a password - PII type enum value
-    PERSON_NAME = "person_name"  # TODO: Implement dictionary-based + NLP name detection
-    ADDRESS = "address"  # TODO: Implement address detection with geocoding/NLP
+    PERSON_NAME = "person_name"  # TODO(OMN-5762): Implement dictionary-based + NLP name detection
+    ADDRESS = "address"  # TODO(OMN-5762): Implement address detection with geocoding/NLP
