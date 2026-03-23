@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -8,8 +8,8 @@ resolution-markers = [
 
 [manifest]
 overrides = [
-    { name = "omnibase-core", specifier = ">=0.30.1" },
-    { name = "omnibase-spi", specifier = "==0.18.0" },
+    { name = "omnibase-core", specifier = ">=0.30.2" },
+    { name = "omnibase-spi", specifier = ">=0.19.1" },
 ]
 
 [[package]]
@@ -747,6 +747,7 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ea/ab/1608e5a7578e62113506740b88066bf09888322a311cff602105e619bd87/greenlet-3.3.2-cp312-cp312-macosx_11_0_universal2.whl", hash = "sha256:ac8d61d4343b799d1e526db579833d72f23759c71e07181c2d2944e429eb09cd", size = 280358, upload-time = "2026-02-20T20:17:43.971Z" },
     { url = "https://files.pythonhosted.org/packages/a5/23/0eae412a4ade4e6623ff7626e38998cb9b11e9ff1ebacaa021e4e108ec15/greenlet-3.3.2-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3ceec72030dae6ac0c8ed7591b96b70410a8be370b6a477b1dbc072856ad02bd", size = 601217, upload-time = "2026-02-20T20:47:31.462Z" },
     { url = "https://files.pythonhosted.org/packages/f8/16/5b1678a9c07098ecb9ab2dd159fafaf12e963293e61ee8d10ecb55273e5e/greenlet-3.3.2-cp312-cp312-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:a2a5be83a45ce6188c045bcc44b0ee037d6a518978de9a5d97438548b953a1ac", size = 611792, upload-time = "2026-02-20T20:55:58.423Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/c5/cc09412a29e43406eba18d61c70baa936e299bc27e074e2be3806ed29098/greenlet-3.3.2-cp312-cp312-manylinux_2_24_s390x.manylinux_2_28_s390x.whl", hash = "sha256:ae9e21c84035c490506c17002f5c8ab25f980205c3e61ddb3a2a2a2e6c411fcb", size = 626250, upload-time = "2026-02-20T21:02:46.596Z" },
     { url = "https://files.pythonhosted.org/packages/50/1f/5155f55bd71cabd03765a4aac9ac446be129895271f73872c36ebd4b04b6/greenlet-3.3.2-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:43e99d1749147ac21dde49b99c9abffcbc1e2d55c67501465ef0930d6e78e070", size = 613875, upload-time = "2026-02-20T20:21:01.102Z" },
     { url = "https://files.pythonhosted.org/packages/fc/dd/845f249c3fcd69e32df80cdab059b4be8b766ef5830a3d0aa9d6cad55beb/greenlet-3.3.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:4c956a19350e2c37f2c48b336a3afb4bff120b36076d9d7fb68cb44e05d95b79", size = 1571467, upload-time = "2026-02-20T20:49:33.495Z" },
     { url = "https://files.pythonhosted.org/packages/2a/50/2649fe21fcc2b56659a452868e695634722a6655ba245d9f77f5656010bf/greenlet-3.3.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:6c6f8ba97d17a1e7d664151284cb3315fc5f8353e75221ed4324f84eb162b395", size = 1640001, upload-time = "2026-02-20T20:21:09.154Z" },
@@ -755,6 +756,7 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ac/48/f8b875fa7dea7dd9b33245e37f065af59df6a25af2f9561efa8d822fde51/greenlet-3.3.2-cp313-cp313-macosx_11_0_universal2.whl", hash = "sha256:aa6ac98bdfd716a749b84d4034486863fd81c3abde9aa3cf8eff9127981a4ae4", size = 279120, upload-time = "2026-02-20T20:19:01.9Z" },
     { url = "https://files.pythonhosted.org/packages/49/8d/9771d03e7a8b1ee456511961e1b97a6d77ae1dea4a34a5b98eee706689d3/greenlet-3.3.2-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ab0c7e7901a00bc0a7284907273dc165b32e0d109a6713babd04471327ff7986", size = 603238, upload-time = "2026-02-20T20:47:32.873Z" },
     { url = "https://files.pythonhosted.org/packages/59/0e/4223c2bbb63cd5c97f28ffb2a8aee71bdfb30b323c35d409450f51b91e3e/greenlet-3.3.2-cp313-cp313-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:d248d8c23c67d2291ffd47af766e2a3aa9fa1c6703155c099feb11f526c63a92", size = 614219, upload-time = "2026-02-20T20:55:59.817Z" },
+    { url = "https://files.pythonhosted.org/packages/94/2b/4d012a69759ac9d77210b8bfb128bc621125f5b20fc398bce3940d036b1c/greenlet-3.3.2-cp313-cp313-manylinux_2_24_s390x.manylinux_2_28_s390x.whl", hash = "sha256:ccd21bb86944ca9be6d967cf7691e658e43417782bce90b5d2faeda0ff78a7dd", size = 628268, upload-time = "2026-02-20T21:02:48.024Z" },
     { url = "https://files.pythonhosted.org/packages/7a/34/259b28ea7a2a0c904b11cd36c79b8cef8019b26ee5dbe24e73b469dea347/greenlet-3.3.2-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b6997d360a4e6a4e936c0f9625b1c20416b8a0ea18a8e19cabbefc712e7397ab", size = 616774, upload-time = "2026-02-20T20:21:02.454Z" },
     { url = "https://files.pythonhosted.org/packages/0a/03/996c2d1689d486a6e199cb0f1cf9e4aa940c500e01bdf201299d7d61fa69/greenlet-3.3.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:64970c33a50551c7c50491671265d8954046cb6e8e2999aacdd60e439b70418a", size = 1571277, upload-time = "2026-02-20T20:49:34.795Z" },
     { url = "https://files.pythonhosted.org/packages/d9/c4/2570fc07f34a39f2caf0bf9f24b0a1a0a47bc2e8e465b2c2424821389dfc/greenlet-3.3.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:1a9172f5bf6bd88e6ba5a84e0a68afeac9dc7b6b412b245dd64f52d83c81e55b", size = 1640455, upload-time = "2026-02-20T20:21:10.261Z" },
@@ -1398,7 +1400,7 @@ wheels = [
 
 [[package]]
 name = "omnibase-core"
-version = "0.30.1"
+version = "0.30.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blake3" },
@@ -1412,14 +1414,14 @@ dependencies = [
     { name = "pyyaml" },
     { name = "ruamel-yaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4a/2e/50d363e3701e5741bcbfbed49b0511694ad4650ba5acb31066c0b47c3e9c/omnibase_core-0.30.1.tar.gz", hash = "sha256:66b2fa44ffae929fc22a269b1e3c8a5be272bfd5ecc453195c790f794ce6eebc", size = 8010634, upload-time = "2026-03-22T01:55:48.658Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/d3/7da4de1756e08909e0cda979837c71a66342d96a9fe432db8ba5dd49aad8/omnibase_core-0.30.2.tar.gz", hash = "sha256:bb2fbf85d5a8f3dad1797680b46dbd9e90351617234b34a7277a47bc3afb930d", size = 8010899, upload-time = "2026-03-23T00:15:37.501Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/95/97f2a18d60c20d4e7e27a032ba8957a4ed7c38e3d340fe0425fe75e4ed04/omnibase_core-0.30.1-py3-none-any.whl", hash = "sha256:495e6654fd241a1274a447898f07c50f8234f778b4c567205c2700bb6a99ff4b", size = 5205029, upload-time = "2026-03-22T01:55:52.092Z" },
+    { url = "https://files.pythonhosted.org/packages/10/84/8d5feacc720668bb2caddc0daf952e4622e5fb4aba39a3f4222034fe87c9/omnibase_core-0.30.2-py3-none-any.whl", hash = "sha256:74def267fa9d1305f71b90b7504e60e0c3027d8d92ee3077e650273e28d0bec1", size = 5205149, upload-time = "2026-03-23T00:15:40.325Z" },
 ]
 
 [[package]]
 name = "omnibase-infra"
-version = "0.22.0"
+version = "0.24.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -1467,23 +1469,23 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/21/c1/8850c1d3d02996d3de332b6ed61ab0cf48d857bb16e94720a8fa743d036a/omnibase_infra-0.22.0.tar.gz", hash = "sha256:71121cd723556d7467008d73b18d71aa8eaf8a72682e53eeabd57ae7240d3b33", size = 6620587, upload-time = "2026-03-19T12:53:25.183Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/e8/0de39c89f12bac7932465dfde911c5e244bc5536fee7189d493f40583498/omnibase_infra-0.24.1.tar.gz", hash = "sha256:3fe2c51be39e48e12d68c7164d95bb0476e0b7e19c0411e2a6efdc20cdefcb2c", size = 6739001, upload-time = "2026-03-23T02:18:09.953Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/31/c6ee3a5490968b21bf9005ca667009d99aeb4e5db71019e55bb3dfa0e800/omnibase_infra-0.22.0-py3-none-any.whl", hash = "sha256:6f54682a443a533f4b3f23e4f4a5e05d42a6e78f7b57d8c0151b37d700301a09", size = 3869732, upload-time = "2026-03-19T12:53:23.302Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/40/e886d5ce21623421f78c31c4054b26d2b17d2a3250ba9cb4185329d5c654/omnibase_infra-0.24.1-py3-none-any.whl", hash = "sha256:fda83e7f699f1bbca172c8bb210b2e1b5f8b06380aadfdafc2855e1055a25439", size = 3964074, upload-time = "2026-03-23T02:18:07.891Z" },
 ]
 
 [[package]]
 name = "omnibase-spi"
-version = "0.18.0"
+version = "0.19.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "omnibase-core" },
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/9d/e7f04394a22bc4641727576b393d7aca8c828db3829d60576a50f745e7df/omnibase_spi-0.18.0.tar.gz", hash = "sha256:c72847d229ccf6a5c53e2b67d0bf8a16be60da7c233af87a17557a69f3145791", size = 1111608, upload-time = "2026-03-19T12:52:57.396Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/cd/c59725d13599dde6d5c0f5d534f1075bbc333c650b35fe4b138ed047bc4d/omnibase_spi-0.19.1.tar.gz", hash = "sha256:e6b51ad013cd225fd9fe16300c9b2696d2705fd91f76f4a21810e2e1876f369c", size = 1119413, upload-time = "2026-03-22T23:25:19.212Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/12/d25528501e092f7a142c3ac6ebbae2ba1fdf848a8341864918513992d63d/omnibase_spi-0.18.0-py3-none-any.whl", hash = "sha256:f40c0e7f9c73ecbb33c498acd5f4762e20456a387c71c02bd7acd8e43a34ba53", size = 755916, upload-time = "2026-03-19T12:52:59.175Z" },
+    { url = "https://files.pythonhosted.org/packages/47/3b/273b4f4d1879f366ada923f6d091ef217e42bf0e53af038cec2e995ef7d8/omnibase_spi-0.19.1-py3-none-any.whl", hash = "sha256:fe2b5d3d2ea30ca5c542f17af64bc501bc0411b904442b8ec406d4aa82321305", size = 758303, upload-time = "2026-03-22T23:25:20.679Z" },
 ]
 
 [[package]]
@@ -1547,8 +1549,8 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.0,<1.0.0" },
     { name = "mcp", specifier = ">=1.8.0,<2.0.0" },
     { name = "omnibase-core", specifier = ">=0.30.1" },
-    { name = "omnibase-infra", specifier = "==0.22.0" },
-    { name = "omnibase-spi", specifier = "==0.18.0" },
+    { name = "omnibase-infra", specifier = ">=0.24.1" },
+    { name = "omnibase-spi", specifier = ">=0.19.1" },
     { name = "pinecone-client", specifier = ">=4.1.0,<7.0.0" },
     { name = "psutil", specifier = ">=7.0.0,<8.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10,<3.0.0" },
