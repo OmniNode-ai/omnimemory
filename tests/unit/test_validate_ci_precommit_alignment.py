@@ -58,7 +58,7 @@ def precommit_content() -> str:
 @pytest.fixture
 def ci_content() -> str:
     """Load the actual .github/workflows/ci.yml content from the repo."""
-    path = _REPO_ROOT / ".github" / "workflows" / "test.yml"
+    path = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
     content = path.read_text(encoding="utf-8")
     return content
 
@@ -74,7 +74,7 @@ def precommit_data() -> dict:
 @pytest.fixture
 def ci_data() -> dict:
     """Parse the actual .github/workflows/ci.yml as a YAML dict."""
-    path = _REPO_ROOT / ".github" / "workflows" / "test.yml"
+    path = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
     content = path.read_text(encoding="utf-8")
     return yaml.safe_load(content)
 
@@ -355,7 +355,7 @@ class TestPrecommitHooksCoveredByAlignments:
 
 @pytest.mark.unit
 class TestAlignmentsMatchCiWorkflow:
-    """Every CI job name in EXPECTED_ALIGNMENTS must exist in test.yml."""
+    """Every CI job name in EXPECTED_ALIGNMENTS must exist in ci.yml."""
 
     def test_all_expected_ci_jobs_exist(self, ci_content: str) -> None:
         actual_ci_jobs = extract_ci_job_ids(ci_content)

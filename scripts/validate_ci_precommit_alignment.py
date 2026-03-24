@@ -4,7 +4,7 @@
 
 """Validate alignment between CI workflow jobs and pre-commit hooks.
 
-This script ensures that the CI workflow (.github/workflows/test.yml) and
+This script ensures that the CI workflow (.github/workflows/ci.yml) and
 pre-commit configuration (.pre-commit-config.yaml) stay synchronized.
 
 It checks:
@@ -117,7 +117,7 @@ def main() -> int:
     verbose = "--verbose" in sys.argv or "-v" in sys.argv
 
     precommit_path = Path(".pre-commit-config.yaml")
-    ci_path = Path(".github/workflows/test.yml")
+    ci_path = Path(".github/workflows/ci.yml")
     required_checks_path = Path(".github/required-checks.yaml")
 
     precommit_content = load_file(precommit_path)
