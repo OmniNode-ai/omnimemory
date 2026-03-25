@@ -55,6 +55,11 @@ _HANDLER_SPECS: list[tuple[str, str, bool]] = [
         "HandlerSubscription",
         False,  # Requires ModelONEXContainer
     ),
+    (
+        "omnimemory.nodes.node_similarity_compute.handlers.handler_similarity_compute",
+        "HandlerSimilarityCompute",
+        False,  # Requires ModelONEXContainer — verify-only
+    ),
 ]
 
 
