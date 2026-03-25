@@ -118,6 +118,9 @@ DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED = (
 )
 """Dispatch-compatible alias for memory-retrieval-requested command topic."""
 
+DISPATCH_ALIAS_GRAPH_MEMORY = "onex.commands.omnimemory.graph-memory-query.v1"
+"""Dispatch-compatible alias for graph memory query/mutation operations (OMN-6578)."""
+
 
 # =============================================================================
 # Bridge Handler: Intent Classified Event
@@ -501,17 +504,19 @@ def create_memory_dispatch_engine(
     | Callable[[str, dict[str, object]], None]
     | None = None,
     publish_topics: dict[str, str] | None = None,
+    graph_memory_adapter: object | None = None,
 ) -> MessageDispatchEngine:
     """Create and configure a MessageDispatchEngine for OmniMemory domain.
 
     Creates the engine, registers all omnimemory domain handlers and routes,
     and freezes it. The engine is ready for dispatch after this call.
 
-    Registers 4 handlers covering 6 routes:
+    Registers 4+ handlers covering 6+ routes:
         1. intent-classified handler (1 route: intent-classified.v1 events)
         2. intent-query handler (1 route: intent-query-requested.v1 commands)
         3. memory-retrieval handler (1 route: memory-retrieval-requested.v1 -- fail-fast)
         4. lifecycle handler (3 routes: runtime-tick, archive, expire -- fail-fast)
+        5. graph-memory handler (optional, 1 route: graph query/mutation -- OMN-6578)
 
     Args:
         intent_consumer: REQUIRED intent event consumer handler.
@@ -521,6 +526,9 @@ def create_memory_dispatch_engine(
         publish_topics: Optional mapping of handler name to publish topic.
             Keys: "intent_query". Values: full topic strings from contract
             event_bus.publish_topics.
+        graph_memory_adapter: Optional AdapterGraphMemory instance.  When
+            provided the adapter is registered as a handler for graph query
+            and mutation operations (OMN-6578).
 
     Returns:
         Frozen MessageDispatchEngine ready for dispatch.
@@ -649,6 +657,28 @@ def create_memory_dispatch_engine(
             ),
         )
     )
+
+    # --- Handler 5 (optional): graph memory adapter (OMN-6578) ---
+    if graph_memory_adapter is not None:
+        engine.register_handler(
+            handler_id="memory-graph-memory-handler",
+            handler=graph_memory_adapter,
+            category=EnumMessageCategory.COMMAND,
+            node_kind=EnumNodeKind.EFFECT,
+            message_types=None,
+        )
+        engine.register_route(
+            ModelDispatchRoute(
+                route_id="memory-graph-memory-route",
+                topic_pattern=DISPATCH_ALIAS_GRAPH_MEMORY,
+                message_category=EnumMessageCategory.COMMAND,
+                handler_id="memory-graph-memory-handler",
+                description=(
+                    "Routes graph memory queries/mutations to "
+                    "AdapterGraphMemory (OMN-6578)."
+                ),
+            )
+        )
 
     engine.freeze()
 

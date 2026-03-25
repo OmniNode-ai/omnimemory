@@ -74,6 +74,7 @@ if TYPE_CHECKING:
     from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
     from omnibase_infra.runtime.registry import RegistryMessageType
 
+    from omnimemory.handlers.adapters.adapter_graph_memory import AdapterGraphMemory
     from omnimemory.runtime.introspection import MemoryNodeIntrospectionProxy
 
 from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
@@ -173,6 +174,7 @@ class PluginMemory:
         self._event_bus: ProtocolEventBus | None = None
         self._introspection_nodes: list[str] = []
         self._introspection_proxies: list[MemoryNodeIntrospectionProxy] = []
+        self._graph_memory_adapter: AdapterGraphMemory | None = None
 
     @property
     def message_type_registry(self) -> RegistryMessageType | None:
@@ -456,11 +458,54 @@ class PluginMemory:
                 collect_publish_topics_for_dispatch,
             )
 
+            # Graph memory adapter — connects to Memgraph (OMN-6578).
+            # ModelGraphMemoryConfig has no host/port fields; connection
+            # details are passed to initialize(connection_uri=...).
+            graph_memory_adapter = None
+            memgraph_host = os.environ.get("OMNIMEMORY_MEMGRAPH_HOST")
+            if memgraph_host:
+                from omnimemory.handlers.adapters.adapter_graph_memory import (
+                    AdapterGraphMemory,
+                )
+                from omnimemory.models.adapters.model_graph_memory_config import (
+                    ModelGraphMemoryConfig,
+                )
+
+                memgraph_port = int(os.environ.get("OMNIMEMORY_MEMGRAPH_PORT", "7687"))
+                graph_config = ModelGraphMemoryConfig()
+                graph_memory_adapter = AdapterGraphMemory(config=graph_config)
+                connection_uri = f"bolt://{memgraph_host}:{memgraph_port}"
+
+                # Probe TCP before attempting full bolt handshake to provide
+                # a clearer error message if Memgraph is unreachable.
+                reachable = await _probe_tcp_reachable(memgraph_host, memgraph_port)
+                if reachable:
+                    await graph_memory_adapter.initialize(
+                        connection_uri=connection_uri, auth=None
+                    )
+                    logger.info(
+                        "Graph memory adapter initialized (uri=%s, correlation_id=%s)",
+                        connection_uri,
+                        correlation_id,
+                    )
+                else:
+                    logger.warning(
+                        "Memgraph unreachable at %s:%d — graph memory "
+                        "adapter created but not initialized "
+                        "(correlation_id=%s)",
+                        memgraph_host,
+                        memgraph_port,
+                        correlation_id,
+                    )
+
+                self._graph_memory_adapter = graph_memory_adapter
+
             self._dispatch_engine = create_memory_dispatch_engine(
                 intent_consumer=intent_consumer,
                 intent_query_handler=intent_query_handler,
                 publish_callback=publish_callback,
                 publish_topics=publish_topics,
+                graph_memory_adapter=graph_memory_adapter,
             )
 
             # Store event_bus reference for introspection publishing.
