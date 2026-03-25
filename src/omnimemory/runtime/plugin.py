@@ -488,17 +488,17 @@ class PluginMemory:
                         connection_uri,
                         correlation_id,
                     )
+                    self._graph_memory_adapter = graph_memory_adapter
                 else:
                     logger.warning(
                         "Memgraph unreachable at %s:%d — graph memory "
-                        "adapter created but not initialized "
+                        "adapter will not be registered "
                         "(correlation_id=%s)",
                         memgraph_host,
                         memgraph_port,
                         correlation_id,
                     )
-
-                self._graph_memory_adapter = graph_memory_adapter
+                    graph_memory_adapter = None
 
             self._dispatch_engine = create_memory_dispatch_engine(
                 intent_consumer=intent_consumer,

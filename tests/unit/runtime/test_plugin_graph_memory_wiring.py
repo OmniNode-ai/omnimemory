@@ -143,10 +143,10 @@ class TestGraphMemoryWiring:
             assert result.success
 
     @pytest.mark.asyncio
-    async def test_graph_memory_adapter_created_but_not_initialized_when_unreachable(
+    async def test_graph_memory_adapter_not_registered_when_unreachable(
         self,
     ) -> None:
-        """Adapter is created but not initialized when Memgraph is unreachable."""
+        """Adapter is not registered when Memgraph is unreachable."""
         plugin = PluginMemory()
         config = _make_config()
 
@@ -183,8 +183,16 @@ class TestGraphMemoryWiring:
             # initialize() NOT called since unreachable
             mock_adapter_instance.initialize.assert_not_called()
 
-            # Adapter still stored on plugin (created but not initialized)
-            assert plugin._graph_memory_adapter is mock_adapter_instance
+            # Adapter NOT stored — uninitialized adapter must not be registered
+            assert (
+                not hasattr(plugin, "_graph_memory_adapter")
+                or plugin._graph_memory_adapter is None
+            )
+
+            # Factory called with None for graph_memory_adapter
+            mock_factory.assert_called_once()
+            call_kwargs = mock_factory.call_args.kwargs
+            assert call_kwargs.get("graph_memory_adapter") is None
 
             assert result.success
 
