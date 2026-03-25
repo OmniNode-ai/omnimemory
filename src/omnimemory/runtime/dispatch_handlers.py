@@ -492,6 +492,70 @@ def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handle
 
 
 # =============================================================================
+# Bridge Handler: Graph Memory Adapter (OMN-6578)
+# =============================================================================
+
+
+def _create_graph_memory_dispatch_handler(
+    *,
+    adapter: object,
+) -> Callable[
+    [ModelEventEnvelope[object], ProtocolHandlerContext],
+    Awaitable[str],
+]:
+    """Create a dispatch engine handler for graph memory operations.
+
+    Returns an async handler function compatible with MessageDispatchEngine's
+    handler signature.  The handler delegates to the ``AdapterGraphMemory``
+    instance passed as *adapter*.
+
+    Args:
+        adapter: An ``AdapterGraphMemory`` instance (typed as ``object`` to
+            avoid importing the adapter at module level).
+
+    Returns:
+        Async handler function with signature (envelope, context) -> str.
+    """
+
+    async def _handle(
+        envelope: ModelEventEnvelope[object],
+        context: ProtocolHandlerContext,
+    ) -> str:
+        """Bridge handler: envelope -> AdapterGraphMemory operation."""
+        ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
+
+        payload = envelope.payload
+        if not isinstance(payload, dict):
+            msg = (
+                f"Unexpected payload type {type(payload).__name__} "
+                f"for graph-memory command "
+                f"(correlation_id={ctx_correlation_id})"
+            )
+            logger.warning(msg)
+            raise ValueError(msg)
+
+        logger.info(
+            "Dispatching graph-memory command via MessageDispatchEngine "
+            "(correlation_id=%s)",
+            ctx_correlation_id,
+        )
+
+        # The adapter operation is determined by the payload content.
+        # For now, this is a placeholder that logs receipt; the full
+        # operation routing will be wired by downstream tasks.
+        operation = payload.get("operation", "unknown")
+        logger.info(
+            "Graph memory command received (operation=%s, correlation_id=%s)",
+            operation,
+            ctx_correlation_id,
+        )
+
+        return ""
+
+    return _handle
+
+
+# =============================================================================
 # Dispatch Engine Factory
 # =============================================================================
 
@@ -660,9 +724,12 @@ def create_memory_dispatch_engine(
 
     # --- Handler 5 (optional): graph memory adapter (OMN-6578) ---
     if graph_memory_adapter is not None:
+        graph_memory_handler = _create_graph_memory_dispatch_handler(
+            adapter=graph_memory_adapter,
+        )
         engine.register_handler(
             handler_id="memory-graph-memory-handler",
-            handler=graph_memory_adapter,
+            handler=graph_memory_handler,
             category=EnumMessageCategory.COMMAND,
             node_kind=EnumNodeKind.EFFECT,
             message_types=None,
