@@ -89,9 +89,9 @@ class PIIDetector:
         """Initialize regex patterns for different PII types using configuration.
 
         Note: The following PIIType values do NOT have patterns implemented:
-        - PIIType.URL: TODO - Add URL validation patterns
-        - PIIType.PERSON_NAME: TODO - Add dictionary-based name matching
-        - PIIType.ADDRESS: TODO - Add address pattern detection
+        - PIIType.URL: TODO(OMN-5762) - Add URL validation patterns
+        - PIIType.PERSON_NAME: TODO(OMN-5762) - Add dictionary-based name matching
+        - PIIType.ADDRESS: TODO(OMN-5762) - Add address pattern detection
 
         These types are defined in PIIType for future extensibility but will
         not match any content until patterns are added.
@@ -203,7 +203,7 @@ class PIIDetector:
     ) -> set[str]:
         """Load common first and last names for person name detection.
 
-        TODO: This name database is loaded but not actively used for detection.
+        TODO(OMN-5762): This name database is loaded but not actively used for detection.
         To enable PERSON_NAME detection:
         1. Add PIIType.PERSON_NAME patterns to _initialize_patterns()
         2. Or implement context-aware NLP-based name detection

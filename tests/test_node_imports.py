@@ -99,7 +99,7 @@ class TestNodeStructure:
         "node_semantic_analyzer_compute",
         # EFFECT node with MOCK handlers: Temporary mock implementations for
         # development/testing. Will be removed when omnibase_infra is integrated.
-        # TODO: Remove from exclusion list when migrating to real handlers.
+        # TODO(OMN-6655): Remove from exclusion list when migrating to real handlers.
         "node_memory_retrieval_effect",
         # ORCHESTRATOR node with domain-specific lifecycle handlers:
         # - handler_memory_tick: TTL evaluation and event emission

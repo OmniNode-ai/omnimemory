@@ -85,7 +85,7 @@ class ModelIntentClassifiedEvent(BaseModel):
     Note: Uses ``extra="ignore"`` to allow forward compatibility — if
     omniintelligence adds new fields, this consumer won't reject them.
 
-    TODO(OMN-future): Consider migrating to omnibase_core.models.events
+    TODO(OMN-6655): Consider migrating to omnibase_core.models.events
     once cross-repo event schemas are standardized. This is logically
     an omniintelligence-owned event; omnimemory is a consumer.
     """

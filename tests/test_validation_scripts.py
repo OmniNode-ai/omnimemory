@@ -1332,7 +1332,9 @@ old_function = new_function  # alias
         finally:
             cleanup_temp_file(path)
 
-    def test_detects_todo_remove_deprecated(self) -> None:
+    def test_detects_todo_remove_deprecated(  # TODO_FORMAT_EXEMPT: test fixture
+        self,
+    ) -> None:
         """Test detection of TODO to remove deprecated code."""
         code = """
 # TODO: remove deprecated function in next version
@@ -2084,7 +2086,9 @@ class TestValidateNoBackwardCompatAdditional:
         violations = validate_no_backward_compat(path)
         assert violations == []
 
-    def test_delete_deprecated_todo(self) -> None:
+    def test_delete_deprecated_todo(  # TODO_FORMAT_EXEMPT: test fixture
+        self,
+    ) -> None:
         """Test detection of TODO: delete deprecated."""
         code = """
 # TODO: delete deprecated code
