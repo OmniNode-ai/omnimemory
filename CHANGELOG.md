@@ -1,3 +1,40 @@
+## v0.12.0 (2026-03-25)
+
+### Added
+- feat: env-configurable retrieval stubs + wire similarity handler (#199)
+- feat(runtime): wire AdapterGraphMemory initialization in PluginMemory [OMN-6578] (#198)
+
+### Changed
+- chore(deps): pin omnibase-core==0.32.0, omnibase-infra==0.27.0 for coordinated release
+- chore(deps): bump omnibase_core to 0.31.0 (#197)
+- chore(ci): rename test.yml -> ci.yml for cross-repo standardization [OMN-6215] (#194)
+- build(deps): bump actions/checkout from 4 to 6 in the actions group (#195)
+
+### Fixed
+- fix(deps): update stale omnibase-infra and spi version pins [OMN-6112] (#193)
+
+## v0.11.0 (2026-03-24)
+
+### Changed
+- chore(deps): bump omnibase_core to 0.30.2 (#192)
+- release: omnimemory v0.11.0 (#196)
+
+## v0.9.3 (2026-03-22)
+
+### Changed
+- ci: add check-handshake workflow [OMN-5858] (#190)
+- chore: bump omnibase-core to >=0.30.1 [OMN-5812] (#189)
+- chore(deps): bump omnibase_core to 0.30.1 (#188)
+
+## v0.9.2 (2026-03-21)
+
+### Changed
+- ci: deploy TODO enforcement hooks and workflows OMN-5694, OMN-5695 (#186)
+- chore: remove canceled TODO for OMN-1589 (pyright strictness) [OMN-5690] (#185)
+
+### Fixed
+- fix: restructure omnimemory root contract with top-level fields [OMN-5703] (#184)
+
 ## v0.9.1 (2026-03-20)
 
 ### Changed
