@@ -234,7 +234,7 @@ class TestContractEnforcement:
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         # Skip if not yet implemented
         if not contract_path.exists():
-            pytest.skip(f"Contract not yet implemented: {contract_path}")
+            pytest.skip(f"Contract pending implementation: {contract_path}")
         assert contract_path.exists()
 
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
@@ -249,7 +249,7 @@ class TestContractEnforcement:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"Contract not yet implemented: {contract_path}")
+            pytest.skip(f"Contract pending implementation: {contract_path}")
 
         result: ContractValidationResult = validate_contract(contract_path)
         assert result.valid, f"Contract {node_name} failed validation: {result.error}"
@@ -280,7 +280,7 @@ class TestContractEnforcement:
         """
         node_py_path: Path = NODES_DIR / node_name / "node.py"
         if not node_py_path.exists():
-            pytest.skip(f"node.py not present (expected): {node_py_path}")
+            pytest.skip(f"node.py not yet created: {node_py_path}")
 
         result: SuperInitValidationResult = validate_super_init_pattern(node_py_path)
         assert result.valid, (

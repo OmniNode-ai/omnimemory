@@ -193,7 +193,7 @@ def contract_data(request: pytest.FixtureRequest, nodes_dir: Path) -> MappingRes
     contract_path: Path = nodes_dir / node_name / "contract.yaml"
 
     if not contract_path.exists():
-        pytest.skip(f"Contract file not yet implemented: {contract_path}")
+        pytest.skip(f"Contract file pending implementation: {contract_path}")
 
     with open(contract_path) as f:
         data = yaml.safe_load(f)

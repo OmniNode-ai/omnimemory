@@ -89,7 +89,9 @@ class TestSkipLockedConcurrency:
         - Multiple concurrent database connections
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_skip_locked_prevents_double_processing(self) -> None:
         """Verify FOR UPDATE SKIP LOCKED prevents concurrent handlers
         from processing same memory.
@@ -114,7 +116,9 @@ class TestSkipLockedConcurrency:
             handlers reach the query point before either commits.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_skip_locked_allows_different_memory_processing(self) -> None:
         """Verify concurrent handlers can process different memories.
 
@@ -135,7 +139,9 @@ class TestSkipLockedConcurrency:
         workloads while preventing double-processing of individual entities.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_skip_locked_batch_processing_isolation(self) -> None:
         """Verify batch processing with SKIP LOCKED isolates work correctly.
 
@@ -181,7 +187,9 @@ class TestOptimisticLocking:
         - Row count validation after UPDATE
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_optimistic_lock_conflict_detected(self) -> None:
         """Verify revision mismatch is detected and handled.
 
@@ -204,7 +212,9 @@ class TestOptimisticLocking:
             When rows_affected=0, handler must recognize this as conflict.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_optimistic_lock_revision_increment(self) -> None:
         """Verify lifecycle_revision increments on each state change.
 
@@ -223,7 +233,9 @@ class TestOptimisticLocking:
         correctly across the full lifecycle state machine.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_optimistic_lock_conflict_recovery(self) -> None:
         """Verify handler gracefully recovers from optimistic lock conflict.
 
@@ -270,7 +282,9 @@ class TestArchiveAtomicity:
         - Temp file + rename pattern for atomicity
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: write_atomic_bytes()")
+    @pytest.mark.skip(
+        reason="Blocked: write_atomic_bytes() not yet available (OMN-1524)"
+    )
     async def test_archive_atomic_write_crash_safety(self) -> None:
         """Verify archive write is atomic (no partial files).
 
@@ -295,7 +309,9 @@ class TestArchiveAtomicity:
             On failure at any step, .tmp file is deleted.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: write_atomic_bytes()")
+    @pytest.mark.skip(
+        reason="Blocked: write_atomic_bytes() not yet available (OMN-1524)"
+    )
     async def test_archive_database_filesystem_consistency(self) -> None:
         """Verify database and filesystem stay consistent on archive.
 
@@ -319,7 +335,9 @@ class TestArchiveAtomicity:
             fails, delete the archive file.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: write_atomic_bytes()")
+    @pytest.mark.skip(
+        reason="Blocked: write_atomic_bytes() not yet available (OMN-1524)"
+    )
     async def test_archive_rollback_on_db_failure(self) -> None:
         """Verify archive file deleted if database update fails.
 
@@ -363,7 +381,9 @@ class TestTickIdempotency:
         - Idempotency checks in projection queries
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_tick_reprocessing_idempotent(self) -> None:
         """Verify processing same tick twice produces same result.
 
@@ -385,7 +405,9 @@ class TestTickIdempotency:
             This ensures already-emitted transitions are not re-emitted.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_emission_marker_atomicity(self) -> None:
         """Verify emission marker set atomically with event emission.
 
@@ -428,7 +450,9 @@ class TestProjectionQueryIsolation:
         - Consistent snapshot within transaction
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_projection_query_snapshot_consistency(self) -> None:
         """Verify projection query returns consistent snapshot.
 
@@ -448,7 +472,9 @@ class TestProjectionQueryIsolation:
             For stricter isolation, can use REPEATABLE READ.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_projection_query_deadline_evaluation(self) -> None:
         """Verify projection query uses injected 'now' for deadline.
 
@@ -485,7 +511,9 @@ class TestTransactionBoundaries:
         - Rollback on any failure
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_tick_processing_single_transaction(self) -> None:
         """Verify tick processing uses single transaction.
 
@@ -505,7 +533,9 @@ class TestTransactionBoundaries:
             All database operations within handler are in same transaction.
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     async def test_transaction_rollback_on_exception(self) -> None:
         """Verify transaction rolls back on unhandled exception.
 
@@ -540,7 +570,9 @@ class TestConcurrentScalePerformance:
     They validate performance characteristics, not functionality.
     """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     @pytest.mark.benchmark
     async def test_skip_locked_throughput_under_contention(self) -> None:
         """Benchmark SKIP LOCKED throughput with high contention.
@@ -562,7 +594,9 @@ class TestConcurrentScalePerformance:
             - Contention rate < 50%
         """
 
-    @pytest.mark.skip(reason="Pending OMN-1524: db.with_transaction()")
+    @pytest.mark.skip(
+        reason="Blocked: db.with_transaction() not yet available (OMN-1524)"
+    )
     @pytest.mark.benchmark
     async def test_optimistic_lock_retry_overhead(self) -> None:
         """Benchmark overhead of optimistic lock conflict resolution.

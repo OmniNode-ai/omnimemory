@@ -44,7 +44,7 @@ class TestContractValidation:
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         # Skip if not yet implemented (scaffold phase)
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
         assert contract_path.exists(), f"Missing contract: {contract_path}"
 
     @pytest.mark.parametrize("node_name", CORE_8_NODES)
@@ -56,7 +56,7 @@ class TestContractValidation:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -82,7 +82,7 @@ class TestContractValidation:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -158,7 +158,7 @@ class TestContractRuntimeLoad:
         """
         node_path: Path = NODES_DIR / node_name / "node.py"
         if not node_path.exists():
-            pytest.skip(f"File not yet implemented: {node_path}")
+            pytest.skip(f"File pending implementation: {node_path}")
 
         # Convert node_name to class name (e.g., memory_storage_effect -> Node...)
         class_name: str = "Node" + "".join(
@@ -188,7 +188,7 @@ class TestContractRuntimeLoad:
         """
         node_path: Path = NODES_DIR / node_name / "node.py"
         if not node_path.exists():
-            pytest.skip(f"File not yet implemented: {node_path}")
+            pytest.skip(f"File pending implementation: {node_path}")
 
         class_name: str = "Node" + "".join(
             word.capitalize() for word in node_name.split("_")
@@ -275,7 +275,7 @@ class TestOrchestratorEventValidation:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -328,7 +328,7 @@ class TestOrchestratorEventValidation:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -369,7 +369,7 @@ class TestOrchestratorEventValidation:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -457,7 +457,7 @@ class TestHandlerRoutingKeyAlignment:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -546,7 +546,7 @@ class TestHandlerRoutingKeyAlignment:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)
@@ -575,7 +575,7 @@ class TestHandlerRoutingKeyAlignment:
         """
         contract_path: Path = NODES_DIR / node_name / "contract.yaml"
         if not contract_path.exists():
-            pytest.skip(f"File not yet implemented: {contract_path}")
+            pytest.skip(f"File pending implementation: {contract_path}")
 
         with open(contract_path, encoding="utf-8") as f:
             data: MappingResultDict = yaml.safe_load(f)

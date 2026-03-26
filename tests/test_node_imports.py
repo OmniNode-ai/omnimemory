@@ -49,7 +49,7 @@ class TestNodeImports:
             assert module is not None
         except ImportError as e:
             # Expected during scaffold phase
-            pytest.skip(f"Node package not yet fully implemented: {e}")
+            pytest.skip(f"Node package pending implementation: {e}")
 
     def test_nodes_package_exports_core_nodes(self) -> None:
         """Verify __all__ in nodes package lists all Core 8 nodes.
@@ -129,7 +129,7 @@ class TestNodeStructure:
         """
         node_dir: Path = NODES_DIR / node_name
         if not node_dir.exists():
-            pytest.skip(f"Directory not yet created: {node_dir}")
+            pytest.skip(f"Directory pending creation: {node_dir}")
         init_path: Path = node_dir / "__init__.py"
         assert init_path.exists(), f"Missing __init__.py: {init_path}"
 
@@ -158,7 +158,7 @@ class TestNodeStructure:
 
         node_dir: Path = NODES_DIR / node_name
         if not node_dir.exists():
-            pytest.skip(f"Directory not yet created: {node_dir}")
+            pytest.skip(f"Directory pending creation: {node_dir}")
         handlers_dir: Path = node_dir / "handlers"
         assert not handlers_dir.exists(), (
             f"handlers/ should not exist in {node_name} - "
