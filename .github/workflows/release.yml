@@ -4,7 +4,9 @@ name: Release
 
 on:
   push:
-    tags: ['v[0-9]*.[0-9]*.[0-9]*']
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+      - 'omnimemory/v[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
     inputs:
       tag:
@@ -42,6 +44,8 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
+          # Strip optional namespace prefix (e.g. omnimemory/v0.12.0 → v0.12.0)
+          TAG="${TAG#omnimemory/}"
           TAG="${TAG#v}"
           PKG_VERSION=$(python3 -c "
           import tomllib, sys
@@ -86,10 +90,13 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+            RAW_TAG="${{ inputs.tag }}"
           else
-            echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            RAW_TAG="${GITHUB_REF_NAME}"
           fi
+          # Strip optional namespace prefix (e.g. omnimemory/v0.12.0 → v0.12.0)
+          RAW_TAG="${RAW_TAG#omnimemory/}"
+          echo "tag=${RAW_TAG}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -100,7 +107,7 @@ jobs:
             dist/*.tar.gz
             dist/SHA256SUMS.txt
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, 'rc') }}
+          prerelease: ${{ contains(steps.tag.outputs.tag, 'rc') }}
 
   # ---------------------------------------------------------------------------
   # Post-release: trigger Dockerfile.runtime pin cascade (OMN-5137)
