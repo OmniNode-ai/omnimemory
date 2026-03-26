@@ -1,3 +1,15 @@
+## v0.12.1 (2026-03-26)
+
+### Fixed
+- fix(tests): standardize skip reason messages across test suite [OMN-6686] (#203)
+
+### Changed
+- chore: standardize TODO markers with ticket references [OMN-6655] (#204)
+
+### Dependencies
+- omnibase-core 0.32.0 -> 0.33.0
+- omnibase-infra 0.27.0 -> 0.27.1
+
 ## v0.12.0 (2026-03-25)
 
 ### Added
