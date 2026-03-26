@@ -94,14 +94,17 @@ jobs:
           else
             RAW_TAG="${GITHUB_REF_NAME}"
           fi
-          # Strip optional namespace prefix (e.g. omnimemory/v0.12.0 → v0.12.0)
-          RAW_TAG="${RAW_TAG#omnimemory/}"
-          echo "tag=${RAW_TAG}" >> $GITHUB_OUTPUT
+          # Preserve original tag for release creation (softprops/action-gh-release
+          # requires the tag to already exist in git)
+          echo "raw_tag=${RAW_TAG}" >> $GITHUB_OUTPUT
+          # Strip optional namespace prefix for version logic (e.g. omnimemory/v0.12.0 → v0.12.0)
+          NORMALIZED="${RAW_TAG#omnimemory/}"
+          echo "tag=${NORMALIZED}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ steps.tag.outputs.raw_tag }}
           files: |
             dist/*.whl
             dist/*.tar.gz
