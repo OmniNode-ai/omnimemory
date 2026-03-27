@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
     )
+    from omnimemory.runtime.handler_lifecycle import HandlerMemoryLifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -765,7 +766,7 @@ def _create_semantic_compute_dispatch_handler(
 
 def _create_lifecycle_bridge_handler(
     *,
-    lifecycle: object,
+    lifecycle: HandlerMemoryLifecycle,
 ) -> Callable[
     [ModelEventEnvelope[object], ProtocolHandlerContext],
     Awaitable[str],
@@ -797,7 +798,7 @@ def _create_lifecycle_bridge_handler(
         )
 
         # Delegate to the real lifecycle handler for startup checks
-        if hasattr(lifecycle, "is_started") and not lifecycle.is_started():
+        if not lifecycle.is_started():
             with contextlib.suppress(Exception):
                 await lifecycle.handle_startup()
 
