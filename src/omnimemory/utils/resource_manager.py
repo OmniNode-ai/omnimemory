@@ -112,7 +112,12 @@ class AsyncCircuitBreaker:
         self.stats = CircuitBreakerStats()
         self._lock = asyncio.Lock()
 
-    async def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    async def call(
+        self,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         """Execute a function call through the circuit breaker."""
         async with self._lock:
             if self.state == CircuitState.OPEN:
@@ -437,13 +442,13 @@ class ResourceHandle:
     Provides resource lifecycle management and context tracking.
     """
 
-    resource_id: Any
-    resource: Any
+    resource_id: object
+    resource: object
     resource_type: ResourceType
     status: ResourceStatus = ResourceStatus.ACTIVE
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     ttl: float | None = None
-    _context: dict[str, Any] = field(default_factory=dict)
+    _context: dict[str, object] = field(default_factory=dict)
 
     def is_healthy(self) -> bool:
         """
@@ -474,7 +479,7 @@ class ResourceHandle:
         elapsed = (datetime.now(timezone.utc) - self.created_at).total_seconds()
         return elapsed >= self.ttl
 
-    def set_context(self, key: str, value: Any) -> None:
+    def set_context(self, key: str, value: object) -> None:
         """
         Set context data on the handle.
 
@@ -484,7 +489,7 @@ class ResourceHandle:
         """
         self._context[key] = value
 
-    def get_context(self, key: str) -> Any | None:
+    def get_context(self, key: str) -> object | None:
         """
         Get context data from the handle.
 
@@ -548,11 +553,12 @@ class ResourcePool:
             if self.available_resources:
                 self._available_event.set()
 
-    def _create_resource(self) -> Any | None:
+    def _create_resource(self) -> object | None:
         """Create a new resource."""
         if self._factory:
             try:
-                return self._factory()
+                result: object = self._factory()
+                return result
             except Exception as e:
                 logger.error(
                     "resource_creation_failed",
@@ -828,7 +834,7 @@ class ResourceManager:
             "total_releases": self._metrics["total_releases"],
         }
 
-    async def _close_resource(self, resource: Any) -> None:
+    async def _close_resource(self, resource: object) -> None:
         """
         Close a resource if it has a close method.
 

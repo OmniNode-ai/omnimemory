@@ -171,7 +171,7 @@ class PriorityLock:
         priority: LockPriority = LockPriority.NORMAL,
         timeout: float | None = None,
         correlation_id: str | None = None,
-        **metadata: Any,
+        **metadata: object,
     ) -> AsyncGenerator[None, None]:
         """
         Acquire the lock with priority and timeout support.
@@ -658,7 +658,7 @@ class AsyncConnectionPool:
                                 error=_sanitize_error(cleanup_error),
                             )
 
-    async def _create_new_connection(self) -> Any:
+    async def _create_new_connection(self) -> object:
         """Create a new connection."""
         try:
             connection = await self._create_connection()
@@ -673,7 +673,7 @@ class AsyncConnectionPool:
             )
             raise
 
-    async def _return_connection(self, connection_id: str, connection: Any) -> None:
+    async def _return_connection(self, connection_id: str, connection: object) -> None:
         """Return a connection to the pool."""
         try:
             async with self._lock:
@@ -709,7 +709,7 @@ class AsyncConnectionPool:
             except Exception:
                 pass  # Ignore cleanup errors
 
-    async def _destroy_connection(self, connection: Any) -> None:
+    async def _destroy_connection(self, connection: object) -> None:
         """Destroy a connection."""
         try:
             if asyncio.iscoroutinefunction(self._close_connection):
@@ -1191,7 +1191,7 @@ class ConnectionPool:
         with self._sync_lock:
             return len(self._active) + len(self._connections)
 
-    def _create_connection(self) -> Any:
+    def _create_connection(self) -> object:
         """
         Create a new connection.
 

@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
@@ -285,7 +284,7 @@ class MigrationProgressTracker(BaseModel):
     )
 
     def add_file(
-        self, file_path: str, file_size: int | None = None, **metadata: Any
+        self, file_path: str, file_size: int | None = None, **metadata: object
     ) -> FileProcessingInfo:
         """Add a file to be tracked for processing."""
         from .model_typed_collections import ModelKeyValuePair
