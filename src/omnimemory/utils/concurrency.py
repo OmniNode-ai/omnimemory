@@ -171,7 +171,7 @@ class PriorityLock:
         priority: LockPriority = LockPriority.NORMAL,
         timeout: float | None = None,
         correlation_id: str | None = None,
-        **metadata: object,
+        **metadata: Any,
     ) -> AsyncGenerator[None, None]:
         """
         Acquire the lock with priority and timeout support.
