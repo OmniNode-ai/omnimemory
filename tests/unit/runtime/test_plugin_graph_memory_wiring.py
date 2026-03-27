@@ -66,6 +66,9 @@ class TestGraphMemoryWiring:
         mock_adapter_instance = MagicMock()
         mock_adapter_instance.initialize = AsyncMock()
 
+        mock_intent_adapter = MagicMock()
+        mock_intent_adapter.initialize = AsyncMock()
+
         env_vars = {
             "OMNIMEMORY_MEMGRAPH_HOST": "test-memgraph",
             "OMNIMEMORY_MEMGRAPH_PORT": "7687",
@@ -85,6 +88,13 @@ class TestGraphMemoryWiring:
             patch(
                 "omnimemory.models.adapters.model_graph_memory_config.ModelGraphMemoryConfig",
             ) as mock_config_cls,
+            patch(
+                "omnimemory.handlers.adapters.adapter_intent_graph.AdapterIntentGraph",
+                return_value=mock_intent_adapter,
+            ),
+            patch(
+                "omnimemory.handlers.adapters.models.model_adapter_intent_graph_config.ModelAdapterIntentGraphConfig",
+            ),
             _patch_dispatch_factory() as mock_factory,
             _patch_contract_topics(),
             _patch_introspection(),

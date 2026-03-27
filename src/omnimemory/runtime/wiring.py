@@ -58,7 +58,31 @@ _HANDLER_SPECS: list[tuple[str, str, bool]] = [
     (
         "omnimemory.nodes.node_similarity_compute.handlers.handler_similarity_compute",
         "HandlerSimilarityCompute",
-        False,  # Requires ModelONEXContainer — verify-only
+        False,  # Requires ModelONEXContainer -- verify-only
+    ),
+    # Graph adapters (OMN-6579, OMN-6580)
+    (
+        "omnimemory.handlers.adapters.adapter_intent_graph",
+        "AdapterIntentGraph",
+        False,  # Requires config + initialize()
+    ),
+    # Navigation history reducer (OMN-6583)
+    (
+        "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer",
+        "HandlerNavigationHistoryReducer",
+        False,  # Requires pg_dsn, qdrant, embedding params
+    ),
+    # Semantic compute (OMN-6585)
+    (
+        "omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute",
+        "HandlerSemanticCompute",
+        False,  # Requires ModelONEXContainer
+    ),
+    # Lifecycle handler (OMN-6588)
+    (
+        "omnimemory.runtime.handler_lifecycle",
+        "HandlerMemoryLifecycle",
+        False,  # Requires component adapters
     ),
 ]
 

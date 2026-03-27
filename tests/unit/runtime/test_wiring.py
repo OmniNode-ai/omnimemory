@@ -75,4 +75,5 @@ class TestWireMemoryHandlers:
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
         # Success means all handlers passed the callable check
-        assert len(result) == 4
+        # 4 base (incl. similarity) + 4 integration chain handlers = 8
+        assert len(result) == 8

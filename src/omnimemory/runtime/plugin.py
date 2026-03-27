@@ -500,12 +500,80 @@ class PluginMemory:
                     )
                     graph_memory_adapter = None
 
+            # Intent graph adapter — same Memgraph, separate adapter (OMN-6579).
+            intent_graph_adapter = None
+            if memgraph_host and graph_memory_adapter is not None:
+                from omnimemory.handlers.adapters.adapter_intent_graph import (
+                    AdapterIntentGraph,
+                )
+                from omnimemory.handlers.adapters.models.model_adapter_intent_graph_config import (
+                    ModelAdapterIntentGraphConfig,
+                )
+
+                intent_config = ModelAdapterIntentGraphConfig()
+                intent_graph_adapter = AdapterIntentGraph(config=intent_config)
+                await intent_graph_adapter.initialize(
+                    connection_uri=connection_uri, auth=None
+                )
+                logger.info(
+                    "Intent graph adapter initialized (uri=%s, correlation_id=%s)",
+                    connection_uri,
+                    correlation_id,
+                )
+                self._intent_graph_adapter = intent_graph_adapter
+
+            # Navigation history reducer (OMN-6583).
+            # Persists navigation sessions to PostgreSQL + Qdrant.
+            navigation_history_handler = None
+            nav_pg_dsn = os.environ.get("OMNIMEMORY_PG_DSN", "")
+            if nav_pg_dsn:
+                from omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer import (
+                    HandlerNavigationHistoryReducer,
+                )
+
+                navigation_history_handler = HandlerNavigationHistoryReducer(
+                    writer=None,
+                    pg_dsn=nav_pg_dsn,
+                    qdrant_host=os.environ.get("QDRANT_HOST", "localhost"),
+                    qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
+                    embedding_url=os.environ.get(
+                        "LLM_EMBEDDING_URL",
+                        "http://192.168.86.200:8100",  # onex-allow-internal-ip
+                    ),
+                    embedding_model=os.environ.get(
+                        "OMNIMEMORY_EMBEDDING_MODEL", "default"
+                    ),
+                )
+                logger.info(
+                    "Navigation history handler constructed (correlation_id=%s)",
+                    correlation_id,
+                )
+
+            # Semantic compute handler (OMN-6585).
+            # Uses container for dependency injection.
+            semantic_compute_handler = None
+            if config.container is not None:
+                from omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute import (
+                    HandlerSemanticCompute,
+                )
+
+                semantic_compute_handler = HandlerSemanticCompute(
+                    container=config.container,
+                )
+                logger.info(
+                    "Semantic compute handler constructed (correlation_id=%s)",
+                    correlation_id,
+                )
+
             self._dispatch_engine = create_memory_dispatch_engine(
                 intent_consumer=intent_consumer,
                 intent_query_handler=intent_query_handler,
                 publish_callback=publish_callback,
                 publish_topics=publish_topics,
                 graph_memory_adapter=graph_memory_adapter,
+                intent_graph_adapter=intent_graph_adapter,
+                navigation_history_handler=navigation_history_handler,
+                semantic_compute_handler=semantic_compute_handler,
             )
 
             # Store event_bus reference for introspection publishing.
