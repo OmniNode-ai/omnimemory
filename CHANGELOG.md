@@ -1,3 +1,12 @@
+## v0.12.2 (2026-03-27)
+
+### Fixed
+- fix(types): narrow Any to object in resource/connection pool models [OMN-6680] (#209)
+- fix: handle namespaced tag format in release workflow [OMN-6712] (#208)
+
+### Changed
+- chore(deps): bump omnibase_core to 0.33.1, omnibase_infra to 0.28.0
+
 ## v0.12.1 (2026-03-26)
 
 ### Fixed
