@@ -1,3 +1,16 @@
+## v0.13.0 (2026-03-28)
+
+### Added
+- ci: add CodeQL security scanning workflow [OMN-5412] (#214)
+- feat(ci): add auto-merge-on-open workflow [OMN-6571] (#213)
+- feat(runtime): wire AdapterGraphMemory into PluginMemory [OMN-6578] (#211)
+
+### Changed
+- chore(deps): bump omnibase-core to 0.34.0
+
+### Dependencies
+- omnibase-core 0.33.1 -> 0.34.0
+
 ## v0.12.2 (2026-03-27)
 
 ### Fixed
