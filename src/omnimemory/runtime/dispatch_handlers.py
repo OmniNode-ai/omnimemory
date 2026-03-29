@@ -591,22 +591,17 @@ def _create_graph_memory_dispatch_handler(
             logger.warning(msg)
             raise ValueError(msg)
 
-        logger.info(
-            "Dispatching graph-memory command via MessageDispatchEngine "
-            "(correlation_id=%s)",
-            ctx_correlation_id,
-        )
-
-        # The adapter operation is determined by the payload content.
-        # For now, this is a placeholder that logs receipt; the full
-        # operation routing will be wired by downstream tasks.
         operation = payload.get("operation", "unknown")
-        logger.info(
-            "Graph memory command received (operation=%s, correlation_id=%s)",
+        logger.warning(
+            "Graph memory command received but adapter dispatch not yet wired "
+            "(operation=%s, correlation_id=%s) -- acknowledging as no-op. "
+            "See OMN-6580 follow-up tasks for operation routing.",
             operation,
             ctx_correlation_id,
         )
 
+        # TODO(OMN-6580): Route to adapter.store() / adapter.query() based on
+        # operation field. Currently validates and acknowledges.
         return ""
 
     return _handle
@@ -652,12 +647,16 @@ def _create_intent_graph_dispatch_handler(
             raise ValueError(msg)
 
         operation = payload.get("operation", "unknown")
-        logger.info(
-            "Intent graph command received (operation=%s, correlation_id=%s)",
+        logger.warning(
+            "Intent graph command received but adapter dispatch not yet wired "
+            "(operation=%s, correlation_id=%s) -- acknowledging as no-op. "
+            "See OMN-6579 follow-up tasks for operation routing.",
             operation,
             ctx_correlation_id,
         )
 
+        # TODO(OMN-6579): Route to adapter methods based on operation field.
+        # Currently validates and acknowledges; full dispatch in follow-up PR.
         return ""
 
     return _handle
@@ -701,11 +700,15 @@ def _create_navigation_history_dispatch_handler(
             logger.warning(msg)
             raise ValueError(msg)
 
-        logger.info(
-            "Navigation history session event received (correlation_id=%s)",
+        logger.warning(
+            "Navigation history session event received but handler dispatch "
+            "not yet wired (correlation_id=%s) -- acknowledging as no-op. "
+            "See OMN-6583 follow-up tasks for session routing.",
             ctx_correlation_id,
         )
 
+        # TODO(OMN-6583): Route to handler.record_session() / handler.query()
+        # based on payload command field. Currently validates and acknowledges.
         return ""
 
     return _handle
@@ -749,11 +752,15 @@ def _create_semantic_compute_dispatch_handler(
             logger.warning(msg)
             raise ValueError(msg)
 
-        logger.info(
-            "Semantic analysis request received (correlation_id=%s)",
+        logger.warning(
+            "Semantic analysis request received but handler dispatch "
+            "not yet wired (correlation_id=%s) -- acknowledging as no-op. "
+            "See OMN-6585 follow-up tasks for compute routing.",
             ctx_correlation_id,
         )
 
+        # TODO(OMN-6585): Route to handler.analyze() based on payload.
+        # Currently validates and acknowledges.
         return ""
 
     return _handle
@@ -791,16 +798,41 @@ def _create_lifecycle_bridge_handler(
         ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
 
         topic = getattr(envelope, "event_type", None) or "unknown"
+        payload = envelope.payload
+        command = payload.get("command", "") if isinstance(payload, dict) else ""
+
         logger.info(
-            "Lifecycle command received (topic=%s, correlation_id=%s)",
+            "Lifecycle command received (topic=%s, command=%s, correlation_id=%s)",
             topic,
+            command,
             ctx_correlation_id,
         )
 
-        # Delegate to the real lifecycle handler for startup checks
+        # Ensure the lifecycle handler is started before processing commands.
         if not lifecycle.is_started():
             with contextlib.suppress(Exception):
                 await lifecycle.handle_startup()
+
+        # Route lifecycle commands.
+        if command in ("shutdown", "expire-memory"):
+            # Shutdown is the only lifecycle teardown method available.
+            # archive-memory has no dedicated handler yet (OMN-6588 follow-up).
+            logger.info(
+                "Lifecycle shutdown requested (command=%s, correlation_id=%s)",
+                command,
+                ctx_correlation_id,
+            )
+            with contextlib.suppress(Exception):
+                await lifecycle.handle_shutdown()
+        elif command == "archive-memory":
+            # TODO(OMN-6588): Wire archive-memory to a dedicated handler.
+            # Currently acknowledged as no-op; the lifecycle handler does not
+            # have an archive method yet.
+            logger.warning(
+                "archive-memory command not yet implemented "
+                "(correlation_id=%s) -- acknowledging as no-op",
+                ctx_correlation_id,
+            )
 
         return ""
 
