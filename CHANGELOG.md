@@ -1,3 +1,13 @@
+## v0.14.0 (2026-03-30)
+
+### Changed
+- release: omnimemory v0.14.0 coordinated release
+- chore(deps): bump omnibase-core to 0.35.0, omnibase-infra to 0.30.0
+
+### Dependencies
+- omnibase-core 0.34.0 -> 0.35.0
+- omnibase-infra 0.29.0 -> 0.30.0
+
 ## v0.13.0 (2026-03-28)
 
 ### Added
