@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+# ONEX Contract: handler_memory_lifecycle
+# Runtime handler for memory lifecycle management
+
+name: handler_memory_lifecycle
+description: |
+  Runtime lifecycle handler for omnimemory component adapters.
+  Manages startup, shutdown, and health for memory subsystem components.
+
+handler_config:
+  handler_class: "HandlerMemoryLifecycle"
+  handler_module: "omnimemory.runtime.handler_lifecycle"
+
+tags:
+  - memory
+  - runtime
+  - lifecycle

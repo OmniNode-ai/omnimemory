@@ -77,3 +77,23 @@ class TestWireMemoryHandlers:
         # Success means all handlers passed the callable check
         # 4 base (incl. similarity) + 4 integration chain handlers = 8
         assert len(result) == 8
+
+
+class TestContractDrivenDiscovery:
+    """Validate that handler discovery reads from contracts, not hardcoded list."""
+
+    @pytest.mark.asyncio
+    async def test_discovers_handlers_from_contracts(self) -> None:
+        """wire_memory_handlers returns the same 8 handlers from contracts."""
+        config = StubConfig()
+        result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
+        assert len(result) == 8
+
+    @pytest.mark.asyncio
+    async def test_no_hardcoded_handler_specs(self) -> None:
+        """_HANDLER_SPECS must not exist -- all specs come from contracts."""
+        import omnimemory.runtime.wiring as wiring_mod
+
+        assert not hasattr(wiring_mod, "_HANDLER_SPECS"), (
+            "_HANDLER_SPECS still exists -- migration incomplete"
+        )

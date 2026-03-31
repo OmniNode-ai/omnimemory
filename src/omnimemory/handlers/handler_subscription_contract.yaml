@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+# ONEX Contract: handler_subscription
+# Standalone handler (not part of a node directory)
+
+name: handler_subscription
+description: |
+  Subscription management handler for omnimemory event subscriptions.
+  Standalone handler, not part of a node directory.
+
+handler_config:
+  handler_class: "HandlerSubscription"
+  handler_module: "omnimemory.handlers.handler_subscription"
+
+tags:
+  - memory
+  - subscription
+  - handler

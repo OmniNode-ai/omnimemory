@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+# ONEX Contract: adapter_intent_graph
+# Graph adapter for intent storage and retrieval
+
+name: adapter_intent_graph
+description: |
+  Graph adapter for intent storage and retrieval via Memgraph.
+  Standalone adapter, not part of a node directory.
+
+handler_config:
+  handler_class: "AdapterIntentGraph"
+  handler_module: "omnimemory.handlers.adapters.adapter_intent_graph"
+
+tags:
+  - memory
+  - adapter
+  - graph
+  - intent
