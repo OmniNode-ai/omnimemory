@@ -28,6 +28,7 @@ from omnimemory.runtime.introspection import (
     IntrospectionResult,
     MemoryNodeIntrospectionProxy,
     _NodeDescriptor,
+    discover_memory_nodes,
     publish_memory_introspection,
     publish_memory_shutdown,
     reset_introspection_guard,
@@ -85,29 +86,29 @@ class TestMemoryNodesStructure:
     """Validate the MEMORY_NODES tuple contents and invariants."""
 
     @pytest.mark.unit
-    def test_has_exactly_nine_nodes(self) -> None:
-        """MEMORY_NODES should contain exactly 9 node descriptors."""
-        assert len(MEMORY_NODES) == 9
+    def test_has_at_least_nine_nodes(self) -> None:
+        """MEMORY_NODES should contain at least the original 9 node descriptors."""
+        assert len(MEMORY_NODES) >= 9
 
     @pytest.mark.unit
-    def test_contains_two_orchestrators(self) -> None:
-        """MEMORY_NODES should contain exactly 2 orchestrator nodes."""
+    def test_contains_at_least_two_orchestrators(self) -> None:
+        """MEMORY_NODES should contain at least 2 orchestrator nodes."""
         orchestrators = [
             n for n in MEMORY_NODES if n.node_type == EnumNodeKind.ORCHESTRATOR
         ]
-        assert len(orchestrators) == 2
+        assert len(orchestrators) >= 2
 
     @pytest.mark.unit
-    def test_contains_two_compute_nodes(self) -> None:
-        """MEMORY_NODES should contain exactly 2 compute nodes."""
+    def test_contains_at_least_two_compute_nodes(self) -> None:
+        """MEMORY_NODES should contain at least 2 compute nodes."""
         compute_nodes = [n for n in MEMORY_NODES if n.node_type == EnumNodeKind.COMPUTE]
-        assert len(compute_nodes) == 2
+        assert len(compute_nodes) >= 2
 
     @pytest.mark.unit
-    def test_contains_five_effect_nodes(self) -> None:
-        """MEMORY_NODES should contain exactly 5 effect nodes."""
+    def test_contains_at_least_five_effect_nodes(self) -> None:
+        """MEMORY_NODES should contain at least 5 effect nodes."""
         effect_nodes = [n for n in MEMORY_NODES if n.node_type == EnumNodeKind.EFFECT]
-        assert len(effect_nodes) == 5
+        assert len(effect_nodes) >= 5
 
     @pytest.mark.unit
     def test_all_names_are_unique(self) -> None:
@@ -634,3 +635,91 @@ class TestIntrospectionLifecycle:
             enable_heartbeat=False,
         )
         assert len(result.registered_nodes) == len(MEMORY_NODES)
+
+
+# =============================================================================
+# Tests: Contract-driven node discovery
+# =============================================================================
+
+
+class TestDiscoverMemoryNodes:
+    """Validate contract-driven node discovery."""
+
+    @pytest.mark.unit
+    def test_discovers_all_hardcoded_nodes(self) -> None:
+        """All nodes from the former MEMORY_NODES tuple must be discoverable."""
+        discovered = discover_memory_nodes()
+        discovered_names = {d.name for d in discovered}
+        # These 9 nodes existed in the original hardcoded tuple
+        expected_names = {
+            "node_memory_lifecycle_orchestrator",
+            "node_agent_coordinator_orchestrator",
+            "node_similarity_compute",
+            "node_semantic_analyzer_compute",
+            "node_intent_event_consumer_effect",
+            "node_intent_query_effect",
+            "node_intent_storage_effect",
+            "node_memory_retrieval_effect",
+            "node_memory_storage_effect",
+        }
+        assert expected_names.issubset(discovered_names), (
+            f"Missing nodes: {expected_names - discovered_names}"
+        )
+
+    @pytest.mark.unit
+    def test_discovers_new_nodes_with_contracts(self) -> None:
+        """Nodes added after the original list should be discovered."""
+        discovered = discover_memory_nodes()
+        discovered_names = {d.name for d in discovered}
+        # These nodes have contract.yaml but were not in the original tuple
+        assert "node_filesystem_crawler_effect" in discovered_names
+        assert "node_kreuzberg_parse_effect" in discovered_names
+
+    @pytest.mark.unit
+    def test_node_types_match_contracts(self) -> None:
+        """Discovered node types must match contract.yaml node_type field."""
+        discovered = discover_memory_nodes()
+        for desc in discovered:
+            if "orchestrator" in desc.name:
+                assert desc.node_type == EnumNodeKind.ORCHESTRATOR, desc.name
+            elif "compute" in desc.name:
+                assert desc.node_type == EnumNodeKind.COMPUTE, desc.name
+            elif "effect" in desc.name:
+                assert desc.node_type == EnumNodeKind.EFFECT, desc.name
+
+    @pytest.mark.unit
+    def test_all_names_are_unique(self) -> None:
+        """All discovered node names must be unique."""
+        discovered = discover_memory_nodes()
+        names = [d.name for d in discovered]
+        assert len(names) == len(set(names))
+
+    @pytest.mark.unit
+    def test_all_node_ids_are_unique(self) -> None:
+        """All discovered node IDs must be unique."""
+        discovered = discover_memory_nodes()
+        ids = [d.node_id for d in discovered]
+        assert len(ids) == len(set(ids))
+
+    @pytest.mark.unit
+    def test_version_defaults_to_1_0_0(self) -> None:
+        """Discovered nodes should have version '1.0.0' (default)."""
+        discovered = discover_memory_nodes()
+        for desc in discovered:
+            assert desc.version == "1.0.0", f"{desc.name} has version {desc.version}"
+
+    @pytest.mark.unit
+    def test_sorted_by_name(self) -> None:
+        """Discovered nodes should be sorted by name for determinism."""
+        discovered = discover_memory_nodes()
+        names = [d.name for d in discovered]
+        assert names == sorted(names)
+
+    @pytest.mark.unit
+    def test_memory_nodes_equals_discovery(self) -> None:
+        """MEMORY_NODES module variable should equal discover_memory_nodes()."""
+        discovered = discover_memory_nodes()
+        assert len(MEMORY_NODES) == len(discovered)
+        for mod_desc, disc_desc in zip(MEMORY_NODES, discovered, strict=True):
+            assert mod_desc.name == disc_desc.name
+            assert mod_desc.node_type == disc_desc.node_type

@@ -29,11 +29,13 @@ Related:
 from __future__ import annotations
 
 import asyncio
+import importlib.resources
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import NAMESPACE_DNS, UUID, uuid5
 
+import yaml
 from omnibase_core.enums import EnumNodeKind
 from omnibase_infra.enums import EnumIntrospectionReason
 from omnibase_infra.mixins.mixin_node_introspection import MixinNodeIntrospection
@@ -87,20 +89,95 @@ class _NodeDescriptor:
         return uuid5(_NAMESPACE_MEMORY, f"omnimemory.{self.name}")
 
 
-MEMORY_NODES: tuple[_NodeDescriptor, ...] = (
-    # Orchestrators
-    _NodeDescriptor("node_memory_lifecycle_orchestrator", EnumNodeKind.ORCHESTRATOR),
-    _NodeDescriptor("node_agent_coordinator_orchestrator", EnumNodeKind.ORCHESTRATOR),
-    # Compute nodes
-    _NodeDescriptor("node_similarity_compute", EnumNodeKind.COMPUTE),
-    _NodeDescriptor("node_semantic_analyzer_compute", EnumNodeKind.COMPUTE),
-    # Effect nodes
-    _NodeDescriptor("node_intent_event_consumer_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("node_intent_query_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("node_intent_storage_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("node_memory_retrieval_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("node_memory_storage_effect", EnumNodeKind.EFFECT),
-)
+def _parse_node_type(raw_type: str) -> EnumNodeKind:
+    """Convert contract.yaml ``node_type`` string to ``EnumNodeKind``.
+
+    Contract YAML uses uppercase strings with optional ``_GENERIC`` suffix::
+
+        "EFFECT_GENERIC" -> EnumNodeKind.EFFECT
+        "COMPUTE" -> EnumNodeKind.COMPUTE
+        "ORCHESTRATOR_GENERIC" -> EnumNodeKind.ORCHESTRATOR
+    """
+    normalized = raw_type.replace("_GENERIC", "").lower()
+    return EnumNodeKind(normalized)
+
+
+def _discover_nodes_from_contracts(
+    base_package: str,
+) -> tuple[_NodeDescriptor, ...]:
+    """Discover node descriptors from ``contract.yaml`` files.
+
+    Scans all ``node_*/contract.yaml`` files under *base_package* and builds
+    ``_NodeDescriptor`` instances from the ``name`` and ``node_type`` fields.
+
+    Returns:
+        Tuple of ``_NodeDescriptor`` sorted by name for deterministic ordering.
+    """
+    descriptors: list[_NodeDescriptor] = []
+    package_files = importlib.resources.files(base_package)
+
+    for item in package_files.iterdir():
+        if not item.name.startswith("node_"):
+            continue
+        contract_path = item.joinpath("contract.yaml")
+        try:
+            content = contract_path.read_text(encoding="utf-8")
+        except (FileNotFoundError, TypeError, OSError):
+            continue
+
+        try:
+            contract = yaml.safe_load(content)
+        except yaml.YAMLError:
+            logger.warning(
+                "Invalid YAML in %s/%s/contract.yaml, skipping",
+                base_package,
+                item.name,
+            )
+            continue
+
+        if not isinstance(contract, dict):
+            continue
+
+        name = contract.get("name")
+        raw_type = contract.get("node_type")
+        if not isinstance(name, str) or not isinstance(raw_type, str):
+            logger.warning(
+                "Missing name or node_type in %s/%s/contract.yaml, skipping",
+                base_package,
+                item.name,
+            )
+            continue
+
+        try:
+            node_type = _parse_node_type(raw_type)
+        except ValueError:
+            logger.warning(
+                "Unknown node_type %r in %s/%s/contract.yaml, skipping",
+                raw_type,
+                base_package,
+                item.name,
+            )
+            continue
+
+        descriptors.append(_NodeDescriptor(name, node_type))
+
+    return tuple(sorted(descriptors, key=lambda d: d.name))
+
+
+def discover_memory_nodes() -> tuple[_NodeDescriptor, ...]:
+    """Discover memory node descriptors from ``contract.yaml`` files.
+
+    Replaces the former hardcoded ``MEMORY_NODES`` tuple with dynamic
+    contract-driven discovery. Scans all ``node_*/contract.yaml`` files
+    under ``omnimemory.nodes``.
+
+    Returns:
+        Tuple of ``_NodeDescriptor`` instances sorted by name.
+    """
+    return _discover_nodes_from_contracts(base_package="omnimemory.nodes")
+
+
+MEMORY_NODES: tuple[_NodeDescriptor, ...] = discover_memory_nodes()
 
 
 # =============================================================================
@@ -422,6 +499,7 @@ __all__ = [
     "MEMORY_NODES",
     "IntrospectionResult",
     "MemoryNodeIntrospectionProxy",
+    "discover_memory_nodes",
     "publish_memory_introspection",
     "publish_memory_shutdown",
     "reset_introspection_guard",
