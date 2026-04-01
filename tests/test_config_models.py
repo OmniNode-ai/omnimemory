@@ -346,51 +346,59 @@ class TestModelQdrantConfig:
         """Test collection_name validates as alphanumeric with underscore/hyphen."""
         # Valid names
         for name in ["my_collection", "test-collection", "collection123"]:
-            config = ModelQdrantConfig(collection_name=name)
+            config = ModelQdrantConfig(
+                url="http://qdrant.test:6333", collection_name=name
+            )
             assert config.collection_name == name
 
         # Invalid name (special characters)
         with pytest.raises(ValidationError):
-            ModelQdrantConfig(collection_name="invalid.collection!")
+            ModelQdrantConfig(
+                url="http://qdrant.test:6333", collection_name="invalid.collection!"
+            )
 
     def test_vector_size_bounds(self) -> None:
         """Test vector_size bounds (1-65536)."""
         # Valid
-        config = ModelQdrantConfig(vector_size=384)
+        config = ModelQdrantConfig(url="http://qdrant.test:6333", vector_size=384)
         assert config.vector_size == 384
 
         # Too low
         with pytest.raises(ValidationError):
-            ModelQdrantConfig(vector_size=0)
+            ModelQdrantConfig(url="http://qdrant.test:6333", vector_size=0)
 
         # Too high
         with pytest.raises(ValidationError):
-            ModelQdrantConfig(vector_size=100000)
+            ModelQdrantConfig(url="http://qdrant.test:6333", vector_size=100000)
 
     def test_distance_metric_validation(self) -> None:
         """Test distance_metric validates against allowed values."""
         # Valid metrics
         for metric in ["Cosine", "Euclid", "Dot"]:
-            config = ModelQdrantConfig(distance_metric=metric)
+            config = ModelQdrantConfig(
+                url="http://qdrant.test:6333", distance_metric=metric
+            )
             assert config.distance_metric == metric
 
         # Invalid metric
         with pytest.raises(ValidationError):
-            ModelQdrantConfig(distance_metric="Manhattan")
+            ModelQdrantConfig(
+                url="http://qdrant.test:6333", distance_metric="Manhattan"
+            )
 
     def test_score_threshold_bounds(self) -> None:
         """Test score_threshold bounds (0.0-1.0)."""
         # Valid
-        config = ModelQdrantConfig(score_threshold=0.85)
+        config = ModelQdrantConfig(url="http://qdrant.test:6333", score_threshold=0.85)
         assert config.score_threshold == 0.85
 
         # Below minimum
         with pytest.raises(ValidationError):
-            ModelQdrantConfig(score_threshold=-0.1)
+            ModelQdrantConfig(url="http://qdrant.test:6333", score_threshold=-0.1)
 
         # Above maximum
         with pytest.raises(ValidationError):
-            ModelQdrantConfig(score_threshold=1.5)
+            ModelQdrantConfig(url="http://qdrant.test:6333", score_threshold=1.5)
 
 
 class TestModelMemoryServiceConfig:

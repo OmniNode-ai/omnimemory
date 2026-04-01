@@ -132,18 +132,19 @@ class TestQdrantSettings:
     def test_loads_from_env_with_defaults(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test qdrant settings load with defaults."""
+        """Test qdrant settings load with URL from env and other defaults."""
         _clear_omnimemory_env_vars(monkeypatch)
-        # Qdrant has all defaults, no required fields
+        monkeypatch.setenv("OMNIMEMORY__QDRANT__URL", "http://qdrant.test:6333")
 
         settings = QdrantSettings()
-        assert str(settings.url).rstrip("/") == "http://localhost:6333"
+        assert str(settings.url).rstrip("/") == "http://qdrant.test:6333"
         assert settings.api_key is None
         assert settings.collection_name == "omnimemory"
 
     def test_loads_api_key_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test qdrant api_key loads from environment."""
         _clear_omnimemory_env_vars(monkeypatch)
+        monkeypatch.setenv("OMNIMEMORY__QDRANT__URL", "http://qdrant.test:6333")
         monkeypatch.setenv("OMNIMEMORY__QDRANT__API_KEY", "my-api-key")
 
         settings = QdrantSettings()
@@ -153,6 +154,7 @@ class TestQdrantSettings:
     def test_to_config_converts_properly(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test to_config() produces ModelQdrantConfig."""
         _clear_omnimemory_env_vars(monkeypatch)
+        monkeypatch.setenv("OMNIMEMORY__QDRANT__URL", "http://qdrant.test:6333")
 
         settings = QdrantSettings()
         config = settings.to_config()
@@ -225,6 +227,7 @@ class TestMemoryServiceSettings:
         _clear_omnimemory_env_vars(monkeypatch)
         monkeypatch.setenv("OMNIMEMORY__FILESYSTEM__BASE_PATH", str(tmp_path))
         monkeypatch.setenv("OMNIMEMORY__QDRANT_ENABLED", "true")
+        monkeypatch.setenv("OMNIMEMORY__QDRANT__URL", "http://qdrant.test:6333")
 
         settings = MemoryServiceSettings()
         config = settings.to_config()

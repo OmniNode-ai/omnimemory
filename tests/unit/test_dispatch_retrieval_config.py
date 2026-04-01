@@ -70,14 +70,10 @@ class TestRetrievalConfigFromEnv:
         assert config.use_stub_handlers is False
         assert config.qdrant_config is not None
 
-    def test_false_without_qdrant_env_uses_defaults(self) -> None:
-        """When stubs disabled but QDRANT_* unset, sensible defaults apply."""
+    def test_false_without_qdrant_env_raises_keyerror(self) -> None:
+        """When stubs disabled but QDRANT_* unset, KeyError is raised (no fallback defaults)."""
         with patch.dict(
             os.environ, {"OMNIMEMORY_USE_STUB_HANDLERS": "false"}, clear=True
         ):
-            config = build_retrieval_config_from_env()
-        assert config.use_stub_handlers is False
-        assert config.qdrant_config is not None
-        assert config.qdrant_config.qdrant_host == "localhost"
-        assert config.qdrant_config.qdrant_port == 6333
-        assert config.qdrant_config.embedding_server_url == "http://localhost:8100"
+            with pytest.raises(KeyError):
+                build_retrieval_config_from_env()

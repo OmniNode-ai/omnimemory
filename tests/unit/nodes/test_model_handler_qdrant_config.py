@@ -19,10 +19,13 @@ from omnimemory.nodes.node_memory_retrieval_effect.models import (
 
 
 @pytest.mark.unit
-def test_defaults_with_required_url() -> None:
-    """ModelHandlerQdrantConfig has correct defaults when embedding_server_url provided."""
-    cfg = ModelHandlerQdrantConfig(embedding_server_url="http://localhost:8100")
-    assert cfg.qdrant_host == "localhost"
+def test_defaults_with_required_fields() -> None:
+    """ModelHandlerQdrantConfig has correct defaults when required fields provided."""
+    cfg = ModelHandlerQdrantConfig(
+        qdrant_host="qdrant.test",
+        embedding_server_url="http://embed.test:8100",
+    )
+    assert cfg.qdrant_host == "qdrant.test"
     assert cfg.qdrant_port == 6333
     assert cfg.collection_name == "omnimemory_documents"
     assert cfg.vector_size == 4096
@@ -63,14 +66,17 @@ def test_retrieval_config_stub_mode_default() -> None:
 @pytest.mark.unit
 def test_retrieval_config_production_mode_with_qdrant_config() -> None:
     """ModelHandlerMemoryRetrievalConfig accepts use_stub_handlers=False when qdrant_config provided."""
-    qdrant_cfg = ModelHandlerQdrantConfig(embedding_server_url="http://localhost:8100")
+    qdrant_cfg = ModelHandlerQdrantConfig(
+        qdrant_host="qdrant.test",
+        embedding_server_url="http://embed.test:8100",
+    )
     cfg = ModelHandlerMemoryRetrievalConfig(
         use_stub_handlers=False,
         qdrant_config=qdrant_cfg,
     )
     assert cfg.use_stub_handlers is False
     assert cfg.qdrant_config is not None
-    assert cfg.qdrant_config.embedding_server_url == "http://localhost:8100"
+    assert cfg.qdrant_config.embedding_server_url == "http://embed.test:8100"
 
 
 @pytest.mark.unit
