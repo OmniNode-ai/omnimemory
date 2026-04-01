@@ -268,11 +268,15 @@ async def _validate_postgres_config(config: ModelPostgresConfig) -> list[str]:
     dsn = config.dsn
     hosts_info = dsn.hosts()
     if not hosts_info:
-        raise ValueError("PostgreSQL DSN must include a host")
+        raise BootstrapError(
+            "PostgreSQL DSN must include a host", config_block="postgres"
+        )
     first_host = hosts_info[0]
     host = first_host.get("host")
     if not host:
-        raise ValueError("PostgreSQL DSN must include a host")
+        raise BootstrapError(
+            "PostgreSQL DSN must include a host", config_block="postgres"
+        )
     port = first_host.get("port", 5432)
 
     logger.info(f"PostgreSQL configured: {host}:{port}")

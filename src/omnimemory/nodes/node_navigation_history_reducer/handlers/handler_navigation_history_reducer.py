@@ -61,9 +61,9 @@ __all__ = ["HandlerNavigationHistoryReducer", "HandlerNavigationHistoryWriter"]
 # ---------------------------------------------------------------------------
 
 _DEFAULT_PG_DSN = os.environ.get("OMNIMEMORY_PG_DSN", "")
-_DEFAULT_QDRANT_HOST = os.environ["QDRANT_HOST"]
-_DEFAULT_QDRANT_PORT = int(os.environ["QDRANT_PORT"])
-_DEFAULT_EMBEDDING_URL = os.environ["LLM_EMBEDDING_URL"]
+_DEFAULT_QDRANT_HOST = os.environ.get("QDRANT_HOST", "")
+_DEFAULT_QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+_DEFAULT_EMBEDDING_URL = os.environ.get("LLM_EMBEDDING_URL", "")
 _DEFAULT_EMBEDDING_MODEL = "Qwen3-Embedding-8B"
 _QDRANT_COLLECTION = "navigation_paths"
 

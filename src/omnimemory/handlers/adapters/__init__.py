@@ -20,6 +20,7 @@ Available Adapters:
 
 Example::
 
+    import os
     from omnimemory.handlers.adapters import (
         AdapterGraphMemory,
         ModelGraphMemoryConfig,
