@@ -26,7 +26,7 @@ Example::
         AdapterValkeyConfig,
     )
 
-    config = AdapterValkeyConfig(host="localhost", port=6379)
+    config = AdapterValkeyConfig(host=os.environ["VALKEY_HOST"], port=6379)
     adapter = AdapterValkey(config)
     await adapter.initialize()
 
@@ -119,7 +119,7 @@ class AdapterValkeyConfig(  # omnimemory-model-exempt: adapter config
     )
 
     host: str = Field(
-        default="localhost",
+        ...,
         description="Valkey server hostname",
     )
     port: int = Field(
@@ -394,7 +394,7 @@ class AdapterValkey:
 
     Example::
 
-        config = AdapterValkeyConfig(host="localhost", port=6379)
+        config = AdapterValkeyConfig(host=os.environ["VALKEY_HOST"], port=6379)
         adapter = AdapterValkey(config)
         await adapter.initialize()
 

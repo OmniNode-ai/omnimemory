@@ -59,8 +59,8 @@ Example::
     container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
         db_dsn=os.environ["OMNIMEMORY_DB_URL"],
-        valkey_host="localhost",
-        valkey_port=6379,
+        valkey_host=os.environ["VALKEY_HOST"],
+        valkey_port=int(os.environ.get("VALKEY_PORT", "6379")),
         kafka_bootstrap_servers=os.environ["KAFKA_BOOTSTRAP_SERVERS"],
     )
     handler = HandlerSubscription(container)
@@ -279,7 +279,7 @@ class ModelHandlerSubscriptionConfig(  # omnimemory-model-exempt: handler config
         description="PostgreSQL connection string",
     )
     valkey_host: str = Field(
-        default="localhost",
+        ...,
         description="Valkey server hostname",
     )
     valkey_port: int = Field(

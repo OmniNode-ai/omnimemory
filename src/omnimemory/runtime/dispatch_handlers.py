@@ -440,11 +440,9 @@ def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers 
         None
         if use_stubs
         else ModelHandlerQdrantConfig(
-            qdrant_host=os.getenv("QDRANT_HOST", "localhost"),
-            qdrant_port=int(os.getenv("QDRANT_PORT", "6333")),
-            embedding_server_url=os.getenv(
-                "LLM_EMBEDDING_URL", "http://localhost:8100"
-            ),
+            qdrant_host=os.environ["QDRANT_HOST"],
+            qdrant_port=int(os.environ["QDRANT_PORT"]),
+            embedding_server_url=os.environ["LLM_EMBEDDING_URL"],
         )
     )
     return ModelHandlerMemoryRetrievalConfig(

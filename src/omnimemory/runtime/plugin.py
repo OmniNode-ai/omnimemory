@@ -238,7 +238,7 @@ class PluginMemory:
         ):
             return ModelHandshakeResult.default_pass(self.plugin_id)
 
-        host = os.getenv("OMNIMEMORY_MEMGRAPH_HOST", "localhost")
+        host = os.environ["OMNIMEMORY_MEMGRAPH_HOST"]
         port = int(os.getenv("OMNIMEMORY_MEMGRAPH_PORT", "7687"))
 
         reachable = await _probe_tcp_reachable(host, port)
@@ -534,7 +534,7 @@ class PluginMemory:
                 navigation_history_handler = HandlerNavigationHistoryReducer(
                     writer=None,
                     pg_dsn=nav_pg_dsn,
-                    qdrant_host=os.environ.get("QDRANT_HOST", "localhost"),
+                    qdrant_host=os.environ["QDRANT_HOST"],
                     qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
                     embedding_url=os.environ.get(
                         "LLM_EMBEDDING_URL",

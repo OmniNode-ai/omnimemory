@@ -215,7 +215,7 @@ class QdrantSettings(BaseSettings):
     )
 
     url: HttpUrl = Field(
-        default="http://localhost:6333",  # type: ignore[assignment]
+        ...,  # type: ignore[assignment]
         description="Qdrant server URL",
     )
     api_key: SecretStr | None = Field(

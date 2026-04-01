@@ -39,7 +39,7 @@ Example::
     # Embedding client (contract boundary for HTTP)
     embed_config = ModelEmbeddingHttpClientConfig(
         provider="local",
-        base_url="http://localhost:8100",  # set via LLM_EMBEDDING_URL env var in production
+        base_url=os.environ["LLM_EMBEDDING_URL"],
     )
     async with EmbeddingHttpClient(embed_config) as client:
         embedding = await client.get_embedding("Hello world")
@@ -50,7 +50,7 @@ Example::
     await intent_adapter.initialize(connection_uri="bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}")
 
     # Valkey adapter for caching
-    valkey_config = AdapterValkeyConfig(host="localhost", port=6379)
+    valkey_config = AdapterValkeyConfig(host=os.environ["VALKEY_HOST"], port=6379)
     valkey = AdapterValkey(valkey_config)
     await valkey.initialize()
     await valkey.set_key("key", "value")

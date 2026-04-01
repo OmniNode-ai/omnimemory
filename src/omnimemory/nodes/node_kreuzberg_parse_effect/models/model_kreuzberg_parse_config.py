@@ -21,7 +21,7 @@ class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
     model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     kreuzberg_url: str = Field(
-        default="http://localhost:8090",
+        ...,
         description="Base URL of the kreuzberg Docker service",
     )
     text_store_path: str = Field(

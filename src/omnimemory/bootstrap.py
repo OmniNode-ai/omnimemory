@@ -267,13 +267,13 @@ async def _validate_postgres_config(config: ModelPostgresConfig) -> list[str]:
     # In Pydantic v2, PostgresDsn uses hosts() which returns a list of dicts
     dsn = config.dsn
     hosts_info = dsn.hosts()
-    if hosts_info:
-        first_host = hosts_info[0]
-        host = first_host.get("host", "localhost")
-        port = first_host.get("port", 5432)
-    else:
-        host = "localhost"
-        port = 5432
+    if not hosts_info:
+        raise ValueError("PostgreSQL DSN must include a host")
+    first_host = hosts_info[0]
+    host = first_host.get("host")
+    if not host:
+        raise ValueError("PostgreSQL DSN must include a host")
+    port = first_host.get("port", 5432)
 
     logger.info(f"PostgreSQL configured: {host}:{port}")
 

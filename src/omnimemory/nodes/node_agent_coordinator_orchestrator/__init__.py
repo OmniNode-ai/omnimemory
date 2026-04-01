@@ -43,7 +43,7 @@ Handler Integration::
     container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
         db_dsn=os.environ["OMNIMEMORY_DB_URL"],
-        valkey_host=os.getenv("VALKEY_HOST", "localhost"),
+        valkey_host=os.environ["VALKEY_HOST"],
         kafka_bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS"),
     )
     handler = HandlerSubscription(container)

@@ -45,7 +45,7 @@ class ModelHandlerQdrantConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
     qdrant_host: str = Field(
-        default="localhost",
+        ...,
         description="Hostname for the Qdrant server",
     )
     qdrant_port: int = Field(

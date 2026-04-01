@@ -32,7 +32,7 @@ class ModelQdrantConfig(BaseModel):
 
     # Connection configuration
     url: HttpUrl = Field(
-        default=HttpUrl("http://localhost:6333"),
+        ...,
         description="Qdrant server URL",
     )
     api_key: SecretStr | None = Field(
