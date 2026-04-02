@@ -15,9 +15,10 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import UUID
 
+from omnimemory.enums import EnumPreferredTone, EnumTechnicalLevel
 from omnimemory.models.persona import ModelUserPersonaV1
 
 logger = logging.getLogger(__name__)
@@ -112,15 +113,15 @@ class AdapterPostgresPersona:
         persona_version_val: int = int(str(row["persona_version"]))
         rebuilt_from_signals_val: int = int(str(row["rebuilt_from_signals"]))
         vocab_val: float = float(str(row["vocabulary_complexity"]))
-        created_at_val = row["created_at"]
+        created_at_val = cast("datetime", row["created_at"])
 
         return ModelUserPersonaV1(
             user_id=str(row["user_id"]),
             agent_id=str(row["agent_id"]) if row.get("agent_id") else None,
-            technical_level=str(row["technical_level"]),
+            technical_level=EnumTechnicalLevel(str(row["technical_level"])),
             vocabulary_complexity=vocab_val,
-            preferred_tone=str(row["preferred_tone"]),
-            domain_familiarity=domain_familiarity,
+            preferred_tone=EnumPreferredTone(str(row["preferred_tone"])),
+            domain_familiarity=cast("dict[str, float]", domain_familiarity),
             session_count=session_count_val,
             persona_version=persona_version_val,
             rebuilt_from_signals=rebuilt_from_signals_val,
