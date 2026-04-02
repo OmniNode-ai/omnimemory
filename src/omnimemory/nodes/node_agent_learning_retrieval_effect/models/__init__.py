@@ -2,23 +2,21 @@
 # SPDX-License-Identifier: MIT
 
 # Copyright (c) 2025 OmniNode Team
-"""Agent Learning Retrieval Effect — ONEX Node.
+"""Models for agent learning retrieval node."""
 
-Retrieval helpers for cross-agent memory fabric. Provides query-building
-and ranking functions for layered similarity search against agent learning
-collections.
-
-.. versionadded:: 0.3.0
-    Initial implementation for OMN-7246.
-"""
-
-from omnimemory.nodes.node_agent_learning_retrieval_effect.models import (
+from omnimemory.nodes.node_agent_learning_retrieval_effect.models.model_request import (
+    EnumRetrievalMatchType,
     ModelAgentLearningRetrievalRequest,
+)
+from omnimemory.nodes.node_agent_learning_retrieval_effect.models.model_response import (
+    EnumRetrievalTaskType,
     ModelAgentLearningRetrievalResponse,
     ModelRetrievedLearning,
 )
 
 __all__ = [
+    "EnumRetrievalMatchType",
+    "EnumRetrievalTaskType",
     "ModelAgentLearningRetrievalRequest",
     "ModelAgentLearningRetrievalResponse",
     "ModelRetrievedLearning",
