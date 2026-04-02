@@ -107,17 +107,24 @@ class AdapterPostgresPersona:
         if isinstance(domain_familiarity, str):
             domain_familiarity = json.loads(domain_familiarity)
 
+        # Row values come as object from the protocol; cast to expected types
+        session_count_val: int = int(str(row["session_count"]))
+        persona_version_val: int = int(str(row["persona_version"]))
+        rebuilt_from_signals_val: int = int(str(row["rebuilt_from_signals"]))
+        vocab_val: float = float(str(row["vocabulary_complexity"]))
+        created_at_val = row["created_at"]
+
         return ModelUserPersonaV1(
             user_id=str(row["user_id"]),
             agent_id=str(row["agent_id"]) if row.get("agent_id") else None,
             technical_level=str(row["technical_level"]),
-            vocabulary_complexity=float(row["vocabulary_complexity"]),  # type: ignore[arg-type]
+            vocabulary_complexity=vocab_val,
             preferred_tone=str(row["preferred_tone"]),
-            domain_familiarity=domain_familiarity,  # type: ignore[arg-type]
-            session_count=int(row["session_count"]),  # type: ignore[arg-type]
-            persona_version=int(row["persona_version"]),  # type: ignore[arg-type]
-            rebuilt_from_signals=int(row["rebuilt_from_signals"]),  # type: ignore[arg-type]
-            created_at=row["created_at"],  # type: ignore[arg-type]
+            domain_familiarity=domain_familiarity,
+            session_count=session_count_val,
+            persona_version=persona_version_val,
+            rebuilt_from_signals=rebuilt_from_signals_val,
+            created_at=created_at_val,
         )
 
     async def get_users_needing_rebuild(
