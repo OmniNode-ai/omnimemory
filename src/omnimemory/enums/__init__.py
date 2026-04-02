@@ -16,15 +16,18 @@ from .enum_intelligence_operation_type import EnumIntelligenceOperationType
 from .enum_lifecycle_state import EnumLifecycleState
 from .enum_memory_operation_type import EnumMemoryOperationType
 from .enum_memory_storage_type import EnumMemoryStorageType
+from .enum_memory_type import EnumMemoryType
 from .enum_migration_status import (
     EnumFileProcessingStatus,
     EnumMigrationPriority,
     EnumMigrationStatus,
 )
+from .enum_preferred_tone import EnumPreferredTone
 from .enum_priority_level import EnumPriorityLevel
 from .enum_promotion_tier import EnumPromotionTier
 from .enum_semantic_entity_type import EnumSemanticEntityType
 from .enum_subscription_status import EnumSubscriptionStatus
+from .enum_technical_level import EnumTechnicalLevel
 from .enum_trust_level import EnumDecayFunction, EnumTrustLevel
 
 __all__ = [
@@ -40,12 +43,15 @@ __all__ = [
     "EnumLifecycleState",
     "EnumMemoryOperationType",
     "EnumMemoryStorageType",
+    "EnumMemoryType",
     "EnumMigrationPriority",
     "EnumMigrationStatus",
     "EnumOmniMemoryErrorCode",
+    "EnumPreferredTone",
     "EnumPriorityLevel",
     "EnumPromotionTier",
     "EnumSemanticEntityType",
     "EnumSubscriptionStatus",
+    "EnumTechnicalLevel",
     "EnumTrustLevel",
 ]
