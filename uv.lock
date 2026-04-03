@@ -8,8 +8,8 @@ resolution-markers = [
 
 [manifest]
 overrides = [
-    { name = "omnibase-core", specifier = "==0.36.0" },
-    { name = "omnibase-spi", specifier = ">=0.19.1" },
+    { name = "omnibase-core", specifier = "==0.38.0" },
+    { name = "omnibase-spi", specifier = "==0.20.4" },
 ]
 
 [[package]]
@@ -1398,7 +1398,7 @@ wheels = [
 
 [[package]]
 name = "omnibase-core"
-version = "0.36.0"
+version = "0.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blake3" },
@@ -1412,9 +1412,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "ruamel-yaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/db/ac7e38dc36f6e814e117c21b6c587b4ba8b824c3eed46b0ba533c1b189f5/omnibase_core-0.36.0.tar.gz", hash = "sha256:0a329b3c2c9d46fb4bea1eafd7b268672bf0baa27ec99b99c3aac32ee0c38c85", size = 8098009, upload-time = "2026-03-31T06:56:48.255Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/f0/9c2971cc3328ca592f19da9afe3b95317de52d476f8b80f6ca03a273254f/omnibase_core-0.38.0.tar.gz", hash = "sha256:1667dd1047f937e5239a10a9443f754c0079b1fd8d58a061b73b0b900bdc6204", size = 8140989, upload-time = "2026-04-03T08:29:15.675Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/43/5477707e360eb5469fa683c40f95eddf570c8aa91ef2e27de9f0ddece4c5/omnibase_core-0.36.0-py3-none-any.whl", hash = "sha256:559408bdf961ea16454c310279dfc0e4c28addd7dbe8c0579343519d67adb1d5", size = 5300159, upload-time = "2026-03-31T06:56:46.079Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/dd/3061cb53bdd9725c216788652860d94bde720ae8883090ac4f18237faec4/omnibase_core-0.38.0-py3-none-any.whl", hash = "sha256:3ce216b042440e62db1959dd930f6807424de8511b0b03cf89a9868ead0c491a", size = 5365077, upload-time = "2026-04-03T08:29:18.665Z" },
 ]
 
 [[package]]
@@ -1474,21 +1474,21 @@ wheels = [
 
 [[package]]
 name = "omnibase-spi"
-version = "0.19.1"
+version = "0.20.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "omnibase-core" },
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/58/cd/c59725d13599dde6d5c0f5d534f1075bbc333c650b35fe4b138ed047bc4d/omnibase_spi-0.19.1.tar.gz", hash = "sha256:e6b51ad013cd225fd9fe16300c9b2696d2705fd91f76f4a21810e2e1876f369c", size = 1119413, upload-time = "2026-03-22T23:25:19.212Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/ed/23668a820fea9b87a88f619f8df1944e8522d7f2ff8d2e34993709be69f7/omnibase_spi-0.20.4.tar.gz", hash = "sha256:79a81568150d89c97f97661cd7ad1443258cc5fdb46c380c9306b02c65001073", size = 1119882, upload-time = "2026-04-03T08:29:09.403Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/3b/273b4f4d1879f366ada923f6d091ef217e42bf0e53af038cec2e995ef7d8/omnibase_spi-0.19.1-py3-none-any.whl", hash = "sha256:fe2b5d3d2ea30ca5c542f17af64bc501bc0411b904442b8ec406d4aa82321305", size = 758303, upload-time = "2026-03-22T23:25:20.679Z" },
+    { url = "https://files.pythonhosted.org/packages/66/1f/e41b898a9f023795376e2a254e64c27889427155c42555a872cdcc0ee67e/omnibase_spi-0.20.4-py3-none-any.whl", hash = "sha256:dc263d4e0474a9031f5159e90ba05c3cb318703740e236b717d61072962921b7", size = 758280, upload-time = "2026-04-03T08:29:07.755Z" },
 ]
 
 [[package]]
 name = "omninode-memory"
-version = "0.14.2"
+version = "0.15.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1546,9 +1546,9 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.120.1,<1.0.0" },
     { name = "httpx", specifier = ">=0.28.0,<1.0.0" },
     { name = "mcp", specifier = ">=1.8.0,<2.0.0" },
-    { name = "omnibase-core", specifier = "==0.36.0" },
+    { name = "omnibase-core", specifier = "==0.38.0" },
     { name = "omnibase-infra", specifier = "==0.30.1" },
-    { name = "omnibase-spi", specifier = ">=0.19.1" },
+    { name = "omnibase-spi", specifier = "==0.20.4" },
     { name = "pinecone-client", specifier = ">=4.1.0,<7.0.0" },
     { name = "psutil", specifier = ">=7.0.0,<8.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10,<3.0.0" },

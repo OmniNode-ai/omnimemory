@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "omninode-memory"
-version = "0.14.2"
+version = "0.15.0"
 description = "OmniNode document ingestion and semantic retrieval"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -59,8 +59,8 @@ dependencies = [
     "pyyaml>=6.0.2,<7.0.0",
 
     # ONEX dependencies - versioned releases from PyPI
-    "omnibase-core==0.36.0",
-    "omnibase-spi>=0.19.1",
+    "omnibase-core==0.38.0",
+    "omnibase-spi==0.20.4",
     "omnibase-infra==0.30.1",
 
     # Logging and monitoring
@@ -363,6 +363,6 @@ markers = [
 [tool.uv]
 # Override omnibase-infra's transitive pins on core/spi so our direct pins win.
 override-dependencies = [
-    "omnibase-core==0.36.0",
-    "omnibase-spi>=0.19.1",
+    "omnibase-core==0.38.0",
+    "omnibase-spi==0.20.4",
 ]

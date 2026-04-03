@@ -1,3 +1,22 @@
+## v0.15.0 (2026-04-03)
+
+### Features
+- feat(persona): add persona enums, models, and signal types [OMN-3967][OMN-3969] (#231)
+- feat(node): add agent learning retrieval effect node with contract and models [OMN-7245] (#230)
+- feat(handler): add agent learning retrieval query-building and ranking helpers [OMN-7246] (#229)
+- feat: replace hardcoded MEMORY_NODES with contract-driven discovery [OMN-7154] (#226)
+- feat(omnimemory): replace _HANDLER_SPECS with contract-driven handler discovery [OMN-7150, OMN-7151, OMN-7152, OMN-7153] (#225)
+
+### Bug Fixes
+- fix: purge localhost fallbacks from models and runtime [OMN-7227] (#228)
+- fix(ci): auto-tag workflow matches chore: release PR titles [OMN-6909] (#227)
+
+### Other Changes
+- chore(deps): bump omnibase_core to 0.37.0 (#233)
+- test(integration): add persona inference round-trip test [OMN-3974] (#232)
+- release: omnimemory v0.14.2 (#224)
+- build(deps): bump actions/upload-artifact in the actions group (#223)
+
 ## v0.14.1 (2026-03-31)
 
 ### Changed
