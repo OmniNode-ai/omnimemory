@@ -1,7 +1,7 @@
 ## v0.15.0 (2026-04-03)
 
 ### Features
-- feat(persona): add persona enums, models, and signal types [OMN-3967][OMN-3969] (#231)
+- feat(persona): add persona enums, models, and signal types OMN-3967, OMN-3969 (#231)
 - feat(node): add agent learning retrieval effect node with contract and models [OMN-7245] (#230)
 - feat(handler): add agent learning retrieval query-building and ranking helpers [OMN-7246] (#229)
 - feat: replace hardcoded MEMORY_NODES with contract-driven discovery [OMN-7154] (#226)
