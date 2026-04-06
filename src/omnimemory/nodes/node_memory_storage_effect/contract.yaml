@@ -199,7 +199,6 @@ event_bus:
     major: 1
     minor: 0
     patch: 0
-  event_bus_enabled: true
 
   # This node does not subscribe to topics (orchestrator-invoked)
   subscribe_topics: []

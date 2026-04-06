@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Node packages that declare event_bus topics
 # ============================================================================
-# All omnimemory nodes with ``event_bus.event_bus_enabled: true`` in their
+# All omnimemory nodes with ``event_bus.subscribe_topics`` in their
 # contract.yaml. Both effect nodes and orchestrator nodes are included since
 # the memory_lifecycle_orchestrator also subscribes to Kafka topics.
 
@@ -291,7 +291,7 @@ def _read_event_bus_topics(package: str, field: str) -> list[str]:
         field: Topic field name (``"subscribe_topics"`` or ``"publish_topics"``).
 
     Returns:
-        List of topic strings (empty if event bus is disabled or field absent).
+        List of topic strings (empty if field absent).
     """
     package_files = importlib.resources.files(package)
     contract_file = package_files.joinpath("contract.yaml")
@@ -313,9 +313,6 @@ def _read_event_bus_topics(package: str, field: str) -> list[str]:
             package,
             type(event_bus).__name__,
         )
-        return []
-
-    if not event_bus.get("event_bus_enabled", False):
         return []
 
     topics_raw: object = event_bus.get(field, [])
