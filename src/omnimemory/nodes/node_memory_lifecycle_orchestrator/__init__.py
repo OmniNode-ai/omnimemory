@@ -75,13 +75,6 @@ from .handlers import (
     ProtocolOrphanedArchiveTracker,
 )
 
-# TODO(OMN-1453): Add handler imports as implemented:
-#   HandlerRestoreMemory, HandlerMemoryAccessed
-
-# TODO(OMN-1453): Add model imports as implemented:
-#   ModelLifecycleOrchestratorInput, ModelLifecycleOrchestratorOutput,
-#   ModelRestoreMemoryCommand
-
 __all__: list[str] = [
     # Implemented handlers
     "HandlerMemoryTick",

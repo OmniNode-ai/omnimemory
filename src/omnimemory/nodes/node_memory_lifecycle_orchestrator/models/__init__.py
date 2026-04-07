@@ -28,10 +28,4 @@ Models (to be implemented):
 Ticket: OMN-1453
 """
 
-# TODO(OMN-1453): Add model imports as implemented:
-#   Input/Output: ModelLifecycleOrchestratorInput, ModelLifecycleOrchestratorOutput
-#   Commands: ModelArchiveMemoryCommand, ModelExpireMemoryCommand, ModelRestoreMemoryCommand
-#   Events: ModelMemoryExpiredEvent, ModelMemoryArchivedEvent, ModelMemoryRestoredEvent,
-#           ModelLifecycleTransitionFailedEvent
-
 __all__: list[str] = []

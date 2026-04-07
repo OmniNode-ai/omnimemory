@@ -71,10 +71,6 @@ _PROJECTION_READER_TIMEOUT_SECONDS: float = 10.0
 # =============================================================================
 # EVENT MODELS (Placeholder - will be extracted to separate module)
 # =============================================================================
-# TODO(OMN-1453): Extract to omnimemory/models/events/model_memory_expired_event.py
-#                 These are inline placeholders for handler structure validation.
-
-
 class ModelMemoryExpiredEvent(BaseModel):  # omnimemory-model-exempt: handler event
     """Event emitted when a memory entity's TTL has expired.
 
@@ -757,7 +753,7 @@ class HandlerMemoryTick:
             )
             return []
 
-        # TODO(OMN-1524): Use infra projection reader primitives
+        # Query projection reader primitives
         # Query projection for expired candidates with timeout and circuit breaker
         try:
             expired_projections = await asyncio.wait_for(
@@ -886,7 +882,7 @@ class HandlerMemoryTick:
             )
             return []
 
-        # TODO(OMN-1524): Use infra projection reader primitives
+        # Query projection reader primitives
         # Query projection for archive candidates with timeout and circuit breaker
         try:
             archive_projections = await asyncio.wait_for(

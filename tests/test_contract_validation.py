@@ -88,7 +88,6 @@ class TestContractValidation:
             data: MappingResultDict = yaml.safe_load(f)
 
         # Strip legacy field that was renamed (not an extension field issue)
-        # TODO(OMN-1588): Remove this once all contracts use contract_version
         if "version" in data:
             del data["version"]
 
@@ -125,7 +124,6 @@ class TestContractValidation:
                 # format than ModelContractOrchestrator expects (it expects
                 # ModelEventDescriptor/ModelEventSubscription types). Strip these fields
                 # since handler_routing is the primary routing mechanism we're validating.
-                # TODO(OMN-1588): Resolve format mismatch when core adds proper support
                 orchestrator_data = {
                     k: v
                     for k, v in data.items()
