@@ -13,10 +13,12 @@ Usage:
         --graph-dir /path/to/graphify-graphs/ \\
         --bolt-uri bolt://localhost:7687
 
+    # --graph-dir defaults to $OMNI_HOME/.onex_state/graphify-graphs/ (or
+    # path relative to this script's repo root if OMNI_HOME is not set).
+
     # Or via env var (e.g. when Memgraph runs on a remote host):
-    MEMGRAPH_URL=bolt://192.168.86.201:7687 \\
-    uv run python scripts/graphify_to_memgraph.py \\
-        --graph-dir /path/to/graphify-graphs/
+    MEMGRAPH_URL=bolt://192.168.1.201:7687 \\
+    uv run python scripts/graphify_to_memgraph.py
 """
 
 from __future__ import annotations
@@ -32,6 +34,16 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 500
+
+# scripts/ is one level below the repo root (omnimemory/)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _default_graph_dir() -> Path:
+    omni_home = os.environ.get("OMNI_HOME")
+    if omni_home:
+        return Path(omni_home) / ".onex_state" / "graphify-graphs"
+    return _REPO_ROOT.parent / ".onex_state" / "graphify-graphs"
 
 
 def parse_graphify_json(
@@ -137,8 +149,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--graph-dir",
-        required=True,
-        help="Directory containing per-repo graph.json files",
+        default=None,
+        help=(
+            "Directory containing per-repo graph.json files. "
+            "Defaults to $OMNI_HOME/.onex_state/graphify-graphs/ "
+            "or <repo-root>/../.onex_state/graphify-graphs/ if OMNI_HOME is unset."
+        ),
     )
     parser.add_argument(
         "--bolt-uri",
@@ -147,7 +163,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    graph_dir = Path(args.graph_dir)
+    graph_dir = Path(args.graph_dir) if args.graph_dir is not None else _default_graph_dir()
     if not graph_dir.is_dir():
         logger.error("graph-dir does not exist: %s", graph_dir)
         sys.exit(1)
