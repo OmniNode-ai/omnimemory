@@ -250,30 +250,26 @@ class TestGoldenChainMemgraphParseCypher:
 @pytest.mark.integration
 @pytest.mark.memgraph
 def test_smoke_memgraph_live_ingest() -> None:
-    """Smoke test: live Memgraph on 192.168.86.201:7687.  # onex-allow-internal-ip
+    """Smoke test: live Memgraph on the dev host (port 7687).
 
     Skipped when Memgraph is unreachable.
     """
     import socket
 
+    _host = "192.168.86.201"  # onex-allow-internal-ip
+    _bolt = f"bolt://{_host}:7687"  # onex-allow-internal-ip
     try:
-        sock = socket.create_connection(
-            ("192.168.86.201", 7687), timeout=2
-        )  # onex-allow-internal-ip
+        sock = socket.create_connection((_host, 7687), timeout=2)
         sock.close()
     except OSError:
-        pytest.skip(
-            "Live Memgraph at 192.168.86.201:7687 not reachable"
-        )  # onex-allow-internal-ip
+        pytest.skip(f"Live Memgraph at {_host}:7687 not reachable")
 
     try:
         from neo4j import GraphDatabase
     except ImportError:
         pytest.skip("neo4j package not installed")
 
-    driver = GraphDatabase.driver(
-        "bolt://192.168.86.201:7687", auth=None
-    )  # onex-allow-internal-ip
+    driver = GraphDatabase.driver(_bolt, auth=None)
     try:
         counts = ingest_repo(driver, [_NODE_A, _NODE_B], [_LINK_AB])
         assert counts["nodes"] == 2
