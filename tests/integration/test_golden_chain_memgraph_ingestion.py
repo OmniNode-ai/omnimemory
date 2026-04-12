@@ -257,17 +257,23 @@ def test_smoke_memgraph_live_ingest() -> None:
     import socket
 
     try:
-        sock = socket.create_connection(("192.168.86.201", 7687), timeout=2)  # onex-allow-internal-ip
+        sock = socket.create_connection(
+            ("192.168.86.201", 7687), timeout=2
+        )  # onex-allow-internal-ip
         sock.close()
     except OSError:
-        pytest.skip("Live Memgraph at 192.168.86.201:7687 not reachable")  # onex-allow-internal-ip
+        pytest.skip(
+            "Live Memgraph at 192.168.86.201:7687 not reachable"
+        )  # onex-allow-internal-ip
 
     try:
         from neo4j import GraphDatabase
     except ImportError:
         pytest.skip("neo4j package not installed")
 
-    driver = GraphDatabase.driver("bolt://192.168.86.201:7687", auth=None)  # onex-allow-internal-ip
+    driver = GraphDatabase.driver(
+        "bolt://192.168.86.201:7687", auth=None
+    )  # onex-allow-internal-ip
     try:
         counts = ingest_repo(driver, [_NODE_A, _NODE_B], [_LINK_AB])
         assert counts["nodes"] == 2

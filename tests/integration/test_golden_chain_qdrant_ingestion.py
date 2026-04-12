@@ -328,10 +328,14 @@ async def test_smoke_qdrant_live_index_and_search() -> None:
     import socket
 
     try:
-        sock = socket.create_connection(("192.168.86.201", 6333), timeout=2)  # onex-allow-internal-ip
+        sock = socket.create_connection(
+            ("192.168.86.201", 6333), timeout=2
+        )  # onex-allow-internal-ip
         sock.close()
     except OSError:
-        pytest.skip("Live Qdrant at 192.168.86.201:6333 not reachable")  # onex-allow-internal-ip
+        pytest.skip(
+            "Live Qdrant at 192.168.86.201:6333 not reachable"
+        )  # onex-allow-internal-ip
 
     handler = HandlerQdrant(
         config=ModelHandlerQdrantConfig(
