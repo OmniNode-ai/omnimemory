@@ -27,7 +27,7 @@ from omnibase_core.utils.util_str_enum_base import StrValueHelper
 
 
 @unique
-class MemoryCommandTopic(StrValueHelper, str, Enum):
+class EnumMemoryCommandTopic(StrValueHelper, str, Enum):
     """Canonical Kafka topic names for omnimemory input commands.
 
     All topics use ``onex.cmd.omnimemory.*`` as the consumer namespace
@@ -63,7 +63,7 @@ class MemoryCommandTopic(StrValueHelper, str, Enum):
 
 
 @unique
-class MemoryEventTopic(StrValueHelper, str, Enum):
+class EnumMemoryEventTopic(StrValueHelper, str, Enum):
     """Canonical Kafka topic names for omnimemory events.
 
     Includes both events produced by omnimemory (crawl pipeline, intent storage)
@@ -104,4 +104,4 @@ class MemoryEventTopic(StrValueHelper, str, Enum):
     """Memory retrieval response event."""
 
 
-__all__ = ["MemoryCommandTopic", "MemoryEventTopic"]
+__all__ = ["EnumMemoryCommandTopic", "EnumMemoryEventTopic"]
