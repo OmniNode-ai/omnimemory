@@ -6,6 +6,8 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.topics import MemoryEventTopic
+
 
 class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
     BaseModel
@@ -50,19 +52,19 @@ class ModelFilesystemCrawlerConfig(  # omnimemory-model-exempt: handler config
 
     # Published topic suffixes (env prefix added at runtime)
     publish_topic_discovered: str = Field(
-        default="onex.evt.omnimemory.document-discovered.v1",
+        default=MemoryEventTopic.DOCUMENT_DISCOVERED,
         description="Topic suffix for document-discovered events",
     )
     publish_topic_changed: str = Field(
-        default="onex.evt.omnimemory.document-changed.v1",
+        default=MemoryEventTopic.DOCUMENT_CHANGED,
         description="Topic suffix for document-changed events",
     )
     publish_topic_removed: str = Field(
-        default="onex.evt.omnimemory.document-removed.v1",
+        default=MemoryEventTopic.DOCUMENT_REMOVED,
         description="Topic suffix for document-removed events",
     )
     publish_topic_indexed: str = Field(
-        default="onex.evt.omnimemory.document-indexed.v1",
+        default=MemoryEventTopic.DOCUMENT_INDEXED,
         description=(
             "Topic suffix for document-indexed events. Emitted after a document "
             "is fully crawled and indexed (discovered or changed). Consumed by "

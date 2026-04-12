@@ -8,6 +8,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from omnimemory.topics import MemoryEventTopic
+
 
 class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
     BaseModel
@@ -69,10 +71,10 @@ class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
         ),
     )
     publish_topic_indexed: str = Field(
-        default="onex.evt.omnimemory.document-indexed.v1",
+        default=MemoryEventTopic.DOCUMENT_INDEXED,
         description="Topic to publish ModelDocumentIndexedKreuzbergEvent messages to",
     )
     publish_topic_parse_failed: str = Field(
-        default="onex.evt.omnimemory.document-parse-failed.v1",
+        default=MemoryEventTopic.DOCUMENT_PARSE_FAILED,
         description="Topic to publish ModelDocumentParseFailedEvent messages to",
     )

@@ -9,6 +9,8 @@ list format per OMN-1746 for EventBusSubcontractWiring compatibility.
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.topics import MemoryEventTopic
+
 
 # omnimemory-model-exempt: handler config
 class ModelIntentEventConsumerConfig(BaseModel):
@@ -33,15 +35,15 @@ class ModelIntentEventConsumerConfig(BaseModel):
     # Topic configuration (suffixes only - env prefix added at runtime)
     # Uses list format matching event_bus.subscribe_topics contract standard
     subscribe_topics: list[str] = Field(
-        default=["onex.evt.omniintelligence.intent-classified.v1"],
+        default=[MemoryEventTopic.INTENT_CLASSIFIED],
         description="Topic suffixes to subscribe to (env prefix added at runtime)",
     )
     publish_topics: list[str] = Field(
-        default=["onex.evt.omnimemory.intent-stored.v1"],
+        default=[MemoryEventTopic.INTENT_STORED],
         description="Topic suffixes to publish to (env prefix added at runtime)",
     )
     dlq_topics: list[str] = Field(
-        default=["onex.evt.omniintelligence.intent-classified.v1.dlq"],
+        default=[MemoryEventTopic.INTENT_CLASSIFIED_DLQ],
         description="Dead letter queue topic suffixes",
     )
 

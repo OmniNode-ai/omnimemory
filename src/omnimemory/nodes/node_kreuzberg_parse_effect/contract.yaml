@@ -110,6 +110,10 @@ event_bus:
       schema_ref: "omnimemory.models.crawl.model_document_parse_failed_event.ModelDocumentParseFailedEvent"
       description: "Document parse failed event. Emitted when kreuzberg cannot extract text."
 
+# === TRANSPORT DECLARATIONS ===
+metadata:
+  transport_type: "HTTP"
+
 # === HANDLER CONFIGURATION ===
 handler_config:
   handler_class: "HandlerKreuzbergParse"

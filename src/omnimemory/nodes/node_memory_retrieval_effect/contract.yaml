@@ -36,6 +36,10 @@ io_operations:
 transaction_management:
   enabled: false
 
+# === TRANSPORT DECLARATIONS ===
+metadata:
+  transport_type: "HTTP"
+
 # === NODE CONFIGURATION ===
 # NOTE: tool_name and main_tool_class are required per ModelContractEffect validation
 tool_specification:
@@ -161,6 +165,8 @@ handler_routing:
     # Semantic similarity search via Qdrant
     - routing_key: "search"
       handler_key: "HandlerQdrantMock"
+      handler:
+        handler_type: "QDRANT"
       priority: 0
       output_events: []
     # Full-text search via PostgreSQL
