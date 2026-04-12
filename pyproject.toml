@@ -74,6 +74,12 @@ dependencies = [
     "cachetools>=6.2.4,<8.0.0",
 ]
 
+[project.optional-dependencies]
+graph = [
+    "neo4j>=5.0.0,<6.0.0",
+    # qdrant-client and httpx are already in core dependencies
+]
+
 [project.urls]
 Homepage = "https://github.com/OmniNode-ai/omnimemory"
 Repository = "https://github.com/OmniNode-ai/omnimemory"
