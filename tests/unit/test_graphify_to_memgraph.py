@@ -160,7 +160,9 @@ def test_default_graph_dir_uses_omni_home(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.mark.unit
-def test_default_graph_dir_falls_back_to_repo_root(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_default_graph_dir_falls_back_to_repo_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("OMNI_HOME", raising=False)
     result = _default_graph_dir()
     assert result == _REPO_ROOT.parent / ".onex_state" / "graphify-graphs"
