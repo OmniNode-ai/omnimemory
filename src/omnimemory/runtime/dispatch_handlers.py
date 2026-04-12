@@ -42,6 +42,10 @@ from omnibase_core.models.dispatch.model_dispatch_route import ModelDispatchRout
 from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
 from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
 
+from omnimemory.runtime.contract_topics import canonical_topic_to_dispatch_alias
+from omnimemory.topics import EnumMemoryCommandTopic as MemoryCommandTopic
+from omnimemory.topics import EnumMemoryEventTopic as MemoryEventTopic
+
 if TYPE_CHECKING:
     from omnibase_core.protocols.handler.protocol_handler_context import (
         ProtocolHandlerContext,
@@ -102,40 +106,54 @@ class ProtocolIntentQueryHandler(Protocol):
 #
 # Usage: when calling dispatch(), pass the alias instead of the raw topic.
 
-DISPATCH_ALIAS_INTENT_CLASSIFIED = "onex.events.omniintelligence.intent-classified.v1"
+DISPATCH_ALIAS_INTENT_CLASSIFIED = canonical_topic_to_dispatch_alias(
+    MemoryEventTopic.INTENT_CLASSIFIED
+)
 """Dispatch-compatible alias for intent-classified canonical topic."""
 
-DISPATCH_ALIAS_INTENT_QUERY_REQUESTED = (
-    "onex.commands.omnimemory.intent-query-requested.v1"
+DISPATCH_ALIAS_INTENT_QUERY_REQUESTED = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.INTENT_QUERY_REQUESTED
 )
 """Dispatch-compatible alias for intent-query-requested canonical topic."""
 
-DISPATCH_ALIAS_RUNTIME_TICK = "onex.commands.omnimemory.runtime-tick.v1"
+DISPATCH_ALIAS_RUNTIME_TICK = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.RUNTIME_TICK
+)
 """Dispatch-compatible alias for runtime-tick command topic."""
 
-DISPATCH_ALIAS_ARCHIVE_MEMORY = "onex.commands.omnimemory.archive-memory.v1"
+DISPATCH_ALIAS_ARCHIVE_MEMORY = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.ARCHIVE_MEMORY
+)
 """Dispatch-compatible alias for archive-memory command topic."""
 
-DISPATCH_ALIAS_EXPIRE_MEMORY = "onex.commands.omnimemory.expire-memory.v1"
+DISPATCH_ALIAS_EXPIRE_MEMORY = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.EXPIRE_MEMORY
+)
 """Dispatch-compatible alias for expire-memory command topic."""
 
-DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED = (
-    "onex.commands.omnimemory.memory-retrieval-requested.v1"
+DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.MEMORY_RETRIEVAL_REQUESTED
 )
 """Dispatch-compatible alias for memory-retrieval-requested command topic."""
 
-DISPATCH_ALIAS_GRAPH_MEMORY = "onex.commands.omnimemory.graph-memory-query.v1"
+DISPATCH_ALIAS_GRAPH_MEMORY = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.GRAPH_MEMORY_QUERY
+)
 """Dispatch-compatible alias for graph memory query/mutation operations (OMN-6578)."""
 
-DISPATCH_ALIAS_INTENT_GRAPH = "onex.commands.omnimemory.intent-graph-query.v1"
+DISPATCH_ALIAS_INTENT_GRAPH = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.INTENT_GRAPH_QUERY
+)
 """Dispatch-compatible alias for intent graph query/mutation operations (OMN-6579)."""
 
-DISPATCH_ALIAS_NAVIGATION_HISTORY = (
-    "onex.commands.omnimemory.navigation-history-session.v1"
+DISPATCH_ALIAS_NAVIGATION_HISTORY = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.NAVIGATION_HISTORY_SESSION
 )
 """Dispatch-compatible alias for navigation history session events (OMN-6583)."""
 
-DISPATCH_ALIAS_SEMANTIC_COMPUTE = "onex.commands.omnimemory.semantic-analysis.v1"
+DISPATCH_ALIAS_SEMANTIC_COMPUTE = canonical_topic_to_dispatch_alias(
+    MemoryCommandTopic.SEMANTIC_ANALYSIS
+)
 """Dispatch-compatible alias for semantic analysis requests (OMN-6585)."""
 
 
