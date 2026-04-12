@@ -321,25 +321,25 @@ class TestGoldenChainQdrantErrors:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_smoke_qdrant_live_index_and_search() -> None:
-    """Smoke test: live Qdrant on 192.168.86.201:6333.
+    """Smoke test: live Qdrant on 192.168.86.201:6333.  # onex-allow-internal-ip
 
     Skipped when Qdrant is unreachable.
     """
     import socket
 
     try:
-        sock = socket.create_connection(("192.168.86.201", 6333), timeout=2)
+        sock = socket.create_connection(("192.168.86.201", 6333), timeout=2)  # onex-allow-internal-ip
         sock.close()
     except OSError:
-        pytest.skip("Live Qdrant at 192.168.86.201:6333 not reachable")
+        pytest.skip("Live Qdrant at 192.168.86.201:6333 not reachable")  # onex-allow-internal-ip
 
     handler = HandlerQdrant(
         config=ModelHandlerQdrantConfig(
-            qdrant_host="192.168.86.201",
+            qdrant_host="192.168.86.201",  # onex-allow-internal-ip
             qdrant_port=6333,
             collection_name="golden_chain_smoke_test",
             vector_size=4,
-            embedding_server_url="http://192.168.86.201:8002",
+            embedding_server_url="http://192.168.86.201:8002",  # onex-allow-internal-ip
             max_chunk_chars=2000,
         )
     )
