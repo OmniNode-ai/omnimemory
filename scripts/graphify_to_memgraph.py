@@ -11,7 +11,12 @@ Graph.json schema:
 Usage:
     uv run python scripts/graphify_to_memgraph.py \\
         --graph-dir /path/to/graphify-graphs/ \\
-        --bolt-uri bolt://192.168.86.201:7687
+        --bolt-uri bolt://localhost:7687
+
+    # Or via env var (e.g. when Memgraph runs on a remote host):
+    MEMGRAPH_URL=bolt://192.168.86.201:7687 \\
+    uv run python scripts/graphify_to_memgraph.py \\
+        --graph-dir /path/to/graphify-graphs/
 """
 
 from __future__ import annotations
@@ -137,8 +142,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--bolt-uri",
-        default=os.environ.get("MEMGRAPH_URL", "bolt://192.168.86.201:7687"),
-        help="Memgraph Bolt URI (env: MEMGRAPH_URL)",
+        default=os.environ.get("MEMGRAPH_URL", "bolt://localhost:7687"),
+        help="Memgraph Bolt URI (env: MEMGRAPH_URL, default: bolt://localhost:7687)",
     )
     args = parser.parse_args()
 
