@@ -363,6 +363,10 @@ markers = [
     "embedding: marks tests as requiring embedding server (http://192.168.86.201:8002)",
 ]
 
+[project.entry-points."onex.nodes"]
+node_memory_consolidator_reducer = "omnimemory.nodes.node_memory_consolidator_reducer"
+node_statistics_reducer = "omnimemory.nodes.node_statistics_reducer"
+
 [tool.uv]
 # Override omnibase-infra's transitive pins on core/spi so our direct pins win.
 override-dependencies = [
