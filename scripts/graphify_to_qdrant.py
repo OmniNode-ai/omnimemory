@@ -6,7 +6,8 @@
 
 For each node, builds a rich embedding text from label, source_file, community,
 repo, node_type, relations, protocols, and contract refs, then embeds via the
-Qwen3-Embedding model and upserts into a Qdrant collection.
+Qwen3-Embedding model (default; configurable via --embedding-model) and upserts
+into a Qdrant collection.
 
 Usage:
     uv run python scripts/graphify_to_qdrant.py \\
@@ -24,6 +25,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -118,7 +120,7 @@ def chunk_nodes(
 def embed_batch(
     texts: list[str],
     embedding_url: str,
-    model: str = "gte-Qwen2-1.5B",
+    model: str = "Qwen3-Embedding",
 ) -> list[list[float]]:
     """Call the embedding API with retry/backoff. Returns list of embedding vectors."""
     try:
@@ -139,7 +141,12 @@ def embed_batch(
             )
             resp.raise_for_status()
             data = resp.json()
-            return [item["embedding"] for item in data["data"]]
+            embeddings = [item["embedding"] for item in data["data"]]
+            if len(embeddings) != len(texts):
+                raise RuntimeError(
+                    f"Embedding response size mismatch: expected {len(texts)}, got {len(embeddings)}"
+                )
+            return embeddings
         except Exception as exc:
             last_exc = exc
             if attempt < EMBED_RETRY_ATTEMPTS - 1:
@@ -162,6 +169,16 @@ def embed_batch(
     raise RuntimeError(f"Embedding failed after {EMBED_RETRY_ATTEMPTS} attempts") from last_exc
 
 
+def _stable_point_id(node_id: str) -> int:
+    """Return a stable, deterministic Qdrant point ID for a node ID string.
+
+    Uses blake2b so the same node_id produces the same integer across
+    interpreter processes (unlike Python's salted built-in hash).
+    """
+    digest = hashlib.blake2b(node_id.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, byteorder="big", signed=False) % (2**63)
+
+
 def upsert_to_qdrant(
     client: Any,
     collection: str,
@@ -173,7 +190,7 @@ def upsert_to_qdrant(
 
     points = [
         PointStruct(
-            id=abs(hash(node["id"])) % (2**63),
+            id=_stable_point_id(node["id"]),
             vector=vector,
             payload={
                 "id": node["id"],
