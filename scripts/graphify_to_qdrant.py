@@ -27,6 +27,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import time
 import uuid
@@ -48,6 +49,19 @@ def _default_graph_dir() -> Path:
     if omni_home:
         return Path(omni_home) / ".onex_state" / "graphify-graphs"
     return _REPO_ROOT.parent / ".onex_state" / "graphify-graphs"
+
+
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+_PHONE_RE = re.compile(r"(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}")
+_SSN_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+
+
+def screen_or_redact_pii(text: str) -> str:
+    """Strip emails, phone numbers, and SSN patterns from text before embedding."""
+    text = _EMAIL_RE.sub("[EMAIL]", text)
+    text = _PHONE_RE.sub("[PHONE]", text)
+    text = _SSN_RE.sub("[SSN]", text)
+    return text
 
 
 def build_embedding_text(node: dict[str, Any]) -> str:
@@ -163,9 +177,9 @@ def upsert_to_qdrant(
             vector=vector,
             payload={
                 "id": node["id"],
-                "label": node.get("label", ""),
+                "label": screen_or_redact_pii(node.get("label", "")),
                 "repo": node.get("repo", ""),
-                "source_file": node.get("source_file", ""),
+                "source_file": screen_or_redact_pii(node.get("source_file", "")),
                 "node_type": node.get("node_type", ""),
                 "community": node.get("community", ""),
             },
@@ -210,9 +224,17 @@ def main() -> None:
         default=os.environ.get("QDRANT_URL", "http://localhost:6333"),
         help="Qdrant base URL (env: QDRANT_URL)",
     )
+    _embedding_url = os.environ.get("EMBEDDING_MODEL_URL")
+    if not _embedding_url and "--embedding-url" not in sys.argv:
+        logger.error(
+            "EMBEDDING_MODEL_URL env var is required but not set. "
+            "Pass --embedding-url or set EMBEDDING_MODEL_URL."
+        )
+        sys.exit(1)
     parser.add_argument(
         "--embedding-url",
-        default=os.environ.get("EMBEDDING_MODEL_URL", "http://192.168.86.200:8100"),
+        default=_embedding_url,
+        required=_embedding_url is None,
         help="Embedding model base URL (env: EMBEDDING_MODEL_URL)",
     )
     parser.add_argument(
@@ -258,7 +280,7 @@ def main() -> None:
         repo_upserted = 0
 
         for batch in chunk_nodes(nodes, batch_size=UPSERT_BATCH_SIZE):
-            texts = [build_embedding_text(n) for n in batch]
+            texts = [screen_or_redact_pii(build_embedding_text(n)) for n in batch]
             try:
                 vectors = embed_batch(texts, args.embedding_url)
             except RuntimeError as exc:
