@@ -28,6 +28,7 @@ import json
 import logging
 import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -179,6 +180,9 @@ def main() -> None:
         logger.error("neo4j package not installed — run: uv sync --extra graph")
         sys.exit(1)
 
+    correlation_id = str(uuid.uuid4())
+    logger.info("Starting ingestion run correlation_id=%s", correlation_id)
+
     driver = GraphDatabase.driver(args.bolt_uri, auth=None)
     try:
         total_nodes = 0
@@ -194,7 +198,8 @@ def main() -> None:
             total_nodes += counts["nodes"]
             total_edges += counts["edges"]
         logger.info(
-            "Done. Total: %d nodes, %d edges across %d repos",
+            "Done. correlation_id=%s total_nodes=%d total_edges=%d repos=%d",
+            correlation_id,
             total_nodes,
             total_edges,
             len(graph_files),
