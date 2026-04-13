@@ -6,7 +6,7 @@
 
 For each node, builds a rich embedding text from label, source_file, community,
 repo, node_type, relations, protocols, and contract refs, then embeds via the
-Qwen3-Embedding model (default; configurable via --embedding-model) and upserts
+gte-Qwen2-1.5B-instruct model (default; configurable via --embedding-model) and upserts
 into a Qdrant collection.
 
 Usage:
@@ -120,7 +120,7 @@ def chunk_nodes(
 def embed_batch(
     texts: list[str],
     embedding_url: str,
-    model: str = "Qwen3-Embedding",
+    model: str = "Alibaba-NLP/gte-Qwen2-1.5B-instruct",
 ) -> list[list[float]]:
     """Call the embedding API with retry/backoff. Returns list of embedding vectors."""
     try:
