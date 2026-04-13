@@ -12,13 +12,13 @@ into a Qdrant collection.
 Usage:
     uv run python scripts/graphify_to_qdrant.py \\
         --graph-dir /path/to/graphify-graphs/ \\
-        --qdrant-url http://192.168.86.201:6333 \\
-        --embedding-url http://192.168.86.200:8100 \\
+        --qdrant-url http://localhost:6333 \\
+        --embedding-url http://localhost:8100 \\
         --collection onex-graphify
 
     # Or via env vars:
-    QDRANT_URL=http://192.168.86.201:6333 \\
-    EMBEDDING_MODEL_URL=http://192.168.86.200:8100 \\
+    QDRANT_URL=http://localhost:6333 \\
+    EMBEDDING_MODEL_URL=http://localhost:8100 \\
     uv run python scripts/graphify_to_qdrant.py
 """
 
@@ -242,12 +242,6 @@ def main() -> None:
         help="Qdrant base URL (env: QDRANT_URL)",
     )
     _embedding_url = os.environ.get("EMBEDDING_MODEL_URL")
-    if not _embedding_url and "--embedding-url" not in sys.argv:
-        logger.error(
-            "EMBEDDING_MODEL_URL env var is required but not set. "
-            "Pass --embedding-url or set EMBEDDING_MODEL_URL."
-        )
-        sys.exit(1)
     parser.add_argument(
         "--embedding-url",
         default=_embedding_url,
