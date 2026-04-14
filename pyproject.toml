@@ -103,7 +103,7 @@ dev = [
     "pytest-cov>=6.0.0,<8.0.0",
     "pytest-timeout>=2.3.1,<3.0.0",
     "pytest-split>=0.10.0,<1.0.0",
-    "pytest-xdist>=3.5.0,<4.0.0",
+    "pytest-xdist>=3.8.0,<4.0.0",
 
     # Code formatting and linting (ruff replaces black, isort, flake8 - 10-100x faster)
     # VERSION SYNC: Poetry uses ^0.8.0 (allows updates), pre-commit pins v0.8.6
