@@ -56,7 +56,7 @@ dependencies = [
     "asyncio-mqtt>=0.16.0,<1.0.0",
 
     # JSON and YAML processing
-    "pyyaml>=6.0.2,<7.0.0",
+    "pyyaml>=6.0.3,<7.0.0",
 
     # ONEX dependencies - versioned releases from PyPI
     "omnibase-core==0.39.0",
