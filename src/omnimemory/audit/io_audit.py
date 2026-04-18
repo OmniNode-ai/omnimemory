@@ -180,7 +180,7 @@ class ModelWhitelistConfig:
     """Complete whitelist configuration."""
 
     files: list[ModelWhitelistEntry] = field(default_factory=list)
-    schema_version: str = "1.0.0"
+    schema_version: str = "1.0.0"  # string-version-ok: YAML config format discriminator at deserialization boundary; @dataclass cannot use ModelSemVer
 
 
 @dataclass
