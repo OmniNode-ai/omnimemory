@@ -489,6 +489,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+  - repo: local
+    hooks:
+      - id: normalization-symmetry
+        name: normalization-symmetry
+        entry: uv run python -m omnibase_core.validators.normalization-symmetry
+        language: system
+        pass_filenames: false
+
 # Configuration
 default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
@@ -529,10 +537,3 @@ ci:
   autoupdate_schedule: weekly
   submodules: false
 
-  - repo: local
-    hooks:
-      - id: normalization-symmetry
-        name: normalization-symmetry
-        entry: uv run python -m omnibase_core.validators.normalization-symmetry
-        language: system
-        pass_filenames: false
