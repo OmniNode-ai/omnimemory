@@ -332,6 +332,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "onex-validate-links",
             "no-hardcoded-topics",
             "no-untracked-todos",
+            "normalization-symmetry",
         }
     )
 
