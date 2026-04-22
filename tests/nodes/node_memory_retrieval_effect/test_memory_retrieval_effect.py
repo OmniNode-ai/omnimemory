@@ -33,6 +33,7 @@ from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,
     ModelSubjectRef,
 )
+from omnibase_core.models.primitives.model_semver import ModelSemVer
 
 from omnimemory.nodes.node_memory_retrieval_effect import (
     HandlerMemoryRetrieval,
@@ -89,7 +90,7 @@ def create_snapshot(
         snapshot_id=uuid4(),
         subject=subject,
         cost_ledger=ledger,
-        schema_version="1.0.0",
+        schema_version=ModelSemVer(major=1, minor=0, patch=0),
         tags=tags,
     )
 
