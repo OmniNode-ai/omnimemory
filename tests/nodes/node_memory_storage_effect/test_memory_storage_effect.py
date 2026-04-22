@@ -36,6 +36,7 @@ from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,
     ModelSubjectRef,
 )
+from omnibase_core.models.primitives.model_semver import ModelSemVer
 
 from omnimemory.nodes.node_memory_storage_effect import (
     HandlerFileSystemAdapter,
@@ -79,7 +80,7 @@ def sample_snapshot() -> ModelMemorySnapshot:
         snapshot_id=uuid4(),
         subject=subject,
         cost_ledger=ledger,
-        schema_version="1.0.0",
+        schema_version=ModelSemVer(major=1, minor=0, patch=0),
     )
 
 
@@ -111,7 +112,7 @@ def sample_snapshot_with_id() -> ModelMemorySnapshot:
         snapshot_id=uuid4(),
         subject=subject,
         cost_ledger=ledger,
-        schema_version="1.0.0",
+        schema_version=ModelSemVer(major=1, minor=0, patch=0),
         tags=("test", "sample"),
     )
 
@@ -139,7 +140,7 @@ def create_unique_snapshot(
         version=version,
         subject=subject,
         cost_ledger=ledger,
-        schema_version="1.0.0",
+        schema_version=ModelSemVer(major=1, minor=0, patch=0),
         tags=tags,
     )
 

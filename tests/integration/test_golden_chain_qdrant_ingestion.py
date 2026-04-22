@@ -221,7 +221,7 @@ class TestGoldenChainQdrantSearch:
                 "hard_ceiling": 1.0,
             },
             "execution_annotations": {},
-            "schema_version": "1.0.0",
+            "schema_version": {"major": 1, "minor": 0, "patch": 0},
             "content_hash": "",
             "created_at": "2025-01-01T00:00:00Z",
             "tags": [],
