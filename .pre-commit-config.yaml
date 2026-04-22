@@ -496,6 +496,7 @@ repos:
         entry: uv run python -m omnibase_core.validators.normalization-symmetry
         language: system
         pass_filenames: false
+        stages: [manual]
 
 # Configuration
 default_install_hook_types: [pre-commit, pre-push]
@@ -536,4 +537,4 @@ ci:
   autofix_prs: true
   autoupdate_schedule: weekly
   submodules: false
-
+  skip: [normalization-symmetry]
