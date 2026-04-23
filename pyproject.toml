@@ -60,7 +60,7 @@ dependencies = [
 
     # ONEX dependencies - versioned releases from PyPI
     "omnibase-core==0.40.0",
-    "omnibase-spi==0.20.4",
+    "omnibase-spi>=0.20.4",
     "omnibase-infra==0.32.0",
 
     # Logging and monitoring
@@ -369,5 +369,5 @@ markers = [
 # Override omnibase-infra's transitive pins on core/spi so our direct pins win.
 override-dependencies = [
     "omnibase-core==0.40.0",
-    "omnibase-spi==0.20.4",
+    "omnibase-spi>=0.20.4",
 ]
