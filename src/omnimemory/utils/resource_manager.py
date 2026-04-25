@@ -540,6 +540,18 @@ class ResourcePool:
         self._available_event = asyncio.Event()
         self._initialized = False
 
+    @property
+    def initialized(self) -> bool:
+        return self._initialized
+
+    @property
+    def lock(self) -> asyncio.Lock:
+        return self._lock
+
+    @property
+    def ttl(self) -> float | None:
+        return self._ttl
+
     async def initialize(self) -> None:
         """Initialize the pool with minimum resources."""
         async with self._lock:
@@ -727,7 +739,7 @@ class ResourceManager:
         pool = self.resource_pools[resource_type]
 
         # Ensure pool is initialized
-        if not pool._initialized:  # noqa: SLF001  # Intentional - manager needs pool internals
+        if not pool.initialized:
             await pool.initialize()
 
         self._metrics["total_operations"] += 1
@@ -879,9 +891,8 @@ class ResourceManager:
         pool = self.resource_pools[resource_type]
         expired_resources: list[Any] = []
 
-        async with pool._lock:  # noqa: SLF001  # Intentional - manager needs pool internals
-            # If no TTL configured, all resources are valid
-            if pool._ttl is None:  # noqa: SLF001
+        async with pool.lock:
+            if pool.ttl is None:
                 return
 
             current_time = time.time()
@@ -889,7 +900,7 @@ class ResourceManager:
 
             for resource, added_time in pool.available_resources:
                 elapsed = current_time - added_time
-                if elapsed < pool._ttl:  # noqa: SLF001
+                if elapsed < pool.ttl:
                     valid_resources.append((resource, added_time))
                 else:
                     expired_resources.append(resource)
@@ -918,7 +929,7 @@ class ResourceManager:
         for resource_type, pool in self.resource_pools.items():
             resources_to_close: list[Any] = []
 
-            async with pool._lock:  # noqa: SLF001  # Intentional - shutdown needs pool internals
+            async with pool.lock:
                 # Collect active resources for closing
                 for handle in list(pool.active_resources.values()):
                     handle.status = ResourceStatus.RELEASED
