@@ -50,7 +50,7 @@ def rank_and_merge(
     """Rank matches by combined_score descending and limit to max_results."""
     sorted_matches = sorted(
         matches,
-        key=lambda m: float(m.get("combined_score", 0)),  # type: ignore[arg-type]
+        key=lambda m: float(m.get("combined_score", 0)),  # type: ignore[arg-type]  # Why: dict[str, object].get returns object; float() accepts int/float/str at runtime
         reverse=True,
     )
     return sorted_matches[:max_results]

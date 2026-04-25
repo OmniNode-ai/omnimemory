@@ -47,7 +47,7 @@ class BatchProcessingMetrics(BaseModel):
         default_factory=list, description="Error messages"
     )
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def success_rate(self) -> float:
         """Calculate success rate for the batch."""
@@ -55,7 +55,7 @@ class BatchProcessingMetrics(BaseModel):
             return 0.0
         return (self.processed_count - self.failed_count) / self.processed_count
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def duration(self) -> timedelta | None:
         """Calculate batch processing duration."""
@@ -85,7 +85,7 @@ class FileProcessingInfo(BaseModel):
         default_factory=ModelMetadata, description="Additional file metadata"
     )
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def processing_duration(self) -> timedelta | None:
         """Calculate file processing duration."""
@@ -141,7 +141,7 @@ class MigrationProgressMetrics(BaseModel):
     _cache_invalidated_at: datetime | None = PrivateAttr(default=None)
     _cache_ttl_seconds: int = PrivateAttr(default=60)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def completion_percentage(self) -> float:
         """Calculate completion percentage with caching for performance."""
@@ -158,7 +158,7 @@ class MigrationProgressMetrics(BaseModel):
         self._cached_completion_percentage = result
         return result
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def success_rate(self) -> float:
         """Calculate overall success rate with caching for performance."""
@@ -176,19 +176,19 @@ class MigrationProgressMetrics(BaseModel):
         self._cached_success_rate = result
         return result
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def elapsed_time(self) -> timedelta:
         """Calculate elapsed processing time."""
         return self.last_update_time - self.start_time
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def remaining_files(self) -> int:
         """Calculate number of remaining files."""
         return self.total_files - self.processed_files
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field incompatible with mypy property check (pydantic/pydantic#6817)
     @property
     def average_processing_time_ms(self) -> float:
         """Calculate average processing time per file in milliseconds."""

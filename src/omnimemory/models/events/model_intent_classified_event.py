@@ -125,7 +125,7 @@ class ModelIntentClassifiedEvent(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def normalize_intent_field(cls, values: dict) -> dict:  # type: ignore[type-arg]
+    def normalize_intent_field(cls, values: dict) -> dict:  # type: ignore[type-arg]  # Why: pydantic model_validator(mode="before") passes untyped dict; adding type args breaks the protocol
         """Normalize the intent field from legacy ``intent_category`` to canonical ``intent_class``.
 
         Applied before field validation so that both wire formats produce a valid

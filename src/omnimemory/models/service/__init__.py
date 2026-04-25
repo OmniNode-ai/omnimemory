@@ -16,7 +16,7 @@ except ImportError:
     # Fallback for development environments without omnibase_core installed
     from enum import Enum
 
-    class EnumHealthStatus(str, Enum):  # type: ignore[no-redef]
+    class EnumHealthStatus(str, Enum):  # type: ignore[no-redef]  # Why: intentional fallback when omnibase_core is not installed
         """Fallback health status levels for development.
 
         Production code MUST use omnibase_core.enums.EnumHealthStatus.

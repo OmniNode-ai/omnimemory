@@ -61,7 +61,7 @@ class ModelProcessingMetrics(BaseModel):
         description="Additional performance-related metadata",
     )
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field decorator is incompatible with mypy's property decorator check (pydantic/pydantic#6817)
     @property
     def efficiency_score(self) -> float:
         """
@@ -84,7 +84,7 @@ class ModelProcessingMetrics(BaseModel):
         # Cap at 1.0
         return min(1.0, efficiency)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # Why: pydantic computed_field decorator is incompatible with mypy's property decorator check (pydantic/pydantic#6817)
     @property
     def breakdown_percentages(self) -> dict[str, float]:
         """

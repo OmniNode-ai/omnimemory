@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 _psutil_available = False
 psutil = None
 try:
-    import psutil  # type: ignore[import-untyped,no-redef]
+    import psutil  # type: ignore[import-untyped,no-redef]  # Why: psutil ships without type stubs; redef because module-level psutil=None is overwritten
 
     _psutil_available = True
 except ImportError:
@@ -747,7 +747,7 @@ async def create_redis_health_check(
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 
         try:
-            client: redis.Redis = redis.from_url(redis_url)  # type: ignore[no-untyped-call]
+            client: redis.Redis = redis.from_url(redis_url)  # type: ignore[no-untyped-call]  # Why: redis-py from_url() lacks type stubs
             await client.ping()
             await client.close()
 
@@ -1198,7 +1198,9 @@ class HealthManager:
                 state_str = str(state)
             state_literal: Literal["closed", "open", "half_open"]
             if state_str in ("closed", "open", "half_open"):
-                state_literal = state_str  # type: ignore[assignment]
+                state_literal = cast(
+                    'Literal["closed", "open", "half_open"]', state_str
+                )
             else:
                 state_literal = "closed"  # Default to closed for unknown states
 

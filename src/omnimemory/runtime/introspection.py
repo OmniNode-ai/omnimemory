@@ -185,7 +185,7 @@ MEMORY_NODES: tuple[_NodeDescriptor, ...] = discover_memory_nodes()
 # =============================================================================
 
 
-class MemoryNodeIntrospectionProxy(MixinNodeIntrospection):  # type: ignore[misc]  # omnibase_infra does not export py.typed
+class MemoryNodeIntrospectionProxy(MixinNodeIntrospection):  # type: ignore[misc]  # Why: mixin requires partial node interface; omnibase_infra lacks py.typed
     """Proxy that uses MixinNodeIntrospection to publish on behalf of a node.
 
     Memory nodes are thin shells that run inside the plugin lifecycle.
