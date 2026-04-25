@@ -12,7 +12,7 @@ that integrate with ModelBaseResult for consistent error handling across the sys
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -666,7 +666,7 @@ def chain_errors(
         # If there's already a cause, chain it
         current: Exception = primary_error.cause
         while hasattr(current, "__cause__") and current.__cause__ is not None:
-            current = current.__cause__  # type: ignore[assignment]
+            current = cast("Exception", current.__cause__)
         current.__cause__ = secondary_error
 
     return primary_error

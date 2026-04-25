@@ -1378,7 +1378,7 @@ def with_retry(
                 raise last_exception
             raise RuntimeError("Unexpected retry loop exit without exception") from None
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper  # type: ignore[return-value]  # Why: retry decorator preserves F signature; wrapper adds retry logic altering control flow
 
     return decorator
 
@@ -1407,7 +1407,7 @@ def with_timeout(timeout: float) -> Callable[[F], F]:
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 return await asyncio.wait_for(func(*args, **kwargs), timeout=timeout)
 
-            return async_wrapper  # type: ignore[return-value]
+            return async_wrapper  # type: ignore[return-value]  # Why: timeout decorator wraps async F in async_wrapper; signature preserved by functools.wraps
         else:
             # Sync function - use ThreadPoolExecutor for timeout enforcement
             @functools.wraps(func)
@@ -1427,7 +1427,7 @@ def with_timeout(timeout: float) -> Callable[[F], F]:
                     )
                     raise
 
-            return sync_wrapper  # type: ignore[return-value]
+            return sync_wrapper  # type: ignore[return-value]  # Why: timeout decorator wraps sync F in async sync_wrapper; signature preserved by functools.wraps
 
     return decorator
 
@@ -1471,6 +1471,6 @@ def with_circuit_breaker(
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await breaker.call(func, *args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper  # type: ignore[return-value]  # Why: circuit_breaker decorator wraps F in wrapper; signature preserved by functools.wraps
 
     return decorator

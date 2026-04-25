@@ -398,7 +398,7 @@ def create_validated_log_entry(
 # Optional psutil import for memory tracking - gracefully degrade if unavailable
 _psutil_available = False
 try:
-    import psutil  # type: ignore[import-untyped]
+    import psutil  # type: ignore[import-untyped]  # Why: psutil ships without type stubs
 
     _psutil_available = True
 except ImportError:
@@ -1716,7 +1716,7 @@ def inject_correlation_context(func: F) -> F:
             )
             raise
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper  # type: ignore[return-value]  # Why: decorator preserves F signature via functools.wraps; wrapper inner type differs from F
 
 
 def inject_correlation_context_async(func: F) -> F:
@@ -1746,7 +1746,7 @@ def inject_correlation_context_async(func: F) -> F:
             )
             raise
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper  # type: ignore[return-value]  # Why: decorator preserves F signature via functools.wraps; async wrapper type differs from F
 
 
 # === HANDLER OBSERVABILITY WRAPPER ===

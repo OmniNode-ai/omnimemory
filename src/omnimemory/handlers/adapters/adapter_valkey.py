@@ -68,8 +68,8 @@ if TYPE_CHECKING:
     RedisClientType: TypeAlias = AsyncRedis  # noqa: UP040 - can't use type keyword in conditional
     PipelineType: TypeAlias = Pipeline  # noqa: UP040 - can't use type keyword in conditional
 else:
-    RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
-    PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040
+    RedisClientType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040  # Why: runtime branch cannot reference AsyncRedis; TYPE_CHECKING branch provides real type
+    PipelineType: TypeAlias = object  # type: ignore[assignment]  # noqa: UP040  # Why: runtime branch cannot reference Pipeline; TYPE_CHECKING branch provides real type
 
 # Use mutable variable names (lowercase) to avoid pyright constant redefinition warnings
 _redis_available: bool = False
@@ -81,7 +81,7 @@ try:
     _redis_available = True
 except ImportError as e:
     _redis_import_error = str(e)
-    aioredis = None  # type: ignore[assignment]
+    aioredis = None  # type: ignore[assignment]  # Why: import failed; None is the documented fallback value
 
 
 logger = logging.getLogger(__name__)
@@ -467,7 +467,7 @@ class AdapterValkey:
         3. Type checkers see the union and require handling both branches
 
         Without this helper, every Redis call would need explicit type
-        narrowing or ``# type: ignore`` comments. This helper provides a
+        narrowing or explicit casts. This helper provides a
         single, type-safe way to handle the union by checking at runtime
         whether the result needs to be awaited.
 
@@ -475,7 +475,7 @@ class AdapterValkey:
 
         Instead of::
 
-            result = await client.sadd(key, *members)  # type: ignore[misc]
+            result = await client.sadd(key, *members)
 
         We use::
 
@@ -918,7 +918,7 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            await pipe.reset()  # type: ignore[no-untyped-call]
+            await pipe.reset()  # type: ignore[no-untyped-call]  # Why: redis-py Pipeline.reset() lacks type stubs
 
     # =========================================================================
     # Utility Methods

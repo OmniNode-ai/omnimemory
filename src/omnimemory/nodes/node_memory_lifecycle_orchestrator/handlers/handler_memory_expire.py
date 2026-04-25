@@ -92,9 +92,9 @@ else:
     except ImportError:
         # Fallback if asyncpg not installed - use base Exception
         # This allows the module to be imported even without asyncpg
-        PostgresError = Exception  # type: ignore[misc,assignment]
-        InterfaceError = Exception  # type: ignore[misc,assignment]
-        InternalClientError = Exception  # type: ignore[misc,assignment]
+        PostgresError = Exception  # type: ignore[misc,assignment]  # Why: fallback when asyncpg not installed; Exception matches catch semantics
+        InterfaceError = Exception  # type: ignore[misc,assignment]  # Why: fallback when asyncpg not installed
+        InternalClientError = Exception  # type: ignore[misc,assignment]  # Why: fallback when asyncpg not installed
 
 from typing import TYPE_CHECKING
 

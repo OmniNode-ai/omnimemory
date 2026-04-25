@@ -26,7 +26,7 @@ except ImportError:
     # This class redefines OnexErrorCode which is conditionally imported from
     # omnibase_core above. When omnibase_core is not available, we provide this
     # fallback implementation.
-    class OnexErrorCode(str, Enum):  # type: ignore[no-redef]
+    class OnexErrorCode(str, Enum):  # type: ignore[no-redef]  # Why: intentional fallback when omnibase_core is not installed
         """Base class for ONEX error codes (fallback implementation)."""
 
         def get_component(self) -> str:
@@ -54,7 +54,7 @@ except ImportError:
     _base_class = OnexErrorCode
 
 
-class EnumOmniMemoryErrorCode(_base_class):  # type: ignore[valid-type,misc]
+class EnumOmniMemoryErrorCode(_base_class):  # type: ignore[valid-type,misc]  # Why: _base_class is conditionally set from omnibase_core or fallback; mypy cannot resolve dynamic base
     """Memory-specific error codes for the ONEX memory system."""
 
     # Memory operation errors (specific to omnimemory only)
