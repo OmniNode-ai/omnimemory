@@ -553,8 +553,18 @@ class ResourcePool:
         return self._ttl
 
     async def initialize(self) -> None:
-        """Initialize the pool with minimum resources."""
+        """Initialize the pool with minimum resources.
+
+        Idempotent under concurrency: short-circuits if already initialized
+        and re-checks the flag after acquiring the lock to handle racing
+        callers (double-checked locking).
+        """
+        if self._initialized:
+            return
+
         async with self._lock:
+            if self._initialized:
+                return
             for _ in range(self.min_size):
                 resource = self._create_resource()
                 if resource:
