@@ -397,11 +397,16 @@ class TestResourcePool:
         assert pool.current_size == 3
         assert len(pool.available_resources) == 3
 
-        # Second call must be a no-op even though the flag is already set.
+        calls_after_first_init = factory_calls
+        size_after_first_init = pool.current_size
+        available_after_first_init = len(pool.available_resources)
+
         await pool.initialize()
-        assert factory_calls == 3, "initialize() must not re-allocate"
-        assert pool.current_size == 3
-        assert len(pool.available_resources) == 3
+        assert factory_calls == calls_after_first_init, (
+            "initialize() must not re-allocate"
+        )
+        assert pool.current_size == size_after_first_init
+        assert len(pool.available_resources) == available_after_first_init
 
     @pytest.mark.asyncio
     async def test_resource_pool_initialize_concurrent_calls_idempotent(self) -> None:
