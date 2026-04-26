@@ -368,7 +368,7 @@ class HandlerQdrantMock:
             A normalized mock embedding vector.
         """
         # Use deterministic hash (md5 is intentional for reproducible mock data, not security)
-        text_hash = hashlib.md5(text.encode()).digest()  # noqa: S324
+        text_hash = hashlib.sha256(text.encode()).digest()
         dim = self._config.embedding_dimension
         # Convert to reproducible embedding
         embedding = [

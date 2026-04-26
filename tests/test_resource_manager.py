@@ -373,6 +373,72 @@ class TestResourcePool:
         assert len(pool.active_resources) == 0
         assert len(pool.available_resources) >= pool.min_size
 
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_resource_pool_initialize_is_idempotent(self) -> None:
+        """initialize() must short-circuit on repeat calls.
+
+        Regression guard for the CodeRabbit finding on PR #288 (OMN-6667):
+        prior implementation re-ran allocation if invoked twice, doubling
+        pool resources. With the double-checked guard, repeated calls are
+        no-ops once initialized.
+        """
+        factory_calls = 0
+
+        def factory() -> Mock:
+            nonlocal factory_calls
+            factory_calls += 1
+            return Mock()
+
+        config = {"min_size": 3, "max_size": 5, "factory": factory}
+        pool = ResourcePool(ResourceType.MEMORY, config)
+
+        await pool.initialize()
+        assert factory_calls == 3
+        assert pool.current_size == 3
+        assert len(pool.available_resources) == 3
+
+        calls_after_first_init = factory_calls
+        size_after_first_init = pool.current_size
+        available_after_first_init = len(pool.available_resources)
+
+        await pool.initialize()
+        assert factory_calls == calls_after_first_init, (
+            "initialize() must not re-allocate"
+        )
+        assert pool.current_size == size_after_first_init
+        assert len(pool.available_resources) == available_after_first_init
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_resource_pool_initialize_concurrent_calls_idempotent(self) -> None:
+        """Concurrent initialize() callers race-safe via double-checked locking.
+
+        Reproduces the exact scenario described in the CodeRabbit review:
+        two callers see ``initialized == False``, both invoke ``initialize()``
+        — only one allocation pass should occur.
+        """
+        factory_calls = 0
+
+        def factory() -> Mock:
+            nonlocal factory_calls
+            factory_calls += 1
+            return Mock()
+
+        config = {"min_size": 4, "max_size": 8, "factory": factory}
+        pool = ResourcePool(ResourceType.DATABASE, config)
+
+        # Fire many concurrent init calls before any has completed.
+        await asyncio.gather(*(pool.initialize() for _ in range(8)))
+
+        assert factory_calls == 4, (
+            f"Expected exactly min_size (4) factory calls under concurrency, "
+            f"got {factory_calls}"
+        )
+        assert pool.current_size == 4
+        assert len(pool.available_resources) == 4
+        assert pool.initialized is True
+
 
 class TestResourceHandle:
     """Test resource handle functionality."""
