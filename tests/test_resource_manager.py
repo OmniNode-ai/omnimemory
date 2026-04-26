@@ -373,6 +373,7 @@ class TestResourcePool:
         assert len(pool.active_resources) == 0
         assert len(pool.available_resources) >= pool.min_size
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_resource_pool_initialize_is_idempotent(self) -> None:
         """initialize() must short-circuit on repeat calls.
@@ -408,6 +409,7 @@ class TestResourcePool:
         assert pool.current_size == size_after_first_init
         assert len(pool.available_resources) == available_after_first_init
 
+    @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_resource_pool_initialize_concurrent_calls_idempotent(self) -> None:
         """Concurrent initialize() callers race-safe via double-checked locking.
