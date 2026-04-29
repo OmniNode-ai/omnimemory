@@ -15,7 +15,7 @@ OmniMemory requires two infrastructure layers:
 1. **Platform infra** (owned by `omnibase_infra`): Kafka/Redpanda + PostgreSQL
 2. **Memory services** (owned by `omnimemory`): Qdrant, Memgraph, Valkey, Kreuzberg
 
-Both layers must be running for full memory operation. Memory services alone are sufficient for unit tests and storage-only workflows.
+Both layers must be running for full memory operation. Unit tests (`pytest -m unit`) do not require either layer — they run fully in-process with mock adapters. Memory services are only needed when running integration tests or workflows that exercise actual storage backends.
 
 ---
 

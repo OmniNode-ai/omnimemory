@@ -13,7 +13,7 @@
 
 Migrate all 17 runnable ONEX nodes from `omnimemory` into `omnimarket`, leaving `omnimemory` as a **pure primitives package**: models, protocols, and storage adapters.
 
-After migration, nodes auto-wire via the `.201` runtime's `importlib.metadata` discovery using the `onex.nodes` entry point — exactly like every other omnimarket node. `omnimemory` retains the `onex.domain_plugins` entry point (`PluginMemory`) for runtime plugin lifecycle management.
+After migration, nodes auto-wire via the ONEX runtime's `importlib.metadata` discovery using the `onex.nodes` entry point — exactly like every other omnimarket node. `omnimemory` retains the `onex.domain_plugins` entry point (`PluginMemory`) for runtime plugin lifecycle management.
 
 **Epic:** OMN-8295
 
