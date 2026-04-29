@@ -133,7 +133,7 @@ Default ports:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| Qdrant returns 503 | Container not healthy yet | Wait 10s and retry; check `docker compose logs omnimemory-qdrant` |
+| Qdrant returns 503 | Container not healthy yet | Wait 10s and retry; check `docker compose logs qdrant` |
 | Memgraph connection refused | Memgraph not started or port conflict | Check `docker compose ps`; ensure port 7687 is free |
 | Embedding failures | Embedding service not running | Verify `LLM_EMBEDDING_URL` from `~/.omnibase/.env`; see CLAUDE.md infra section |
 | `OMNIMEMORY_ENABLED` not set | Plugin does not activate | Set in `.env` or export before starting the runtime; see [Environment Variables](../environment_variables.md) |

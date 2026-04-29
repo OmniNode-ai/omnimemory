@@ -26,7 +26,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 
 - **Domain models** — all memory, crawl, persona, intent, and intelligence Pydantic models in `src/omnimemory/models/`
 - **Protocol interfaces** — `ProtocolEmbedding`, `ProtocolIntentGraphAdapter`, `ProtocolSecretsProvider`, and all base protocols in `src/omnimemory/protocols/`
-- **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `nodes/*/adapters/`
+- **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `handlers/adapters/` and `nodes/*/adapters/`
 - **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/` registered as `onex.domain_plugins`
 - **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
 - **Node handlers** — 17 runnable nodes in `src/omnimemory/nodes/` (migrating to omnimarket per OMN-8295)
