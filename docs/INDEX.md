@@ -9,8 +9,8 @@ Welcome to the OmniMemory documentation. This is the navigation hub — all docu
 | Source | Authority | Contains |
 |--------|-----------|----------|
 | **[CLAUDE.md](../CLAUDE.md)** | **Hard constraints** | Invariants, forbidden patterns, zero-backwards-compat policy, quick reference |
-| **docs/** | **Explanations** | Architecture, guides, conventions, reference, ADRs |
-| **[README.md](../README.md)** | **First contact** | Elevator pitch, quick start, project overview |
+| **docs/** | **Explanations** | Architecture, guides, conventions, reference, migrations, runbooks |
+| **[README.md](../README.md)** | **First contact** | Elevator pitch, quick start, ownership summary, project overview |
 
 **When in conflict, CLAUDE.md takes precedence.** The docs directory provides depth and context; CLAUDE.md provides the enforceable rules.
 
@@ -18,14 +18,19 @@ Welcome to the OmniMemory documentation. This is the navigation hub — all docu
 - Need a rule or constraint? Check [CLAUDE.md](../CLAUDE.md)
 - Need an explanation or deep dive? Check [docs/](.)
 - Need environment setup? Check [environment_variables.md](environment_variables.md)
+- Need to start services? Check [runbooks/STARTING_MEMORY_SERVICES.md](runbooks/STARTING_MEMORY_SERVICES.md)
 
 ---
 
-## Quick Navigation
+## Start Here
 
 | I want to... | Go to |
 |---|---|
+| Understand what omnimemory owns | [README.md — Where This Fits](../README.md#where-this-fits) |
+| Start memory services locally | [Runbook: Starting Memory Services](runbooks/STARTING_MEMORY_SERVICES.md) |
 | Understand the memory architecture | [ONEX Four-Node Architecture](architecture/ONEX_FOUR_NODE_ARCHITECTURE.md) |
+| Understand storage backend ownership | [Memory Data Ownership](architecture/MEMORY_DATA_OWNERSHIP.md) |
+| Understand what moves to omnimarket | [Market Migration Boundary](migrations/MARKET_MIGRATION_BOUNDARY.md) |
 | Understand Kafka/event bus integration | [ARCH-002 Kafka Abstraction](architecture/ARCH_002_KAFKA_ABSTRACTION.md) |
 | Set up environment variables | [Environment Variables](environment_variables.md) |
 | Understand PII detection and privacy | [PII Handling Guide](pii_handling.md) |
@@ -37,36 +42,41 @@ Welcome to the OmniMemory documentation. This is the navigation hub — all docu
 
 ---
 
-## Documentation Structure
+## Current Architecture
 
-### Architecture
-
-System design, data flow, and architectural decisions.
+System design, data flow, ownership boundaries, and architectural decisions.
 
 | Document | Description |
 |---|---|
 | [ONEX Four-Node Architecture](architecture/ONEX_FOUR_NODE_ARCHITECTURE.md) | EFFECT, COMPUTE, REDUCER, ORCHESTRATOR archetypes in OmniMemory |
 | [ARCH-002 Kafka Abstraction](architecture/ARCH_002_KAFKA_ABSTRACTION.md) | Kafka/Redpanda event bus integration and abstraction layer |
+| [Memory Data Ownership](architecture/MEMORY_DATA_OWNERSHIP.md) | Qdrant, Memgraph, Valkey, Kreuzberg ownership and infra boundary |
 
-### CI
+---
 
-Continuous integration monitoring, failure analysis, and tooling.
+## Migrations
 
-| Document | Description |
-|---|---|
-| [CI Monitoring Guide](ci/CI_MONITORING_GUIDE.md) | CI performance monitoring, failure triage, and local reproduction |
-
-### Runtime
-
-Runtime plugin system and extension points.
+Migration context, boundary definitions, and durable upgrade guidance.
 
 | Document | Description |
 |---|---|
-| [Runtime Plugins](runtime/RUNTIME_PLUGINS.md) | Plugin architecture, registration, and lifecycle management |
+| [Market Migration Boundary](migrations/MARKET_MIGRATION_BOUNDARY.md) | What moves to omnimarket (OMN-8295), what stays, wave plan, import path changes |
 
-### Reference
+---
 
-Configuration, environment, and operational reference.
+## Runbooks
+
+Current operational procedures with commands and expected evidence.
+
+| Document | Description |
+|---|---|
+| [Starting Memory Services](runbooks/STARTING_MEMORY_SERVICES.md) | Start Qdrant, Memgraph, Valkey, Kreuzberg; health checks; stop procedure |
+
+---
+
+## Reference
+
+Stable configuration, environment, and operational reference.
 
 | Document | Description |
 |---|---|
@@ -76,13 +86,39 @@ Configuration, environment, and operational reference.
 | [PII Handling Guide](pii_handling.md) | PII detection system, privacy compliance, and data security |
 | [Stub Protocols](stub_protocols.md) | Compatibility layer stubs and their migration path to `omnibase_core` |
 
-### DB Split (Audit Archive)
+---
 
-Point-in-time audit records from the OMN-2054 database split work. These are historical records, not living documentation.
+## Runtime
+
+Runtime plugin system and extension points.
 
 | Document | Description |
 |---|---|
-| [FK Audit: OMN-2069](db-split/fk-audit-omn-2069.md) | Foreign key audit of migration files (2026-02-10) |
+| [Runtime Plugins](runtime/RUNTIME_PLUGINS.md) | Plugin architecture, registration, and lifecycle management |
+
+---
+
+## CI
+
+Continuous integration monitoring, failure analysis, and tooling.
+
+| Document | Description |
+|---|---|
+| [CI Monitoring Guide](ci/CI_MONITORING_GUIDE.md) | CI performance monitoring, failure triage, and local reproduction |
+
+---
+
+## Historical Context
+
+Point-in-time audit records and historical design context. These are not current source of truth.
+
+| Document | Description |
+|---|---|
+| [FK Audit: OMN-2069](db-split/fk-audit-omn-2069.md) | Foreign key audit of migration files (2026-02-10, OMN-2054 DB split) |
+
+**Architecture plans (context only, not promoted):**
+- `omni_home/docs/plans/2026-04-07-plan-omnimemory-architecture.md` — memory evolution design (surprise gating, activation decay, memory cubes, Hebbian associations). Planned, not yet implemented.
+- `omni_home/docs/plans/2026-04-10-omnimemory-to-omnimarket-migration.md` — node migration plan. Promoted summary: [Market Migration Boundary](migrations/MARKET_MIGRATION_BOUNDARY.md).
 
 ---
 
@@ -90,12 +126,13 @@ Point-in-time audit records from the OMN-2054 database split work. These are his
 
 | Section | Status | Coverage |
 |---|---|---|
-| Architecture | Initial | 2 of ~15 needed |
-| CI | Initial | 1 of ~5 needed |
-| Runtime | Initial | 1 of ~3 needed |
-| Reference | Partial | 5 of ~10 needed |
-| DB Split | Archive | Complete (point-in-time audit) |
+| Architecture | Partial | 3 docs: Four-Node, Kafka, Data Ownership |
+| Migrations | Initial | 1 doc: Market Migration Boundary |
+| Runbooks | Initial | 1 doc: Starting Memory Services |
+| Reference | Partial | 5 docs |
+| Runtime | Initial | 1 doc |
+| CI | Initial | 1 doc |
+| Historical | Archive | DB split audit |
 | Getting Started | Not started | 0 of ~3 needed |
 | Guides | Not started | 0 of ~8 needed |
-| Patterns | Not started | 0 of ~5 needed |
 | Decisions (ADRs) | Not started | 0 of ~10 needed |
