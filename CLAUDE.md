@@ -174,8 +174,8 @@ class MyRequest(BaseModel):
 ### Models in domain subdirectory
 
 ```python
-# CORRECT location: src/omnimemory/models/memory/model_search_request.py
-class ModelSearchRequest(BaseModel):
+# CORRECT location: src/omnimemory/models/memory/model_memory_query.py
+class ModelMemoryQuery(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
 
     query: str = Field(..., description="Semantic search query")
@@ -240,8 +240,11 @@ Canonical spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`
 | Stub protocols | `docs/stub_protocols.md` |
 | Architecture (ONEX 4-node) | `docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md` |
 | Architecture (Kafka abstraction) | `docs/architecture/ARCH_002_KAFKA_ABSTRACTION.md` |
+| Architecture (data ownership) | `docs/architecture/MEMORY_DATA_OWNERSHIP.md` |
 | CI monitoring | `docs/ci/CI_MONITORING_GUIDE.md` |
 | Runtime plugins | `docs/runtime/RUNTIME_PLUGINS.md` |
+| Market migration boundary | `docs/migrations/MARKET_MIGRATION_BOUNDARY.md` |
+| Starting memory services | `docs/runbooks/STARTING_MEMORY_SERVICES.md` |
 
 For project overview, mission, and technology stack, see `README.md`.
 
