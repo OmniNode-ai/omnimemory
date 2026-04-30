@@ -6,7 +6,7 @@
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy%20strict-blue.svg)](https://mypy.readthedocs.io/)
 [![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 
-**Memory persistence, recall, and semantic retrieval for the OmniNode platform.** OmniMemory provides ONEX-compliant nodes and handlers for storing agent context, indexing embeddings, querying intent graphs, and managing the full memory lifecycle across distributed omni agents.
+**Memory persistence, recall, and semantic retrieval for the OmniNode platform.** OmniMemory provides ONEX (OmniNode eXecution)-compliant nodes and handlers for storing agent context, indexing embeddings, querying intent graphs, and managing the full memory lifecycle across distributed omni agents.
 
 ## Where This Fits
 
