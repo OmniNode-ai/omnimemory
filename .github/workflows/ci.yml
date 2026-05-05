@@ -107,22 +107,22 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       # SYNC: Pre-commit hook 'ruff-format' at pre-commit stage
       # Both pre-commit and CI use --check for consistent validation
       - name: Check ruff formatting
-        run: uv run ruff format --check src/ tests/
+        run: uv run --with 'ruff>=0.8.0,<1.0.0' ruff format --check src/ tests/
 
       # SYNC: Pre-commit hook 'ruff-check' at pre-commit stage
       # Both pre-commit and CI use check-only mode (no --fix)
       - name: Check ruff linting (includes import sorting)
-        run: uv run ruff check src/ tests/
+        run: uv run --with 'ruff>=0.8.0,<1.0.0' ruff check src/ tests/
 
       # SYNC: Pre-commit hook 'mypy-type-check' at pre-push stage
       # Both pre-commit and CI use same flags for consistent output
       - name: Run mypy type checking (strict)
-        run: uv run mypy --show-error-codes --no-error-summary src/omnimemory
+        run: uv run --with 'mypy>=1.14.0,<2.0.0' --with 'types-pyyaml>=6.0.12.20250915' --with 'types-cachetools>=6.2.0' mypy --show-error-codes --no-error-summary src/omnimemory
 
   # Phase 1 - Pyright Type Checking
   pyright:
@@ -138,12 +138,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       # SYNC: Pre-commit hook 'pyright-type-check' at pre-push stage
       # Uses pyrightconfig.json for project-level settings
       - name: Run pyright type checking
-        run: uv run pyright src/omnimemory
+        run: uv run --with 'pyright>=1.1.408' pyright src/omnimemory
 
   # Phase 1 - ONEX Validation
   onex-validation:
@@ -159,7 +159,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
@@ -251,7 +251,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Find and validate contract YAML files
         run: |
@@ -281,7 +281,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Run I/O audit
         run: uv run python -m omnimemory.audit
@@ -350,11 +350,11 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Run tests
         run: |
-          uv run pytest tests/ \
+          uv run --with 'pytest-cov>=6.0.0,<8.0.0' --with 'pytest-timeout>=2.3.1,<3.0.0' --with 'pytest-xdist>=3.8.0,<4.0.0' pytest tests/ \
             -n auto \
             --timeout=60 \
             --timeout-method=thread \
@@ -402,7 +402,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Check if onex compliance command exists
         id: check-command
@@ -455,7 +455,7 @@ jobs:
 
       - name: Install onex_change_control
         working-directory: onex_change_control
-        run: uv sync --all-extras
+        run: uv sync --locked --all-extras
 
       - name: Validate contract YAML files
         working-directory: onex_change_control
