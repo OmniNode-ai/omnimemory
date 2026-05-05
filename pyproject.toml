@@ -116,7 +116,7 @@ dev = [
     # pyright: ^1.1.390 in Poetry, v1.1.391 in pre-commit
     "mypy>=1.14.0,<2.0.0",
     "pyright>=1.1.408",
-    "types-cachetools>=6.2.0",
+    "types-cachetools>=7.0.0.20260503",
 
     # Pre-commit hooks
     "pre-commit>=4.5.1,<5.0.0",
