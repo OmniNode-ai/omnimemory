@@ -1573,7 +1573,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1,<1.0.0" },
     { name = "httpx", marker = "extra == 'graph'", specifier = ">=0.28.1,<1.0.0" },
     { name = "mcp", specifier = ">=1.8.0,<2.0.0" },
-    { name = "neo4j", marker = "extra == 'graph'", specifier = ">=6.2.0,<7.0.0" },
+    { name = "neo4j", marker = "extra == 'graph'", specifier = ">=5.0.0,<6.0.0" },
     { name = "omnibase-core", specifier = "==0.40.1" },
     { name = "omnibase-infra", specifier = "==0.34.2" },
     { name = "omnibase-spi", specifier = "==0.20.6" },
@@ -1609,7 +1609,7 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.4.0,<3.0.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0,<4.0.0" },
     { name = "ruff", specifier = ">=0.8.0,<1.0.0" },
-    { name = "types-cachetools", specifier = ">=7.0.0.20260503" },
+    { name = "types-cachetools", specifier = ">=6.2.0" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
 ]
 
