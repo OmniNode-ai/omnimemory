@@ -338,15 +338,71 @@ jobs:
             echo "Handshake verification failed or was skipped; see logs." >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Phase 2 - Test Suite
-  test:
-    name: Tests
+  # Phase 2a - Smart Test Selection (OMN-10762)
+  # Computes which test paths to run based on changed files.
+  # When ENABLE_SMART_TESTS != 'true', emits full-suite selection (10 shards).
+  test-select:
+    name: Smart Test Selection
     needs: [lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, contract-compliance]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    outputs:
+      selected_paths: ${{ steps.select.outputs.selected_paths }}
+      split_count: ${{ steps.select.outputs.split_count }}
+      matrix: ${{ steps.select.outputs.matrix }}
+      is_full_suite: ${{ steps.select.outputs.is_full_suite }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+
+      - name: Compute changed files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --no-tags --depth=1
+            git diff --name-only "origin/${{ github.base_ref }}"...HEAD > /tmp/changed_files.txt
+          else
+            # push / merge_group / schedule: compare with HEAD~1 or emit empty (full suite will run)
+            git diff --name-only HEAD~1 HEAD 2>/dev/null > /tmp/changed_files.txt || true
+          fi
+          echo "Changed files:"
+          cat /tmp/changed_files.txt
+
+      - name: Run smart test selection
+        id: select
+        run: |
+          FEATURE_FLAG="${{ vars.ENABLE_SMART_TESTS == 'true' && 'on' || 'off' }}"
+          SELECTION=$(uv run python scripts/ci/detect_test_paths.py \
+            --changed-files-from /tmp/changed_files.txt \
+            --ref-name "${{ github.ref_name }}" \
+            --event-name "${{ github.event_name }}" \
+            --feature-flag "$FEATURE_FLAG")
+          echo "Selection: $SELECTION"
+          echo "selected_paths=$(echo "$SELECTION" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d['selected_paths']))")" >> "$GITHUB_OUTPUT"
+          echo "split_count=$(echo "$SELECTION" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['split_count'])")" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(echo "$SELECTION" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d['matrix']))")" >> "$GITHUB_OUTPUT"
+          echo "is_full_suite=$(echo "$SELECTION" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d['is_full_suite']).lower())")" >> "$GITHUB_OUTPUT"
+
+  # Phase 2b - Test Suite (matrix-parallel, OMN-10762)
+  test:
+    name: Tests (${{ matrix.index }}/${{ needs.test-select.outputs.split_count }})
+    needs: [test-select]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        index: ${{ fromJSON(needs.test-select.outputs.matrix) }}
     env:
-      # Performance test threshold (relaxed for CI variance)
-      # Local dev uses 50ms default, CI uses 100ms for tolerance
       PERF_THRESHOLD_MS: "100"
 
     steps:
@@ -359,33 +415,62 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
-      - name: Run tests
+      - name: Run tests (shard ${{ matrix.index }}/${{ needs.test-select.outputs.split_count }})
         run: |
-          uv run --with 'pytest-cov>=6.0.0,<8.0.0' --with 'pytest-timeout>=2.3.1,<3.0.0' --with 'pytest-xdist>=3.8.0,<4.0.0' pytest tests/ \
+          SELECTED_PATHS='${{ needs.test-select.outputs.selected_paths }}'
+          SPLIT_COUNT=${{ needs.test-select.outputs.split_count }}
+          INDEX=${{ matrix.index }}
+
+          # Build path args from JSON array
+          PATHS=$(python3 -c "import json,sys; paths=json.loads('$SELECTED_PATHS'); print(' '.join(paths))")
+
+          uv run --with 'pytest-cov>=6.0.0,<8.0.0' \
+            --with 'pytest-timeout>=2.3.1,<3.0.0' \
+            --with 'pytest-xdist>=3.8.0,<4.0.0' \
+            --with 'pytest-split>=0.11.0,<1.0.0' \
+            pytest $PATHS \
+            --splits "$SPLIT_COUNT" \
+            --group "$INDEX" \
             -n auto \
             --timeout=60 \
             --timeout-method=thread \
             --tb=short \
-            --junitxml=junit.xml \
+            --junitxml=junit-${{ matrix.index }}.xml \
             --cov=src/omnimemory \
-            --cov-report=xml \
+            --cov-report=xml:coverage-${{ matrix.index }}.xml \
             --cov-report=term-missing
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results
-          path: junit.xml
+          name: test-results-${{ matrix.index }}
+          path: junit-${{ matrix.index }}.xml
           retention-days: 7
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report
-          path: coverage.xml
+          name: coverage-report-${{ matrix.index }}
+          path: coverage-${{ matrix.index }}.xml
           retention-days: 7
+
+  # Phase 2c - Tests gate (aggregates matrix shards)
+  tests-gate:
+    name: Tests Gate
+    needs: [test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all shards passed
+        run: |
+          result="${{ needs.test.result }}"
+          if [[ "$result" != "success" ]]; then
+            echo "Test shards failed: $result"
+            exit 1
+          fi
+          echo "All test shards passed"
 
   # NOTE: Version Pin Compliance check (OMN-4809) removed — prerequisite
   # OMN-4803 (check_version_pins.py in omni_home/standards/) not yet shipped,
@@ -479,7 +564,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test, compliance]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance]
     if: always()
 
     steps:
@@ -493,7 +578,8 @@ jobs:
           contracts="${{ needs.contract-validation.result }}"
           io_audit="${{ needs.io-audit.result }}"
           handshake="${{ needs.check-handshake.result }}"
-          test="${{ needs.test.result }}"
+          test_select="${{ needs.test-select.result }}"
+          tests_gate="${{ needs.tests-gate.result }}"
           compliance="${{ needs.compliance.result }}"
 
           if [[ "$migration_freeze" == "success" ]] && \
@@ -504,7 +590,8 @@ jobs:
              [[ "$contracts" == "success" ]] && \
              [[ "$io_audit" == "success" ]] && \
              [[ "$handshake" == "success" || "$handshake" == "skipped" ]] && \
-             [[ "$test" == "success" ]] && \
+             [[ "$test_select" == "success" ]] && \
+             [[ "$tests_gate" == "success" ]] && \
              [[ "$compliance" == "success" || "$compliance" == "skipped" ]]; then
             echo "All tests passed successfully"
             echo "Migration Freeze: Passed"
@@ -515,7 +602,8 @@ jobs:
             echo "Contract Validation: Passed"
             echo "I/O Audit: Passed"
             echo "Architecture Handshake: $handshake"
-            echo "Tests: Passed"
+            echo "Smart Test Selection: Passed"
+            echo "Tests Gate: Passed"
             echo "Contract Compliance: $compliance"
             exit 0
           else
@@ -528,7 +616,8 @@ jobs:
             echo "Contract Validation: $contracts"
             echo "I/O Audit: $io_audit"
             echo "Architecture Handshake: $handshake"
-            echo "Tests: $test"
+            echo "Smart Test Selection: $test_select"
+            echo "Tests Gate: $tests_gate"
             echo "Contract Compliance: $compliance"
             exit 1
           fi

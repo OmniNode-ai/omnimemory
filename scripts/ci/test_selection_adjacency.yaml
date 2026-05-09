@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+# scripts/ci/test_selection_adjacency.yaml
+# Static adjacency map from src/omnimemory/<module> to dependent modules.
+# When a key module changes, every module in `reverse_deps` ALSO has its tests run.
+# Treated as CI contract data — manually curated, reviewed in PRs that change it.
+
+schema_version: 1
+
+# `shared_modules` is a FULL-SUITE ESCALATION POLICY, not an architectural ontology.
+# Listing a module here means "if this module changes, run the full suite".
+# Curate based on operational risk + import fan-out.
+shared_modules:
+  - models
+  - enums
+  - errors
+  - protocols
+  - runtime
+
+# Per-repo full-suite escalation thresholds.
+thresholds:
+  modules_changed_for_full_suite: 6
+
+# Test infrastructure — any change forces the full suite.
+test_infrastructure_paths:
+  - tests/conftest.py
+  - pytest.ini
+  - pyproject.toml
+
+# Reverse dependency edges. Key = changed module; value = modules that import it.
+# When `models` changes, also run tests for everything in `models.reverse_deps`.
+# Note: shared_modules entries here are not consulted at runtime
+# (they trigger full suite first), but kept for completeness/documentation.
+adjacency:
+  models:
+    reverse_deps: [handlers, nodes, runtime, tools, audit, utils]
+  enums:
+    reverse_deps: [models, handlers, nodes, runtime, protocols, tools]
+  errors:
+    reverse_deps: [handlers, nodes, runtime, tools, utils, audit]
+  protocols:
+    reverse_deps: [handlers, nodes, runtime, tools]
+  runtime:
+    reverse_deps: [nodes, handlers]
+  handlers:
+    reverse_deps: [nodes]
+  nodes:
+    reverse_deps: []
+  tools:
+    reverse_deps: [handlers, nodes]
+  audit:
+    reverse_deps: []
+  utils:
+    reverse_deps: [handlers, nodes, tools]
