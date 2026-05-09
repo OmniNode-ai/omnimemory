@@ -241,6 +241,16 @@ repos:
         exclude: ^(tests/|src/omnimemory/protocols/).*\.py$
         stages: [pre-commit]
 
+      # Silent env-fallback guard (OMN-10735)
+      # Prevents os.getenv/os.environ.get with localhost defaults in src/
+      - id: validate-no-env-fallbacks
+        name: ONEX No Silent Env Fallbacks
+        entry: python scripts/validation/validate_no_env_fallbacks.py
+        language: python
+        pass_filenames: false
+        files: ^src/.*\.py$
+        stages: [pre-commit]
+
       # ONEX No Backward Compatibility Anti-Pattern Detection
       - id: validate-no-backward-compatibility
         name: ONEX Backward Compatibility Anti-Pattern Detection

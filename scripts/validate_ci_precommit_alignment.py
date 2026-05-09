@@ -61,6 +61,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ("validate-http-imports", "onex-validation", "validate_http_imports.py"),
     ("validate-kafka-imports", "onex-validation", "validate_kafka_imports.py"),
     ("validate-model-locations", "onex-validation", "validate_model_locations.py"),
+    ("validate-no-env-fallbacks", "onex-validation", "validate_no_env_fallbacks.py"),
     # Infrastructure hooks
     ("migration-freeze-check", "migration-freeze", "check_migration_freeze.sh"),
     # New hooks from OMN-2218
