@@ -260,6 +260,7 @@ known-first-party = ["omnimemory"]
     "S607",  # start process with partial path
     "N802",  # AST visitor methods must use CamelCase names (visit_Import, visit_ClassDef)
     "ERA001",  # Commented-out code (validation scripts document code patterns in comments)
+    "T201",  # print() is intentional user-facing output in CLI validator scripts
 ]
 # Transport import guard uses AST visitor methods (visit_Import, visit_ImportFrom, visit_If)
 "scripts/validate_no_transport_imports.py" = [
@@ -268,6 +269,7 @@ known-first-party = ["omnimemory"]
 # CI alignment script uses simple file parsing
 "scripts/validate_ci_precommit_alignment.py" = [
     "ERA001",  # Commented-out code in examples
+    "T201",  # print() is intentional user-facing output
 ]
 # Tools and audit modules use AST visitors for analysis
 "src/omnimemory/tools/*" = [

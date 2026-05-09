@@ -67,6 +67,7 @@ jobs:
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
   # onex-validation | validate-kafka-imports            | python scripts/validation/validate_kafka_imports.py src/
   # onex-validation | validate-model-locations          | python scripts/validation/validate_model_locations.py src/
+  # onex-validation | validate-no-env-fallbacks         | python scripts/validation/validate_no_env_fallbacks.py
   # transport-import-guard | validate-no-transport-imports | python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
   # contract-validation | contract-linter                | python -m omnimemory.tools.contract_linter <contracts>
   # io-audit        | io-audit                          | python -m omnimemory.audit
@@ -196,6 +197,11 @@ jobs:
       - name: Validate Kafka import boundary (ARCH-002)
         run: uv run python scripts/validation/validate_kafka_imports.py src/
 
+      # SYNC: Pre-commit hook 'validate-no-env-fallbacks' at pre-commit stage (OMN-10735)
+      # Prevents silent fallback to localhost defaults via os.getenv/os.environ.get
+      - name: Validate no silent env fallbacks
+        run: uv run python scripts/validation/validate_no_env_fallbacks.py
+
       - name: ONEX validation summary
         if: always()
         run: |
@@ -211,6 +217,7 @@ jobs:
           echo "- HTTP import boundary enforcement" >> $GITHUB_STEP_SUMMARY
           echo "- Kafka import boundary enforcement (ARCH-002)" >> $GITHUB_STEP_SUMMARY
           echo "- Pydantic model location enforcement" >> $GITHUB_STEP_SUMMARY
+          echo "- No silent env fallbacks (OMN-10735)" >> $GITHUB_STEP_SUMMARY
 
   # Phase 1 - Transport Import Guard (ARCH-002)
   # SYNC: Pre-commit hook 'validate-no-transport-imports' at pre-commit stage

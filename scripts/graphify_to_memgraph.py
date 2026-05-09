@@ -159,12 +159,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--bolt-uri",
-        default=os.environ.get("MEMGRAPH_URL", "bolt://localhost:7687"),
-        help="Memgraph Bolt URI (env: MEMGRAPH_URL, default: bolt://localhost:7687)",
+        default=os.environ.get("MEMGRAPH_URL"),
+        required=os.environ.get("MEMGRAPH_URL") is None,
+        help="Memgraph Bolt URI (env: MEMGRAPH_URL)",
     )
     args = parser.parse_args()
 
-    graph_dir = Path(args.graph_dir) if args.graph_dir is not None else _default_graph_dir()
+    graph_dir = (
+        Path(args.graph_dir) if args.graph_dir is not None else _default_graph_dir()
+    )
     if not graph_dir.is_dir():
         logger.error("graph-dir does not exist: %s", graph_dir)
         sys.exit(1)

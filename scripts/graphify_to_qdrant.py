@@ -86,7 +86,9 @@ def build_embedding_text(node: dict[str, Any]) -> str:
     if community:
         parts.append(f"community: {community}")
 
-    repo = node.get("repo", node.get("id", "").split("::")[0] if "::" in node.get("id", "") else "")
+    repo = node.get(
+        "repo", node.get("id", "").split("::")[0] if "::" in node.get("id", "") else ""
+    )
     if repo:
         parts.append(f"repo: {repo}")
 
@@ -166,7 +168,9 @@ def embed_batch(
                     exc,
                 )
 
-    raise RuntimeError(f"Embedding failed after {EMBED_RETRY_ATTEMPTS} attempts") from last_exc
+    raise RuntimeError(
+        f"Embedding failed after {EMBED_RETRY_ATTEMPTS} attempts"
+    ) from last_exc
 
 
 def _stable_point_id(node_id: str) -> int:
@@ -238,7 +242,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--qdrant-url",
-        default=os.environ.get("QDRANT_URL", "http://localhost:6333"),
+        default=os.environ.get("QDRANT_URL"),
+        required=os.environ.get("QDRANT_URL") is None,
         help="Qdrant base URL (env: QDRANT_URL)",
     )
     _embedding_url = os.environ.get("EMBEDDING_MODEL_URL")
@@ -255,7 +260,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    graph_dir = Path(args.graph_dir) if args.graph_dir is not None else _default_graph_dir()
+    graph_dir = (
+        Path(args.graph_dir) if args.graph_dir is not None else _default_graph_dir()
+    )
     if not graph_dir.is_dir():
         logger.error("graph-dir does not exist: %s", graph_dir)
         sys.exit(1)
