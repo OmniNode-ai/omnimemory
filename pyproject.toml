@@ -47,7 +47,7 @@ dependencies = [
     # qdrant-client is a transitive dep; ceiling at <1.17.0 because 1.17.0 applies
     # PEP 604 union syntax to protobuf EnumTypeWrapper objects, causing TypeError at
     # import time under Python 3.12. Remove ceiling once fixed upstream.
-    "qdrant-client>=1.17.1,<1.18.0",
+    "qdrant-client>=1.18.0,<1.19.0",
 
     # Environment variable management
     "python-dotenv>=1.0.1,<2.0.0",
@@ -78,7 +78,7 @@ dependencies = [
 graph = [
     "neo4j>=5.0.0,<6.0.0",
     # qdrant-client ceiling held at <1.18.0 (see core dep comment re: Python 3.12 TypeError)
-    "qdrant-client>=1.17.1,<1.18.0",
+    "qdrant-client>=1.18.0,<1.19.0",
     "httpx>=0.28.1,<1.0.0",
 ]
 
