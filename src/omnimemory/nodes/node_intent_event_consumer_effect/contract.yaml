@@ -8,7 +8,7 @@ name: node_intent_event_consumer_effect
 contract_version: {major: 0, minor: 2, patch: 0}
 node_version: {major: 0, minor: 2, patch: 0}
 uuid: "6fc349b1-34f0-4760-b547-6e8bebf0c9c0"
-node_type: EFFECT
+node_type: effect
 input_model: "ModelIntentClassifiedEvent"
 output_model: "ModelIntentStoredEvent"
 description: |
@@ -116,11 +116,11 @@ event_bus:
   # NOTE: DLQ topic included here for publish_topic_metadata consistency
   publish_topics:
     - "onex.evt.omnimemory.intent-stored.v1"
-    - "onex.evt.omniintelligence.intent-classified.v1.dlq"
+    - "onex.evt.omniintelligence.intent-classified-dlq.v1"
 
   # Dead letter queue topics (documentation; also listed in publish_topics)
   dlq_topics:
-    - "onex.evt.omniintelligence.intent-classified.v1.dlq"
+    - "onex.evt.omniintelligence.intent-classified-dlq.v1"
 
   # Metadata for subscribed topics
   subscribe_topic_metadata:
@@ -135,7 +135,7 @@ event_bus:
       schema_ref: "omnibase_core.models.events.ModelIntentStoredEvent"
       description: "Intent storage confirmation events. Emitted after successfully persisting a classified
         intent to Memgraph. Uses status field to indicate success or error."
-    "onex.evt.omniintelligence.intent-classified.v1.dlq":
+    "onex.evt.omniintelligence.intent-classified-dlq.v1":
       schema_ref: "omnimemory.models.events.model_intent_classified_event.ModelIntentClassifiedEvent"
       description: "Dead letter queue for intent-classified events that failed processing after max retries.
         Contains the original event plus error metadata."
