@@ -14,7 +14,7 @@ description: >
   Compute node for semantic analysis including embedding generation, entity extraction, and topic modeling.
   Delegates I/O to provider protocols (ProtocolEmbeddingProvider, ProtocolLLMProvider) to maintain compute
   purity. Supports deterministic and best-effort extraction modes.
-node_type: "COMPUTE"
+node_type: compute
 input_model: "ModelSemanticAnalyzerComputeRequest"
 output_model: "ModelSemanticAnalyzerComputeResponse"
 

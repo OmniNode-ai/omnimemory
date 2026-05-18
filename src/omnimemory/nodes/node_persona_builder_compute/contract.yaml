@@ -13,7 +13,7 @@ description: >
   Pure compute node that takes a batch of PersonaSignal events and an optional existing PersonaProfile,
   then produces an updated PersonaProfile. Classification uses heuristic rules and threshold scoring (no
   ML). Conservatism rules prevent thrashing on weak evidence. Phase 3 Adaptive Personalization (OMN-7305).
-node_type: "COMPUTE"
+node_type: compute
 input_model: "ModelPersonaClassifyRequest"
 output_model: "ModelPersonaClassifyResult"
 
