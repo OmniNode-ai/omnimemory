@@ -1609,7 +1609,7 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.4.0,<3.0.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0,<4.0.0" },
     { name = "ruff", specifier = ">=0.8.0,<1.0.0" },
-    { name = "types-cachetools", specifier = ">=6.2.0" },
+    { name = "types-cachetools", specifier = ">=7.0.0.20260518" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20260510" },
 ]
 
