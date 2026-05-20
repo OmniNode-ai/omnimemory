@@ -1577,7 +1577,7 @@ requires-dist = [
     { name = "omnibase-core", specifier = "==0.40.1" },
     { name = "omnibase-infra", specifier = "==0.34.2" },
     { name = "omnibase-spi", specifier = "==0.20.6" },
-    { name = "pinecone-client", specifier = ">=4.1.0,<7.0.0" },
+    { name = "pinecone-client", specifier = ">=6.0.0,<7.0.0" },
     { name = "psutil", specifier = ">=7.2.2,<8.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.12,<3.0.0" },
     { name = "pydantic", specifier = ">=2.13.4,<3.0.0" },
@@ -1851,18 +1851,18 @@ wheels = [
 
 [[package]]
 name = "pinecone-client"
-version = "4.1.2"
+version = "6.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
     { name = "pinecone-plugin-interface" },
-    { name = "tqdm" },
+    { name = "python-dateutil" },
     { name = "typing-extensions" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/c9/6d8fcd1f3a8447baa28860b33e50f585c1e95748a8109fa2fabc0b0e473c/pinecone_client-4.1.2.tar.gz", hash = "sha256:fa89c605792ec94de36d4c9585250b47b0b643407457053eca89008424be6281", size = 113210, upload-time = "2024-07-03T19:31:50.934Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/ab/3ab3b81e8ad82fbfcaa4f446c7f962b18968d61543c8c9e2c38bd777c056/pinecone_client-6.0.0.tar.gz", hash = "sha256:f224fc999205e4858c4737c40922bdf42d178b361c8859bc486ec00d45b359a9", size = 7004, upload-time = "2025-02-21T19:47:38.899Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/c5/c47bb8ce4e1238e291ec04d48d5e7b660da4355923e9178d581abea97bfa/pinecone_client-4.1.2-py3-none-any.whl", hash = "sha256:3d69cbbca2d9d4f77c90bad59a1194e3d20d535b29f277eee32b439fd526546b", size = 216432, upload-time = "2024-07-03T19:31:48.585Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/e4/7780cd631dc6dad0172a245e958b41b28a70779594c0790fa08b952aa97f/pinecone_client-6.0.0-py3-none-any.whl", hash = "sha256:d81a9e73cae441e4ab6dfc9c1d8b51c9895dae2488cda64f3e21b9dfc10c8d94", size = 6654, upload-time = "2025-02-21T19:47:37.23Z" },
 ]
 
 [[package]]
@@ -2769,18 +2769,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/19/75/241269d1da26b624c0d5e110e8149093c759b7a286138f4efd61a60e75fe/tomli_w-1.2.0.tar.gz", hash = "sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021", size = 7184, upload-time = "2025-01-15T12:07:24.262Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl", hash = "sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90", size = 6675, upload-time = "2025-01-15T12:07:22.074Z" },
-]
-
-[[package]]
-name = "tqdm"
-version = "4.67.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl", hash = "sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf", size = 78374, upload-time = "2026-02-03T17:35:50.982Z" },
 ]
 
 [[package]]
