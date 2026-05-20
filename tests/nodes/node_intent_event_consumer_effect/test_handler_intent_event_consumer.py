@@ -884,7 +884,7 @@ class TestConfigModel:
         ]
         assert config.publish_topics == ["onex.evt.omnimemory.intent-stored.v1"]
         assert config.dlq_topics == [
-            "onex.evt.omniintelligence.intent-classified.v1.dlq"
+            "onex.evt.omniintelligence.intent-classified-dlq.v1"
         ]
 
     def test_config_accepts_multiple_topics(self) -> None:

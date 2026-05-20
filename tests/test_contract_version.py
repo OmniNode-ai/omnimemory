@@ -206,18 +206,18 @@ class TestContractVersionField:
         node_type: object = contract_data["node_type"]
         assert isinstance(node_type, str), f"node_type must be a string: {node_name}"
         assert node_type in (
-            "EFFECT",
-            "COMPUTE",
-            "REDUCER",
-            "ORCHESTRATOR",
+            "effect",
+            "compute",
+            "reducer",
+            "orchestrator",
         ), f"node_type must be a valid ONEX type, got '{node_type}': {node_name}"
 
     @pytest.mark.parametrize(
         ("node_name", "expected_type"),
         [
-            ("node_memory_retrieval_effect", "EFFECT"),
-            ("node_memory_storage_effect", "EFFECT"),
-            ("node_similarity_compute", "COMPUTE"),
+            ("node_memory_retrieval_effect", "effect"),
+            ("node_memory_storage_effect", "effect"),
+            ("node_similarity_compute", "compute"),
         ],
         ids=[
             "node_memory_retrieval_effect",
