@@ -82,7 +82,7 @@ EXPECTED_DISPATCH_MAP = {
 EXPECTED_ALL_PUBLISH_TOPICS = {
     # intent_event_consumer_effect
     "onex.evt.omnimemory.intent-stored.v1",
-    "onex.evt.omniintelligence.intent-classified.v1.dlq",
+    "onex.evt.omniintelligence.intent-classified-dlq.v1",
     # intent_query_effect
     "onex.evt.omnimemory.intent-query-response.v1",
     # intent_storage_effect (intent-stored.v1 also from consumer, set deduplicates)
@@ -284,7 +284,7 @@ class TestCollectAllPublishTopics:
     def test_includes_dlq_topics(self) -> None:
         """DLQ topics declared in publish_topics must be included."""
         topics = collect_all_publish_topics()
-        assert "onex.evt.omniintelligence.intent-classified.v1.dlq" in topics
+        assert "onex.evt.omniintelligence.intent-classified-dlq.v1" in topics
 
     def test_includes_all_memory_storage_topics(self) -> None:
         """All 4 memory storage CRUD event topics must be present."""

@@ -75,7 +75,7 @@ class EnumMemoryEventTopic(StrValueHelper, str, Enum):
     INTENT_CLASSIFIED = "onex.evt.omniintelligence.intent-classified.v1"
     """Intent classified event produced by omniintelligence."""
 
-    INTENT_CLASSIFIED_DLQ = "onex.evt.omniintelligence.intent-classified.v1.dlq"
+    INTENT_CLASSIFIED_DLQ = "onex.evt.omniintelligence.intent-classified-dlq.v1"
     """Dead-letter queue for intent-classified events."""
 
     # --- Crawl pipeline events produced by omnimemory ---
