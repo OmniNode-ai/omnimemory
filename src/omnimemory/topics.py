@@ -23,11 +23,11 @@ from __future__ import annotations
 
 from enum import Enum, unique
 
-from omnibase_core.utils.util_str_enum_base import StrValueHelper
+from omnibase_core.utils.util_str_enum_base import UtilStrValueHelper
 
 
 @unique
-class EnumMemoryCommandTopic(StrValueHelper, str, Enum):
+class EnumMemoryCommandTopic(UtilStrValueHelper, str, Enum):
     """Canonical Kafka topic names for omnimemory input commands.
 
     All topics use ``onex.cmd.omnimemory.*`` as the consumer namespace
@@ -63,7 +63,7 @@ class EnumMemoryCommandTopic(StrValueHelper, str, Enum):
 
 
 @unique
-class EnumMemoryEventTopic(StrValueHelper, str, Enum):
+class EnumMemoryEventTopic(UtilStrValueHelper, str, Enum):
     """Canonical Kafka topic names for omnimemory events.
 
     Includes both events produced by omnimemory (crawl pipeline, intent storage)

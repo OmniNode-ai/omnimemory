@@ -8,10 +8,10 @@ resolution-markers = [
 
 [manifest]
 overrides = [
-    { name = "omnibase-compat", url = "https://github.com/OmniNode-ai/omnibase_compat/archive/ea4239d357fe07bb7c45afee9edceaa5c428bf32.zip" },
-    { name = "omnibase-core", specifier = "==0.40.1" },
-    { name = "omnibase-infra", specifier = "==0.36.0" },
-    { name = "omnibase-spi", specifier = "==0.20.6" },
+    { name = "omnibase-compat", git = "https://github.com/OmniNode-ai/omnibase_compat.git?branch=main" },
+    { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?branch=main" },
+    { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?branch=main" },
+    { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main" },
     { name = "omnimarket", git = "https://github.com/OmniNode-ai/omnimarket.git?rev=e6cc7c603f1d4e7ed287f9ec9a6d3c85328b8d64" },
     { name = "omninode-memory", editable = "." },
     { name = "onex-change-control", git = "https://github.com/OmniNode-ai/onex_change_control.git?rev=bd30807469c2b570d99ffefb25fb23e6a9d7cfb1" },
@@ -1307,8 +1307,8 @@ wheels = [
 
 [[package]]
 name = "omnibase-core"
-version = "0.40.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.41.0"
+source = { git = "https://github.com/OmniNode-ai/omnibase_core.git?branch=main#27aeae055648c535bc6397dfc7018c4cb4dba4fb" }
 dependencies = [
     { name = "blake3" },
     { name = "click" },
@@ -1323,15 +1323,11 @@ dependencies = [
     { name = "tree-sitter" },
     { name = "tree-sitter-python" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/ee/437d2a59f3a08827c7688d2ddf62da6d0f2647ef7ca741f092da695c23d2/omnibase_core-0.40.1.tar.gz", hash = "sha256:ed9308f3cbca5dbcdcffd5cc7e6ce9d5ae3e4fa96b89b0dda6f69388fedac3bf", size = 8395663, upload-time = "2026-05-04T02:00:24.88Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/98/20316960a989aa24f5b851bf74402c0b8a0febc0a28ccb67cfc8b518d418/omnibase_core-0.40.1-py3-none-any.whl", hash = "sha256:1fa09caee8e9237397c42154b102704b4faacd4c881edf1d98aa3d1d897b6308", size = 5773507, upload-time = "2026-05-04T02:00:22.44Z" },
-]
 
 [[package]]
 name = "omnibase-infra"
-version = "0.36.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.36.1"
+source = { git = "https://github.com/OmniNode-ai/omnibase_infra.git?branch=main#4389973ac2274eaa21b1017a287a414dfc34deb0" }
 dependencies = [
     { name = "a2a-sdk" },
     { name = "aiofiles" },
@@ -1380,28 +1376,20 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/9d/ffee802f88611629763e9f71609737595f69728944dc648adddb44d1d9e0/omnibase_infra-0.36.0.tar.gz", hash = "sha256:918494b283f983ead2e6e6e17ba995dd9778586ddd10da2cdecb063a90a86a8c", size = 8167794, upload-time = "2026-05-21T02:30:51.869Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/d9/13c471d6ad8b6bab98d941c576c0297d6a3eca71e06dea1d7b7bc744d19e/omnibase_infra-0.36.0-py3-none-any.whl", hash = "sha256:108812d3bfaff4da1608db983db9c198ff38d02acb82a021fb863ef45be83c93", size = 4833735, upload-time = "2026-05-21T02:31:03.254Z" },
-]
 
 [[package]]
 name = "omnibase-spi"
-version = "0.20.6"
-source = { registry = "https://pypi.org/simple" }
+version = "0.21.0"
+source = { git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main#63cd72f2532351f92d8a845cd537d81dc7cbedcf" }
 dependencies = [
     { name = "omnibase-core" },
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/52/d7623f3d4a063364639768240fe9d981ed95e4d631f9d477aca54499ed96/omnibase_spi-0.20.6.tar.gz", hash = "sha256:89c70b21fe1aeaa61a7622ae40bcf21e925ebb6d5282039ce5f4258eae22da48", size = 1135612, upload-time = "2026-05-04T02:20:10.286Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/68/b8b917f1c6de94c5cca26a5af673fd164ee656953503000254edad4bd090/omnibase_spi-0.20.6-py3-none-any.whl", hash = "sha256:1e32893d1fabb9215a1cb2e314ca03a5362b89495be5f3ec049491ec4cc0d041", size = 792937, upload-time = "2026-05-04T02:20:08.691Z" },
-]
 
 [[package]]
 name = "omninode-memory"
-version = "0.15.0"
+version = "0.16.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1442,9 +1430,9 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'graph'", specifier = ">=0.28.1,<1.0.0" },
     { name = "mcp", specifier = ">=1.8.0,<2.0.0" },
     { name = "neo4j", marker = "extra == 'graph'", specifier = ">=5.0.0,<6.0.0" },
-    { name = "omnibase-core", specifier = "==0.40.1" },
-    { name = "omnibase-infra", specifier = "==0.36.0" },
-    { name = "omnibase-spi", specifier = "==0.20.6" },
+    { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?branch=main" },
+    { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?branch=main" },
+    { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main" },
     { name = "pinecone-client", specifier = ">=6.0.0,<7.0.0" },
     { name = "psutil", specifier = ">=7.2.2,<8.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.12,<3.0.0" },

@@ -1,3 +1,30 @@
+## v0.16.0 (2026-05-21)
+
+### Features
+- feat(OMN-10762): port change-aware test selection to omnimemory (#308)
+- feat(OMN-10603): migrate runner selector to vars.OMNI_TRUSTED_CI_RUNS_ON_JSON (#309)
+- feat(OMN-10316): wire docs-validate as required CI gate (#297)
+
+### Bug Fixes
+- fix(OMN-11293): expect lowercase node_type in test_contract_version (#322)
+- fix(OMN-9210, OMN-9211): lowercase node_type + fix dlq topic (#316)
+- fix(OMN-10970): wire skip-token rejection CI gate (#315)
+- fix(OMN-10735): remove 5 silent env fallbacks + add validator (#307)
+- fix(OMN-10276): run CR gate for dependabot PRs (#295)
+
+### Pin Updates (2026-05-21 release wave 2)
+- omnibase-core: `==0.40.1` → `==0.42.0`
+- omnibase-infra: `==0.36.0` → `==0.36.1`
+- omnibase-spi: `==0.20.6` → `==0.21.0`
+- omnibase-compat: archive zip @ ea4239d → `==0.4.1`
+- omnimarket: git rev → `==0.3.1`
+
+### Other Changes
+- chore(OMN-11320, OMN-11321): bump omnibase-infra to 0.36.0 (#323) (superseded by this release's 0.36.1 pin)
+- chore(OMN-10533): update memory dependency pins and lockfile (#306)
+- chore: align omnibase release pins (#300)
+- build(deps): various dependency updates (pinecone-client, fastapi, mypy, pydantic, supabase, qdrant-client, psycopg2-binary)
+
 ## v0.15.0 (2026-04-03)
 
 ### Features
