@@ -275,49 +275,71 @@ def _check_lines(filename: str, source_lines: list[str]) -> list[SlopViolation]:
     Line-based regex checks for patterns that don't require AST analysis.
     Only applies outside of docstrings (we use a simple heuristic: skip
     lines inside triple-quoted strings by tracking quote depth).
+
+    step_narration is only checked in Markdown files (.md), not Python files.
+    In Python code, '# Step N:' is a legitimate ordered-step comment pattern
+    (e.g., documenting multi-step functions). In Markdown, it is LLM boilerplate.
+
+    For Markdown files, lines inside fenced code blocks (``` ... ```) are skipped
+    so that quoted Python examples with '# Step N:' comments are not flagged.
     """
     violations: list[SlopViolation] = []
+    is_markdown = filename.endswith(".md")
 
     in_triple_quote = False
     triple_char = ""
+    in_md_code_fence = False
 
     for lineno, line in enumerate(source_lines, start=1):
         stripped = line.rstrip()
 
-        # Toggle triple-quote tracking (simple heuristic)
+        # Toggle triple-quote tracking for Python files (simple heuristic)
         # Count occurrences of """ and '''
-        for tq in ('"""', "'''"):
-            count = stripped.count(tq)
-            if count:
-                if not in_triple_quote:
-                    if count % 2 == 1:
-                        in_triple_quote = True
-                        triple_char = tq
-                elif tq == triple_char:
-                    if count % 2 == 1:
-                        in_triple_quote = False
-                        triple_char = ""
+        if not is_markdown:
+            for tq in ('"""', "'''"):
+                count = stripped.count(tq)
+                if count:
+                    if not in_triple_quote:
+                        if count % 2 == 1:
+                            in_triple_quote = True
+                            triple_char = tq
+                    elif tq == triple_char:
+                        if count % 2 == 1:
+                            in_triple_quote = False
+                            triple_char = ""
 
-        if in_triple_quote:
-            continue
+            if in_triple_quote:
+                continue
 
-        # Step narration: "# Step N:" outside docstrings
-        comment_match = re.search(r"#(.+)", stripped)
-        if comment_match:
-            comment_text = comment_match.group(0)
-            if _STEP_NARRATION_RE.search(comment_text):
-                # Check for suppression on this line
-                if SUPPRESSION_MARKER not in stripped:
-                    violations.append(
-                        SlopViolation(
-                            filename=filename,
-                            line=lineno,
-                            check=CHECK_STEP_NARRATION,
-                            severity=SEVERITY_WARNING,
-                            message=f"Step narration comment: {comment_text.strip()!r}",
-                            source_line=stripped,
+        # For Markdown: track fenced code blocks (``` or ~~~) to skip their content.
+        # Lines inside code fences are quoted code examples, not prose patterns.
+        if is_markdown:
+            if stripped.startswith(("```", "~~~")):
+                in_md_code_fence = not in_md_code_fence
+            if in_md_code_fence or stripped.startswith(("```", "~~~")):
+                continue
+
+        # Step narration: "# Step N:" — Markdown files only, outside code fences.
+        # Python inline comments like "# Step 1: Clone repo" are legitimate code
+        # documentation for ordered multi-step functions; only flag in .md files
+        # where "## Step N:" / "### Step N:" is LLM-generated structural boilerplate.
+        if is_markdown:
+            comment_match = re.search(r"#(.+)", stripped)
+            if comment_match:
+                comment_text = comment_match.group(0)
+                if _STEP_NARRATION_RE.search(comment_text):
+                    # Check for suppression on this line
+                    if SUPPRESSION_MARKER not in stripped:
+                        violations.append(
+                            SlopViolation(
+                                filename=filename,
+                                line=lineno,
+                                check=CHECK_STEP_NARRATION,
+                                severity=SEVERITY_WARNING,
+                                message=f"Step narration comment: {comment_text.strip()!r}",
+                                source_line=stripped,
+                            )
                         )
-                    )
 
     return violations
 
