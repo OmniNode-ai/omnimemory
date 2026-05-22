@@ -271,6 +271,10 @@ known-first-party = ["omnimemory"]
     "ERA001",  # Commented-out code in examples
     "T201",  # print() is intentional user-facing output
 ]
+# Root foundation validators are user-facing CLI scripts.
+"validate_foundation*.py" = [
+    "T201",  # print() is intentional user-facing output
+]
 # Tools and audit modules use AST visitors for analysis
 "src/omnimemory/tools/*" = [
     "N802",  # AST visitor methods use CamelCase

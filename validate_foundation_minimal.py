@@ -16,6 +16,11 @@ from typing import Any
 
 import yaml
 
+from scripts.validation.foundation_validation_common import (
+    print_validation_results,
+    validate_expected_structure,
+)
+
 
 def validate_contract_specification() -> dict[str, Any]:
     """Validate contract.yaml structure."""
@@ -125,30 +130,7 @@ def validate_project_structure() -> dict[str, Any]:
             "tests/test_foundation.py": "Foundation tests",
         }
 
-        found_items = {}
-        missing_items = []
-
-        for item, description in expected_structure.items():
-            item_path = base_path / item
-            if item_path.exists():
-                found_items[item] = description
-            else:
-                missing_items.append(item)
-
-        print("  Project structure validation")
-        total = len(expected_structure)
-        print(f"   Found: {len(found_items)} / {total} expected items")
-        if missing_items:
-            items = ", ".join(missing_items[:3])
-            suffix = "..." if len(missing_items) > 3 else ""
-            print(f"   Missing: {items}{suffix}")
-
-        return {
-            "success": len(missing_items) == 0,
-            "found_count": len(found_items),
-            "total_count": len(expected_structure),
-            "missing_items": missing_items,
-        }
+        return validate_expected_structure(base_path, expected_structure)
 
     except Exception as e:
         print(f"❌ Project structure validation failed: {e!s}")
@@ -277,39 +259,23 @@ def main() -> int:
     results["contract"] = validate_contract_specification()
     results["file_syntax"] = validate_file_syntax()
 
-    print("\n📊 Validation Results:")
-    print("=" * 30)
-
-    passed = 0
-    failed = 0
-
-    for test_name, result in results.items():
-        if result.get("success", False):
-            print(f"✅ {test_name}: PASS")
-            passed += 1
-        else:
-            print(f"❌ {test_name}: FAIL - {result.get('error', 'Unknown error')}")
-            failed += 1
-
-    print(f"\nResults: {passed} passed, {failed} failed")
-
-    # Provide summary assessment
-    if failed == 0:
-        print("\n🎉 Foundation validation successful!")
-        print("   ✅ Project structure is complete")
-        print("   ✅ Contract specification follows ONEX 4-node pattern")
-        print("   ✅ All Python files have valid syntax")
-        print("   ✅ Configuration is properly set up")
-        print("\n📋 Next Steps:")
-        print("   1. Resolve omnibase_core dependency (Python 3.12+ requirement)")
-        print("   2. Run full integration tests with omnibase_core")
-        print("   3. Implement service implementations")
-        print("   4. Add event bus integration framework")
-        return 0
-    else:
-        print(f"\n⚠️  {failed} structural issues found")
-        print("   Foundation architecture needs attention before proceeding")
-        return 1
+    return print_validation_results(
+        results=results,
+        success_header="🎉 Foundation validation successful!",
+        success_lines=[
+            "   ✅ Project structure is complete",
+            "   ✅ Contract specification follows ONEX 4-node pattern",
+            "   ✅ All Python files have valid syntax",
+            "   ✅ Configuration is properly set up",
+            "\n📋 Next Steps:",
+            "   1. Resolve omnibase_core dependency (Python 3.12+ requirement)",
+            "   2. Run full integration tests with omnibase_core",
+            "   3. Implement service implementations",
+            "   4. Add event bus integration framework",
+        ],
+        failure_header="⚠️  {failed} structural issues found",
+        failure_lines=["   Foundation architecture needs attention before proceeding"],
+    )
 
 
 if __name__ == "__main__":

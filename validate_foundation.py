@@ -18,6 +18,8 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+from scripts.validation.foundation_validation_common import print_validation_results
+
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -259,31 +261,16 @@ def main() -> int:
     results["container"] = validate_container_creation()
     results["base_implementations"] = validate_base_implementations()
 
-    print("\n📊 Validation Results:")
-    print("=" * 30)
-
-    passed = 0
-    failed = 0
-
-    for test_name, result in results.items():
-        if result.get("success", False):
-            print(f"✅ {test_name}: PASS")
-            passed += 1
-        else:
-            print(f"❌ {test_name}: FAIL - {result.get('error', 'Unknown error')}")
-            failed += 1
-
-    print(f"\nResults: {passed} passed, {failed} failed")
-
-    if failed == 0:
-        print("\n🎉 Foundation validation successful!")
-        print("   ONEX architecture is properly implemented")
-        print("   Ready for service implementations")
-        return 0
-    else:
-        print(f"\n🚫 {failed} validation issues found")
-        print("   Foundation needs fixes before proceeding")
-        return 1
+    return print_validation_results(
+        results=results,
+        success_header="🎉 Foundation validation successful!",
+        success_lines=[
+            "   ONEX architecture is properly implemented",
+            "   Ready for service implementations",
+        ],
+        failure_header="🚫 {failed} validation issues found",
+        failure_lines=["   Foundation needs fixes before proceeding"],
+    )
 
 
 if __name__ == "__main__":

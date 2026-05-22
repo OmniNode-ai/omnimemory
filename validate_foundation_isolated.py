@@ -18,6 +18,11 @@ from typing import Any
 
 import yaml
 
+from scripts.validation.foundation_validation_common import (
+    print_validation_results,
+    validate_expected_structure,
+)
+
 # Add src and protocols paths to Python path
 # Note: Both paths needed - src for omnimemory package imports,
 # protocols for direct module imports
@@ -219,29 +224,7 @@ def validate_project_structure() -> dict[str, Any]:
             "tests": "Test directory",
         }
 
-        found_items = {}
-        missing_items = []
-
-        for item, description in expected_structure.items():
-            item_path = base_path / item
-            if item_path.exists():
-                found_items[item] = description
-            else:
-                missing_items.append(item)
-
-        print("  Project structure validation")
-        print(
-            f"   Found: {len(found_items)} / {len(expected_structure)} expected items"
-        )
-        if missing_items:
-            print(f"   Missing: {', '.join(missing_items)}")
-
-        return {
-            "success": len(missing_items) == 0,
-            "found_count": len(found_items),
-            "total_count": len(expected_structure),
-            "missing_items": missing_items,
-        }
+        return validate_expected_structure(base_path, expected_structure)
 
     except Exception as e:
         print(f"❌ Project structure validation failed: {e!s}")
@@ -264,31 +247,16 @@ def main() -> int:
     results["data_models"] = validate_data_model_definitions()
     results["error_models"] = validate_error_model_definitions()
 
-    print("\n📊 Validation Results:")
-    print("=" * 30)
-
-    passed = 0
-    failed = 0
-
-    for test_name, result in results.items():
-        if result.get("success", False):
-            print(f"✅ {test_name}: PASS")
-            passed += 1
-        else:
-            print(f"❌ {test_name}: FAIL - {result.get('error', 'Unknown error')}")
-            failed += 1
-
-    print(f"\nResults: {passed} passed, {failed} failed")
-
-    if failed == 0:
-        print("\n🎉 Isolated foundation validation successful!")
-        print("   ONEX architecture structure is properly implemented")
-        print("   Ready for omnibase_core integration")
-        return 0
-    else:
-        print(f"\n⚠️  {failed} validation issues found")
-        print("   Some foundation components need attention")
-        return min(failed, 1)  # Return 1 for any failures
+    return print_validation_results(
+        results=results,
+        success_header="🎉 Isolated foundation validation successful!",
+        success_lines=[
+            "   ONEX architecture structure is properly implemented",
+            "   Ready for omnibase_core integration",
+        ],
+        failure_header="⚠️  {failed} validation issues found",
+        failure_lines=["   Some foundation components need attention"],
+    )
 
 
 if __name__ == "__main__":
