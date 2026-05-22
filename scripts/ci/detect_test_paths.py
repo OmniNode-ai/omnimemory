@@ -114,9 +114,14 @@ def compute_selection(
 
     # 5. Smart selection.
     selected = _resolve(changed_files, config)
+    # Drop paths with no test directory on disk. A module may have reverse_deps
+    # or be changed without owning a tests/unit/<module>/ dir; passing a missing
+    # path to pytest aborts collection before any real test runs (exit code 5).
+    selected = [p for p in selected if (REPO_ROOT / p).is_dir()]
     if not selected:
         # Conservative one-shard fallback over the full tests/unit/ tree.
-        # Fires for doc-only, workflow-only, integration-only changes.
+        # Fires for doc-only, workflow-only, integration-only changes, or when
+        # every resolved module lacks a dedicated test directory.
         selected = ["tests/unit/"]
     split_count = _split_count_for(selected)
 
