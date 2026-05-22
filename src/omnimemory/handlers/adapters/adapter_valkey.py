@@ -81,7 +81,7 @@ try:
     _redis_available = True
 except ImportError as e:
     _redis_import_error = str(e)
-    aioredis = None  # type: ignore[assignment]  # Why: import failed; None is the documented fallback value
+    aioredis = None
 
 
 logger = logging.getLogger(__name__)
@@ -918,7 +918,7 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            await pipe.reset()  # type: ignore[no-untyped-call]  # Why: redis-py Pipeline.reset() lacks type stubs
+            await pipe.reset()
 
     # =========================================================================
     # Utility Methods

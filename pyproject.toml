@@ -318,12 +318,17 @@ module = [
     "pinecone.*",
     "supabase.*",
     "asyncpg.*",
+    "cachetools.*",
     "structlog.*",
+    "yaml",
+    "yaml.*",
     "pydantic_settings.*",
     "omnibase_core",
     "omnibase_core.*",
     "omnibase_infra",
     "omnibase_infra.*",
+    "omnibase_spi",
+    "omnibase_spi.*",
     "pkg_resources",
 ]
 ignore_missing_imports = true
@@ -336,6 +341,19 @@ disallow_untyped_calls = false
 # Settings module uses pydantic_settings which is ignored - allow subclassing Any
 [[tool.mypy.overrides]]
 module = ["omnimemory.settings"]
+disallow_subclassing_any = false
+
+# Dependency-provided base classes are runtime-valid but imported as Any by mypy
+# because these packages are currently consumed without complete type metadata.
+[[tool.mypy.overrides]]
+module = [
+    "omnimemory.models.contracts.model_contract_compute_extended",
+    "omnimemory.models.contracts.model_contract_effect_extended",
+    "omnimemory.models.contracts.model_contract_orchestrator_extended",
+    "omnimemory.models.contracts.model_contract_reducer_extended",
+    "omnimemory.protocols.error_models",
+    "omnimemory.topics",
+]
 disallow_subclassing_any = false
 
 [tool.pydantic-mypy]

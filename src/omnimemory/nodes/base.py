@@ -26,7 +26,7 @@ from abc import ABC
 from omnibase_core.container import ModelONEXContainer
 
 # Type alias for container
-ContainerType = ModelONEXContainer
+type ContainerType = ModelONEXContainer
 
 
 class BaseNode(ABC):

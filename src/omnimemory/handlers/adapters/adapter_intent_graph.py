@@ -688,7 +688,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
                     "intent_id": str(intent_id),
                     "intent_category": intent_category_str,
                     "confidence": confidence_val,
-                    "keywords": cast("list[JsonType]", keywords_val),
+                    "keywords": keywords_val,
                     "created_at_utc": timestamp_utc_str,
                     "timestamp_utc": timestamp_utc_str,
                     "correlation_id": str(parsed_correlation_id)
