@@ -154,13 +154,41 @@ class TestComputeSelection:
 
     def test_leaf_module_change_returns_smart_selection(self) -> None:
         sel = compute_selection(
-            changed_files=["src/omnimemory/audit/audit_io.py"],
+            changed_files=["src/omnimemory/handlers/handler_foo.py"],
             adjacency_path=ADJACENCY_PATH,
             ref_name="jonah/omn-10762-feature",
         )
         assert not sel.is_full_suite
         assert sel.full_suite_reason is None
-        assert "tests/unit/audit/" in sel.selected_paths
+        assert "tests/unit/handlers/" in sel.selected_paths
+
+    def test_deleted_util_drops_missing_dirs_keeps_existing(self) -> None:
+        # Deleting src/omnimemory/utils/audit_logger.py resolves to
+        # {utils, handlers, nodes, tools}. Only handlers/ and nodes/ have a
+        # tests/unit/<module>/ dir; tools/ and utils/ must be dropped so pytest
+        # does not abort collection on a missing path (exit 5). OMN-11576.
+        sel = compute_selection(
+            changed_files=["src/omnimemory/utils/audit_logger.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-11576-delete-dead-audit-logger",
+        )
+        assert not sel.is_full_suite
+        assert "tests/unit/handlers/" in sel.selected_paths
+        assert "tests/unit/nodes/" in sel.selected_paths
+        assert "tests/unit/tools/" not in sel.selected_paths
+        assert "tests/unit/utils/" not in sel.selected_paths
+
+    def test_selected_paths_all_exist_on_disk(self) -> None:
+        # Mixed resolution: handlers/nodes exist, tools/utils do not. Only the
+        # existing directories survive filtering.
+        sel = compute_selection(
+            changed_files=["src/omnimemory/handlers/handler_foo.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-11576-feature",
+        )
+        repo_root = ADJACENCY_PATH.parent.parent.parent
+        for path in sel.selected_paths:
+            assert (repo_root / path).is_dir(), f"selected non-existent path: {path}"
 
     def test_doc_only_returns_fallback_unit_dir(self) -> None:
         sel = compute_selection(
