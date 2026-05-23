@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 _T = TypeVar("_T")
+type _ResetPipeline = Callable[[], Awaitable[None]]
 
 # redis-py is compatible with both Redis and Valkey
 # Type alias for Redis client - provides IDE support while handling incomplete stubs
@@ -918,7 +919,7 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            reset_pipeline = cast("Callable[[], Awaitable[None]]", pipe.reset)
+            reset_pipeline = cast("_ResetPipeline", pipe.reset)
             await reset_pipeline()
 
     # =========================================================================
