@@ -583,7 +583,7 @@ class HandlerSemanticCompute:
                 self._embedding_provider = embedding_provider
             else:
                 resolved = self._container.get_service_optional(
-                    ProtocolEmbeddingProvider
+                    ProtocolEmbeddingProvider  # type: ignore[type-abstract]
                 )
                 if resolved is not None:
                     self._embedding_provider = resolved
@@ -599,7 +599,7 @@ class HandlerSemanticCompute:
                 self._llm_provider = llm_provider
             else:
                 self._llm_provider = self._container.get_service_optional(
-                    ProtocolLLMProvider
+                    ProtocolLLMProvider  # type: ignore[type-abstract]
                 )
 
             # Set up policy and cache

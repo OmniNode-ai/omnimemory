@@ -670,7 +670,7 @@ class AdapterIntentGraph(ProtocolIntentGraphAdapter):
             float(confidence_raw) if isinstance(confidence_raw, int | float) else 0.0
         )
         keywords_raw = intent_data.keywords
-        keywords_val = list(keywords_raw) if keywords_raw else []
+        keywords_val: list[JsonType] = list(keywords_raw) if keywords_raw else []
 
         try:
             async with asyncio.timeout(self._config.timeout_seconds):

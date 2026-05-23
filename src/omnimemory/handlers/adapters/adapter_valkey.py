@@ -50,9 +50,9 @@ import asyncio
 import inspect
 import logging
 import warnings
-from collections.abc import AsyncGenerator, Awaitable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
@@ -81,7 +81,7 @@ try:
     _redis_available = True
 except ImportError as e:
     _redis_import_error = str(e)
-    aioredis = None
+    aioredis = None  # type: ignore[assignment]  # Why: runtime optional import sentinel; TYPE_CHECKING branch owns the module type
 
 
 logger = logging.getLogger(__name__)
@@ -918,7 +918,8 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            await pipe.reset()
+            reset_pipeline = cast("Callable[[], Awaitable[None]]", pipe.reset)
+            await reset_pipeline()
 
     # =========================================================================
     # Utility Methods
