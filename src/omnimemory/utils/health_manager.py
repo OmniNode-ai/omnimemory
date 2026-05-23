@@ -747,7 +747,8 @@ async def create_redis_health_check(
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 
         try:
-            client: redis.Redis = redis.from_url(redis_url)  # type: ignore[no-untyped-call]  # Why: redis-py from_url() lacks type stubs
+            redis_from_url = cast("Callable[[str], redis.Redis]", redis.from_url)
+            client: redis.Redis = redis_from_url(redis_url)
             await client.ping()
             await client.close()
 

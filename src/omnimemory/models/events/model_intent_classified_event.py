@@ -196,4 +196,4 @@ class ModelIntentClassifiedEvent(BaseModel):
         working without modification. New code should read ``event.intent_class``
         (Enum) directly. Emitted payloads should use ``event.intent_class.value``.
         """
-        return self.intent_class.value
+        return str(self.intent_class.value)

@@ -50,13 +50,14 @@ import asyncio
 import inspect
 import logging
 import warnings
-from collections.abc import AsyncGenerator, Awaitable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 _T = TypeVar("_T")
+type _ResetPipeline = Callable[[], Awaitable[None]]
 
 # redis-py is compatible with both Redis and Valkey
 # Type alias for Redis client - provides IDE support while handling incomplete stubs
@@ -81,7 +82,7 @@ try:
     _redis_available = True
 except ImportError as e:
     _redis_import_error = str(e)
-    aioredis = None  # type: ignore[assignment]  # Why: import failed; None is the documented fallback value
+    aioredis = None  # type: ignore[assignment]  # Why: runtime optional import sentinel; TYPE_CHECKING branch owns the module type
 
 
 logger = logging.getLogger(__name__)
@@ -918,7 +919,8 @@ class AdapterValkey:
                 await wrapper.execute()
         finally:
             # Reset releases pipeline resources
-            await pipe.reset()  # type: ignore[no-untyped-call]  # Why: redis-py Pipeline.reset() lacks type stubs
+            reset_pipeline = cast("_ResetPipeline", pipe.reset)
+            await reset_pipeline()
 
     # =========================================================================
     # Utility Methods
