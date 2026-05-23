@@ -6,7 +6,7 @@ name: Pre-commit
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'hotfix/**']
   merge_group:
 
 jobs:
