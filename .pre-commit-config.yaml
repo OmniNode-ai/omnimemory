@@ -167,8 +167,10 @@ repos:
     hooks:
       - id: mypy-type-check
         name: mypy (type checking - strict)
-        # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
-        entry: uv run mypy --show-error-codes --no-error-summary src/omnimemory
+        # SYNCHRONIZED WITH CI: identical to the lint job in .github/workflows/ci.yml
+        # (must include the same --with type-stub injection or the hook diverges from CI).
+        entry: uv run --with 'mypy>=1.14.0,<2.0.0' --with 'types-pyyaml>=6.0.12.20250915' --with 'types-cachetools>=6.2.0'
+          mypy --show-error-codes --no-error-summary src/omnimemory
         language: system
         types: [python]
         pass_filenames: false
