@@ -32,13 +32,24 @@ handler_routing:
     - routing_key: "qdrant"
       handler_key: "HandlerQdrant"
       handler:
+        name: "HandlerQdrant"
+        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
         handler_type: "QDRANT"
       priority: 0
       output_events: []
     - routing_key: "http"
       handler_key: "HandlerHttp"
       handler:
+        name: "HandlerHttp"
+        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
         handler_type: "HTTP"
+      priority: 0
+      output_events: []
+    - routing_key: "reduce"
+      handler_key: "HandlerNavigationHistoryReducer"
+      handler:
+        name: "HandlerNavigationHistoryReducer"
+        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
       priority: 0
       output_events: []
   default_handler: "HandlerNavigationHistoryReducer"

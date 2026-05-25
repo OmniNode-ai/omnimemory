@@ -113,6 +113,9 @@ handler_routing:
   handlers:
     - routing_key: "retrieve"
       handler_key: "HandlerAgentLearningRetrieval"
+      handler:
+        name: "HandlerAgentLearningRetrieval"
+        module: "omnimemory.nodes.node_agent_learning_retrieval_effect.handlers.handler_agent_learning_retrieval"
       priority: 0
       output_events: []
   default_handler: "HandlerAgentLearningRetrieval"
