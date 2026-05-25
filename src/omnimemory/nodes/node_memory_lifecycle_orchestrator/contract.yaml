@@ -150,16 +150,25 @@ handler_routing:
     # RuntimeTick handler - evaluates memory TTL expiration and archive candidates
     - routing_key: "tick"
       handler_key: "HandlerMemoryTick"
+      handler:
+        name: "HandlerMemoryTick"
+        module: "omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_tick"
       priority: 0
       output_events: []
     # Expire command handler - ACTIVE -> EXPIRED state transition
     - routing_key: "expire"
       handler_key: "HandlerMemoryExpire"
+      handler:
+        name: "HandlerMemoryExpire"
+        module: "omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire"
       priority: 0
       output_events: []
     # Archive command handler - EXPIRED -> ARCHIVED state transition
     - routing_key: "archive"
       handler_key: "HandlerMemoryArchive"
+      handler:
+        name: "HandlerMemoryArchive"
+        module: "omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_archive"
       priority: 0
       output_events: []
   # NOTE: restore and memory-accessed handlers planned for OMN-1453

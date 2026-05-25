@@ -82,16 +82,25 @@ handler_routing:
     # Generate embedding vector for content
     - routing_key: "embed"
       handler_key: "HandlerSemanticCompute.embed"
+      handler:
+        name: "HandlerSemanticCompute"
+        module: "omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute"
       priority: 0
       output_events: []
     # Extract named entities from content
     - routing_key: "extract_entities"
       handler_key: "HandlerSemanticCompute.extract_entities"
+      handler:
+        name: "HandlerSemanticCompute"
+        module: "omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute"
       priority: 0
       output_events: []
     # Full semantic analysis (embedding + entities + topics)
     - routing_key: "analyze"
       handler_key: "HandlerSemanticCompute.analyze"
+      handler:
+        name: "HandlerSemanticCompute"
+        module: "omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute"
       priority: 0
       output_events: []
   default_handler: null

@@ -151,21 +151,33 @@ handler_routing:
     # Get intent distribution across categories
     - routing_key: "query_distribution"
       handler_key: "HandlerIntentQuery"
+      handler:
+        name: "HandlerIntentQuery"
+        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
       priority: 0
       output_events: []
     # Get intents for a specific session
     - routing_key: "query_session"
       handler_key: "HandlerIntentQuery"
+      handler:
+        name: "HandlerIntentQuery"
+        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
       priority: 0
       output_events: []
     # Get recent intents across all sessions
     - routing_key: "query_recent"
       handler_key: "HandlerIntentQuery"
+      handler:
+        name: "HandlerIntentQuery"
+        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
       priority: 0
       output_events: []
     # Check node health status
     - routing_key: "health_check"
       handler_key: "HandlerIntentQuery"
+      handler:
+        name: "HandlerIntentQuery"
+        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
       priority: 0
       output_events: []
   default_handler: null
