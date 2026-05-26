@@ -305,22 +305,18 @@ class TestPriorityHintForPath:
 class TestScopeRefForPath:
     @pytest.mark.unit
     def test_exact_prefix_match(self) -> None:
-        mappings = [("/Volumes/PRO-G40/Code/omnimemory", "omninode/omnimemory")]
-        result = _scope_ref_for_path(
-            Path("/Volumes/PRO-G40/Code/omnimemory/CLAUDE.md"), mappings
-        )
+        mappings = [("/Code/omnimemory", "omninode/omnimemory")]
+        result = _scope_ref_for_path(Path("/Code/omnimemory/CLAUDE.md"), mappings)
         assert result == "omninode/omnimemory"
 
     @pytest.mark.unit
     def test_longest_prefix_wins(self) -> None:
         mappings = [
-            ("/Volumes/PRO-G40/Code", "omninode/shared"),
-            ("/Volumes/PRO-G40/Code/omni_save/design", "omninode/shared/design"),
-            ("/Volumes/PRO-G40/Code/omni_save", "omninode/shared/plans"),
+            ("/Code", "omninode/shared"),
+            ("/Code/omni_save/design", "omninode/shared/design"),
+            ("/Code/omni_save", "omninode/shared/plans"),
         ]
-        result = _scope_ref_for_path(
-            Path("/Volumes/PRO-G40/Code/omni_save/design/my.md"), mappings
-        )
+        result = _scope_ref_for_path(Path("/Code/omni_save/design/my.md"), mappings)
         assert result == "omninode/shared/design"
 
     @pytest.mark.unit
