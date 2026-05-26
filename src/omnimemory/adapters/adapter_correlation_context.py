@@ -57,7 +57,7 @@ try:
 
     _psutil_available = True
 except ImportError:
-    psutil = None  # type: ignore[assignment]
+    psutil = None
 
 # Context variables for correlation tracking
 correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
