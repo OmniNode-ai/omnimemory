@@ -78,16 +78,25 @@ handler_routing:
     # Calculate cosine distance between two vectors
     - routing_key: "cosine_distance"
       handler_key: "HandlerSimilarityCompute.cosine_distance"
+      handler:
+        name: "HandlerSimilarityCompute"
+        module: "omnimemory.nodes.node_similarity_compute.handlers.handler_similarity_compute"
       priority: 0
       output_events: []
     # Calculate Euclidean (L2) distance between two vectors
     - routing_key: "euclidean_distance"
       handler_key: "HandlerSimilarityCompute.euclidean_distance"
+      handler:
+        name: "HandlerSimilarityCompute"
+        module: "omnimemory.nodes.node_similarity_compute.handlers.handler_similarity_compute"
       priority: 0
       output_events: []
     # Full vector comparison with optional threshold matching
     - routing_key: "compare"
       handler_key: "HandlerSimilarityCompute.compare"
+      handler:
+        name: "HandlerSimilarityCompute"
+        module: "omnimemory.nodes.node_similarity_compute.handlers.handler_similarity_compute"
       priority: 0
       output_events: []
   default_handler: null

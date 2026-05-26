@@ -49,6 +49,9 @@ handler_routing:
   handlers:
     - routing_key: "classify"
       handler_key: "HandlerPersonaClassify.classify"
+      handler:
+        name: "HandlerPersonaClassify"
+        module: "omnimemory.nodes.node_persona_builder_compute.handlers.handler_persona_classify"
       priority: 0
       output_events: []
   default_handler: null
