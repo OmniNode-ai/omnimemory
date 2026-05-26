@@ -18,7 +18,7 @@ Example::
     from uuid import uuid4
 
     from omnimemory.handlers.adapters.models import ModelIntentRecord
-    from omnimemory.nodes.node_intent_query_effect.utils import map_to_intent_payload
+    from omnimemory.nodes.node_intent_query_effect.mappers import map_to_intent_payload
 
     record = ModelIntentRecord(
         intent_id=uuid4(),

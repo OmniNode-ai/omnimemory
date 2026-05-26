@@ -70,7 +70,7 @@ from omnimemory.models.crawl.model_document_indexed_kreuzberg_event import (
 from omnimemory.models.crawl.model_document_parse_failed_event import (
     ModelDocumentParseFailedEvent,
 )
-from omnimemory.nodes.node_kreuzberg_parse_effect.clients.client_kreuzberg import (
+from omnimemory.nodes.node_kreuzberg_parse_effect.adapters.adapter_kreuzberg_client import (
     KreuzbergExtractionError,
     KreuzbergTimeoutError,
     call_kreuzberg_extract,

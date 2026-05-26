@@ -50,14 +50,14 @@ Example::
 """
 
 from omnimemory.nodes.node_intent_query_effect.handlers import HandlerIntentQuery
+from omnimemory.nodes.node_intent_query_effect.mappers import (
+    map_intent_records,
+    map_to_intent_payload,
+)
 from omnimemory.nodes.node_intent_query_effect.models import (
     ModelHandlerIntentQueryConfig,
 )
 from omnimemory.nodes.node_intent_query_effect.registry import RegistryIntentQueryEffect
-from omnimemory.nodes.node_intent_query_effect.utils import (
-    map_intent_records,
-    map_to_intent_payload,
-)
 
 __all__ = [
     "HandlerIntentQuery",

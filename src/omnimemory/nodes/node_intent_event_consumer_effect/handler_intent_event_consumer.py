@@ -76,16 +76,16 @@ from uuid import UUID
 from omnibase_core.models.events import ModelIntentStoredEvent
 from pydantic import ValidationError
 
+from omnimemory.adapters.adapter_concurrency import CircuitBreaker, CircuitBreakerState
 from omnimemory.models.events import ModelIntentClassifiedEvent
 from omnimemory.models.utils.model_health_status import HealthStatus
+from omnimemory.nodes.node_intent_event_consumer_effect.mappers import (
+    map_event_to_storage_request,
+)
 from omnimemory.nodes.node_intent_event_consumer_effect.models import (
     ModelIntentEventConsumerConfig,
     ModelIntentEventConsumerHealth,
 )
-from omnimemory.nodes.node_intent_event_consumer_effect.utils import (
-    map_event_to_storage_request,
-)
-from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerState
 
 if TYPE_CHECKING:
     from omnimemory.nodes.node_intent_storage_effect.adapters.adapter_intent_storage import (

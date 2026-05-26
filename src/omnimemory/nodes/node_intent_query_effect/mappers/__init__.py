@@ -4,7 +4,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Utilities for the intent_query_effect node."""
 
-from omnimemory.nodes.node_intent_query_effect.utils.util_intent_mapping import (
+from omnimemory.nodes.node_intent_query_effect.mappers.util_intent_mapping import (
     map_intent_records,
     map_to_intent_payload,
 )

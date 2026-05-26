@@ -19,7 +19,7 @@ from omnibase_core.models.intelligence import (
 )
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from omnimemory.utils.pii_detector import PIIDetector
+from omnimemory.adapters.adapter_pii_detector import PIIDetector
 
 __all__ = ["ModelIntentStorageRequest"]
 

@@ -4,7 +4,7 @@
 """Contract Linter CLI for ONEX Node Contract Validation.
 
 Validates YAML contract files against the ONEX schema using the
-ProtocolContractValidator stub. Provides structured error output
+ValidatorContract stub. Provides structured error output
 with field paths for easy debugging and CI/CD integration.
 
 Usage:
@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
-from omnimemory.tools.stubs.contract_validator import ProtocolContractValidator
+from omnimemory.tools.validators.validator_contract import ValidatorContract
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -158,7 +158,7 @@ def validate_contract(file_path: str | Path) -> dict[str, object]:
                 f"Invalid node_type: '{node_type}'. Must be one of: {valid_types}"
             )
         else:
-            validator = ProtocolContractValidator()
+            validator = ValidatorContract()
             result = validator.validate_contract_file(
                 path,
                 contract_type=node_type_lower,

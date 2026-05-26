@@ -10,7 +10,7 @@ that all external HTTP calls must go through the adapter layer.
 
 Allowed locations for HTTP imports:
 - src/omnimemory/handlers/adapters/ (the contract boundary)
-- src/omnimemory/nodes/*/clients/ (legacy clients - being migrated)
+- src/omnimemory/nodes/*/adapters/ (effect node adapters - designated I/O boundary)
 - tests/ (test mocks and fixtures)
 
 All other locations must use the adapter layer for HTTP operations.
@@ -104,11 +104,10 @@ HTTP_IMPORT_PATTERNS = [
 ALLOWED_PATHS = [
     # Adapter layer - the only allowed exit hatch
     "handlers/adapters/",
-    # Legacy clients directory - allowed during migration
-    # TODO(OMN-5694): Remove this allowance after migration to adapters is complete
-    "nodes/node_memory_retrieval_effect/clients/",
+    # Effect node adapters - designated I/O boundary (OMN-11575: renamed from clients/)
+    "nodes/node_memory_retrieval_effect/adapters/",
     # Kreuzberg effect client - HTTP transport boundary for document extraction (OMN-2733)
-    "nodes/node_kreuzberg_parse_effect/clients/",
+    "nodes/node_kreuzberg_parse_effect/adapters/",
     # Tests can mock HTTP clients
     "tests/",
 ]

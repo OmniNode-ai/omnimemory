@@ -89,16 +89,16 @@ from omnibase_core.models.intelligence import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.adapters.adapter_concurrency import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    CircuitBreakerState,
+)
 from omnimemory.handlers.adapters.adapter_intent_graph import AdapterIntentGraph
 from omnimemory.handlers.adapters.models import (
     ModelAdapterIntentGraphConfig,
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
-)
-from omnimemory.utils.concurrency import (
-    CircuitBreaker,
-    CircuitBreakerOpenError,
-    CircuitBreakerState,
 )
 
 if TYPE_CHECKING:

@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     from asyncpg import Pool
     from omnibase_core.container import ModelONEXContainer
 
-    from omnimemory.utils.concurrency import CircuitBreaker
+    from omnimemory.adapters.adapter_concurrency import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 

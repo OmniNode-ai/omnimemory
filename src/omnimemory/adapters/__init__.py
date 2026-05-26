@@ -2,21 +2,21 @@
 # SPDX-License-Identifier: MIT
 
 """
-Utility modules for OmniMemory ONEX architecture.
+Adapter modules for OmniMemory ONEX architecture.
 
-This package provides common utilities used across the OmniMemory system:
+This package provides adapter implementations used across the OmniMemory system:
 - Retry logic with exponential backoff
 - Resource management with circuit breakers and async context managers
-- Observability with ContextVar correlation tracking
+- Observability: metrics counters/histograms/gauges (adapter_metrics_counter),
+  correlation context tracking (adapter_correlation_context),
+  and handler observability wrapper (adapter_observability_wrapper)
 - Concurrency utilities with priority locks and fair semaphores
 - Health checking with comprehensive dependency monitoring
-- Performance monitoring helpers
-- Common validation patterns
 - Database URL display utilities for safe credential masking
 """
 
 from ..models.utils.model_concurrency import ModelConnectionPoolConfig
-from .concurrency import (
+from .adapter_concurrency import (
     AsyncConnectionPool,
     FairSemaphore,
     LockPriority,
@@ -30,14 +30,27 @@ from .concurrency import (
     with_fair_semaphore,
     with_priority_lock,
 )
-from .db_url import safe_db_url_display
-from .error_sanitizer import (
+from .adapter_correlation_context import (
+    CorrelationContext,
+    ObservabilityManager,
+    OperationType,
+    correlation_context,
+    get_correlation_id,
+    get_request_id,
+    inject_correlation_context,
+    inject_correlation_context_async,
+    log_with_correlation,
+    observability_manager,
+    trace_operation,
+)
+from .adapter_db_url import safe_db_url_display
+from .adapter_error_sanitizer import (
     ErrorSanitizer,
     SanitizationLevel,
     sanitize_dict,
     sanitize_error,
 )
-from .health_manager import (
+from .adapter_health_manager import (
     DependencyType,
     HealthCheckConfig,
     HealthCheckManager,
@@ -49,30 +62,21 @@ from .health_manager import (
     create_redis_health_check,
     health_manager,
 )
-from .observability import (
-    CorrelationContext,
+from .adapter_metrics_counter import (
     Counter,
     Gauge,
-    HandlerMetrics,
-    HandlerObservabilityWrapper,
     Histogram,
     MetricsRegistry,
-    ObservabilityManager,
-    OperationType,
     TraceLevel,
-    correlation_context,
-    get_correlation_id,
-    get_request_id,
-    inject_correlation_context,
-    inject_correlation_context_async,
-    log_with_correlation,
     metrics_registry,
-    observability_manager,
     sanitize_metadata_value,
-    trace_operation,
     validate_correlation_id,
 )
-from .pii_detector import (
+from .adapter_observability_wrapper import (
+    HandlerMetrics,
+    HandlerObservabilityWrapper,
+)
+from .adapter_pii_detector import (
     ModelPIIDetectionResult,
     ModelPIIDetectorConfig,
     ModelPIIMatch,
@@ -80,7 +84,7 @@ from .pii_detector import (
     PIIDetector,
     PIIType,
 )
-from .resource_manager import (
+from .adapter_resource_manager import (
     AsyncCircuitBreaker,
     AsyncResourceManager,
     CircuitBreakerError,
@@ -91,7 +95,7 @@ from .resource_manager import (
     with_semaphore,
     with_timeout,
 )
-from .retry_utils import (
+from .adapter_retry_utils import (
     ModelRetryAttemptInfo,
     ModelRetryConfig,
     ModelRetryStatistics,

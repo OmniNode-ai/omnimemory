@@ -56,7 +56,7 @@ HealthCheckDetails = ModelHealthCheckDetails
 HealthCheckResult = ModelHealthCheckResult
 ResourceHealthCheck = ModelResourceHealthCheck
 SystemHealth = ModelSystemHealth
-from .error_sanitizer import SanitizationLevel, sanitize_error
+from .adapter_error_sanitizer import SanitizationLevel, sanitize_error
 
 # === RATE LIMITING ===
 
@@ -163,9 +163,13 @@ from ..models.foundation.model_health_response import (
     ModelHealthResponse,
     ModelResourceMetrics,
 )
-from .concurrency import CircuitBreaker, CircuitBreakerOpenError
-from .observability import OperationType, correlation_context, trace_operation
-from .resource_manager import AsyncCircuitBreaker
+from .adapter_concurrency import CircuitBreaker, CircuitBreakerOpenError
+from .adapter_correlation_context import (
+    OperationType,
+    correlation_context,
+    trace_operation,
+)
+from .adapter_resource_manager import AsyncCircuitBreaker
 
 logger = structlog.get_logger(__name__)
 

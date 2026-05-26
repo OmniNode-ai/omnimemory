@@ -11,15 +11,15 @@ from uuid import uuid4
 
 import pytest
 
-from omnimemory.models.foundation.model_health_response import (
-    ModelCircuitBreakerStatsCollection,
-    ModelRateLimitedHealthCheckResponse,
-)
-from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerState
-from omnimemory.utils.health_manager import (
+from omnimemory.adapters.adapter_concurrency import CircuitBreaker, CircuitBreakerState
+from omnimemory.adapters.adapter_health_manager import (
     HealthManager,
     HealthStatus,
     SystemHealth,
+)
+from omnimemory.models.foundation.model_health_response import (
+    ModelCircuitBreakerStatsCollection,
+    ModelRateLimitedHealthCheckResponse,
 )
 
 
