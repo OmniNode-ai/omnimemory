@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""Unit tests for persona storage/retrieval effect nodes and adapter."""
+"""Unit tests for persona storage effect node and adapter."""
 
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
@@ -11,10 +11,6 @@ import pytest
 
 from omnimemory.enums import EnumPreferredTone, EnumTechnicalLevel
 from omnimemory.models.persona import ModelUserPersonaV1
-from omnimemory.nodes.node_persona_retrieval_effect import (
-    ModelPersonaRetrievalRequest,
-    ModelPersonaRetrievalResponse,
-)
 from omnimemory.nodes.node_persona_storage_effect import (
     AdapterPostgresPersona,
     ModelPersonaStorageRequest,
@@ -143,23 +139,3 @@ class TestPersonaStorageModels:
             is_new_insert=False,
         )
         assert response.is_new_insert is False
-
-
-@pytest.mark.unit
-class TestPersonaRetrievalModels:
-    def test_retrieval_request_creation(self) -> None:
-        request = ModelPersonaRetrievalRequest(user_id="test-user")
-        assert request.user_id == "test-user"
-        assert request.agent_id is None
-
-    def test_retrieval_response_found(self) -> None:
-        persona = _make_persona()
-        response = ModelPersonaRetrievalResponse(
-            status="found",
-            persona=persona,
-        )
-        assert response.persona is not None
-
-    def test_retrieval_response_not_found(self) -> None:
-        response = ModelPersonaRetrievalResponse(status="not_found")
-        assert response.persona is None
