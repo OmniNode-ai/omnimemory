@@ -45,13 +45,13 @@ import structlog
 from ..models.foundation.model_connection_metadata import (
     ConnectionMetadata,
 )
-from .error_sanitizer import SanitizationLevel
-from .error_sanitizer import sanitize_error as _base_sanitize_error
-from .observability import (
+from .adapter_correlation_context import (
     OperationType,
     correlation_context,
     trace_operation,
 )
+from .adapter_error_sanitizer import SanitizationLevel
+from .adapter_error_sanitizer import sanitize_error as _base_sanitize_error
 
 if TYPE_CHECKING:
     from ..models.utils.model_concurrency import ModelConnectionPoolConfig

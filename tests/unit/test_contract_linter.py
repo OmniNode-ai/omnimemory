@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 # Copyright (c) 2025 OmniNode Team
-"""Unit tests for the contract linter and ProtocolContractValidator stub.
+"""Unit tests for the contract linter and ValidatorContract stub.
 
 Tests cover:
 - Contract type detection (node, FSM, workflow, subcontract, unknown)
@@ -10,7 +10,7 @@ Tests cover:
 - Version field validation (structured semver objects)
 - Name field validation
 - The ``validate_contract`` function with valid and invalid inputs
-- The ``ProtocolContractValidator`` class methods directly
+- The ``ValidatorContract`` class methods directly
 - CLI output formatting (text and JSON)
 """
 
@@ -28,9 +28,9 @@ from omnimemory.tools.contract_linter import (
     validate_batch,
     validate_contract,
 )
-from omnimemory.tools.stubs.contract_validator import (
-    ProtocolContractValidator,
-    ProtocolContractValidatorResult,
+from omnimemory.tools.validators.validator_contract import (
+    ValidatorContract,
+    ValidatorContractResult,
 )
 
 # ---------------------------------------------------------------------------
@@ -73,9 +73,9 @@ def _make_valid_node_contract(**overrides: object) -> dict[str, object]:
 
 
 @pytest.fixture
-def validator() -> ProtocolContractValidator:
-    """Provide a fresh ProtocolContractValidator instance."""
-    return ProtocolContractValidator()
+def validator() -> ValidatorContract:
+    """Provide a fresh ValidatorContract instance."""
+    return ValidatorContract()
 
 
 @pytest.fixture
@@ -136,7 +136,7 @@ class TestDetectContractType:
 
 
 # ---------------------------------------------------------------------------
-# ProtocolContractValidator: Required Fields
+# ValidatorContract: Required Fields
 # ---------------------------------------------------------------------------
 
 
@@ -144,7 +144,7 @@ class TestDetectContractType:
 class TestValidateRequiredFields:
     """Tests for _validate_required_fields on the validator."""
 
-    def test_all_fields_present(self, validator: ProtocolContractValidator) -> None:
+    def test_all_fields_present(self, validator: ValidatorContract) -> None:
         data = {
             "name": "x",
             "node_type": "compute",
@@ -158,7 +158,7 @@ class TestValidateRequiredFields:
         )
         assert violations == []
 
-    def test_missing_single_field(self, validator: ProtocolContractValidator) -> None:
+    def test_missing_single_field(self, validator: ValidatorContract) -> None:
         data = {
             "node_type": "compute",
             "description": "d",
@@ -173,7 +173,7 @@ class TestValidateRequiredFields:
         assert "name" in violations[0]
         assert "Missing required field" in violations[0]
 
-    def test_null_field_value(self, validator: ProtocolContractValidator) -> None:
+    def test_null_field_value(self, validator: ValidatorContract) -> None:
         data: dict[str, object] = {
             "name": None,
             "node_type": "compute",
@@ -188,9 +188,7 @@ class TestValidateRequiredFields:
         assert len(violations) == 1
         assert "cannot be null" in violations[0]
 
-    def test_multiple_missing_fields(
-        self, validator: ProtocolContractValidator
-    ) -> None:
+    def test_multiple_missing_fields(self, validator: ValidatorContract) -> None:
         violations = validator._validate_required_fields(
             {},
             validator.COMMON_REQUIRED_FIELDS,
@@ -199,7 +197,7 @@ class TestValidateRequiredFields:
 
 
 # ---------------------------------------------------------------------------
-# ProtocolContractValidator: Version Fields
+# ValidatorContract: Version Fields
 # ---------------------------------------------------------------------------
 
 
@@ -207,7 +205,7 @@ class TestValidateRequiredFields:
 class TestValidateVersionFields:
     """Tests for _validate_version_fields and _validate_version_structure."""
 
-    def test_valid_version_object(self, validator: ProtocolContractValidator) -> None:
+    def test_valid_version_object(self, validator: ValidatorContract) -> None:
         data: dict[str, object] = {
             "node_type": "compute",
             "contract_version": {"major": 1, "minor": 2, "patch": 3},
@@ -216,9 +214,7 @@ class TestValidateVersionFields:
         violations = validator._validate_version_fields(data, is_node_contract=True)
         assert violations == []
 
-    def test_version_as_string_rejected(
-        self, validator: ProtocolContractValidator
-    ) -> None:
+    def test_version_as_string_rejected(self, validator: ValidatorContract) -> None:
         data: dict[str, object] = {
             "node_type": "compute",
             "contract_version": "1.0.0",
@@ -229,53 +225,45 @@ class TestValidateVersionFields:
         assert "Expected object" in violations[0]
         assert "got string" in violations[0]
 
-    def test_version_null_rejected(self, validator: ProtocolContractValidator) -> None:
+    def test_version_null_rejected(self, validator: ValidatorContract) -> None:
         violations = validator._validate_version_structure(None, "contract_version")
         assert len(violations) == 1
         assert "cannot be null" in violations[0]
 
-    def test_version_missing_component(
-        self, validator: ProtocolContractValidator
-    ) -> None:
+    def test_version_missing_component(self, validator: ValidatorContract) -> None:
         version = {"major": 1, "minor": 0}  # missing patch
         violations = validator._validate_version_structure(version, "contract_version")
         assert len(violations) == 1
         assert "patch" in violations[0]
         assert "Missing required field" in violations[0]
 
-    def test_version_component_null(self, validator: ProtocolContractValidator) -> None:
+    def test_version_component_null(self, validator: ValidatorContract) -> None:
         version: dict[str, object] = {"major": 1, "minor": None, "patch": 0}
         violations = validator._validate_version_structure(version, "contract_version")
         assert len(violations) == 1
         assert "minor" in violations[0]
         assert "cannot be null" in violations[0]
 
-    def test_version_component_wrong_type(
-        self, validator: ProtocolContractValidator
-    ) -> None:
+    def test_version_component_wrong_type(self, validator: ValidatorContract) -> None:
         version: dict[str, object] = {"major": 1, "minor": "two", "patch": 0}
         violations = validator._validate_version_structure(version, "contract_version")
         assert len(violations) == 1
         assert "Expected non-negative integer" in violations[0]
 
-    def test_version_component_negative(
-        self, validator: ProtocolContractValidator
-    ) -> None:
+    def test_version_component_negative(self, validator: ValidatorContract) -> None:
         version = {"major": 1, "minor": -1, "patch": 0}
         violations = validator._validate_version_structure(version, "contract_version")
         assert len(violations) == 1
         assert "must be non-negative" in violations[0]
 
-    def test_version_unexpected_type(
-        self, validator: ProtocolContractValidator
-    ) -> None:
+    def test_version_unexpected_type(self, validator: ValidatorContract) -> None:
         violations = validator._validate_version_structure(42, "contract_version")
         assert len(violations) == 1
         assert "Expected object with major/minor/patch" in violations[0]
 
     def test_missing_version_fields_for_node_contract(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         data: dict[str, object] = {"node_type": "compute"}
         violations = validator._validate_version_fields(data, is_node_contract=True)
@@ -287,7 +275,7 @@ class TestValidateVersionFields:
 
     def test_non_node_contract_missing_all_version_fields(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         data: dict[str, object] = {"some_field": "value"}
         violations = validator._validate_version_fields(data, is_node_contract=False)
@@ -296,7 +284,7 @@ class TestValidateVersionFields:
 
     def test_non_node_contract_with_contract_version(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         data: dict[str, object] = {
             "contract_version": {"major": 1, "minor": 0, "patch": 0},
@@ -307,7 +295,7 @@ class TestValidateVersionFields:
     @pytest.mark.parametrize("component", ["major", "minor", "patch"])
     def test_each_version_component_validated(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         component: str,
     ) -> None:
         version = {"major": 0, "minor": 0, "patch": 0}
@@ -318,7 +306,7 @@ class TestValidateVersionFields:
 
 
 # ---------------------------------------------------------------------------
-# ProtocolContractValidator: Name Validation
+# ValidatorContract: Name Validation
 # ---------------------------------------------------------------------------
 
 
@@ -326,27 +314,27 @@ class TestValidateVersionFields:
 class TestValidateName:
     """Tests for _validate_name on the validator."""
 
-    def test_valid_name(self, validator: ProtocolContractValidator) -> None:
+    def test_valid_name(self, validator: ValidatorContract) -> None:
         assert validator._validate_name("my_node_compute") == []
 
-    def test_name_not_string(self, validator: ProtocolContractValidator) -> None:
+    def test_name_not_string(self, validator: ValidatorContract) -> None:
         violations = validator._validate_name(123)
         assert len(violations) == 1
         assert "Expected string" in violations[0]
 
-    def test_name_empty_string(self, validator: ProtocolContractValidator) -> None:
+    def test_name_empty_string(self, validator: ValidatorContract) -> None:
         violations = validator._validate_name("")
         assert len(violations) == 1
         assert "Cannot be empty" in violations[0]
 
-    def test_name_whitespace_only(self, validator: ProtocolContractValidator) -> None:
+    def test_name_whitespace_only(self, validator: ValidatorContract) -> None:
         violations = validator._validate_name("   ")
         assert len(violations) == 1
         assert "Cannot be empty" in violations[0]
 
 
 # ---------------------------------------------------------------------------
-# ProtocolContractValidator: Full File Validation
+# ValidatorContract: Full File Validation
 # ---------------------------------------------------------------------------
 
 
@@ -356,7 +344,7 @@ class TestValidateContractFile:
 
     def test_valid_contract_passes(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         valid_node_contract_path: Path,
     ) -> None:
         result = validator.validate_contract_file(valid_node_contract_path)
@@ -365,7 +353,7 @@ class TestValidateContractFile:
 
     def test_file_not_found(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         tmp_path: Path,
     ) -> None:
         result = validator.validate_contract_file(tmp_path / "nonexistent.yaml")
@@ -374,7 +362,7 @@ class TestValidateContractFile:
 
     def test_invalid_yaml_syntax(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         tmp_path: Path,
     ) -> None:
         path = _write_text(tmp_path, "name: [invalid yaml\n")
@@ -384,7 +372,7 @@ class TestValidateContractFile:
 
     def test_empty_file(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         tmp_path: Path,
     ) -> None:
         path = _write_text(tmp_path, "# only a comment\n")
@@ -394,7 +382,7 @@ class TestValidateContractFile:
 
     def test_non_mapping_yaml(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         tmp_path: Path,
     ) -> None:
         path = _write_text(tmp_path, "- item1\n- item2\n")
@@ -404,7 +392,7 @@ class TestValidateContractFile:
 
     def test_contract_type_mismatch(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         tmp_path: Path,
     ) -> None:
         data = _make_valid_node_contract(node_type="effect")
@@ -415,7 +403,7 @@ class TestValidateContractFile:
 
     def test_accepts_string_path(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         valid_node_contract_path: Path,
     ) -> None:
         result = validator.validate_contract_file(str(valid_node_contract_path))
@@ -423,21 +411,21 @@ class TestValidateContractFile:
 
 
 # ---------------------------------------------------------------------------
-# ProtocolContractValidatorResult dataclass
+# ValidatorContractResult dataclass
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestProtocolContractValidatorResult:
-    """Tests for the ProtocolContractValidatorResult dataclass defaults."""
+class TestValidatorContractResult:
+    """Tests for the ValidatorContractResult dataclass defaults."""
 
     def test_default_is_valid(self) -> None:
-        result = ProtocolContractValidatorResult()
+        result = ValidatorContractResult()
         assert result.is_valid is True
         assert result.violations == []
 
     def test_explicit_invalid(self) -> None:
-        result = ProtocolContractValidatorResult(
+        result = ValidatorContractResult(
             is_valid=False,
             violations=["error one"],
         )
@@ -446,8 +434,8 @@ class TestProtocolContractValidatorResult:
 
     def test_violations_list_independence(self) -> None:
         """Each instance should have its own violations list."""
-        r1 = ProtocolContractValidatorResult()
-        r2 = ProtocolContractValidatorResult()
+        r1 = ValidatorContractResult()
+        r2 = ValidatorContractResult()
         r1.violations.append("only in r1")
         assert r2.violations == []
 
@@ -729,7 +717,7 @@ class TestNodeTypeSpecificFields:
     )
     def test_node_type_in_required_fields_map(self, node_type: str) -> None:
         """All valid node types should have an entry in NODE_TYPE_REQUIRED_FIELDS."""
-        assert node_type in ProtocolContractValidator.NODE_TYPE_REQUIRED_FIELDS
+        assert node_type in ValidatorContract.NODE_TYPE_REQUIRED_FIELDS
 
 
 # ---------------------------------------------------------------------------
@@ -743,7 +731,7 @@ class TestEdgeCases:
 
     def test_version_with_zero_components(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         version = {"major": 0, "minor": 0, "patch": 0}
         violations = validator._validate_version_structure(version, "v")
@@ -751,7 +739,7 @@ class TestEdgeCases:
 
     def test_name_with_unicode(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         violations = validator._validate_name("node_unicode_test")
         assert violations == []
@@ -765,7 +753,7 @@ class TestEdgeCases:
 
     def test_contract_type_mismatch_case_insensitive(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
         tmp_path: Path,
     ) -> None:
         """Contract type comparison should be case-insensitive."""
@@ -776,7 +764,7 @@ class TestEdgeCases:
 
     def test_version_fields_all_components_missing(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         version: dict[str, object] = {}
         violations = validator._validate_version_structure(version, "v")
@@ -784,7 +772,7 @@ class TestEdgeCases:
 
     def test_name_as_list_rejected(
         self,
-        validator: ProtocolContractValidator,
+        validator: ValidatorContract,
     ) -> None:
         violations = validator._validate_name(["not", "a", "string"])
         assert len(violations) == 1

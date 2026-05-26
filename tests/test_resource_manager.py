@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from omnimemory.utils.resource_manager import (
+from omnimemory.adapters.adapter_resource_manager import (
     ResourceAllocationError,
     ResourceHandle,
     ResourceManager,

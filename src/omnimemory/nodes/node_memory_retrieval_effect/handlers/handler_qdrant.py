@@ -36,7 +36,10 @@ from typing import Any
 
 from omnibase_core.models.omnimemory import ModelMemorySnapshot
 
-from ..clients.embedding_client import EmbeddingClient, ModelEmbeddingClientConfig
+from ..adapters.adapter_embedding_client import (
+    EmbeddingClient,
+    ModelEmbeddingClientConfig,
+)
 from ..models import (
     ModelHandlerQdrantConfig,
     ModelMemoryRetrievalRequest,

@@ -27,6 +27,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from omnimemory.adapters.adapter_concurrency import CircuitBreakerState
 from omnimemory.models.utils.model_health_status import HealthStatus
 from omnimemory.nodes.node_intent_event_consumer_effect.handler_intent_event_consumer import (
     HandlerIntentEventConsumer,
@@ -37,7 +38,6 @@ from omnimemory.nodes.node_intent_event_consumer_effect.models import (
 from omnimemory.nodes.node_intent_storage_effect.models.model_intent_storage_response import (
     ModelIntentStorageResponse,
 )
-from omnimemory.utils.concurrency import CircuitBreakerState
 
 # Type aliases for Kafka message handling (avoiding Any per zero-Any policy)
 type MessagePayload = dict[str, object]

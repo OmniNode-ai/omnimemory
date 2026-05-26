@@ -10,7 +10,7 @@ import pytest
 from omnibase_core.enums.intelligence import EnumIntentCategory, EnumIntentClass
 
 from omnimemory.models.events import ModelIntentClassifiedEvent
-from omnimemory.nodes.node_intent_event_consumer_effect.utils import (
+from omnimemory.nodes.node_intent_event_consumer_effect.mappers import (
     map_event_to_storage_request,
 )
 

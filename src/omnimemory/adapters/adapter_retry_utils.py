@@ -32,7 +32,7 @@ from uuid import UUID
 from ..models.utils.model_retry_attempt_info import ModelRetryAttemptInfo
 from ..models.utils.model_retry_config import ModelRetryConfig
 from ..models.utils.model_retry_statistics import ModelRetryStatistics
-from .error_sanitizer import SanitizationLevel, sanitize_error
+from .adapter_error_sanitizer import SanitizationLevel, sanitize_error
 
 logger = logging.getLogger(__name__)
 

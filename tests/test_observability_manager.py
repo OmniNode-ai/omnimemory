@@ -20,15 +20,17 @@ from __future__ import annotations
 
 import pytest
 
-from omnimemory.utils.observability import (
+from omnimemory.adapters.adapter_correlation_context import (
     ObservabilityManager,
     OperationType,
     correlation_context,
     correlation_id_var,
     get_correlation_id,
     get_request_id,
-    sanitize_metadata_value,
     trace_operation,
+)
+from omnimemory.adapters.adapter_metrics_counter import (
+    sanitize_metadata_value,
     validate_correlation_id,
 )
 
@@ -174,7 +176,7 @@ class TestContextVarHelpers:
             correlation_id_var.reset(token)
 
     def test_get_request_id_returns_none_by_default(self) -> None:
-        from omnimemory.utils.observability import request_id_var
+        from omnimemory.adapters.adapter_correlation_context import request_id_var
 
         token = request_id_var.set(None)
         try:

@@ -54,8 +54,11 @@ from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
 from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.adapters.adapter_concurrency import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+)
 from omnimemory.enums import EnumLifecycleState
-from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerOpenError
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer

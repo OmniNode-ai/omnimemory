@@ -41,6 +41,7 @@ from omnibase_core.models.intelligence import (
     ModelIntentStorageResult as CoreIntentStorageResult,
 )
 
+from omnimemory.adapters.adapter_concurrency import CircuitBreakerState
 from omnimemory.handlers.adapters.models import (
     ModelIntentDistributionResult,
     ModelIntentGraphHealth,
@@ -50,7 +51,6 @@ from omnimemory.handlers.handler_intent import (
     HandlerIntent,
     ModelHandlerIntentMetadata,
 )
-from omnimemory.utils.concurrency import CircuitBreakerState
 
 # =============================================================================
 # Mock Container

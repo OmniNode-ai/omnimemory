@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""Stub implementation of ProtocolContractValidator.
+"""Contract validator for ONEX node contract YAML files.
 
-that validates ONEX node contract YAML files against basic structural rules.
+Validates ONEX node contract YAML files against basic structural rules.
 
 This is a temporary implementation until the actual omnibase_core module
-provides the ProtocolContractValidator class.
+provides the ValidatorContract class.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import yaml
 
 
 @dataclass
-class ProtocolContractValidatorResult:
+class ValidatorContractResult:
     """Result of contract validation.
 
     Attributes:
@@ -30,8 +30,8 @@ class ProtocolContractValidatorResult:
     violations: list[str] = field(default_factory=list)
 
 
-class ProtocolContractValidator:
-    """Stub implementation of ProtocolContractValidator for ONEX node contracts.
+class ValidatorContract:
+    """Stub implementation of ValidatorContract for ONEX node contracts.
 
     This validator performs basic structural validation of YAML contract files.
     It checks for required fields based on the contract_type (compute, effect,
@@ -75,7 +75,7 @@ class ProtocolContractValidator:
         path: Path | str,
         *,
         contract_type: str | None = None,
-    ) -> ProtocolContractValidatorResult:
+    ) -> ValidatorContractResult:
         """Validate a contract YAML file.
 
         Args:
@@ -83,7 +83,7 @@ class ProtocolContractValidator:
             contract_type: Expected contract type (compute, effect, reducer, orchestrator).
 
         Returns:
-            ProtocolContractValidatorResult with validation status and any violations.
+            ValidatorContractResult with validation status and any violations.
         """
         path = Path(path) if isinstance(path, str) else path
         violations: list[str] = []
@@ -92,29 +92,29 @@ class ProtocolContractValidator:
             content = path.read_text(encoding="utf-8")
             data = yaml.safe_load(content)
         except FileNotFoundError:
-            return ProtocolContractValidatorResult(
+            return ValidatorContractResult(
                 is_valid=False,
                 violations=[f"file: Contract file not found: {path}"],
             )
         except yaml.YAMLError as e:
-            return ProtocolContractValidatorResult(
+            return ValidatorContractResult(
                 is_valid=False,
                 violations=[f"yaml: Invalid YAML syntax: {e}"],
             )
         except OSError as e:
-            return ProtocolContractValidatorResult(
+            return ValidatorContractResult(
                 is_valid=False,
                 violations=[f"file: Error reading contract file: {e}"],
             )
 
         if data is None:
-            return ProtocolContractValidatorResult(
+            return ValidatorContractResult(
                 is_valid=False,
                 violations=["file: Contract file is empty or contains only comments"],
             )
 
         if not isinstance(data, dict):
-            return ProtocolContractValidatorResult(
+            return ValidatorContractResult(
                 is_valid=False,
                 violations=[
                     f"structure: Contract must be a YAML mapping, got {type(data).__name__}"
@@ -157,7 +157,7 @@ class ProtocolContractValidator:
         if "name" in data:
             violations.extend(self._validate_name(data["name"]))
 
-        return ProtocolContractValidatorResult(
+        return ValidatorContractResult(
             is_valid=len(violations) == 0,
             violations=violations,
         )

@@ -50,6 +50,11 @@ from uuid import uuid4
 
 import structlog
 
+from omnimemory.adapters.adapter_concurrency import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+)
+from omnimemory.adapters.adapter_pii_detector import PIIDetector
 from omnimemory.handlers.adapters import AdapterIntentGraph
 from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
 from omnimemory.models.utils.model_circuit_breaker_config import (
@@ -60,8 +65,6 @@ from omnimemory.nodes.node_intent_storage_effect.models import (
     ModelIntentStorageRequest,
     ModelIntentStorageResponse,
 )
-from omnimemory.utils.concurrency import CircuitBreaker, CircuitBreakerOpenError
-from omnimemory.utils.pii_detector import PIIDetector
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)

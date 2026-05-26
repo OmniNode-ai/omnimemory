@@ -77,6 +77,15 @@ from uuid import UUID, uuid4
 from cachetools import LRUCache
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from omnimemory.adapters.adapter_handler_constants import (
+    COMPLEXITY_SENTENCE_LEN_MIN,
+    COMPLEXITY_SENTENCE_LEN_RANGE,
+    COMPLEXITY_WORD_LEN_MIN,
+    COMPLEXITY_WORD_LEN_RANGE,
+    KEY_CONCEPT_CONFIDENCE_THRESHOLD,
+    SENTENCE_STARTING_STOPWORDS,
+    TOPIC_EXTRACTION_STOPWORDS,
+)
 from omnimemory.enums import EnumEntityExtractionMode, EnumSemanticEntityType
 from omnimemory.models.config import (
     ModelHandlerSemanticComputeConfig,
@@ -86,15 +95,6 @@ from omnimemory.models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
     ModelSemanticEntityList,
-)
-from omnimemory.utils.handler_constants import (
-    COMPLEXITY_SENTENCE_LEN_MIN,
-    COMPLEXITY_SENTENCE_LEN_RANGE,
-    COMPLEXITY_WORD_LEN_MIN,
-    COMPLEXITY_WORD_LEN_RANGE,
-    KEY_CONCEPT_CONFIDENCE_THRESHOLD,
-    SENTENCE_STARTING_STOPWORDS,
-    TOPIC_EXTRACTION_STOPWORDS,
 )
 
 if TYPE_CHECKING:

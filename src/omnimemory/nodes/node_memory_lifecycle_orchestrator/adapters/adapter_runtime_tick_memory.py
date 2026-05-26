@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
-    from omnimemory.utils.concurrency import CircuitBreaker
+    from omnimemory.adapters.adapter_concurrency import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
