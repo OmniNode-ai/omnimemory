@@ -43,8 +43,8 @@ from ..models.utils.model_circuit_breaker_stats_response import (
 # Re-export ModelCircuitBreakerConfig for public API
 __all__ = ["ModelCircuitBreakerConfig"]
 
-from .error_sanitizer import SanitizationLevel
-from .error_sanitizer import sanitize_error as _base_sanitize_error
+from .adapter_error_sanitizer import SanitizationLevel
+from .adapter_error_sanitizer import sanitize_error as _base_sanitize_error
 
 logger = structlog.get_logger(__name__)
 

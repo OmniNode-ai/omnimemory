@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from omnimemory.utils.db_url import safe_db_url_display
+from omnimemory.adapters.adapter_db_url import safe_db_url_display
 
 
 @pytest.mark.unit
@@ -125,7 +125,7 @@ class TestSafeDbUrlDisplay:
         """Test that non-PostgreSQL URLs emit a structured warning."""
         from unittest.mock import patch
 
-        with patch("omnimemory.utils.db_url.logger") as mock_logger:
+        with patch("omnimemory.adapters.adapter_db_url.logger") as mock_logger:
             result = safe_db_url_display("https://example.com/path")
             assert result == "(unparseable URL)"
             mock_logger.warning.assert_called_once()
@@ -159,7 +159,7 @@ class TestSafeDbUrlDisplay:
 
     def test_import_from_utils_package(self) -> None:
         """Test that safe_db_url_display is importable from utils package."""
-        from omnimemory.utils import safe_db_url_display as imported_fn
+        from omnimemory.adapters import safe_db_url_display as imported_fn
 
         assert callable(imported_fn)
         result = imported_fn("postgresql://u:p@host:5432/db")

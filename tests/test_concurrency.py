@@ -12,7 +12,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from omnimemory.utils.concurrency import (
+from omnimemory.adapters.adapter_concurrency import (
     CircuitBreaker,
     CircuitBreakerState,
     ConnectionPool,

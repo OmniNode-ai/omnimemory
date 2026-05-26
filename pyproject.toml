@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "omninode-memory"
-version = "0.16.0"
+version = "0.17.0"
 description = "OmniNode memory primitives — models, protocols, and storage adapters for Qdrant, Memgraph, and PostgreSQL backends."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -59,9 +59,9 @@ dependencies = [
     "pyyaml>=6.0.3,<7.0.0",
 
     # ONEX dependencies - versioned releases from PyPI
-    "omnibase-core==0.42.0",
-    "omnibase-spi==0.21.0",
-    "omnibase-infra==0.36.1",
+    "omnibase-core>=0.42.0,<0.43.0",
+    "omnibase-spi>=0.22.0,<0.23.0",
+    "omnibase-infra>=0.37.0,<0.38.0",
 
     # Logging and monitoring
     # Version ^23.3.0 required for compatibility with omnibase-infra (requires ^23.2.0)
@@ -390,23 +390,22 @@ markers = [
 ]
 
 [tool.uv]
-# Override omnibase-infra's transitive pins on core/spi so our direct pins win.
+# Override transitive pins so our direct pins win.
 override-dependencies = [
-    "omnibase-core==0.42.0",
-    "omnibase-spi==0.21.0",
-    "omnibase-infra==0.36.1",
-    "omnibase-compat==0.4.1",
-    "omninode-memory==0.16.0",
-    "omnimarket==0.3.1",
+    "omnibase-core>=0.42.0,<0.43.0",
+    "omnibase-spi>=0.22.0,<0.23.0",
+    "omnibase-infra>=0.37.0,<0.38.0",
+    "omnibase-compat>=0.5.0,<0.6.0",
+    "omninode-memory>=0.17.0,<0.18.0",
+    "omnimarket>=0.4.0,<0.5.0",
     "onex-change-control @ git+https://github.com/OmniNode-ai/onex_change_control.git@bd30807469c2b570d99ffefb25fb23e6a9d7cfb1",
 ]
 
 [tool.uv.sources]
 omninode-memory = { workspace = true }
-# Pinned to main while 2026-05-21 release wave 2 upstream packages are unpublished on PyPI.
-# Switch to PyPI pins after omnibase-core v0.42.0 / omnibase-infra v0.36.1 / omnibase-spi v0.21.0 / omnibase-compat v0.4.1 publish.
-omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", branch = "main" }
-omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", branch = "main" }
-omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", branch = "main" }
-omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", branch = "main" }
-omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", rev = "e6cc7c603f1d4e7ed287f9ec9a6d3c85328b8d64" }
+# Release v0.17.0: pin to release tags
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.42.0" }
+omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", tag = "v0.37.0" }
+omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", tag = "v0.22.0" }
+omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", tag = "v0.5.0" }
+omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", tag = "v0.4.0" }

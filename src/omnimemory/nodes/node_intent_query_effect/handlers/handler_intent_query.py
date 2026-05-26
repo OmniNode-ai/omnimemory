@@ -46,12 +46,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.handlers.adapters import AdapterIntentGraph
 from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
+from omnimemory.nodes.node_intent_query_effect.mappers import map_intent_records
 from omnimemory.nodes.node_intent_query_effect.models import (
     ModelHandlerIntentQueryConfig,
     ModelIntentQueryRequestedEvent,
     ModelIntentQueryResponseEvent,
 )
-from omnimemory.nodes.node_intent_query_effect.utils import map_intent_records
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer

@@ -14,7 +14,7 @@ Example::
 
     import asyncio
     import os
-    from omnimemory.nodes.node_memory_retrieval_effect.clients import (
+    from omnimemory.nodes.node_memory_retrieval_effect.adapters import (
         EmbeddingClient,
         ModelEmbeddingClientConfig,
     )
@@ -36,7 +36,7 @@ Example::
 """
 
 from ..models import ModelEmbeddingClientConfig
-from .embedding_client import EmbeddingClient
+from .adapter_embedding_client import EmbeddingClient
 
 __all__ = [
     "EmbeddingClient",

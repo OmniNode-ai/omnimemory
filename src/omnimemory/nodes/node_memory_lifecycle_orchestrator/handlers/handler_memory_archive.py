@@ -92,8 +92,8 @@ from uuid import UUID
 from omnibase_core.models.metadata.model_generic_metadata import ModelGenericMetadata
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.adapters.adapter_concurrency import CircuitBreaker
 from omnimemory.enums import EnumLifecycleState
-from omnimemory.utils.concurrency import CircuitBreaker
 
 if TYPE_CHECKING:
     from asyncpg import Pool

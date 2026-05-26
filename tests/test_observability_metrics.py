@@ -15,19 +15,21 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from omnimemory.utils.observability import (
+from omnimemory.adapters.adapter_metrics_counter import (
     Counter,
     Gauge,
-    HandlerMetrics,
-    HandlerObservabilityWrapper,
     Histogram,
     LabelValidationError,
     MetricsRegistry,
     StructuredLogEntry,
-    _get_safe_content_metadata,
     create_validated_log_entry,
     validate_log_entry,
     validate_metric_labels,
+)
+from omnimemory.adapters.adapter_observability_wrapper import (
+    HandlerMetrics,
+    HandlerObservabilityWrapper,
+    _get_safe_content_metadata,
 )
 
 

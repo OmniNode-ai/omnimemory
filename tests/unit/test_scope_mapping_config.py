@@ -80,7 +80,7 @@ class TestResolveScopeForPath:
 
     def test_no_match_returns_none(self) -> None:
         cfg = make_config(("/Code/repo", "omninode/repo"))
-        assert cfg.resolve_scope_for_path("/Users/jonah/file.py") is None
+        assert cfg.resolve_scope_for_path("/home/user/file.py") is None
 
     def test_empty_mappings_returns_none(self) -> None:
         cfg = ModelScopeMappingConfig()
@@ -215,11 +215,11 @@ class TestResolvePriorityHint:
 
     def test_path_override_wins(self) -> None:
         cfg = ModelScopeMappingConfig(
-            priority_hints={"/Users/jonah/.claude/CLAUDE.md": 95},
+            priority_hints={"/home/user/.claude/CLAUDE.md": 95},
         )
         hint = cfg.resolve_priority_hint(
             EnumDetectedDocType.CLAUDE_MD,
-            absolute_path="/Users/jonah/.claude/CLAUDE.md",
+            absolute_path="/home/user/.claude/CLAUDE.md",
         )
         assert hint == 95
 
@@ -244,11 +244,11 @@ class TestResolvePriorityHint:
 
     def test_path_override_does_not_affect_other_paths(self) -> None:
         cfg = ModelScopeMappingConfig(
-            priority_hints={"/Users/jonah/.claude/CLAUDE.md": 95},
+            priority_hints={"/home/user/.claude/CLAUDE.md": 95},
         )
         hint = cfg.resolve_priority_hint(
             EnumDetectedDocType.CLAUDE_MD,
-            absolute_path="/Volumes/PRO-G40/Code/repo/CLAUDE.md",
+            absolute_path="/Code/other-repo/CLAUDE.md",
         )
         assert hint == 85
 

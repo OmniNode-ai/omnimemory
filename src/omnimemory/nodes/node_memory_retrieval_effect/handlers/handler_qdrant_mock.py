@@ -71,7 +71,7 @@ from omnibase_core.models.omnimemory import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-from ..clients.embedding_client import (
+from ..adapters.adapter_embedding_client import (
     EmbeddingClient,
     EmbeddingClientError,
     EmbeddingConnectionError,

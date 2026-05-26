@@ -69,7 +69,6 @@ CORE_8_NODES: list[str] = [
     "node_semantic_analyzer_compute",
     "node_similarity_compute",
     "node_memory_consolidator_reducer",
-    "node_statistics_reducer",
     "node_memory_lifecycle_orchestrator",
     "node_agent_coordinator_orchestrator",
 ]
