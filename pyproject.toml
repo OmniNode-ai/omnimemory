@@ -50,7 +50,7 @@ dependencies = [
     "qdrant-client>=1.18.0,<1.19.0",
 
     # Environment variable management
-    "python-dotenv>=1.0.1,<2.0.0",
+    "python-dotenv>=1.2.2,<2.0.0",
 
     # Async support
     "asyncio-mqtt>=0.16.0,<1.0.0",
