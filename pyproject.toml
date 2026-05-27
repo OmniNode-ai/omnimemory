@@ -26,7 +26,7 @@ dependencies = [
 
     # FastAPI web framework for production API
     "fastapi>=0.136.1,<1.0.0",
-    "uvicorn[standard]>=0.32.0,<1.0.0",
+    "uvicorn[standard]>=0.48.0,<1.0.0",
 
     # Memory and storage components
     # Database support for memory storage - using Supabase client
