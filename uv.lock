@@ -1305,8 +1305,8 @@ wheels = [
 
 [[package]]
 name = "omnibase-core"
-version = "0.41.0"
-source = { git = "https://github.com/OmniNode-ai/omnibase_core.git?branch=main#27aeae055648c535bc6397dfc7018c4cb4dba4fb" }
+version = "0.42.0"
+source = { git = "https://github.com/OmniNode-ai/omnibase_core.git?branch=main#875a4ff7c1e7026fe5c619a0125a974ff6d0731b" }
 dependencies = [
     { name = "blake3" },
     { name = "click" },
