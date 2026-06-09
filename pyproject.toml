@@ -53,7 +53,7 @@ dependencies = [
     "python-dotenv>=1.2.2,<2.0.0",
 
     # Async support
-    "asyncio-mqtt>=0.16.0,<1.0.0",
+    "asyncio-mqtt>=0.16.2,<1.0.0",
 
     # JSON and YAML processing
     "pyyaml>=6.0.3,<7.0.0",
