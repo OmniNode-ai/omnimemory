@@ -39,7 +39,7 @@ dependencies = [
     "alembic>=1.18.4,<2.0.0",
 
     # Redis support for caching and ephemeral memory
-    "redis>=6.4.0,<8.0.0",
+    "redis>=8.0.0,<9.0.0",
 
     # Vector database support
     # Pinecone for vector memory storage
@@ -61,7 +61,7 @@ dependencies = [
     # ONEX dependencies - versioned releases from PyPI
     "omnibase-core==0.43.0",
     "omnibase-spi==0.22.0",
-    "omnibase-infra==0.36.1",
+    "omnibase-infra==0.38.3",
 
     # Logging and monitoring
     # Version ^23.3.0 required for compatibility with omnibase-infra (requires ^23.2.0)
@@ -394,7 +394,7 @@ markers = [
 override-dependencies = [
     "omnibase-core==0.43.0",
     "omnibase-spi==0.22.0",
-    "omnibase-infra==0.36.1",
+    "omnibase-infra==0.38.3",
     "omnibase-compat==0.4.1",
     "omninode-memory==0.16.0",
     "omnimarket==0.3.1",
@@ -404,7 +404,7 @@ override-dependencies = [
 [tool.uv.sources]
 omninode-memory = { workspace = true }
 # Pinned to release tags while 2026-05-21 release wave 2 upstream packages are unpublished on PyPI.
-# Switch to PyPI pins after omnibase-core v0.43.0 / omnibase-infra v0.36.1 / omnibase-spi v0.21.0 / omnibase-compat v0.4.1 publish.
+# Switch to PyPI pins after omnibase-core v0.43.0 / omnibase-infra v0.38.3 / omnibase-spi v0.21.0 / omnibase-compat v0.4.1 publish.
 omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.43.0" }
 omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", branch = "main" }
 omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", branch = "main" }
