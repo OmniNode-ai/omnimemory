@@ -18,7 +18,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 
 3. **Storage integration owner for Qdrant, Memgraph, Valkey, and Kreuzberg adapters.** The concrete adapter implementations for all memory-layer storage backends live in `omnimemory`. These adapters implement the domain protocols and are injected at runtime via the DI container.
 
-**What is migrating to omnimarket:** The 17 runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket` as part of OMN-8295. Protocols, models, adapters, and the runtime plugin stay here. See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
+**What is migrating to omnimarket:** The 15 runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket` as part of OMN-8295. Protocols, models, adapters, and the runtime plugin stay here. See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
 
 ---
 
@@ -29,7 +29,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 - **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `handlers/adapters/` and `nodes/*/adapters/`
 - **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/` registered as `onex.domain_plugins`
 - **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
-- **Node handlers** — 17 runnable nodes in `src/omnimemory/nodes/` (migrating to omnimarket per OMN-8295)
+- **Node handlers** — 15 runnable nodes in `src/omnimemory/nodes/` (migrating to omnimarket per OMN-8295)
 
 ## What This Repo Does Not Own
 
@@ -50,10 +50,12 @@ Follows the [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/omnibas
 
 ### Node inventory
 
-- **Effect nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `agent_learning_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`, `intent_event_consumer_effect`, `filesystem_crawler_effect`, `kreuzberg_parse_effect`, `persona_storage_effect`, `persona_retrieval_effect`
+- **Effect nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `agent_learning_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`, `intent_event_consumer_effect`, `filesystem_crawler_effect`, `kreuzberg_parse_effect`, `persona_storage_effect`
 - **Compute nodes** — `semantic_analyzer_compute`, `similarity_compute`, `persona_builder_compute`
-- **Reducer nodes** — `navigation_history_reducer` (+ stubs: `memory_consolidator_reducer`, `statistics_reducer`)
-- **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`, `persona_lifecycle_orchestrator`
+- **Reducer nodes** — `navigation_history_reducer`, `memory_consolidator_reducer` (stub — no contract.yaml)
+- **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`
+
+> `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in OMN-12172; they never had a `contract.yaml` and are no longer present in the repository.
 
 ### Memory evolution (planned phases)
 
@@ -171,10 +173,10 @@ src/omnimemory/
 │   └── <node>/
 │       ├── adapters/   # Stays in omnimemory (protocol implementations)
 │       └── handlers/   # Migrating to omnimarket (OMN-8295)
+├── adapters/           # Shared utilities with adapter_* prefix (PII detection, retry, health, metrics)
 ├── protocols/          # Protocol interfaces (embedding, intent graph, secrets)
 ├── runtime/            # PluginMemory, DI container wiring, dispatch, introspection
-├── tools/              # Contract linter and stubs
-└── utils/              # Shared utilities (audit logger, PII detection, retry, health)
+└── tools/              # Contract linter and validators
 ```
 
 ---
