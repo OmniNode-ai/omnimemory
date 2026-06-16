@@ -4,146 +4,17 @@
 
 ## Overview
 
-OmniMemory includes a compatibility layer (`src/omnimemory/compat/`) that provides local implementations for `omnibase_core` components that are not yet available in the installed package version. This document tracks these stubs and their migration path.
+OmniMemory previously included a compatibility layer at `src/omnimemory/compat/` providing local stubs for `omnibase_core` components that were not yet available upstream. The `compat/` directory has been removed. The only remaining compat artifact is `src/omnimemory/_compat_imports.py`, which re-exports `ErrorCodeType` and `SeverityType` type aliases for backward import compatibility.
 
-**Location**: `src/omnimemory/compat/`
+All former stubs (`NodeResult`, `OnexError`/`BaseOnexError`, `ModelONEXContainer`) have been fully migrated to upstream `omnibase_core` equivalents or removed.
 
----
+### Migrated Components (for historical reference)
 
-## Current Stub Implementations
-
-### 1. NodeResult (Monadic Pattern) - MIGRATED
-
-**File**: `src/omnimemory/compat/node_result.py` (deprecated)
-
-**Purpose**: Provides the monadic result pattern for node operations, enabling clean error handling without exceptions.
-
-**Status**: **MIGRATED** - Now using `omnibase_core.models.core.model_base_result.ModelBaseResult`
-
-**Migration Notes**:
-- All protocol return types changed from `NodeResult[T]` to `ModelBaseResult`
-- `result.is_success` changed to `result.success`
-- Success/failure creation now uses direct construction instead of class methods
-- Result values stored in `metadata.custom_fields` instead of direct `.value` access
-
-**New Usage**:
-```python
-from omnibase_core.models.core.model_base_result import ModelBaseResult
-from omnibase_core.models.core.model_error_details import ModelErrorDetails
-from omnibase_core.models.results.model_simple_metadata import ModelGenericMetadata
-
-# Create success result
-result = ModelBaseResult(
-    success=True,
-    exit_code=0,
-    errors=[],
-    metadata=ModelGenericMetadata(custom_fields={"data": {"key": "value"}})
-)
-
-# Create failure result
-result = ModelBaseResult(
-    success=False,
-    exit_code=1,
-    errors=[ModelErrorDetails(error_message="Operation failed", error_code="ERR_001", error_type="runtime", component="memory_operation")]
-)
-
-# Check result
-if result.success:
-    process(result.metadata.custom_fields["data"])
-else:
-    handle_error(result.errors)
-```
-
----
-
-### 2. OnexError / BaseOnexError
-
-**File**: `src/omnimemory/compat/onex_error.py`
-
-**Purpose**: Structured error types for ONEX-compliant error handling with correlation IDs and error codes.
-
-**Upstream Target**: `omnibase_core.core.errors.core_errors.OnexError`
-
-**Status**: Active (core 0.17) - Local stub still required. The upstream package exposes `ModelOnexError` (at `omnibase_core.models.errors.model_onex_error.ModelOnexError`) but does not export `OnexError` or `BaseOnexError` under the originally targeted module path. The local stub remains the canonical source until upstream aligns naming or an explicit migration is performed. Target: tracked in omnibase-core upstream; check CHANGELOG for resolution.
-
-**Usage**:
-```python
-from omnimemory.compat import OnexError, BaseOnexError
-
-# Raise structured error
-raise OnexError(
-    message="Memory storage failed",
-    error_code="MEM_001",
-    correlation_id="abc-123",
-    details={"operation": "store"}
-)
-```
-
----
-
-### 3. ModelOnexContainer / ModelONEXContainer
-
-**File**: `src/omnimemory/compat/model_onex_container.py`
-
-**Purpose**: Dependency injection container for ONEX nodes, providing service registration and resolution.
-
-**Upstream Target**: `omnibase_core.container.ModelONEXContainer`
-
-**Status**: **MIGRATED** — use `omnibase_core` directly. `ModelONEXContainer` is now available in the installed package (omnibase-core 0.17+) at:
-
-```python
-from omnibase_core.container import ModelONEXContainer
-```
-
-Any remaining imports from `omnimemory.compat` for this class should be updated to the upstream path above. The local stub file (`src/omnimemory/compat/model_onex_container.py`) can be deleted once all callers are migrated.
-
----
-
-## Migration Path
-
-### Phase 1: Monitoring (Current)
-
-Monitor `omnibase_core` releases for availability of:
-- `omnibase_core.core.errors.core_errors` (OnexError, BaseOnexError)
-
-**Already migrated** (no longer monitoring):
-- ~~`omnibase_core.core.monadic.model_node_result`~~ - Migrated to `ModelBaseResult` (see Section 1)
-- ~~`omnibase_core.core.model_onex_container`~~ - Migrated to `omnibase_core.container.ModelONEXContainer` (see Section 3)
-
-### Phase 2: Migration
-
-When upstream components become available:
-
-1. **Update Imports**:
-   ```python
-   # Before (using stub)
-   from omnimemory.compat import NodeResult
-
-   # After (using upstream ModelBaseResult)
-   from omnibase_core.models.core.model_base_result import ModelBaseResult
-   ```
-
-   **Note**: NodeResult has been migrated to ModelBaseResult (see section 1 above).
-
-2. **Run Test Suite**:
-   ```bash
-   pytest tests/ -v
-   ```
-
-3. **Verify API Compatibility**:
-   - Ensure upstream API matches local stub
-   - Update any incompatible usages
-
-4. **Remove Stubs**:
-   - Delete files from `src/omnimemory/compat/`
-   - Remove exports from `__init__.py`
-   - Update `docs/stub_protocols.md`
-
-### Phase 3: Cleanup
-
-- Remove `src/omnimemory/compat/` directory
-- Update this documentation
-- Remove migration notes from code
+| Former stub | Upstream replacement | Status |
+|-------------|---------------------|--------|
+| `omnimemory.compat.node_result.NodeResult` | `omnibase_core.models.core.model_base_result.ModelBaseResult` | MIGRATED |
+| `omnimemory.compat.onex_error.OnexError` / `BaseOnexError` | `omnibase_core.models.errors.model_onex_error.ModelOnexError` | MIGRATED |
+| `omnimemory.compat.model_onex_container.ModelONEXContainer` | `omnibase_core.container.ModelONEXContainer` | MIGRATED |
 
 ---
 
@@ -153,7 +24,7 @@ The following features are defined but not fully implemented:
 
 ### PII Detection - Partial Implementation
 
-**File**: `src/omnimemory/utils/pii_detector.py`
+**File**: `src/omnimemory/adapters/adapter_pii_detector.py`
 
 The following `PIIType` values are defined but do not have detection patterns:
 
@@ -167,14 +38,9 @@ See [PII Handling Guide](./pii_handling.md) for details.
 
 ### Health Manager - Placeholder
 
-**File**: `src/omnimemory/utils/health_manager.py`
+**File**: `src/omnimemory/adapters/adapter_health_manager.py`
 
-Contains a placeholder for health check aggregation logic that returns healthy status. Full implementation pending:
-
-```python
-# Current placeholder (line 646)
-# For now, return healthy as a placeholder
-```
+Contains a placeholder for health check aggregation logic that returns healthy status. Full implementation pending.
 
 ---
 

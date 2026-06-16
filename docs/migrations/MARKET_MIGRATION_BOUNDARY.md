@@ -11,7 +11,7 @@
 
 ## Migration Goal
 
-Migrate all 17 runnable ONEX nodes from `omnimemory` into `omnimarket`, leaving `omnimemory` as a **pure primitives package**: models, protocols, and storage adapters.
+Migrate all 15 runnable ONEX nodes from `omnimemory` into `omnimarket`, leaving `omnimemory` as a **pure primitives package**: models, protocols, and storage adapters.
 
 After migration, nodes auto-wire via the ONEX runtime's `importlib.metadata` discovery using the `onex.nodes` entry point — exactly like every other omnimarket node. `omnimemory` retains the `onex.domain_plugins` entry point (`PluginMemory`) for runtime plugin lifecycle management.
 
@@ -74,7 +74,7 @@ Qdrant, Memgraph, Valkey, and Kreuzberg remain omnimemory-owned. See [Memory Dat
 
 ## What Moves to omnimarket
 
-All 17 runnable nodes (those with a `contract.yaml`) move to `omnimarket/src/omnimarket/nodes/`:
+All 15 runnable nodes (those with a `contract.yaml`) move to `omnimarket/src/omnimarket/nodes/`:
 
 | Node | Type | Domain |
 |------|------|--------|
@@ -92,17 +92,18 @@ All 17 runnable nodes (those with a `contract.yaml`) move to `omnimarket/src/omn
 | `node_intent_storage_effect` | EFFECT | Intent |
 | `node_navigation_history_reducer` | REDUCER | Navigation |
 | `node_persona_builder_compute` | COMPUTE | Persona |
-| `node_persona_lifecycle_orchestrator` | ORCHESTRATOR | Persona |
-| `node_persona_retrieval_effect` | EFFECT | Persona |
 | `node_persona_storage_effect` | EFFECT | Persona |
 
 **What moves with each node:** handler implementations, node-local models, `contract.yaml`, clients, registry, utils, validators.
 
 **What stays in omnimemory:** each node's `adapters/` subdirectory (concrete protocol implementations injected at runtime via DI).
 
-**Stub nodes (no contract.yaml) — not migrated:**
-- `node_memory_consolidator_reducer` — `__init__.py` skeleton only
-- `node_statistics_reducer` — `__init__.py` skeleton only
+**Stub node (no contract.yaml) — not migrated:**
+- `node_memory_consolidator_reducer` — skeleton only; no `contract.yaml`
+
+**Decommissioned nodes (OMN-12172) — not migrated, not present:**
+- `node_persona_lifecycle_orchestrator` — removed; never had a `contract.yaml`
+- `node_persona_retrieval_effect` — removed; never had a `contract.yaml`
 
 ---
 
@@ -114,7 +115,7 @@ All 17 runnable nodes (those with a `contract.yaml`) move to `omnimarket/src/omn
 | 2 | `node_memory_storage_effect`, `node_memory_retrieval_effect`, `node_persona_storage_effect`, `node_persona_retrieval_effect`, `node_agent_learning_retrieval_effect` | OMN-8298 |
 | 3 | `node_filesystem_crawler_effect`, `node_kreuzberg_parse_effect` | OMN-8299 |
 | 4 | `node_intent_storage_effect`, `node_intent_query_effect`, `node_intent_event_consumer_effect` | OMN-8300 |
-| 5 | `node_memory_lifecycle_orchestrator`, `node_navigation_history_reducer`, `node_persona_lifecycle_orchestrator`, `node_agent_coordinator_orchestrator` | OMN-8301 |
+| 5 | `node_memory_lifecycle_orchestrator`, `node_navigation_history_reducer`, `node_agent_coordinator_orchestrator` | OMN-8301 |
 
 Pre-work: add `omninode-memory` dependency to omnimarket (OMN-8296, blocks Wave 1).
 
@@ -146,7 +147,7 @@ Pre-work: add `omninode-memory` dependency to omnimarket (OMN-8296, blocks Wave 
 
 ## Post-Migration omnimemory State
 
-After all 17 nodes move:
+After all 15 nodes move:
 
 - `nodes/` retains only adapter subdirectories and stub nodes
 - The `onex.node_package` entry point (if present) is removed from `pyproject.toml`

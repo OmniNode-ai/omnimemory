@@ -9,20 +9,26 @@
 
 ## Overview
 
-OmniMemory CI runs on GitHub Actions and is defined in two workflow files:
+OmniMemory CI runs on GitHub Actions and is defined in the following workflow files:
 
 | File | Trigger | Purpose |
 |------|---------|---------|
-| `.github/workflows/test.yml` | Push to `main`/`develop`, all PRs | Full validation pipeline |
-| `.github/workflows/pre-commit.yml` | Push to `main`, all PRs | Pre-commit hook validation |
+| `.github/workflows/ci.yml` | Push to `dev`/`main`, all PRs | Full validation pipeline |
+| `.github/workflows/pre-commit.yml` | Push to `dev`/`main`, all PRs | Pre-commit hook validation |
+| `.github/workflows/imperative-contract-guard.yml` | All PRs | Enforces no imperative I/O in contract-managed paths |
+| `.github/workflows/omni-standards-compliance.yml` | All PRs | Platform-wide naming, typing, and pattern compliance |
+| `.github/workflows/stale-todo-gate.yml` | All PRs | Blocks unresolved TODO annotations |
+| `.github/workflows/docs-validate.yml` | All PRs | Validates documentation structure and links |
+| `.github/workflows/cr-thread-gate.yml` | All PRs | Fails if unresolved CodeRabbit review threads exist |
+| `.github/workflows/pr-title-check.yml` | All PRs | Enforces `OMN-XXXX` ticket reference in PR title |
 
-The full pipeline runs in three phases:
+The full validation pipeline (`ci.yml`) runs in three phases:
 
 - **Phase 1** (parallel, ~5 min): `migration-freeze`, `lint`, `pyright`, `onex-validation`, `transport-import-guard`, `contract-validation`, `io-audit`, `check-handshake`
 - **Phase 2** (after Phase 1): `test` — full test suite with coverage
 - **Phase 3** (aggregation): `test-summary` — gates the overall pass/fail result
 
-Every CI validation job has a corresponding pre-commit hook so that "works locally, fails in CI" drift is prevented. The synchronization map is documented in `.pre-commit-config.yaml` and `.github/workflows/test.yml`.
+Every CI validation job has a corresponding pre-commit hook so that "works locally, fails in CI" drift is prevented. The synchronization map is documented in `.pre-commit-config.yaml` and `.github/workflows/ci.yml`.
 
 ---
 
@@ -33,7 +39,7 @@ Every CI validation job has a corresponding pre-commit hook so that "works local
 **What it checks**: Prevents direct Kafka client imports (`aiokafka`, `kafka`, `confluent_kafka`) from appearing in `src/omnimemory/nodes/`. This enforces ARCH-002: "Runtime owns all Kafka plumbing." Nodes must consume events through the abstract `EventBus` SPI provided by the runtime layer.
 
 **Where defined**:
-- CI job: `onex-validation` step "Validate Kafka import boundary (ARCH-002)" in `.github/workflows/test.yml`
+- CI job: `onex-validation` step "Validate Kafka import boundary (ARCH-002)" in `.github/workflows/ci.yml`
 - Script: `scripts/validation/validate_kafka_imports.py`
 - Pre-commit hook: `validate-kafka-imports` in `.pre-commit-config.yaml` (stage: `pre-commit`)
 
@@ -77,7 +83,7 @@ poetry run python scripts/validation/validate_kafka_imports.py src/
 **What it enforces**: While `.migration_freeze` exists at the repository root, no new migration files may be added to `deployment/database/migrations/`. This freeze was activated during the DB-per-repo refactor (OMN-2055) on 2026-02-10. Modifications to existing migration files (bug fixes, comment tweaks) are allowed during the freeze.
 
 **Where defined**:
-- CI job: `migration-freeze` in `.github/workflows/test.yml`
+- CI job: `migration-freeze` in `.github/workflows/ci.yml`
 - Script: `scripts/check_migration_freeze.sh`
 - Freeze sentinel: `.migration_freeze` (root of repo)
 - Pre-commit hook: `migration-freeze-check` in `.pre-commit-config.yaml` (stage: `pre-commit`, triggered by changes to `deployment/database/migrations/` or `.migration_freeze`)
@@ -112,7 +118,7 @@ New migrations are blocked while `.migration_freeze` exists. To proceed:
 **What it checks**: An AST-based validator that ensures nodes do not import transport or I/O libraries at runtime. This is the stricter, AST-aware counterpart to the regex-based Kafka import guard above. It covers a broader set of banned modules across all of `src/omnimemory/` (excluding `src/omnimemory/runtime/`).
 
 **Where defined**:
-- CI job: `transport-import-guard` in `.github/workflows/test.yml`
+- CI job: `transport-import-guard` in `.github/workflows/ci.yml`
 - Script: `scripts/validate_no_transport_imports.py`
 - Whitelist: `tests/audit/transport_import_whitelist.yaml`
 - Pre-commit hook: `validate-no-transport-imports` in `.pre-commit-config.yaml` (stage: `pre-commit`)
@@ -180,12 +186,12 @@ poetry run python scripts/validate_no_transport_imports.py \
 | `contract-validation` | `contract-linter` | OMN-2218 |
 | `io-audit` | `io-audit` | OMN-2218 |
 
-**Current CI tooling versions** (from `.github/workflows/test.yml` and `.pre-commit-config.yaml`):
+**Current CI tooling versions** (from `.github/workflows/ci.yml` and `.pre-commit-config.yaml`):
 
 | Tool | Version | Configuration |
 |------|---------|---------------|
-| Python | 3.12 | `env.PYTHON_VERSION` in `test.yml` |
-| Poetry | 2.2.1 | `env.POETRY_VERSION` in `test.yml` |
+| Python | 3.12 | `env.PYTHON_VERSION` in `ci.yml` |
+| Poetry | 2.2.1 | `env.POETRY_VERSION` in `ci.yml` |
 | ruff | 0.8.6 | `.pre-commit-config.yaml` rev; `pyproject.toml [tool.ruff]` |
 | mypy | ^1.14.0 | `pyproject.toml [tool.mypy]`; CI uses Poetry env |
 | pyright | 1.1.391 | `.pre-commit-config.yaml` rev; `pyrightconfig.json` |

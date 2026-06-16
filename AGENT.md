@@ -13,7 +13,7 @@
 
 - Tests: `uv run pytest -m unit`
 - Lint: `uv run ruff check src/ tests/`
-- Type check: `uv run mypy src/omnimemory/`
+- Type check: `uv run mypy src/omnimemory/ --strict`
 - Pre-commit: `pre-commit run --all-files`
 
 ## Cross-Repo
