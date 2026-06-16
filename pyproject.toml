@@ -16,7 +16,7 @@ authors = [{ name = "OmniNode.ai", email = "contact@omninode.ai" }]
 keywords = ["omninode", "memory", "rag", "embeddings", "semantic-search", "onex"]
 dependencies = [
     # Core MCP integration for Archon connectivity
-    "mcp>=1.27.1,<2.0.0",
+    "mcp>=1.27.2,<2.0.0",
 
     # HTTP client for MCP calls and API communication
     "httpx>=0.28.1,<1.0.0",
@@ -108,7 +108,7 @@ dev = [
     # Code formatting and linting (ruff replaces black, isort, flake8 - 10-100x faster)
     # VERSION SYNC: Poetry uses ^0.8.0 (allows updates), pre-commit pins v0.8.6
     # UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
-    "ruff>=0.8.0,<1.0.0",
+    "ruff>=0.15.17,<1.0.0",
 
     # Type checking (dual checker: mypy strict + pyright basic)
     # VERSION SYNC: Poetry uses caret versions, pre-commit pins exact versions
