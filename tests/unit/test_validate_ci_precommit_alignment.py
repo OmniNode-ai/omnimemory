@@ -333,6 +333,11 @@ class TestPrecommitHooksCoveredByAlignments:
             "no-hardcoded-topics",
             "no-untracked-todos",
             "normalization-symmetry",
+            "check-url-authority",
+            "onex-validate-runtime-profiles",
+            "reject-deploy-gate-skip-token",
+            "reject-deploy-gate-skip-token-commit-msg",
+            "validate-validator-requirements",
         }
     )
 
