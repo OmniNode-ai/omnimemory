@@ -242,11 +242,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--qdrant-url",
-        default=os.environ.get("QDRANT_URL"),
-        required=os.environ.get("QDRANT_URL") is None,
+        default=os.environ.get("QDRANT_URL"),  # url-authority-ok: CLI fallback for operator-supplied Qdrant endpoint, OMN-2584
+        required=os.environ.get("QDRANT_URL") is None,  # url-authority-ok: CLI fallback for operator-supplied Qdrant endpoint, OMN-2584
         help="Qdrant base URL (env: QDRANT_URL)",
     )
-    _embedding_url = os.environ.get("EMBEDDING_MODEL_URL")
+    _embedding_url = os.environ.get("EMBEDDING_MODEL_URL")  # url-authority-ok: CLI fallback for operator-supplied embedding endpoint, OMN-2584
     parser.add_argument(
         "--embedding-url",
         default=_embedding_url,

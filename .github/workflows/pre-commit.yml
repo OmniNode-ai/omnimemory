@@ -19,6 +19,8 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: astral-sh/setup-uv@v7
+
       # SKIP hooks that require the full project installed (uv + omnimemory).
       # These hooks have dedicated CI jobs in .github/workflows/test.yml:
       #   - contract-linter  -> contract-validation job

@@ -58,7 +58,7 @@ Example::
 
     container = ModelONEXContainer()
     config = ModelHandlerSubscriptionConfig(
-        db_dsn=os.environ["OMNIMEMORY_DB_URL"],
+        db_dsn=os.environ["OMNIMEMORY_DB_URL"],  # url-authority-ok: docstring example for legacy subscription DB config, OMN-2584
         valkey_host=os.environ["VALKEY_HOST"],
         valkey_port=int(os.environ.get("VALKEY_PORT", "6379")),
         kafka_bootstrap_servers=os.environ["KAFKA_BOOTSTRAP_SERVERS"],

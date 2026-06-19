@@ -159,8 +159,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--bolt-uri",
-        default=os.environ.get("MEMGRAPH_URL"),
-        required=os.environ.get("MEMGRAPH_URL") is None,
+        default=os.environ.get("MEMGRAPH_URL"),  # url-authority-ok: CLI fallback for operator-supplied Memgraph endpoint, OMN-2584
+        required=os.environ.get("MEMGRAPH_URL") is None,  # url-authority-ok: CLI fallback for operator-supplied Memgraph endpoint, OMN-2584
         help="Memgraph Bolt URI (env: MEMGRAPH_URL)",
     )
     args = parser.parse_args()

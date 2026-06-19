@@ -31,7 +31,7 @@ Example::
         await handler.initialize()
 
         # Or use real MLX embeddings (URL from environment variable - REQUIRED)
-        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
         config_real = ModelHandlerQdrantMockConfig(
             use_real_embeddings=True,
             embedding_server_url=embedding_url,

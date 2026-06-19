@@ -460,7 +460,9 @@ def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers 
         else ModelHandlerQdrantConfig(
             qdrant_host=os.environ["QDRANT_HOST"],
             qdrant_port=int(os.environ["QDRANT_PORT"]),
-            embedding_server_url=os.environ["LLM_EMBEDDING_URL"],
+            embedding_server_url=os.environ[
+                "LLM_EMBEDDING_URL"
+            ],  # url-authority-ok: legacy dispatch bootstrap config; Phase-3 DI debt OMN-2584
         )
     )
     return ModelHandlerMemoryRetrievalConfig(
