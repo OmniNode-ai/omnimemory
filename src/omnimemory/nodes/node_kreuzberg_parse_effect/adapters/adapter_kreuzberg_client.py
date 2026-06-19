@@ -154,9 +154,9 @@ def read_cached_text(text_path: Path) -> tuple[str, str] | None:
     if not text_path.exists():
         return None
     try:
-        content = text_path.read_text(
+        content = text_path.read_text(  # node-purity-ok: effect-node client idempotency cache read (designated I/O boundary), OMN-2733
             encoding="utf-8"
-        )  # node-purity-ok: effect-node client idempotency cache read (designated I/O boundary), OMN-2733
+        )
         first_newline = content.index("\n")
         first_line = content[:first_newline]
         if not first_line.startswith(_FINGERPRINT_PREFIX):
