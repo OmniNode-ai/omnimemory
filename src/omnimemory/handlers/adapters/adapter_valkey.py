@@ -78,7 +78,7 @@ _redis_available: bool = False
 _redis_import_error: str | None = None
 
 try:
-    import redis.asyncio as aioredis
+    import redis.asyncio as aioredis  # transport-import-ok: designated redis transport boundary (adapter pattern), OMN-13283
 
     _redis_available = True
 except ImportError as e:

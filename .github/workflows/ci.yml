@@ -220,8 +220,8 @@ jobs:
           echo "- No silent env fallbacks (OMN-10735)" >> $GITHUB_STEP_SUMMARY
 
   # Phase 1 - Transport Import Guard (ARCH-002)
-  # SYNC: Pre-commit hook 'validate-no-transport-imports' at pre-commit stage
-  # Added: OMN-2218
+  # SYNC: Pre-commit hook 'validate-no-transport-imports' (omnibase_core remote hook)
+  # OMN-13283: consolidated into omnibase_core; runs the canonical core validator.
   transport-import-guard:
     name: Transport Import Guard
     runs-on: ubuntu-latest
@@ -231,16 +231,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
-      - name: Install PyYAML for transport import guard
-        run: pip install pyyaml
+      - name: Install dependencies
+        run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
       - name: Validate no transport imports in nodes (ARCH-002)
-        run: python scripts/validate_no_transport_imports.py --src-dir src/omnimemory --exclude src/omnimemory/runtime --whitelist tests/audit/transport_import_whitelist.yaml
+        run: |
+          files=$(find src/omnimemory -name '*.py' -not -path '*/runtime/*')
+          uv run python -m omnibase_core.validation.validator_transport_import $files
 
   # Phase 1 - Contract Validation
   # SYNC: Pre-commit hook 'contract-linter' at pre-commit stage
@@ -272,9 +272,9 @@ jobs:
           echo ""
           uv run python -m omnimemory.tools.contract_linter --verbose $contracts
 
-  # Phase 1 - I/O Audit
-  # SYNC: Pre-commit hook 'io-audit' at pre-commit stage
-  # Added: OMN-2218
+  # Phase 1 - I/O Audit (node purity)
+  # SYNC: Pre-commit hook 'node-purity' (omnibase_core remote hook)
+  # OMN-13283: consolidated into omnibase_core; runs the canonical core validator.
   io-audit:
     name: I/O Audit
     runs-on: ubuntu-latest
@@ -290,8 +290,10 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
 
-      - name: Run I/O audit
-        run: uv run python -m omnimemory.audit
+      - name: Run node-purity audit
+        run: |
+          files=$(find src/omnimemory/nodes -name '*.py')
+          uv run python -m omnibase_core.validation.validator_node_purity $files
 
   # Phase 1 - Architecture Handshake Verification
   check-handshake:

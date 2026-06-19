@@ -84,7 +84,7 @@ if TYPE_CHECKING:
     from asyncpg.exceptions import InterfaceError, InternalClientError, PostgresError
 else:
     try:
-        from asyncpg.exceptions import (
+        from asyncpg.exceptions import (  # transport-import-ok node-purity-ok: pre-existing handler uses asyncpg; Phase-3 DI debt OMN-2584
             InterfaceError,
             InternalClientError,
             PostgresError,
