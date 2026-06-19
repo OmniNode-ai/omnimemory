@@ -403,9 +403,8 @@ override-dependencies = [
 
 [tool.uv.sources]
 omninode-memory = { workspace = true }
-# Pinned to release tags while 2026-05-21 release wave 2 upstream packages are unpublished on PyPI.
-# Switch to PyPI pins after omnibase-core v0.43.0 / omnibase-infra v0.38.3 / omnibase-spi v0.21.0 / omnibase-compat v0.4.1 publish.
-omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.43.0" }
+# Pinned to a dev commit until the core validator consolidation release is published.
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", rev = "e17e24e60f5abd81657b2bb25cbafc0fed994bf7" }
 omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", branch = "main" }
 omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", branch = "main" }
 omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", branch = "main" }

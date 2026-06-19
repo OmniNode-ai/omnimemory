@@ -65,10 +65,12 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     # Infrastructure hooks
     ("migration-freeze-check", "migration-freeze", "check_migration_freeze.sh"),
     # New hooks from OMN-2218
-    # NOTE(OMN-13283): validate-no-transport-imports and io-audit were consolidated
-    # into omnibase_core remote hooks (validate-no-transport-imports, node-purity);
-    # they are no longer local scripts/CI jobs in this repo, so they are not part of
-    # the local CI<->pre-commit alignment matrix.
+    (
+        "validate-no-transport-imports",
+        "transport-import-guard",
+        "validator_transport_import",
+    ),
+    ("node-purity", "io-audit", "validator_node_purity"),
     ("contract-linter", "contract-validation", "contract_linter"),
     # AI-slop pattern checker
     ("check-ai-slop", "ai-slop-check", "check_ai_slop.py"),

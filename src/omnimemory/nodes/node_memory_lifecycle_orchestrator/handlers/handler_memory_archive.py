@@ -633,7 +633,9 @@ class HandlerMemoryArchive:
             resolved_level = compression_level
             level_source = "constructor argument"
         else:
-            env_level_raw = os.environ.get("OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL")
+            env_level_raw = os.environ.get(  # node-purity-ok: constructor fallback config; Phase-3 DI debt OMN-2584
+                "OMNIMEMORY_ARCHIVE_COMPRESSION_LEVEL"
+            )
             if env_level_raw is not None:
                 try:
                     resolved_level = int(env_level_raw)
@@ -678,7 +680,9 @@ class HandlerMemoryArchive:
         if archive_base_path is not None:
             self._archive_base_path = archive_base_path
         else:
-            env_path = os.environ.get("OMNIMEMORY_ARCHIVE_PATH")
+            env_path = os.environ.get(  # node-purity-ok: constructor fallback config; Phase-3 DI debt OMN-2584
+                "OMNIMEMORY_ARCHIVE_PATH"
+            )
             if env_path:
                 self._archive_base_path = Path(env_path)
                 logger.debug(

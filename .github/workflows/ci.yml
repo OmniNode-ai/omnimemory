@@ -368,16 +368,18 @@ jobs:
 
       - name: Compute changed files
         id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin "${{ github.base_ref }}" --no-tags --depth=1
-            git diff --name-only "origin/${{ github.base_ref }}"...HEAD > /tmp/changed_files.txt
-          else
-            # push / merge_group / schedule: compare with HEAD~1 or emit empty (full suite will run)
-            git diff --name-only HEAD~1 HEAD 2>/dev/null > /tmp/changed_files.txt || true
-          fi
-          echo "Changed files:"
-          cat /tmp/changed_files.txt
+          uv run python scripts/ci/collect_changed_files.py \
+            --event-name "$EVENT_NAME" \
+            --base-ref "$BASE_REF" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
+            --output /tmp/changed_files.txt
 
       - name: Run smart test selection
         id: select
@@ -462,13 +464,26 @@ jobs:
   # Phase 2c - Tests gate (aggregates matrix shards)
   tests-gate:
     name: Tests Gate
-    needs: [test]
+    needs: [test-select, test]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all shards passed
         run: |
+          selection_result="${{ needs.test-select.result }}"
           result="${{ needs.test.result }}"
+
+          if [[ "$selection_result" == "skipped" ]]; then
+            echo "Test selection was skipped because an upstream prerequisite did not pass."
+            echo "CI Summary will report the blocking prerequisite."
+            exit 0
+          fi
+
+          if [[ "$selection_result" != "success" ]]; then
+            echo "Test selection did not complete successfully: $selection_result"
+            exit 1
+          fi
+
           if [[ "$result" != "success" ]]; then
             echo "Test shards failed: $result"
             exit 1
@@ -567,7 +582,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance]
     if: always()
 
     steps:
@@ -584,6 +599,7 @@ jobs:
           test_select="${{ needs.test-select.result }}"
           tests_gate="${{ needs.tests-gate.result }}"
           compliance="${{ needs.compliance.result }}"
+          central_contracts="${{ needs.contract-compliance.result }}"
 
           if [[ "$migration_freeze" == "success" ]] && \
              [[ "$lint" == "success" ]] && \
@@ -595,7 +611,8 @@ jobs:
              [[ "$handshake" == "success" || "$handshake" == "skipped" ]] && \
              [[ "$test_select" == "success" ]] && \
              [[ "$tests_gate" == "success" ]] && \
-             [[ "$compliance" == "success" || "$compliance" == "skipped" ]]; then
+             [[ "$compliance" == "success" || "$compliance" == "skipped" ]] && \
+             [[ "$central_contracts" == "success" ]]; then
             echo "All tests passed successfully"
             echo "Migration Freeze: Passed"
             echo "Code Quality: Passed"
@@ -608,6 +625,7 @@ jobs:
             echo "Smart Test Selection: Passed"
             echo "Tests Gate: Passed"
             echo "Contract Compliance: $compliance"
+            echo "Central Contract Compliance: Passed"
             exit 0
           else
             echo "Tests failed"
@@ -622,6 +640,7 @@ jobs:
             echo "Smart Test Selection: $test_select"
             echo "Tests Gate: $tests_gate"
             echo "Contract Compliance: $compliance"
+            echo "Central Contract Compliance: $central_contracts"
             exit 1
           fi
 

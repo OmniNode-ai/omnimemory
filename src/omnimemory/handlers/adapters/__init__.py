@@ -40,7 +40,7 @@ Example::
     # Embedding client (contract boundary for HTTP)
     embed_config = ModelEmbeddingHttpClientConfig(
         provider="local",
-        base_url=os.environ["LLM_EMBEDDING_URL"],
+        base_url=os.environ["LLM_EMBEDDING_URL"],  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
     )
     async with EmbeddingHttpClient(embed_config) as client:
         embedding = await client.get_embedding("Hello world")

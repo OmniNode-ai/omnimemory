@@ -60,10 +60,26 @@ __all__ = ["HandlerNavigationHistoryReducer", "HandlerNavigationHistoryWriter"]
 # Constants (env-var driven; no hardcoded internal IPs)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PG_DSN = os.environ.get("OMNIMEMORY_PG_DSN", "")
-_DEFAULT_QDRANT_HOST = os.environ.get("QDRANT_HOST", "")
-_DEFAULT_QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
-_DEFAULT_EMBEDDING_URL = os.environ.get("LLM_EMBEDDING_URL", "")
+_DEFAULT_PG_DSN = (
+    os.environ.get(  # node-purity-ok: legacy module default; Phase-3 DI debt OMN-2584
+        "OMNIMEMORY_PG_DSN", ""
+    )
+)
+_DEFAULT_QDRANT_HOST = (
+    os.environ.get(  # node-purity-ok: legacy module default; Phase-3 DI debt OMN-2584
+        "QDRANT_HOST", ""
+    )
+)
+_DEFAULT_QDRANT_PORT = int(
+    os.environ.get(  # node-purity-ok: legacy module default; Phase-3 DI debt OMN-2584
+        "QDRANT_PORT", "6333"
+    )
+)
+_DEFAULT_EMBEDDING_URL = (
+    os.environ.get(  # node-purity-ok: legacy module default; Phase-3 DI debt OMN-2584
+        "LLM_EMBEDDING_URL", ""
+    )
+)
 _DEFAULT_EMBEDDING_MODEL = "Qwen3-Embedding-8B"
 _QDRANT_COLLECTION = "navigation_paths"
 
