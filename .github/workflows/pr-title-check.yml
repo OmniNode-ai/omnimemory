@@ -12,6 +12,19 @@ on:
 
 jobs:
   pr-title:
+    if: github.event_name == 'pull_request'
     uses: OmniNode-ai/onex_change_control/.github/workflows/pr-title-check-reusable.yml@main
     permissions:
       pull-requests: read
+
+  pr-title-merge-group:
+    if: github.event_name == 'merge_group'
+    name: pr-title / check-title
+    runs-on: >-
+      ${{
+        fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]')
+      }}
+    steps:
+      - name: Accept merge-group title check
+        run: |
+          echo "PR title validation is enforced on pull_request opened/edited before enqueue."
