@@ -223,7 +223,7 @@ class HandlerNavigationHistoryWriter:
 
     async def _get_pg_pool(self) -> asyncpg.Pool:
         """Return the shared asyncpg connection pool, creating it if needed."""
-        import asyncpg as _asyncpg
+        import asyncpg as _asyncpg  # transport-import-ok node-purity-ok: Phase-2 handler asyncpg; Phase-3 DI debt OMN-2584
 
         if self._pg_pool is None:
             self._pg_pool = await _asyncpg.create_pool(
@@ -413,7 +413,7 @@ class HandlerNavigationHistoryWriter:
             Exception: If the embedding service returns an error or the
                 response does not contain a valid embedding.
         """
-        import httpx as _httpx  # omnimemory-http-exempt: Phase 2 handler; local import to satisfy static scan; Phase 3 will inject via adapter (OMN-2584)
+        import httpx as _httpx  # omnimemory-http-exempt: Phase 2 handler; local import to satisfy static scan; Phase 3 will inject via adapter (OMN-2584)  # transport-import-ok node-purity-ok: Phase-2 handler httpx; Phase-3 DI debt OMN-2584
 
         async with _httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(

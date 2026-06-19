@@ -42,7 +42,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-import httpx
+import httpx  # transport-import-ok node-purity-ok: effect-node embedding client httpx (designated I/O boundary), OMN-13283
 
 if TYPE_CHECKING:
     from types import TracebackType
