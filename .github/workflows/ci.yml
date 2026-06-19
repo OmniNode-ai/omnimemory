@@ -368,12 +368,17 @@ jobs:
 
       - name: Compute changed files
         id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           uv run python scripts/ci/collect_changed_files.py \
-            --event-name "${{ github.event_name }}" \
-            --base-ref "${{ github.base_ref }}" \
-            --base-sha "${{ github.event.pull_request.base.sha }}" \
-            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --event-name "$EVENT_NAME" \
+            --base-ref "$BASE_REF" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
             --output /tmp/changed_files.txt
 
       - name: Run smart test selection

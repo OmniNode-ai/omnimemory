@@ -13,7 +13,7 @@ on:
 jobs:
   pr-title:
     if: github.event_name == 'pull_request'
-    uses: OmniNode-ai/onex_change_control/.github/workflows/pr-title-check-reusable.yml@main
+    uses: OmniNode-ai/onex_change_control/.github/workflows/pr-title-check-reusable.yml@725d2967b031d7065efd41d0751f903638202cc1 # main
     permissions:
       pull-requests: read
 
