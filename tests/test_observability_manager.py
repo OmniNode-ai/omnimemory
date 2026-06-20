@@ -18,8 +18,13 @@ Covers uncovered surfaces in observability.py:
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+
 import pytest
 
+import omnimemory.adapters.adapter_correlation_context as correlation_module
 from omnimemory.adapters.adapter_correlation_context import (
     ObservabilityManager,
     OperationType,
@@ -30,9 +35,46 @@ from omnimemory.adapters.adapter_correlation_context import (
     trace_operation,
 )
 from omnimemory.adapters.adapter_metrics_counter import (
+    MetadataValue,
     sanitize_metadata_value,
     validate_correlation_id,
 )
+
+
+@dataclass(frozen=True)
+class CapturedTraceOperation:
+    operation_name: str
+    operation_type: OperationType
+    trace_performance: bool
+    context: dict[str, MetadataValue]
+
+
+class RecordingObservabilityManager:
+    def __init__(self) -> None:
+        self.calls: list[CapturedTraceOperation] = []
+        self.exited_operation_names: list[str] = []
+
+    @asynccontextmanager
+    async def trace_operation(
+        self,
+        operation_name: str,
+        operation_type: OperationType,
+        trace_performance: bool = True,
+        **additional_context: MetadataValue,
+    ) -> AsyncGenerator[str, None]:
+        self.calls.append(
+            CapturedTraceOperation(
+                operation_name=operation_name,
+                operation_type=operation_type,
+                trace_performance=trace_performance,
+                context=dict(additional_context),
+            )
+        )
+        try:
+            yield "recorded-trace-id"
+        finally:
+            self.exited_operation_names.append(operation_name)
+
 
 # =============================================================================
 # validate_correlation_id
@@ -359,6 +401,84 @@ class TestModuleLevelConvenienceWrappers:
             operation_type=OperationType.MEMORY_RETRIEVE,
         ) as trace_id:
             assert isinstance(trace_id, str)
+
+    @pytest.mark.asyncio
+    async def test_trace_operation_wrapper_forwards_valid_string_type(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        manager = RecordingObservabilityManager()
+        monkeypatch.setattr(correlation_module, "observability_manager", manager)
+
+        async with trace_operation(
+            operation_name="search_op",
+            operation_type="memory_search",
+            trace_performance=False,
+            retry_count=2,
+            cache_hit=True,
+        ) as trace_id:
+            assert trace_id == "recorded-trace-id"
+
+        assert manager.calls == [
+            CapturedTraceOperation(
+                operation_name="search_op",
+                operation_type=OperationType.MEMORY_SEARCH,
+                trace_performance=False,
+                context={"retry_count": 2, "cache_hit": True},
+            )
+        ]
+        assert manager.exited_operation_names == ["search_op"]
+
+    @pytest.mark.asyncio
+    async def test_trace_operation_wrapper_defaults_unknown_string_type(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        manager = RecordingObservabilityManager()
+        monkeypatch.setattr(correlation_module, "observability_manager", manager)
+
+        async with trace_operation(
+            operation_name="external_op",
+            operation_type="not_registered",
+            source="legacy",
+        ) as trace_id:
+            assert trace_id == "recorded-trace-id"
+
+        assert manager.calls == [
+            CapturedTraceOperation(
+                operation_name="external_op",
+                operation_type=OperationType.EXTERNAL_API,
+                trace_performance=True,
+                context={"source": "legacy"},
+            )
+        ]
+        assert manager.exited_operation_names == ["external_op"]
+
+    @pytest.mark.asyncio
+    async def test_trace_operation_wrapper_propagates_body_exceptions(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        manager = RecordingObservabilityManager()
+        monkeypatch.setattr(correlation_module, "observability_manager", manager)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            async with trace_operation(
+                operation_name="cleanup_op",
+                operation_type=OperationType.CLEANUP,
+                cleanup_reason="ttl",
+            ):
+                raise RuntimeError("boom")
+
+        assert manager.calls == [
+            CapturedTraceOperation(
+                operation_name="cleanup_op",
+                operation_type=OperationType.CLEANUP,
+                trace_performance=True,
+                context={"cleanup_reason": "ttl"},
+            )
+        ]
+        assert manager.exited_operation_names == ["cleanup_op"]
 
 
 # =============================================================================
