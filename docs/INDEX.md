@@ -1,4 +1,6 @@
 > **Navigation**: Home (You are here)
+>
+> _Verified against code on 2026-06-21 (OMN-13457): node inventory (16 dirs, 15 with `contract.yaml`), runtime plugin entry point, protocol names, and storage-service ownership confirmed against `src/omnimemory/`._
 
 # OmniMemory Documentation
 

@@ -3,8 +3,8 @@
 # Memory Data Ownership
 
 **Owner:** `omnimemory`
-**Last verified:** 2026-04-29
-**Verification:** `docker compose ps` in omnimemory root + `pyproject.toml` entry-point check
+**Last verified:** 2026-06-21 (OMN-13457) — node count (15 with `contract.yaml`), protocol names, and Valkey access path verified against `src/omnimemory/` source.
+**Verification:** `find src/omnimemory/nodes -name contract.yaml`, `src/omnimemory/protocols/__init__.py`, `docker-compose.yml`, `pyproject.toml` entry-point check
 **Source plans:**
 - `omni_home/docs/plans/2026-04-07-plan-omnimemory-architecture.md`
 - `omni_home/docs/plans/2026-04-10-omnimemory-to-omnimarket-migration.md`
@@ -88,7 +88,7 @@ docker compose up -d
 
 **Usage:** Session state caching and short-lived ephemeral storage. Data is not durably persisted; Valkey is complementary to Qdrant and PostgreSQL.
 
-**Access pattern:** Accessed through `omnimemory.utils` utilities and handler-level caching. Not accessed directly from outside omnimemory.
+**Access pattern:** Accessed through handler-level caching utilities. Not accessed directly from outside omnimemory.
 
 ---
 
@@ -113,8 +113,8 @@ See [Market Migration Boundary](../migrations/MARKET_MIGRATION_BOUNDARY.md) for 
 | Layer | Stays in omnimemory | Moves to omnimarket |
 |-------|--------------------|--------------------|
 | Storage services | Qdrant, Memgraph, Valkey, Kreuzberg | — |
-| Node handlers | — | All 17 runnable nodes |
-| Protocols | All (ProtocolEmbedding, ProtocolIntentGraphAdapter, etc.) | — |
+| Node handlers | — | All 15 runnable nodes (those with `contract.yaml`) |
+| Protocols | All (`ProtocolEmbeddingClient`, `ProtocolEmbeddingProvider`, `ProtocolIntentGraphAdapter`, etc.) | — |
 | Models | All domain models | — |
 | Adapters | All concrete adapter implementations | — |
 | Runtime plugin | PluginMemory entry point | — |
