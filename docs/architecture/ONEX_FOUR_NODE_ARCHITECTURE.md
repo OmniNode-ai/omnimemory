@@ -2,8 +2,8 @@
 
 # ONEX Four-Node Architecture in OmniMemory
 
-> **Version**: 0.2.0
-> **Last Updated**: 2026-06-16
+> **Version**: 0.2.1
+> **Last Updated**: 2026-06-21 (OMN-13457 — verified node inventory, COMPUTE table, and directory-naming convention against `src/omnimemory/nodes/`)
 > **Status**: Active
 
 ## Overview
@@ -111,8 +111,9 @@ provider protocols, keeping the node logic deterministic and testable.
 
 | Directory | Node Class | Responsibility |
 |-----------|------------|----------------|
-| `nodes/semantic_analyzer_compute/` | `NodeSemanticAnalyzerCompute` | Generates embeddings, extracts entities, runs full semantic analysis |
-| `nodes/similarity_compute/` | `NodeSimilarityCompute` | Computes vector similarity between memory records |
+| `nodes/node_semantic_analyzer_compute/` | `NodeSemanticAnalyzerCompute` | Generates embeddings, extracts entities, runs full semantic analysis |
+| `nodes/node_similarity_compute/` | `NodeSimilarityCompute` | Computes vector similarity between memory records |
+| `nodes/node_persona_builder_compute/` | (handler-only; `contract.yaml` routes to `omnimemory.nodes.node_persona_builder_compute.handlers.handler_persona_classify`) | Classifies persona signals into an updated persona profile |
 
 ### REDUCER Nodes
 
@@ -149,11 +150,11 @@ They do not perform I/O directly — they delegate to EFFECT nodes.
 ## Naming Convention
 
 All nodes follow the pattern `Node<Name><Type>` mapped to files named
-`node_<name>_<type>.py`. Directories follow `<name>_<type>/`.
+`node_<name>_<type>.py`. Directories follow `node_<name>_<type>/`.
 
 ```
 nodes/
-  semantic_analyzer_compute/           # directory: <name>_<type>
+  node_semantic_analyzer_compute/      # directory: node_<name>_<type>
     node_semantic_analyzer_compute.py  # file: node_<name>_<type>.py
     handlers/
       handler_semantic_compute.py

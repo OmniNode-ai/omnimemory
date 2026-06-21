@@ -25,7 +25,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 ## What This Repo Owns
 
 - **Domain models** — all memory, crawl, persona, intent, and intelligence Pydantic models in `src/omnimemory/models/`
-- **Protocol interfaces** — `ProtocolEmbedding`, `ProtocolIntentGraphAdapter`, `ProtocolSecretsProvider`, and all base protocols in `src/omnimemory/protocols/`
+- **Protocol interfaces** — `ProtocolEmbeddingClient`, `ProtocolEmbeddingProvider`, `ProtocolIntentGraphAdapter`, `ProtocolSecretsProvider`, and all base protocols in `src/omnimemory/protocols/`
 - **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `handlers/adapters/` and `nodes/*/adapters/`
 - **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/` registered as `onex.domain_plugins`
 - **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
@@ -56,6 +56,8 @@ Follows the [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/omnibas
 - **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`
 
 > `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in OMN-12172; they never had a `contract.yaml` and are no longer present in the repository.
+
+> _Verified against `src/omnimemory/nodes/` on 2026-06-21 (OMN-13457): 16 node directories, 15 with `contract.yaml`; `node_memory_consolidator_reducer` is the contract-less stub._
 
 ### Memory evolution (planned phases)
 
