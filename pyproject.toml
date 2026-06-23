@@ -25,7 +25,7 @@ dependencies = [
     "pydantic>=2.13.4,<3.0.0",
 
     # FastAPI web framework for production API
-    "fastapi>=0.138.0,<1.0.0",
+    "fastapi>=0.136.3,<0.137.0",
     "uvicorn[standard]>=0.49.0,<1.0.0",
 
     # Memory and storage components
@@ -108,7 +108,7 @@ dev = [
     # Code formatting and linting (ruff replaces black, isort, flake8 - 10-100x faster)
     # VERSION SYNC: Poetry uses ^0.8.0 (allows updates), pre-commit pins v0.8.6
     # UP007 (PEP 604 union syntax) is ENABLED and organizationally mandated
-    "ruff>=0.15.17,<1.0.0",
+    "ruff>=0.15.18,<1.0.0",
 
     # Type checking (dual checker: mypy strict + pyright basic)
     # VERSION SYNC: Poetry uses caret versions, pre-commit pins exact versions
