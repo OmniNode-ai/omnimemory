@@ -34,7 +34,7 @@ Every CI validation job has a corresponding pre-commit hook so that "works local
 
 ## CI Checks
 
-### ARCH-002: Kafka Import Lint Guard (OMN-1750)
+### ARCH-002: Kafka Import Lint Guard
 
 **What it checks**: Prevents direct Kafka client imports (`aiokafka`, `kafka`, `confluent_kafka`) from appearing in `src/omnimemory/nodes/`. This enforces ARCH-002: "Runtime owns all Kafka plumbing." Nodes must consume events through the abstract `EventBus` SPI provided by the runtime layer.
 
@@ -78,9 +78,9 @@ poetry run python scripts/validation/validate_kafka_imports.py src/
 
 ---
 
-### Migration Freeze Enforcement (OMN-2074)
+### Migration Freeze Enforcement
 
-**What it enforces**: While `.migration_freeze` exists at the repository root, no new migration files may be added to `deployment/database/migrations/`. This freeze was activated during the DB-per-repo refactor (OMN-2055) on 2026-02-10. Modifications to existing migration files (bug fixes, comment tweaks) are allowed during the freeze.
+**What it enforces**: While `.migration_freeze` exists at the repository root, no new migration files may be added to `deployment/database/migrations/`. This freeze was activated during the DB-per-repo refactor on 2026-02-10. Modifications to existing migration files (bug fixes, comment tweaks) are allowed during the freeze.
 
 **Where defined**:
 - CI job: `migration-freeze` in `.github/workflows/ci.yml`
@@ -94,7 +94,7 @@ New migrations are blocked while `.migration_freeze` exists. To proceed:
 
 1. Check `.migration_freeze` for context on when the freeze will be lifted.
 2. If the freeze must be lifted: remove `.migration_freeze` and add your migration in the same commit. The check script detects the sentinel's absence at runtime and exits cleanly.
-3. If the freeze must stay active: do not add new migration files. Raise the topic in OMN-2074 or OMN-2055 to determine the correct action.
+3. If the freeze must stay active: do not add new migration files. Raise the topic with the team to determine the correct action.
 
 **Allowed during freeze**:
 - Migration moves (reorganizing between repos)
@@ -113,7 +113,7 @@ New migrations are blocked while `.migration_freeze` exists. To proceed:
 
 ---
 
-### Transport Import Guard (OMN-2218)
+### Transport Import Guard
 
 **What it checks**: An AST-based validator that ensures nodes do not import transport or I/O libraries at runtime. This is the stricter, AST-aware counterpart to the regex-based Kafka import guard above. It covers a broader set of banned modules across all of `src/omnimemory/` (excluding `src/omnimemory/runtime/`).
 
@@ -176,15 +176,15 @@ poetry run python scripts/validate_no_transport_imports.py \
 
 ---
 
-### CI Infrastructure Alignment (OMN-2218)
+### CI Infrastructure Alignment
 
-**What was aligned**: Phase 7 of the CI infrastructure work (OMN-2218) added several new CI jobs and synchronized them with matching pre-commit hooks to eliminate drift between local validation and CI:
+**What was aligned**: A CI infrastructure alignment pass added several new CI jobs and synchronized them with matching pre-commit hooks to eliminate drift between local validation and CI:
 
-| New CI Job | Pre-commit Hook | Added |
-|------------|-----------------|-------|
-| `transport-import-guard` | `validate-no-transport-imports` | OMN-2218 |
-| `contract-validation` | `contract-linter` | OMN-2218 |
-| `io-audit` | `io-audit` | OMN-2218 |
+| New CI Job | Pre-commit Hook |
+|------------|-----------------|
+| `transport-import-guard` | `validate-no-transport-imports` |
+| `contract-validation` | `contract-linter` |
+| `io-audit` | `io-audit` |
 
 **Current CI tooling versions** (from `.github/workflows/ci.yml` and `.pre-commit-config.yaml`):
 

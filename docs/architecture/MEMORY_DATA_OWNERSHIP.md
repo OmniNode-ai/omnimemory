@@ -3,7 +3,7 @@
 # Memory Data Ownership
 
 **Owner:** `omnimemory`
-**Last verified:** 2026-06-21 (OMN-13457) — node count (15 with `contract.yaml`), protocol names, and Valkey access path verified against `src/omnimemory/` source.
+**Last verified:** 2026-06-21 — node count (15 with `contract.yaml`), protocol names, and Valkey access path verified against `src/omnimemory/` source.
 **Verification:** `find src/omnimemory/nodes -name contract.yaml`, `src/omnimemory/protocols/__init__.py`, `docker-compose.yml`, `pyproject.toml` entry-point check
 **Source plans:**
 - `omni_home/docs/plans/2026-04-07-plan-omnimemory-architecture.md`
@@ -66,7 +66,7 @@ docker compose up -d
 
 **Access pattern:** All reads and writes go through `node_memory_retrieval_effect` and `node_memory_storage_effect` handlers. No component accesses Qdrant directly outside of these nodes.
 
-**Migration note:** After the omnimarket node migration (OMN-8295), Qdrant access will route through omnimarket-hosted handlers. The Qdrant service itself remains omnimemory-owned.
+**Migration note:** After the omnimarket node migration, Qdrant access will route through omnimarket-hosted handlers. The Qdrant service itself remains omnimemory-owned.
 
 ---
 
@@ -100,7 +100,7 @@ docker compose up -d
 
 **Access pattern:** `node_kreuzberg_parse_effect` is the only caller. Kreuzberg is stateless; requests are isolated per document.
 
-**Migration note:** After OMN-8295, `node_kreuzberg_parse_effect` will live in omnimarket. The Kreuzberg service container remains omnimemory-owned.
+**Migration note:** After the omnimarket node migration, `node_kreuzberg_parse_effect` will live in omnimarket. The Kreuzberg service container remains omnimemory-owned.
 
 ---
 

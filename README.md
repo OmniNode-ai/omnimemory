@@ -18,7 +18,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 
 3. **Storage integration owner for Qdrant, Memgraph, Valkey, and Kreuzberg adapters.** The concrete adapter implementations for all memory-layer storage backends live in `omnimemory`. These adapters implement the domain protocols and are injected at runtime via the DI container.
 
-**What is migrating to omnimarket:** The 15 runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket` as part of OMN-8295. Protocols, models, adapters, and the runtime plugin stay here. See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
+**What is migrating to omnimarket:** The 15 runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket`. Protocols, models, adapters, and the runtime plugin stay here. See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
 
 ---
 
@@ -29,7 +29,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 - **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `handlers/adapters/` and `nodes/*/adapters/`
 - **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/` registered as `onex.domain_plugins`
 - **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
-- **Node handlers** — 15 runnable nodes in `src/omnimemory/nodes/` (migrating to omnimarket per OMN-8295)
+- **Node handlers** — 15 runnable nodes in `src/omnimemory/nodes/` (migrating to omnimarket)
 
 ## What This Repo Does Not Own
 
@@ -55,9 +55,9 @@ Follows the [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/omnibas
 - **Reducer nodes** — `navigation_history_reducer`, `memory_consolidator_reducer` (stub — no contract.yaml)
 - **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`
 
-> `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in OMN-12172; they never had a `contract.yaml` and are no longer present in the repository.
+> `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in an earlier cleanup pass; they never had a `contract.yaml` and are no longer present in the repository.
 
-> _Verified against `src/omnimemory/nodes/` on 2026-06-21 (OMN-13457): 16 node directories, 15 with `contract.yaml`; `node_memory_consolidator_reducer` is the contract-less stub._
+> _Verified against `src/omnimemory/nodes/` on 2026-06-21: 16 node directories, 15 with `contract.yaml`; `node_memory_consolidator_reducer` is the contract-less stub._
 
 ### Memory evolution (planned phases)
 
@@ -174,7 +174,7 @@ src/omnimemory/
 ├── nodes/              # EFFECT, COMPUTE, REDUCER, ORCHESTRATOR node implementations
 │   └── <node>/
 │       ├── adapters/   # Stays in omnimemory (protocol implementations)
-│       └── handlers/   # Migrating to omnimarket (OMN-8295)
+│       └── handlers/   # Migrating to omnimarket
 ├── adapters/           # Shared utilities with adapter_* prefix (PII detection, retry, health, metrics)
 ├── protocols/          # Protocol interfaces (embedding, intent graph, secrets)
 ├── runtime/            # PluginMemory, DI container wiring, dispatch, introspection
@@ -210,7 +210,7 @@ pre-commit run --all-files
 
 ## Migration Status
 
-Nodes are migrating to omnimarket as part of OMN-8295 (epic). The migration preserves the protocol-adapter-handler split: handlers move, adapters stay.
+Nodes are migrating to omnimarket. The migration preserves the protocol-adapter-handler split: handlers move, adapters stay.
 
 See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
 

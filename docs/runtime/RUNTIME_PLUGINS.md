@@ -8,11 +8,11 @@ The runtime plugin system wires the OmniMemory domain into the ONEX kernel witho
 
 For OmniMemory, the plugin (`PluginMemory`) performs five sequential steps:
 
-1. Register memory wire models with `RegistryMessageType` (OMN-2217).
-2. Verify that domain handler classes are importable (`wire_handlers`, OMN-2216).
-3. Create and freeze a `MessageDispatchEngine` for topic-based routing (`wire_dispatchers`, OMN-2215).
+1. Register memory wire models with `RegistryMessageType`.
+2. Verify that domain handler classes are importable (`wire_handlers`).
+3. Create and freeze a `MessageDispatchEngine` for topic-based routing (`wire_dispatchers`).
 4. Publish node introspection events so the platform registration orchestrator can discover each memory node.
-5. Subscribe to all Kafka input topics declared in node `contract.yaml` files (`start_consumers`, OMN-2213).
+5. Subscribe to all Kafka input topics declared in node `contract.yaml` files (`start_consumers`).
 
 The plugin activates only when the `OMNIMEMORY_ENABLED` environment variable is set, enabling graceful degradation in kernels that do not require the memory domain. See [`OMNIMEMORY_ENABLED` in the environment variables reference](../environment_variables.md#service-level-configuration) for configuration details and expected values.
 
@@ -35,7 +35,7 @@ All runtime modules live under `src/omnimemory/runtime/`:
 
 ---
 
-## PluginMemory (OMN-2216)
+## PluginMemory
 
 **Class**: `PluginMemory`
 **File**: `src/omnimemory/runtime/plugin.py`
@@ -106,7 +106,7 @@ The entry point group `onex.domain_plugins` is the shared discovery namespace. T
 
 ---
 
-## Wire Model Registration (OMN-2217)
+## Wire Model Registration
 
 **Function**: `register_memory_message_types`
 **File**: `src/omnimemory/runtime/message_type_registration.py`
@@ -168,7 +168,7 @@ registered.append("ModelNewCommandRequest")
 
 ---
 
-## MessageDispatchEngine Integration (OMN-2215)
+## MessageDispatchEngine Integration
 
 **Factory**: `create_memory_dispatch_engine`
 **File**: `src/omnimemory/runtime/dispatch_handlers.py`
@@ -259,7 +259,7 @@ engine = create_memory_dispatch_engine(
 
 ---
 
-## Contract-Driven Topic Discovery (OMN-2213)
+## Contract-Driven Topic Discovery
 
 **Module**: `src/omnimemory/runtime/contract_topics.py`
 
@@ -350,7 +350,7 @@ If a `contract.yaml` is missing, contains invalid YAML, or belongs to a package 
 
 ---
 
-## Protocol Adapters (OMN-2214)
+## Protocol Adapters
 
 **File**: `src/omnimemory/runtime/adapters.py`
 

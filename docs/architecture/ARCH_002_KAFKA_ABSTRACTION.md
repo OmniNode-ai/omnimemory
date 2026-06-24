@@ -248,16 +248,16 @@ For guidance on running these checks locally and triaging failures, see
 
 ---
 
-## Files Migrated as Part of OMN-2214
+## Files Migrated to ARCH-002 Compliance
 
-The following files were migrated to ARCH-002 compliance in OMN-2214 (PR #40):
+The following files were migrated to ARCH-002 compliance (PR #40):
 
 | File | What changed |
 |------|-------------|
 | `src/omnimemory/handlers/handler_subscription.py` | Replaced direct `AIOKafkaProducer` with `ProtocolEventBusPublish` protocol injection via `create_default_event_bus` factory |
 | `src/omnimemory/runtime/adapters.py` | Created — defines `ProtocolEventBusPublish`, `ProtocolEventBusLifecycle`, `ProtocolEventBusHealthCheck`, `AdapterKafkaPublisher`, and `create_default_event_bus` factory |
 
-The CI lint guard (OMN-1750, PR #42) was added as a follow-up to prevent
+The CI lint guard (PR #42) was added as a follow-up to prevent
 regressions.
 
 ---
