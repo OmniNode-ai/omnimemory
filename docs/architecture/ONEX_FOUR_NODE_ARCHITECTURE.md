@@ -3,7 +3,7 @@
 # ONEX Four-Node Architecture in OmniMemory
 
 > **Version**: 0.2.1
-> **Last Updated**: 2026-06-21 (OMN-13457 — verified node inventory, COMPUTE table, and directory-naming convention against `src/omnimemory/nodes/`)
+> **Last Updated**: 2026-06-21 (verified node inventory, COMPUTE table, and directory-naming convention against `src/omnimemory/nodes/`)
 > **Status**: Active
 
 ## Overview
@@ -128,7 +128,7 @@ counters.
 | `nodes/node_navigation_history_reducer/` | Aggregates and persists agent navigation history | Runnable (has `contract.yaml`) |
 | `nodes/node_memory_consolidator_reducer/` | Merges and deduplicates overlapping memory records | Stub — no `contract.yaml`; scaffolded skeleton only |
 
-> `node_statistics_reducer` was decommissioned in OMN-12172 and is no longer present in the repository.
+> `node_statistics_reducer` was decommissioned in an earlier cleanup pass and is no longer present in the repository.
 
 ### ORCHESTRATOR Nodes
 
@@ -143,7 +143,7 @@ They do not perform I/O directly — they delegate to EFFECT nodes.
 | `nodes/node_memory_lifecycle_orchestrator/` | `HandlerMemoryTick`, `HandlerMemoryArchive`, `HandlerMemoryExpire` | Drives time-based lifecycle: ticking expiry counters, archiving old memories, expiring stale records |
 | `nodes/node_agent_coordinator_orchestrator/` | (in progress) | Routes memory requests across agents, coordinates cross-service memory operations |
 
-> `node_persona_lifecycle_orchestrator` was decommissioned in OMN-12172 (never had a `contract.yaml`) and is no longer present in the repository.
+> `node_persona_lifecycle_orchestrator` was decommissioned in an earlier cleanup pass (never had a `contract.yaml`) and is no longer present in the repository.
 
 ---
 
