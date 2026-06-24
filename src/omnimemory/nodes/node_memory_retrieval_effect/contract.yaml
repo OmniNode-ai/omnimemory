@@ -112,6 +112,23 @@ dependencies:
     dependency_type: protocol
     description: Memory CRUD operations protocol
 
+# === DESCRIPTOR (endpoint overlay seam) ===
+# OMN-13562 / OMN-13556 Wave-1 endpoint→overlay migration.
+# The Qdrant host/port the retrieval-effect handlers (and the navigation-history
+# reducer that writes to the same store) connect to are declared here with the
+# ${env.VAR} overlay convention so an operator overlay / the per-lane service env
+# supplies the real endpoint per lane — never a hardcoded host in source. The
+# config defaults resolve these through
+# omnibase_infra.runtime.overlay.contract_env_ref.expand_contract_env_refs (the
+# one sanctioned env-reading boundary) and fail closed: an unset/empty host
+# raises rather than silently defaulting to localhost.
+descriptor:
+  node_archetype: effect
+  purity: side_effect
+  idempotent: false
+  qdrant_host: "${env.QDRANT_HOST}"
+  qdrant_port: "${env.QDRANT_PORT:6333}"
+
 # === PERFORMANCE ===
 performance:
   max_response_time_ms: 100

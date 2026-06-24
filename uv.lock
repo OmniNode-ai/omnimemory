@@ -10,7 +10,7 @@ resolution-markers = [
 overrides = [
     { name = "omnibase-compat", git = "https://github.com/OmniNode-ai/omnibase_compat.git?branch=main" },
     { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?rev=e17e24e60f5abd81657b2bb25cbafc0fed994bf7" },
-    { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?branch=main" },
+    { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?rev=7e52d5b0046c394b38454b97157e7a7191e6f008" },
     { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main" },
     { name = "omnimarket", git = "https://github.com/OmniNode-ai/omnimarket.git?rev=e6cc7c603f1d4e7ed287f9ec9a6d3c85328b8d64" },
     { name = "omninode-memory", editable = "." },
@@ -1292,8 +1292,8 @@ dependencies = [
 
 [[package]]
 name = "omnibase-infra"
-version = "0.38.3"
-source = { git = "https://github.com/OmniNode-ai/omnibase_infra.git?branch=main#5ffe2978911ab17d2b7e5446299c77688e04ae0d" }
+version = "0.38.4"
+source = { git = "https://github.com/OmniNode-ai/omnibase_infra.git?rev=7e52d5b0046c394b38454b97157e7a7191e6f008#7e52d5b0046c394b38454b97157e7a7191e6f008" }
 dependencies = [
     { name = "a2a-sdk" },
     { name = "aiofiles" },
@@ -1397,7 +1397,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.27.2,<2.0.0" },
     { name = "neo4j", marker = "extra == 'graph'", specifier = ">=5.0.0,<6.0.0" },
     { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?rev=e17e24e60f5abd81657b2bb25cbafc0fed994bf7" },
-    { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?branch=main" },
+    { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?rev=7e52d5b0046c394b38454b97157e7a7191e6f008" },
     { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main" },
     { name = "pinecone-client", specifier = ">=6.0.0,<7.0.0" },
     { name = "psutil", specifier = ">=7.2.2,<8.0.0" },
