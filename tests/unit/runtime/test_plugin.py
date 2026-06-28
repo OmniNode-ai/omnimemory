@@ -221,7 +221,8 @@ class TestPluginWireHandlers:
 
         assert result.success
         assert len(result.services_registered) > 0
-        assert "HandlerIntentEventConsumer" in result.services_registered
+        # HandlerIntentEventConsumer removed (OMN-13701): node moved to omnimarket
+        assert "HandlerIntentEventConsumer" not in result.services_registered
         assert "HandlerIntentQuery" in result.services_registered
         assert "HandlerSubscription" in result.services_registered
 

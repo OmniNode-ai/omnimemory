@@ -100,8 +100,7 @@ logger = logging.getLogger(__name__)
 # scanning those contracts via importlib.resources.
 #
 # Source contracts:
-#   - node_intent_event_consumer_effect/contract.yaml
-#   - node_intent_query_effect/contract.yaml
+#   - node_intent_query_effect/contract.yaml  (node_intent_event_consumer_effect removed: OMN-13701)
 #   - node_intent_storage_effect/contract.yaml
 #   - node_memory_retrieval_effect/contract.yaml
 #   - node_memory_storage_effect/contract.yaml
