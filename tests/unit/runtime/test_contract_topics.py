@@ -52,7 +52,7 @@ EXPECTED_EXPIRE_MEMORY = "onex.cmd.omnimemory.expire-memory.v1"
 EXPECTED_CRAWL_TICK = "onex.cmd.omnimemory.crawl-tick.v1"
 
 EXPECTED_SUBSCRIBE_TOPICS = {
-    EXPECTED_INTENT_CLASSIFIED,
+    # EXPECTED_INTENT_CLASSIFIED removed (OMN-13701): node moved to omnimarket
     EXPECTED_INTENT_QUERY_REQUESTED,
     EXPECTED_MEMORY_RETRIEVAL_REQUESTED,
     EXPECTED_RUNTIME_TICK,
@@ -66,7 +66,7 @@ EXPECTED_SUBSCRIBE_TOPICS = {
 # =============================================================================
 
 EXPECTED_DISPATCH_MAP = {
-    "intent_event_consumer": "onex.evt.omnimemory.intent-stored.v1",
+    # "intent_event_consumer" removed (OMN-13701): node moved to omnimarket
     "intent_query": "onex.evt.omnimemory.intent-query-response.v1",
     "intent_storage": "onex.evt.omnimemory.intent-stored.v1",
     "memory_retrieval": "onex.evt.omnimemory.memory-retrieval-response.v1",
@@ -80,12 +80,12 @@ EXPECTED_DISPATCH_MAP = {
 # =============================================================================
 
 EXPECTED_ALL_PUBLISH_TOPICS = {
-    # intent_event_consumer_effect
-    "onex.evt.omnimemory.intent-stored.v1",
-    "onex.evt.omniintelligence.intent-classified-dlq.v1",
+    # intent_event_consumer_effect removed (OMN-13701): node moved to omnimarket.
+    # intent-classified-dlq topic no longer published by omnimemory.
     # intent_query_effect
     "onex.evt.omnimemory.intent-query-response.v1",
-    # intent_storage_effect (intent-stored.v1 also from consumer, set deduplicates)
+    # intent_storage_effect
+    "onex.evt.omnimemory.intent-stored.v1",
     "onex.evt.omnimemory.intent-store-failed.v1",
     # memory_retrieval_effect
     "onex.evt.omnimemory.memory-retrieval-response.v1",
@@ -116,15 +116,15 @@ EXPECTED_ALL_PUBLISH_TOPICS = {
 class TestCollectSubscribeTopics:
     """Validate contract-driven subscribe topic collection."""
 
-    def test_returns_exactly_seven_topics(self) -> None:
-        """All omnimemory nodes declare 7 subscribe topics total."""
-        topics = collect_subscribe_topics_from_contracts()
-        assert len(topics) == 7
+    def test_returns_exactly_six_topics(self) -> None:
+        """Remaining omnimemory nodes declare 6 subscribe topics.
 
-    def test_contains_intent_classified_topic(self) -> None:
-        """Intent classified topic from intent_event_consumer_effect."""
+        node_intent_event_consumer_effect was removed (OMN-13701); its topic
+        onex.evt.omniintelligence.intent-classified.v1 is now consumed only
+        by omnimarket's canonical node.
+        """
         topics = collect_subscribe_topics_from_contracts()
-        assert EXPECTED_INTENT_CLASSIFIED in topics
+        assert len(topics) == 6
 
     def test_contains_intent_query_requested_topic(self) -> None:
         """Intent query requested topic from intent_query_effect."""
@@ -205,14 +205,6 @@ class TestCollectPublishTopicsForDispatch:
         result = collect_publish_topics_for_dispatch()
         assert set(result.keys()) == set(EXPECTED_DISPATCH_MAP.keys())
 
-    def test_intent_event_consumer_topic(self) -> None:
-        """intent_event_consumer dispatch key maps to correct topic."""
-        result = collect_publish_topics_for_dispatch()
-        assert (
-            result["intent_event_consumer"]
-            == EXPECTED_DISPATCH_MAP["intent_event_consumer"]
-        )
-
     def test_intent_query_topic(self) -> None:
         """intent_query dispatch key maps to correct topic."""
         result = collect_publish_topics_for_dispatch()
@@ -281,10 +273,15 @@ class TestCollectAllPublishTopics:
         topics = set(collect_all_publish_topics())
         assert topics == EXPECTED_ALL_PUBLISH_TOPICS
 
-    def test_includes_dlq_topics(self) -> None:
-        """DLQ topics declared in publish_topics must be included."""
+    def test_does_not_include_intent_classified_dlq(self) -> None:
+        """intent-classified DLQ topic must NOT be published by omnimemory.
+
+        node_intent_event_consumer_effect was removed (OMN-13701); its DLQ
+        publish topic onex.evt.omniintelligence.intent-classified-dlq.v1 is
+        now exclusively omnimarket's responsibility.
+        """
         topics = collect_all_publish_topics()
-        assert "onex.evt.omniintelligence.intent-classified-dlq.v1" in topics
+        assert "onex.evt.omniintelligence.intent-classified-dlq.v1" not in topics
 
     def test_includes_all_memory_storage_topics(self) -> None:
         """All 4 memory storage CRUD event topics must be present."""
@@ -420,11 +417,15 @@ class TestDeriveDispatchKey:
 class TestNodePackageRegistry:
     """Validate that _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES is complete."""
 
-    def test_contains_intent_event_consumer(self) -> None:
-        """intent_event_consumer_effect must be in the package list."""
+    def test_does_not_contain_intent_event_consumer(self) -> None:
+        """intent_event_consumer_effect must NOT be in the omnimemory package list.
+
+        Canonical owner is omnimarket (OMN-13701).  Its presence in omnimemory
+        caused a duplicate UUID and dual-consumer race on the intent-classified topic.
+        """
         assert (
             "omnimemory.nodes.node_intent_event_consumer_effect"
-            in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
+            not in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
     def test_contains_intent_query(self) -> None:
@@ -469,9 +470,13 @@ class TestNodePackageRegistry:
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
-    def test_exactly_seven_packages(self) -> None:
-        """Exactly 7 omnimemory nodes have event_bus enabled."""
-        assert len(_OMNIMEMORY_EVENT_BUS_NODE_PACKAGES) == 7
+    def test_exactly_six_packages(self) -> None:
+        """Exactly 6 omnimemory nodes have event_bus enabled.
+
+        node_intent_event_consumer_effect removed (OMN-13701): canonical
+        owner is omnimarket.
+        """
+        assert len(_OMNIMEMORY_EVENT_BUS_NODE_PACKAGES) == 6
 
 
 # =============================================================================

@@ -40,7 +40,8 @@ logger = logging.getLogger(__name__)
 # the memory_lifecycle_orchestrator also subscribes to Kafka topics.
 
 _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES: list[str] = [
-    "omnimemory.nodes.node_intent_event_consumer_effect",
+    # node_intent_event_consumer_effect removed (OMN-13701): canonical owner is
+    # omnimarket; duplicate UUID caused dual-consumer race on intent-classified topic.
     "omnimemory.nodes.node_intent_query_effect",
     "omnimemory.nodes.node_intent_storage_effect",
     "omnimemory.nodes.node_memory_retrieval_effect",
