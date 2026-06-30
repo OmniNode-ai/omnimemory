@@ -409,6 +409,10 @@ omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", rev 
 # sanctioned ${env.VAR} overlay-resolution boundary) for OMN-13562 Wave-1
 # endpoint→overlay migration. Matches omnimarket's pin (OMN-13557).
 omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", rev = "7e52d5b0046c394b38454b97157e7a7191e6f008" }
-omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", branch = "main" }
-omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", branch = "main" }
+# Pinned to fixed revs (OMN-13762): a `branch = "main"` pin makes the lockfile
+# non-deterministic — every advance of spi/compat `main` drifts the locked SHA,
+# so a fresh CI `uv sync --locked` re-resolves to a newer HEAD and fails the
+# whole repo. Fixed revs keep resolution reproducible (matches core/infra pins).
+omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", rev = "63cd72f2532351f92d8a845cd537d81dc7cbedcf" }
+omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", rev = "66117ecb8a6b3218d369ffe92ebd805c63589547" }
 omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", rev = "e6cc7c603f1d4e7ed287f9ec9a6d3c85328b8d64" }
