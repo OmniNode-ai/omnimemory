@@ -8,10 +8,10 @@ resolution-markers = [
 
 [manifest]
 overrides = [
-    { name = "omnibase-compat", git = "https://github.com/OmniNode-ai/omnibase_compat.git?branch=main" },
+    { name = "omnibase-compat", git = "https://github.com/OmniNode-ai/omnibase_compat.git?rev=66117ecb8a6b3218d369ffe92ebd805c63589547" },
     { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?rev=e17e24e60f5abd81657b2bb25cbafc0fed994bf7" },
     { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?rev=7e52d5b0046c394b38454b97157e7a7191e6f008" },
-    { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main" },
+    { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?rev=a32ce0046710c614248822db0226f3bb5a171d0e" },
     { name = "omnimarket", git = "https://github.com/OmniNode-ai/omnimarket.git?rev=e6cc7c603f1d4e7ed287f9ec9a6d3c85328b8d64" },
     { name = "omninode-memory", editable = "." },
     { name = "onex-change-control", git = "https://github.com/OmniNode-ai/onex_change_control.git?rev=bd30807469c2b570d99ffefb25fb23e6a9d7cfb1" },
@@ -1345,8 +1345,8 @@ dependencies = [
 
 [[package]]
 name = "omnibase-spi"
-version = "0.21.0"
-source = { git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main#63cd72f2532351f92d8a845cd537d81dc7cbedcf" }
+version = "0.22.0"
+source = { git = "https://github.com/OmniNode-ai/omnibase_spi.git?rev=a32ce0046710c614248822db0226f3bb5a171d0e#a32ce0046710c614248822db0226f3bb5a171d0e" }
 dependencies = [
     { name = "omnibase-core" },
     { name = "pydantic" },
@@ -1398,7 +1398,7 @@ requires-dist = [
     { name = "neo4j", marker = "extra == 'graph'", specifier = ">=5.0.0,<6.0.0" },
     { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?rev=e17e24e60f5abd81657b2bb25cbafc0fed994bf7" },
     { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?rev=7e52d5b0046c394b38454b97157e7a7191e6f008" },
-    { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?branch=main" },
+    { name = "omnibase-spi", git = "https://github.com/OmniNode-ai/omnibase_spi.git?rev=a32ce0046710c614248822db0226f3bb5a171d0e" },
     { name = "pinecone-client", specifier = ">=6.0.0,<7.0.0" },
     { name = "psutil", specifier = ">=7.2.2,<8.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.12,<3.0.0" },
