@@ -294,7 +294,7 @@ class TestPluginWireDispatchers:
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
 
         assert plugin._dispatch_engine is not None
-        assert plugin._dispatch_engine.handler_count >= 4
+        assert plugin._dispatch_engine.dispatcher_count >= 4
 
     @pytest.mark.asyncio
     async def test_wire_dispatchers_returns_resources_created(

@@ -424,6 +424,20 @@ class TestHandlerRoutingKeyAlignment:
     }
 
     @staticmethod
+    def _handler_route_key(handler: dict[str, object]) -> str:
+        """Return the routing discriminator across legacy and current schemas."""
+        for field_name in ("routing_key", "operation", "event_type"):
+            value = handler.get(field_name)
+            if isinstance(value, str) and value:
+                return value
+        handler_ref = handler.get("handler")
+        if isinstance(handler_ref, dict):
+            name = handler_ref.get("name")
+            if isinstance(name, str) and name:
+                return name
+        return ""
+
+    @staticmethod
     def _extract_literal_values(constraint_def: str) -> set[str]:
         """Extract values from a Literal type definition string.
 
@@ -481,7 +495,7 @@ class TestHandlerRoutingKeyAlignment:
 
         # Extract routing_keys from handlers
         routing_keys: set[str] = {
-            h.get("routing_key", "") for h in handlers if h.get("routing_key")
+            route_key for h in handlers if (route_key := self._handler_route_key(h))
         }
 
         # Get constraint definitions
@@ -557,7 +571,7 @@ class TestHandlerRoutingKeyAlignment:
         if not handlers:
             pytest.skip(f"No handlers defined: {node_name}")
 
-        routing_keys = [h.get("routing_key", "") for h in handlers]
+        routing_keys = [self._handler_route_key(h) for h in handlers]
         unique_keys = set(routing_keys)
 
         assert len(routing_keys) == len(unique_keys), (
