@@ -40,7 +40,7 @@ Example::
     from omnimemory.nodes.node_kreuzberg_parse_effect.models import ModelKreuzbergParseConfig
 
     config = ModelKreuzbergParseConfig(
-        kreuzberg_url="http://localhost:8090",
+        kreuzberg_url="http://localhost:8090",  # url-authority-ok: doc example for local kreuzberg parser config
         text_store_path="/tmp/kreuzberg_texts",
         parser_version="1.0.0",
     )
