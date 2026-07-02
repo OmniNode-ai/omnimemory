@@ -59,9 +59,13 @@ dependencies = [
     "pyyaml>=6.0.3,<7.0.0",
 
     # ONEX dependencies - versioned releases from PyPI
-    "omnibase-core>=0.42.0,<0.43.0",
-    "omnibase-spi>=0.22.0,<0.23.0",
-    "omnibase-infra>=0.37.0,<0.38.0",
+    # OMN-13837: relax spi/core/infra pins so consumers on spi>=0.23 (omnibase_infra @main,
+    # omnimarket-as-dependency chain) can transitively resolve omninode-memory. spi 0.23.0
+    # requires core>=0.46.1; infra @main (0.38.4) is the first infra to carry the spi-0.23 pins
+    # (no infra release tag exists yet — see HOLD note / [tool.uv.sources]).
+    "omnibase-core>=0.46.1,<0.47.0",
+    "omnibase-spi>=0.23.0,<0.24.0",
+    "omnibase-infra>=0.38.4,<0.39.0",
 
     # Logging and monitoring
     # Version ^23.3.0 required for compatibility with omnibase-infra (requires ^23.2.0)
@@ -392,9 +396,10 @@ markers = [
 [tool.uv]
 # Override transitive pins so our direct pins win.
 override-dependencies = [
-    "omnibase-core>=0.42.0,<0.43.0",
-    "omnibase-spi>=0.22.0,<0.23.0",
-    "omnibase-infra>=0.37.0,<0.38.0",
+    # OMN-13837: relaxed spi/core/infra to unblock the omnimarket-as-dependency chain.
+    "omnibase-core>=0.46.1,<0.47.0",
+    "omnibase-spi>=0.23.0,<0.24.0",
+    "omnibase-infra>=0.38.4,<0.39.0",
     "omnibase-compat>=0.5.0,<0.6.0",
     "omninode-memory>=0.17.0,<0.18.0",
     "omnimarket>=0.4.0,<0.5.0",
@@ -403,9 +408,13 @@ override-dependencies = [
 
 [tool.uv.sources]
 omninode-memory = { workspace = true }
-# Release v0.17.0: pin to release tags
-omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.42.0" }
-omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", tag = "v0.37.0" }
-omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", tag = "v0.22.0" }
+# OMN-13837: bump to spi 0.23 / core 0.46.1 release tags. omnibase-infra has NO release tag
+# carrying the spi-0.23 pins yet (latest tag v0.38.3 still pins spi<0.23); infra @main (0.38.4,
+# rev 00e5a02a511da691d22d5301b73dd2b0d7400e4a) is the first with spi>=0.23. Pinned to that
+# immutable SHA so this workspace resolves; a coordinated omnibase-infra release (>=0.38.4) must
+# land before downstream PyPI consumers can resolve omninode-memory against spi 0.23. See HOLD note.
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.46.1" }
+omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", rev = "00e5a02a511da691d22d5301b73dd2b0d7400e4a" }
+omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", tag = "v0.23.0" }
 omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", tag = "v0.5.0" }
 omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", tag = "v0.4.0" }
