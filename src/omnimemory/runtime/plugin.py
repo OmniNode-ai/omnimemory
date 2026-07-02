@@ -71,7 +71,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
-    from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
+    from omnibase_infra.runtime.message_dispatch_engine import MessageDispatchEngine
     from omnibase_infra.runtime.registry import RegistryMessageType
 
     from omnimemory.handlers.adapters.adapter_graph_memory import AdapterGraphMemory
@@ -564,7 +564,7 @@ class PluginMemory:
                     correlation_id,
                 )
 
-            self._dispatch_engine = create_memory_dispatch_engine(
+            dispatch_engine = create_memory_dispatch_engine(
                 intent_consumer=intent_consumer,
                 intent_query_handler=intent_query_handler,
                 publish_callback=publish_callback,
@@ -574,6 +574,7 @@ class PluginMemory:
                 navigation_history_handler=navigation_history_handler,
                 semantic_compute_handler=semantic_compute_handler,
             )
+            self._dispatch_engine = dispatch_engine
 
             # Store event_bus reference for introspection publishing.
             # NOTE: This reference is captured at wire time and used during
@@ -598,8 +599,8 @@ class PluginMemory:
                 "Memory dispatch engine wired "
                 "(routes=%d, handlers=%d, kafka=%s, introspection=%d, "
                 "correlation_id=%s)",
-                self._dispatch_engine.route_count,
-                self._dispatch_engine.handler_count,
+                dispatch_engine.route_count,
+                dispatch_engine.dispatcher_count,
                 publish_callback is not None,
                 len(self._introspection_nodes),
                 correlation_id,

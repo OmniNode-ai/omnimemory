@@ -78,15 +78,23 @@ def create_handler_routing_subcontract(
     Returns:
         Configured ModelHandlerRoutingSubcontract instance
     """
-    # Build handler entry kwargs, only including output_events if provided
+    # Build handler entry kwargs for the current omnibase_core routing schema.
     handler_kwargs: dict[str, object] = {
-        "routing_key": routing_key,
-        "handler_key": handler_key,
+        "handler": {
+            "name": handler_key,
+            "module": "tests.models.contracts.test_extended_contracts",
+        },
         "message_category": message_category,
-        "priority": priority,
     }
-    if output_events is not None:
-        handler_kwargs["output_events"] = output_events
+    if routing_strategy == "operation_match":
+        handler_kwargs["operation"] = routing_key
+    elif routing_strategy == "topic_pattern":
+        handler_kwargs["event_type"] = routing_key
+    else:
+        handler_kwargs["event_model"] = {
+            "name": routing_key,
+            "module": "tests.models.contracts.test_extended_contracts",
+        }
 
     primary_handler = ModelHandlerRoutingEntry(**handler_kwargs)  # type: ignore[arg-type]
 
@@ -171,7 +179,8 @@ class TestModelContractEffectExtended:
         assert contract.handler_routing is not None
         assert contract.handler_routing.routing_strategy == "payload_type_match"
         assert len(contract.handler_routing.handlers) == 1
-        assert contract.handler_routing.handlers[0].routing_key == "memory.store"
+        assert contract.handler_routing.handlers[0].event_model is not None
+        assert contract.handler_routing.handlers[0].event_model.name == "memory.store"
 
     def test_effect_extended_extra_fields_ignored(
         self, minimal_effect_data: dict[str, object]
@@ -305,9 +314,7 @@ class TestModelContractReducerExtended:
 
         assert contract.handler_routing is not None
         assert contract.handler_routing.routing_strategy == "topic_pattern"
-        assert contract.handler_routing.handlers[0].output_events == [
-            "memory.consolidated"
-        ]
+        assert contract.handler_routing.handlers[0].event_type == "reduce.consolidate"
 
     def test_reducer_extended_extra_fields_ignored(
         self, minimal_reducer_data: dict[str, object]
@@ -350,10 +357,15 @@ class TestModelContractOrchestratorExtended:
             default_handler="workflow_default_handler",
             additional_handlers=[
                 ModelHandlerRoutingEntry(
-                    routing_key="orchestrate.archive",
-                    handler_key="archive_handler",
+                    event_model={
+                        "name": "orchestrate.archive",
+                        "module": "tests.models.contracts.test_extended_contracts",
+                    },
+                    handler={
+                        "name": "archive_handler",
+                        "module": "tests.models.contracts.test_extended_contracts",
+                    },
                     message_category=EnumMessageCategory.EVENT,
-                    priority=2,
                 ),
             ],
         )
@@ -412,8 +424,11 @@ class TestHandlerRoutingSubcontractStructure:
             routing_strategy="operation_match",
             handlers=[
                 ModelHandlerRoutingEntry(
-                    routing_key="test.route",
-                    handler_key="test_handler",
+                    operation="test.route",
+                    handler={
+                        "name": "test_handler",
+                        "module": "tests.models.contracts.test_extended_contracts",
+                    },
                 )
             ],
         )
@@ -424,26 +439,26 @@ class TestHandlerRoutingSubcontractStructure:
     def test_handler_routing_entry_all_fields(self) -> None:
         """Verify handler routing entry with all optional fields."""
         entry = ModelHandlerRoutingEntry(
-            routing_key="test.route",
-            handler_key="test_handler",
+            operation="test.route",
+            handler={
+                "name": "test_handler",
+                "module": "tests.models.contracts.test_extended_contracts",
+            },
             message_category=EnumMessageCategory.COMMAND,
-            priority=5,
-            output_events=["test.completed", "test.logged"],
         )
-        assert entry.routing_key == "test.route"
-        assert entry.handler_key == "test_handler"
+        assert entry.operation == "test.route"
+        assert entry.handler.name == "test_handler"
         assert entry.message_category == EnumMessageCategory.COMMAND
-        assert entry.priority == 5
-        assert entry.output_events == ["test.completed", "test.logged"]
 
     def test_handler_routing_entry_minimal(self) -> None:
         """Verify handler routing entry with minimal required fields."""
         entry = ModelHandlerRoutingEntry(
-            routing_key="minimal.route",
-            handler_key="minimal_handler",
+            handler={
+                "name": "minimal_handler",
+                "module": "tests.models.contracts.test_extended_contracts",
+            },
         )
-        assert entry.routing_key == "minimal.route"
-        assert entry.handler_key == "minimal_handler"
+        assert entry.handler.name == "minimal_handler"
 
 
 class TestExtendedContractsModelConfig:

@@ -64,7 +64,7 @@ async def call_kreuzberg_extract(
 
     Args:
         kreuzberg_url: Base URL of the kreuzberg service
-            (e.g. ``"http://localhost:8090"``).
+            (e.g. ``"http://localhost:8090"``).  # url-authority-ok: doc example for caller-provided local kreuzberg endpoint
         file_bytes: Raw binary content of the document to parse.
         filename: Original filename hint for kreuzberg (e.g. ``"report.pdf"``).
         mime_type: MIME type hint for kreuzberg.

@@ -192,7 +192,7 @@ class TestCreateMemoryDispatchEngine:
             intent_consumer=mock_intent_consumer,
             intent_query_handler=mock_intent_query_handler,
         )
-        assert engine.handler_count == 4
+        assert engine.dispatcher_count == 4
 
     def test_engine_has_six_routes(
         self,
@@ -265,7 +265,7 @@ class TestIntentClassifiedDispatchHandler:
         )
 
         result = await handler(envelope, context)
-        assert isinstance(result, str)
+        assert result == []
         mock_intent_consumer._handle_message.assert_called_once_with(
             sample_intent_classified_payload, retry_count=0
         )
@@ -383,7 +383,7 @@ class TestIntentQueryDispatchHandler:
         )
 
         result = await handler(envelope, context)
-        assert isinstance(result, str)
+        assert result == []
         mock_intent_query_handler.execute.assert_called_once()
 
     @pytest.mark.asyncio
@@ -582,7 +582,7 @@ class TestLifecycleDispatchHandler:
         )
 
         result = await handler(envelope, context)
-        assert result == ""
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_noop_handler_handles_archive_payload(
@@ -612,7 +612,7 @@ class TestLifecycleDispatchHandler:
         )
 
         result = await handler(envelope, context)
-        assert result == ""
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_noop_handler_handles_expire_payload(
@@ -642,7 +642,7 @@ class TestLifecycleDispatchHandler:
         )
 
         result = await handler(envelope, context)
-        assert result == ""
+        assert result == []
 
 
 # =============================================================================

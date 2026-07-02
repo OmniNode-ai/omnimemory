@@ -38,7 +38,7 @@ transaction_management:
 
 # === TRANSPORT DECLARATIONS ===
 metadata:
-  transport_type: "HTTP"
+  transport_type: "QDRANT"
 
 # === NODE CONFIGURATION ===
 # NOTE: tool_name and main_tool_class are required per ModelContractEffect validation
@@ -180,47 +180,30 @@ handler_routing:
   routing_strategy: operation_match
   handlers:
     # Semantic similarity search via Qdrant
-    - routing_key: "search"
-      handler_key: "HandlerQdrantMock"
+    - operation: "search"
       handler:
         name: "HandlerQdrantMock"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_qdrant_mock"
-        handler_type: "QDRANT"
-      priority: 0
-      output_events: []
     # Full-text search via PostgreSQL
-    - routing_key: "search_text"
-      handler_key: "HandlerDbMock"
+    - operation: "search_text"
       handler:
         name: "HandlerDbMock"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_db_mock"
-      priority: 0
-      output_events: []
     # Graph traversal via Neo4j/Memgraph
-    - routing_key: "search_graph"
-      handler_key: "HandlerGraphMock"
+    - operation: "search_graph"
       handler:
         name: "HandlerGraphMock"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_graph_mock"
-      priority: 0
-      output_events: []
     # Health check — primary retrieval handler (default for all operations)
-    - routing_key: "health_check"
-      handler_key: "HandlerMemoryRetrieval"
+    - operation: "health_check"
       handler:
         name: "HandlerMemoryRetrieval"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_memory_retrieval"
-      priority: 0
-      output_events: []
     # Production Qdrant handler — handles index and semantic search operations
-    - routing_key: "index"
-      handler_key: "HandlerQdrant"
+    - operation: "index"
       handler:
         name: "HandlerQdrant"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_qdrant"
-        handler_type: "QDRANT"
-      priority: 0
-      output_events: []
   default_handler: "HandlerMemoryRetrieval"
 
 # =============================================================================
