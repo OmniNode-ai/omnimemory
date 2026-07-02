@@ -38,7 +38,7 @@ transaction_management:
 
 # === TRANSPORT DECLARATIONS ===
 metadata:
-  transport_type: "HTTP"
+  transport_type: "QDRANT"
 
 # === NODE CONFIGURATION ===
 # NOTE: tool_name and main_tool_class are required per ModelContractEffect validation
