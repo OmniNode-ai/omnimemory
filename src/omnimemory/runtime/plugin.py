@@ -71,7 +71,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
-    from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
+    from omnibase_infra.runtime.message_dispatch_engine import MessageDispatchEngine
     from omnibase_infra.runtime.registry import RegistryMessageType
 
     from omnimemory.handlers.adapters.adapter_graph_memory import AdapterGraphMemory
@@ -600,7 +600,7 @@ class PluginMemory:
                 "(routes=%d, handlers=%d, kafka=%s, introspection=%d, "
                 "correlation_id=%s)",
                 dispatch_engine.route_count,
-                dispatch_engine.handler_count,
+                dispatch_engine.dispatcher_count,
                 publish_callback is not None,
                 len(self._introspection_nodes),
                 correlation_id,
