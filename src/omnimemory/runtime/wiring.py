@@ -44,7 +44,8 @@ logger = logging.getLogger(__name__)
 #   - handler_config: {handler_class, handler_module}
 #   - handler_routing: {handlers: [{handler_key, ...}]}
 _OMNIMEMORY_HANDLER_NODE_PACKAGES: list[str] = [
-    "omnimemory.nodes.node_intent_event_consumer_effect",
+    # node_intent_event_consumer_effect removed (OMN-13701): canonical owner is
+    # omnimarket; duplicate UUID caused dual-consumer race on intent-classified topic.
     "omnimemory.nodes.node_intent_query_effect",
     "omnimemory.nodes.node_similarity_compute",
     "omnimemory.nodes.node_semantic_analyzer_compute",

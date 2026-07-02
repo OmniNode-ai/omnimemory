@@ -1,9 +1,9 @@
 > **Navigation**: [Home](../INDEX.md) > DB Split
 
-# FK Audit: omnimemory (OMN-2069)
+# FK Audit: omnimemory
 
 **Audit Date**: 2026-02-10
-**Parent Ticket**: OMN-2054 (DB-SPLIT-03)
+**Context**: DB split work (DB-SPLIT-03)
 **Scope**: All migration files in `deployment/database/migrations/`
 
 ## Migration Files Scanned

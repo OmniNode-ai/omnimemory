@@ -40,13 +40,18 @@ class TestWireMemoryHandlers:
         assert len(result) > 0
 
     @pytest.mark.asyncio
-    async def test_includes_intent_consumer(self) -> None:
-        """HandlerIntentEventConsumer should be in the registered services."""
+    async def test_excludes_intent_consumer(self) -> None:
+        """HandlerIntentEventConsumer must NOT be wired by omnimemory.
+
+        node_intent_event_consumer_effect is canonically owned by omnimarket
+        (OMN-13701). Its presence in omnimemory caused a duplicate UUID and
+        dual-consumer race on the intent-classified Kafka topic.
+        """
         config = StubConfig()
 
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
-        assert "HandlerIntentEventConsumer" in result
+        assert "HandlerIntentEventConsumer" not in result
 
     @pytest.mark.asyncio
     async def test_includes_intent_query(self) -> None:
@@ -75,8 +80,8 @@ class TestWireMemoryHandlers:
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
 
         # Success means all handlers passed the callable check
-        # 4 base (incl. similarity) + 4 integration chain handlers = 8
-        assert len(result) == 8
+        # 7 handlers (reduced from 8 in OMN-13701: HandlerIntentEventConsumer moved to omnimarket)
+        assert len(result) == 7
 
 
 class TestContractDrivenDiscovery:
@@ -84,10 +89,14 @@ class TestContractDrivenDiscovery:
 
     @pytest.mark.asyncio
     async def test_discovers_handlers_from_contracts(self) -> None:
-        """wire_memory_handlers returns the same 8 handlers from contracts."""
+        """wire_memory_handlers returns 7 handlers from contracts.
+
+        Reduced from 8 (OMN-13701): HandlerIntentEventConsumer removed;
+        node_intent_event_consumer_effect canonical owner is omnimarket.
+        """
         config = StubConfig()
         result = await wire_memory_handlers(config=config)  # type: ignore[arg-type]
-        assert len(result) == 8
+        assert len(result) == 7
 
     @pytest.mark.asyncio
     async def test_no_hardcoded_handler_specs(self) -> None:

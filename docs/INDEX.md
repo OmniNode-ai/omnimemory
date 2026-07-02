@@ -1,4 +1,6 @@
 > **Navigation**: Home (You are here)
+>
+> _Verified against code on 2026-06-21: node inventory (16 dirs, 15 with `contract.yaml`), runtime plugin entry point, protocol names, and storage-service ownership confirmed against `src/omnimemory/`._
 
 # OmniMemory Documentation
 
@@ -60,7 +62,7 @@ Migration context, boundary definitions, and durable upgrade guidance.
 
 | Document | Description |
 |---|---|
-| [Market Migration Boundary](migrations/MARKET_MIGRATION_BOUNDARY.md) | What moves to omnimarket (OMN-8295), what stays, wave plan, import path changes |
+| [Market Migration Boundary](migrations/MARKET_MIGRATION_BOUNDARY.md) | What moves to omnimarket, what stays, wave plan, import path changes |
 
 ---
 
@@ -114,7 +116,7 @@ Point-in-time audit records and historical design context. These are not current
 
 | Document | Description |
 |---|---|
-| [FK Audit: OMN-2069](db-split/fk-audit-omn-2069.md) | Foreign key audit of migration files (2026-02-10, OMN-2054 DB split) |
+| [FK Audit](db-split/fk-audit.md) | Foreign key audit of migration files (2026-02-10, DB split) |
 
 **Architecture plans (context only, not promoted):**
 - `omni_home/docs/plans/2026-04-07-plan-omnimemory-architecture.md` — memory evolution design (surprise gating, activation decay, memory cubes, Hebbian associations). Planned, not yet implemented.

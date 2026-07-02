@@ -60,10 +60,23 @@ __all__ = ["HandlerNavigationHistoryReducer", "HandlerNavigationHistoryWriter"]
 # Constants (env-var driven; no hardcoded internal IPs)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PG_DSN = os.environ.get("OMNIMEMORY_PG_DSN", "")
-_DEFAULT_QDRANT_HOST = os.environ.get("QDRANT_HOST", "")
-_DEFAULT_QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
-_DEFAULT_EMBEDDING_URL = os.environ.get("LLM_EMBEDDING_URL", "")
+_DEFAULT_PG_DSN = (
+    os.environ.get(  # node-purity-ok: legacy module default; Phase-3 DI debt OMN-2584
+        "OMNIMEMORY_PG_DSN", ""
+    )
+)
+# OMN-13562 Wave-1: the Qdrant host/port are no longer read from os.environ at
+# module import. They resolve lazily through the retrieval node's
+# overlay-declared descriptor (descriptor.qdrant_host / descriptor.qdrant_port)
+# at the Qdrant-client boundary in ``_get_qdrant_client`` — fail-closed on unset
+# QDRANT_HOST. ``None`` here means "resolve from the contract descriptor".
+_DEFAULT_QDRANT_HOST: str | None = None
+_DEFAULT_QDRANT_PORT: int | None = None
+_DEFAULT_EMBEDDING_URL = (
+    os.environ.get(  # node-purity-ok: legacy module default; Phase-3 DI debt OMN-2584
+        "LLM_EMBEDDING_URL", ""
+    )
+)
 _DEFAULT_EMBEDDING_MODEL = "Qwen3-Embedding-8B"
 _QDRANT_COLLECTION = "navigation_paths"
 
@@ -91,8 +104,8 @@ class HandlerNavigationHistoryWriter:
     def __init__(
         self,
         pg_dsn: str = _DEFAULT_PG_DSN,
-        qdrant_host: str = _DEFAULT_QDRANT_HOST,
-        qdrant_port: int = _DEFAULT_QDRANT_PORT,
+        qdrant_host: str | None = _DEFAULT_QDRANT_HOST,
+        qdrant_port: int | None = _DEFAULT_QDRANT_PORT,
         embedding_url: str = _DEFAULT_EMBEDDING_URL,
         embedding_model: str = _DEFAULT_EMBEDDING_MODEL,
     ) -> None:
@@ -100,8 +113,12 @@ class HandlerNavigationHistoryWriter:
 
         Args:
             pg_dsn: PostgreSQL DSN string for the omnimemory database.
-            qdrant_host: Hostname of the Qdrant server.
-            qdrant_port: Port of the Qdrant server.
+            qdrant_host: Hostname of the Qdrant server. ``None`` (the default)
+                resolves the host from the retrieval node's contract descriptor
+                (``descriptor.qdrant_host``, OMN-13562 Wave-1) at the Qdrant-client
+                boundary, fail-closed on unset ``QDRANT_HOST``.
+            qdrant_port: Port of the Qdrant server. ``None`` (the default) resolves
+                the port from the contract descriptor (``descriptor.qdrant_port``).
             embedding_url: Full URL for the embedding API endpoint.
             embedding_model: Model identifier to pass to the embedding endpoint.
         """
@@ -223,7 +240,7 @@ class HandlerNavigationHistoryWriter:
 
     async def _get_pg_pool(self) -> asyncpg.Pool:
         """Return the shared asyncpg connection pool, creating it if needed."""
-        import asyncpg as _asyncpg
+        import asyncpg as _asyncpg  # transport-import-ok node-purity-ok: Phase-2 handler asyncpg; Phase-3 DI debt OMN-2584
 
         if self._pg_pool is None:
             self._pg_pool = await _asyncpg.create_pool(
@@ -236,11 +253,34 @@ class HandlerNavigationHistoryWriter:
         return self._pg_pool
 
     async def _get_qdrant_client(self) -> AsyncQdrantClient:
-        """Return the shared Qdrant async client, creating it if needed."""
+        """Return the shared Qdrant async client, creating it if needed.
+
+        The Qdrant host/port resolve through the retrieval node's
+        overlay-declared contract descriptor (``descriptor.qdrant_host`` /
+        ``descriptor.qdrant_port``, OMN-13562 Wave-1) when not explicitly
+        supplied — the one sanctioned env-reading boundary. Resolution is
+        fail-closed: an unset ``QDRANT_HOST`` raises rather than silently
+        defaulting to localhost.
+        """
         if self._qdrant_client is None:
+            from omnimemory.nodes.node_memory_retrieval_effect.contract_descriptor import (
+                contract_qdrant_host,
+                contract_qdrant_port,
+            )
+
+            host = (
+                self._qdrant_host
+                if self._qdrant_host is not None
+                else contract_qdrant_host()
+            )
+            port = (
+                self._qdrant_port
+                if self._qdrant_port is not None
+                else contract_qdrant_port()
+            )
             self._qdrant_client = AsyncQdrantClient(
-                host=self._qdrant_host,
-                port=self._qdrant_port,
+                host=host,
+                port=port,
                 timeout=30,
             )
         return self._qdrant_client
@@ -413,7 +453,7 @@ class HandlerNavigationHistoryWriter:
             Exception: If the embedding service returns an error or the
                 response does not contain a valid embedding.
         """
-        import httpx as _httpx  # omnimemory-http-exempt: Phase 2 handler; local import to satisfy static scan; Phase 3 will inject via adapter (OMN-2584)
+        import httpx as _httpx  # omnimemory-http-exempt: Phase 2 handler; local import to satisfy static scan; Phase 3 will inject via adapter (OMN-2584)  # transport-import-ok node-purity-ok: Phase-2 handler httpx; Phase-3 DI debt OMN-2584
 
         async with _httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -489,8 +529,8 @@ class HandlerNavigationHistoryReducer:
         self,
         writer: HandlerNavigationHistoryWriter | None = None,
         pg_dsn: str = _DEFAULT_PG_DSN,
-        qdrant_host: str = _DEFAULT_QDRANT_HOST,
-        qdrant_port: int = _DEFAULT_QDRANT_PORT,
+        qdrant_host: str | None = _DEFAULT_QDRANT_HOST,
+        qdrant_port: int | None = _DEFAULT_QDRANT_PORT,
         embedding_url: str = _DEFAULT_EMBEDDING_URL,
         embedding_model: str = _DEFAULT_EMBEDDING_MODEL,
     ) -> None:
@@ -501,7 +541,9 @@ class HandlerNavigationHistoryReducer:
                 If not provided, one is created from the remaining kwargs.
             pg_dsn: PostgreSQL DSN (used only if ``writer`` is None).
             qdrant_host: Qdrant hostname (used only if ``writer`` is None).
+                ``None`` resolves from the contract descriptor (OMN-13562 Wave-1).
             qdrant_port: Qdrant port (used only if ``writer`` is None).
+                ``None`` resolves from the contract descriptor.
             embedding_url: Embedding endpoint URL (used only if ``writer`` is None).
             embedding_model: Embedding model name (used only if ``writer`` is None).
         """

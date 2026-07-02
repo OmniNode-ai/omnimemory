@@ -68,10 +68,10 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     (
         "validate-no-transport-imports",
         "transport-import-guard",
-        "validate_no_transport_imports.py",
+        "validator_transport_import",
     ),
+    ("node-purity", "io-audit", "validator_node_purity"),
     ("contract-linter", "contract-validation", "contract_linter"),
-    ("io-audit", "io-audit", "io_audit"),
     # AI-slop pattern checker
     ("check-ai-slop", "ai-slop-check", "check_ai_slop.py"),
 ]

@@ -57,7 +57,9 @@ MEMORY_DOMAIN = "memory"
 
 # Total number of unique message types registered.
 # Used in tests and validate_startup logging.
-EXPECTED_MESSAGE_TYPE_COUNT = 10
+# OMN-13701: Reduced from 10 to 9; ModelIntentClassifiedEvent removed
+# (node_intent_event_consumer_effect canonical owner is omnimarket).
+EXPECTED_MESSAGE_TYPE_COUNT = 9
 
 # ---------------------------------------------------------------------------
 # Observability: readiness flag and metric counters
@@ -183,27 +185,18 @@ def register_memory_message_types(
 
     try:
         # =====================================================================
-        # Consumed Kafka Event (from omniintelligence) -- EVENT category
+        # NOTE (OMN-13701): ModelIntentClassifiedEvent was previously registered
+        # here for node_intent_event_consumer_effect, but that node is now
+        # canonically owned by omnimarket.  The duplicate registration caused a
+        # dual-consumer race on the intent-classified Kafka topic.  It has been
+        # removed from omnimemory's registry.
         # =====================================================================
-
-        # 1. Intent classification event consumed from omniintelligence
-        registry.register_simple(
-            message_type="ModelIntentClassifiedEvent",
-            handler_id="node_intent_event_consumer_effect",
-            category=EnumMessageCategory.EVENT,
-            domain=MEMORY_DOMAIN,
-            description=(
-                "Intent classification event consumed from omniintelligence "
-                "for memory storage"
-            ),
-        )
-        registered.append("ModelIntentClassifiedEvent")
 
         # =====================================================================
         # Intent Storage Effect (orchestrator-invoked) -- COMMAND/EVENT
         # =====================================================================
 
-        # 2. Intent storage request (command input)
+        # 1. Intent storage request (command input)
         registry.register_simple(
             message_type="ModelIntentStorageRequest",
             handler_id="node_intent_storage_effect",

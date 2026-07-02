@@ -73,8 +73,12 @@ class TestRegistrationCount:
         assert frozen_registry.entry_count == EXPECTED_MESSAGE_TYPE_COUNT
 
     def test_expected_count_constant_matches(self) -> None:
-        """EXPECTED_MESSAGE_TYPE_COUNT constant is 10."""
-        assert EXPECTED_MESSAGE_TYPE_COUNT == 10
+        """EXPECTED_MESSAGE_TYPE_COUNT constant is 9.
+
+        Reduced from 10 (OMN-13701): ModelIntentClassifiedEvent removed;
+        node_intent_event_consumer_effect canonical owner is omnimarket.
+        """
+        assert EXPECTED_MESSAGE_TYPE_COUNT == 9
 
 
 # =============================================================================
@@ -87,8 +91,7 @@ class TestHasMessageType:
     """Verify all registered types are discoverable via has_message_type."""
 
     ALL_MESSAGE_TYPES = [
-        # Consumed Kafka event
-        "ModelIntentClassifiedEvent",
+        # ModelIntentClassifiedEvent removed (OMN-13701): node moved to omnimarket
         # Intent storage effect
         "ModelIntentStorageRequest",
         "ModelIntentStorageResponse",
@@ -168,7 +171,7 @@ class TestCategoryAssignment:
     """Verify correct EnumMessageCategory assignment per type."""
 
     EVENT_TYPES = [
-        "ModelIntentClassifiedEvent",
+        # "ModelIntentClassifiedEvent" removed (OMN-13701): node moved to omnimarket
         "ModelIntentStorageResponse",
         "ModelMemoryRetrievalResponse",
         "ModelMemoryStorageResponse",
@@ -212,7 +215,7 @@ class TestHandlerIds:
     """Verify handler_id assignments match node directory names."""
 
     HANDLER_MAP = {
-        "ModelIntentClassifiedEvent": ("node_intent_event_consumer_effect",),
+        # ModelIntentClassifiedEvent removed (OMN-13701): node moved to omnimarket
         "ModelIntentStorageRequest": ("node_intent_storage_effect",),
         "ModelIntentStorageResponse": ("node_intent_storage_effect",),
         "ModelMemoryRetrievalRequest": ("node_memory_retrieval_effect",),
@@ -289,9 +292,13 @@ class TestStartupValidation:
     def test_validation_with_available_handlers(
         self, frozen_registry: RegistryMessageType
     ) -> None:
-        """validate_startup with all handler IDs available returns no errors."""
+        """validate_startup with all handler IDs available returns no errors.
+
+        node_intent_event_consumer_effect removed (OMN-13701): that handler
+        is canonically owned by omnimarket; its registration was removed from
+        omnimemory's registry to eliminate the dual-consumer race.
+        """
         all_handler_ids = {
-            "node_intent_event_consumer_effect",
             "node_intent_storage_effect",
             "node_memory_retrieval_effect",
             "node_memory_storage_effect",
@@ -306,7 +313,8 @@ class TestStartupValidation:
         self, frozen_registry: RegistryMessageType
     ) -> None:
         """validate_startup reports missing handlers when subset provided."""
-        partial_handlers = {"node_intent_event_consumer_effect"}
+        # Provide only one handler out of the registered set to force errors
+        partial_handlers = {"node_intent_storage_effect"}
         errors = frozen_registry.validate_startup(
             available_handler_ids=partial_handlers,
         )
@@ -327,9 +335,13 @@ class TestRegistryProperties:
         assert frozen_registry.is_frozen
 
     def test_handler_count(self, frozen_registry: RegistryMessageType) -> None:
-        """Registry tracks the correct number of unique handlers."""
-        # 5 unique handler IDs across all 10 registrations
-        assert frozen_registry.handler_count == 5
+        """Registry tracks the correct number of unique handlers.
+
+        Reduced from 5 to 4 (OMN-13701): node_intent_event_consumer_effect
+        handler removed; canonical owner is omnimarket.
+        """
+        # 4 unique handler IDs across all 9 registrations
+        assert frozen_registry.handler_count == 4
 
     def test_domain_count(self, frozen_registry: RegistryMessageType) -> None:
         """Registry tracks exactly 1 domain (memory)."""

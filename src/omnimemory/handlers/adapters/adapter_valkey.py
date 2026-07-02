@@ -50,14 +50,15 @@ import asyncio
 import inspect
 import logging
 import warnings
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast, overload
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 _T = TypeVar("_T")
 type _ResetPipeline = Callable[[], Awaitable[None]]
+type _RedisScalar = bytes | bytearray | memoryview[int] | str | int | float
 
 # redis-py is compatible with both Redis and Valkey
 # Type alias for Redis client - provides IDE support while handling incomplete stubs
@@ -77,7 +78,7 @@ _redis_available: bool = False
 _redis_import_error: str | None = None
 
 try:
-    import redis.asyncio as aioredis
+    import redis.asyncio as aioredis  # transport-import-ok: designated redis transport boundary (adapter pattern), OMN-13283
 
     _redis_available = True
 except ImportError as e:
@@ -450,6 +451,12 @@ class AdapterValkey:
         """
         return f"{self._config.key_prefix}{key}"
 
+    @overload
+    async def _ensure_awaited(self, result: Awaitable[_T]) -> _T: ...
+
+    @overload
+    async def _ensure_awaited(self, result: _T) -> _T: ...
+
     async def _ensure_awaited(  # stub-ok: redis-py-awaitable-helper-deferred
         self, result: _T | Awaitable[_T]
     ) -> _T:
@@ -771,7 +778,7 @@ class AdapterValkey:
     async def hset(
         self,
         key: str,
-        mapping: dict[str, str],
+        mapping: Mapping[str, str],
     ) -> int:
         """Set multiple hash fields.
 
@@ -785,8 +792,9 @@ class AdapterValkey:
         if not mapping:
             return 0
         client = self._ensure_initialized()
+        redis_mapping = cast("Mapping[_RedisScalar, _RedisScalar]", mapping)
         result = await self._ensure_awaited(
-            client.hset(self._prefixed_key(key), mapping=mapping)  # pyright: ignore[reportArgumentType]
+            client.hset(self._prefixed_key(key), mapping=redis_mapping)
         )
         return int(result)
 

@@ -444,6 +444,10 @@ def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers 
     Returns:
         Fully-populated retrieval config ready for ``HandlerMemoryRetrieval``.
     """
+    from omnimemory.nodes.node_memory_retrieval_effect.contract_descriptor import (
+        contract_qdrant_host,
+        contract_qdrant_port,
+    )
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
     )
@@ -457,10 +461,15 @@ def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers 
     qdrant_config = (
         None
         if use_stubs
+        # OMN-13562 Wave-1: resolve the Qdrant host/port through the
+        # retrieval node's overlay-declared descriptor (the qdrant owner)
+        # instead of direct os.environ reads. Fails closed on unset QDRANT_HOST.
         else ModelHandlerQdrantConfig(
-            qdrant_host=os.environ["QDRANT_HOST"],
-            qdrant_port=int(os.environ["QDRANT_PORT"]),
-            embedding_server_url=os.environ["LLM_EMBEDDING_URL"],
+            qdrant_host=contract_qdrant_host(),
+            qdrant_port=contract_qdrant_port(),
+            embedding_server_url=os.environ[
+                "LLM_EMBEDDING_URL"
+            ],  # url-authority-ok: legacy dispatch bootstrap config; Phase-3 DI debt OMN-2584
         )
     )
     return ModelHandlerMemoryRetrievalConfig(
