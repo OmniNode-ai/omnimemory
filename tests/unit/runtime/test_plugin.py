@@ -221,7 +221,8 @@ class TestPluginWireHandlers:
 
         assert result.success
         assert len(result.services_registered) > 0
-        assert "HandlerIntentEventConsumer" in result.services_registered
+        # HandlerIntentEventConsumer removed (OMN-13701): node moved to omnimarket
+        assert "HandlerIntentEventConsumer" not in result.services_registered
         assert "HandlerIntentQuery" in result.services_registered
         assert "HandlerSubscription" in result.services_registered
 
@@ -293,7 +294,7 @@ class TestPluginWireDispatchers:
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
 
         assert plugin._dispatch_engine is not None
-        assert plugin._dispatch_engine.handler_count >= 4
+        assert plugin._dispatch_engine.dispatcher_count >= 4
 
     @pytest.mark.asyncio
     async def test_wire_dispatchers_returns_resources_created(

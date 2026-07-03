@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-import httpx
+import httpx  # transport-import-ok node-purity-ok: effect-node client httpx (designated I/O boundary), OMN-2733
 
 __all__ = [
     "KreuzbergExtractionError",
@@ -64,7 +64,7 @@ async def call_kreuzberg_extract(
 
     Args:
         kreuzberg_url: Base URL of the kreuzberg service
-            (e.g. ``"http://localhost:8090"``).
+            (e.g. ``"http://localhost:8090"``).  # url-authority-ok: doc example for caller-provided local kreuzberg endpoint
         file_bytes: Raw binary content of the document to parse.
         filename: Original filename hint for kreuzberg (e.g. ``"report.pdf"``).
         mime_type: MIME type hint for kreuzberg.
@@ -154,7 +154,9 @@ def read_cached_text(text_path: Path) -> tuple[str, str] | None:
     if not text_path.exists():
         return None
     try:
-        content = text_path.read_text(encoding="utf-8")
+        content = text_path.read_text(  # node-purity-ok: effect-node client idempotency cache read (designated I/O boundary), OMN-2733
+            encoding="utf-8"
+        )
         first_newline = content.index("\n")
         first_line = content[:first_newline]
         if not first_line.startswith(_FINGERPRINT_PREFIX):
@@ -175,7 +177,7 @@ def write_cached_text(text_path: Path, fingerprint: str, text: str) -> None:
         text: Extracted text content to store.
     """
     text_path.parent.mkdir(parents=True, exist_ok=True)
-    text_path.write_text(
+    text_path.write_text(  # node-purity-ok: effect-node client idempotency cache write (designated I/O boundary), OMN-2733
         f"{_FINGERPRINT_PREFIX}{fingerprint}\n{text}",
         encoding="utf-8",
     )

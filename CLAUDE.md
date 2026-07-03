@@ -58,7 +58,7 @@ uv run ruff format src/ tests/
 uv run ruff check --fix src/ tests/
 
 # Type checking
-uv run mypy src/omnimemory
+uv run mypy src/omnimemory --strict
 
 # Testing
 uv run pytest                        # All tests

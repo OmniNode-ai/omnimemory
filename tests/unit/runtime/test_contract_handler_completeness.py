@@ -21,9 +21,9 @@ from omnimemory.runtime.wiring import wire_memory_handlers
 from .conftest import StubConfig
 
 # The canonical handler set — must match what the old _HANDLER_SPECS declared.
+# HandlerIntentEventConsumer removed (OMN-13701): node moved to omnimarket.
 _EXPECTED_HANDLERS: frozenset[str] = frozenset(
     {
-        "HandlerIntentEventConsumer",
         "HandlerIntentQuery",
         "HandlerSubscription",
         "HandlerSimilarityCompute",

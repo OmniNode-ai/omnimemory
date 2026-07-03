@@ -713,7 +713,7 @@ async def create_postgresql_health_check(
     """Create a PostgreSQL health check function."""
 
     async def check_postgresql() -> HealthCheckResult:
-        import asyncpg
+        import asyncpg  # transport-import-ok: health manager probes asyncpg connectivity directly (infra boundary), OMN-13283
 
         config = HealthCheckConfig(
             name="postgresql", dependency_type=DependencyType.DATABASE
@@ -746,7 +746,7 @@ async def create_redis_health_check(
     """Create a Redis health check function."""
 
     async def check_redis() -> HealthCheckResult:
-        import redis.asyncio as redis
+        import redis.asyncio as redis  # transport-import-ok: health manager probes redis connectivity directly (infra boundary), OMN-13283
 
         config = HealthCheckConfig(name="redis", dependency_type=DependencyType.CACHE)
 

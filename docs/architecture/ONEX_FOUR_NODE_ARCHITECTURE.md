@@ -2,8 +2,8 @@
 
 # ONEX Four-Node Architecture in OmniMemory
 
-> **Version**: 0.1.0
-> **Last Updated**: 2026-02-19
+> **Version**: 0.2.1
+> **Last Updated**: 2026-06-21 (verified node inventory, COMPUTE table, and directory-naming convention against `src/omnimemory/nodes/`)
 > **Status**: Active
 
 ## Overview
@@ -84,11 +84,15 @@ to produce side effects.
 
 | Directory | Handler | Responsibility |
 |-----------|---------|----------------|
-| `nodes/intent_event_consumer_effect/` | `HandlerIntentEventConsumer` | Consumes `intent-classified.v1` events from Kafka, persists to Memgraph via `HandlerIntentStorageAdapter` |
-| `nodes/intent_storage_effect/` | `HandlerIntentStorageAdapter` | Writes intent records to the graph store |
-| `nodes/intent_query_effect/` | `HandlerIntentQuery` | Queries stored intents, returns results over the event bus |
-| `nodes/memory_retrieval_effect/` | `HandlerMemoryRetrieval` | Retrieves memory records from Qdrant, PostgreSQL, and Memgraph |
-| `nodes/memory_storage_effect/` | `AdapterFilesystem` | Persists memory payloads to the filesystem adapter |
+| `nodes/node_intent_event_consumer_effect/` | `HandlerIntentEventConsumer` | Consumes `intent-classified.v1` events from Kafka, persists to Memgraph via `HandlerIntentStorageAdapter` |
+| `nodes/node_intent_storage_effect/` | `HandlerIntentStorageAdapter` | Writes intent records to the graph store |
+| `nodes/node_intent_query_effect/` | `HandlerIntentQuery` | Queries stored intents, returns results over the event bus |
+| `nodes/node_memory_retrieval_effect/` | `HandlerMemoryRetrieval` | Retrieves memory records from Qdrant, PostgreSQL, and Memgraph |
+| `nodes/node_memory_storage_effect/` | `AdapterFilesystem` | Persists memory payloads to the filesystem adapter |
+| `nodes/node_filesystem_crawler_effect/` | `HandlerFilesystemCrawler` | Crawls the local filesystem for document discovery |
+| `nodes/node_kreuzberg_parse_effect/` | `HandlerKreuzbergParse` | Sends documents to the Kreuzberg parser service for text extraction |
+| `nodes/node_agent_learning_retrieval_effect/` | `HandlerAgentLearningRetrieval` | Retrieves learning context for agent sessions |
+| `nodes/node_persona_storage_effect/` | `HandlerPersonaStorage` | Persists persona signals and profile updates |
 
 ### COMPUTE Nodes
 
@@ -107,8 +111,9 @@ provider protocols, keeping the node logic deterministic and testable.
 
 | Directory | Node Class | Responsibility |
 |-----------|------------|----------------|
-| `nodes/semantic_analyzer_compute/` | `NodeSemanticAnalyzerCompute` | Generates embeddings, extracts entities, runs full semantic analysis |
-| `nodes/similarity_compute/` | `NodeSimilarityCompute` | Computes vector similarity between memory records |
+| `nodes/node_semantic_analyzer_compute/` | `NodeSemanticAnalyzerCompute` | Generates embeddings, extracts entities, runs full semantic analysis |
+| `nodes/node_similarity_compute/` | `NodeSimilarityCompute` | Computes vector similarity between memory records |
+| `nodes/node_persona_builder_compute/` | (handler-only; `contract.yaml` routes to `omnimemory.nodes.node_persona_builder_compute.handlers.handler_persona_classify`) | Classifies persona signals into an updated persona profile |
 
 ### REDUCER Nodes
 
@@ -118,13 +123,12 @@ counters.
 
 **OmniMemory REDUCER nodes:**
 
-| Directory | Responsibility |
-|-----------|----------------|
-| `nodes/statistics_reducer/` | Aggregates memory operation metrics and statistics |
-| `nodes/memory_consolidator_reducer/` | Merges and deduplicates overlapping memory records |
+| Directory | Responsibility | Status |
+|-----------|----------------|--------|
+| `nodes/node_navigation_history_reducer/` | Aggregates and persists agent navigation history | Runnable (has `contract.yaml`) |
+| `nodes/node_memory_consolidator_reducer/` | Merges and deduplicates overlapping memory records | Stub — no `contract.yaml`; scaffolded skeleton only |
 
-> Both reducer nodes are currently scaffolded. Implementation is in progress as
-> part of the Core 8 memory pipeline.
+> `node_statistics_reducer` was decommissioned in an earlier cleanup pass and is no longer present in the repository.
 
 ### ORCHESTRATOR Nodes
 
@@ -136,19 +140,21 @@ They do not perform I/O directly — they delegate to EFFECT nodes.
 
 | Directory | Handler | Responsibility |
 |-----------|---------|----------------|
-| `nodes/memory_lifecycle_orchestrator/` | `HandlerMemoryTick`, `HandlerMemoryArchive`, `HandlerMemoryExpire` | Drives time-based lifecycle: ticking expiry counters, archiving old memories, expiring stale records |
-| `nodes/agent_coordinator_orchestrator/` | (in progress) | Routes memory requests across agents, coordinates cross-service memory operations |
+| `nodes/node_memory_lifecycle_orchestrator/` | `HandlerMemoryTick`, `HandlerMemoryArchive`, `HandlerMemoryExpire` | Drives time-based lifecycle: ticking expiry counters, archiving old memories, expiring stale records |
+| `nodes/node_agent_coordinator_orchestrator/` | (in progress) | Routes memory requests across agents, coordinates cross-service memory operations |
+
+> `node_persona_lifecycle_orchestrator` was decommissioned in an earlier cleanup pass (never had a `contract.yaml`) and is no longer present in the repository.
 
 ---
 
 ## Naming Convention
 
 All nodes follow the pattern `Node<Name><Type>` mapped to files named
-`node_<name>_<type>.py`. Directories follow `<name>_<type>/`.
+`node_<name>_<type>.py`. Directories follow `node_<name>_<type>/`.
 
 ```
 nodes/
-  semantic_analyzer_compute/           # directory: <name>_<type>
+  node_semantic_analyzer_compute/      # directory: node_<name>_<type>
     node_semantic_analyzer_compute.py  # file: node_<name>_<type>.py
     handlers/
       handler_semantic_compute.py

@@ -13,18 +13,22 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+
       # SKIP hooks that require the full project installed (uv + omnimemory).
       # These hooks have dedicated CI jobs in .github/workflows/test.yml:
       #   - contract-linter  -> contract-validation job
-      #   - io-audit         -> io-audit job
       #   - mypy             -> lint job (pre-push stage, not triggered here anyway)
       #   - onex-validate-links -> requires uv (not available in pre-commit CI env)
+      # NOTE(OMN-13283): io-audit removed from SKIP — the node-purity / transport
+      # gates are now omnibase_core remote hooks that self-install core into their
+      # own hook venv, so they run fine in this pre-commit env.
       - uses: pre-commit/action@v3.0.1
         env:
-          SKIP: contract-linter,io-audit,check-ai-slop,onex-validate-links
+          SKIP: contract-linter,check-ai-slop,onex-validate-links

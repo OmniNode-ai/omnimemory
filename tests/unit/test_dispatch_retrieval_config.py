@@ -70,10 +70,20 @@ class TestRetrievalConfigFromEnv:
         assert config.use_stub_handlers is False
         assert config.qdrant_config is not None
 
-    def test_false_without_qdrant_env_raises_keyerror(self) -> None:
-        """When stubs disabled but QDRANT_* unset, KeyError is raised (no fallback defaults)."""
+    def test_false_without_qdrant_env_fails_closed(self) -> None:
+        """When stubs disabled but QDRANT_HOST unset, the overlay descriptor seam
+        fails closed with a ValueError (no silent localhost fallback).
+
+        OMN-13562 Wave-1: the Qdrant host now resolves through
+        node_memory_retrieval_effect.contract_descriptor.contract_qdrant_host
+        (overlay-declared ``descriptor.qdrant_host = ${env.QDRANT_HOST}``), which
+        raises a descriptive ValueError when QDRANT_HOST is unset rather than the
+        previous raw KeyError from a direct ``os.environ`` read.
+        """
         with patch.dict(
             os.environ, {"OMNIMEMORY_USE_STUB_HANDLERS": "false"}, clear=True
         ):
-            with pytest.raises(KeyError):
+            with pytest.raises(
+                ValueError, match=r"descriptor\.qdrant_host resolved empty"
+            ):
                 build_retrieval_config_from_env()

@@ -8,11 +8,11 @@ The runtime plugin system wires the OmniMemory domain into the ONEX kernel witho
 
 For OmniMemory, the plugin (`PluginMemory`) performs five sequential steps:
 
-1. Register memory wire models with `RegistryMessageType` (OMN-2217).
-2. Verify that domain handler classes are importable (`wire_handlers`, OMN-2216).
-3. Create and freeze a `MessageDispatchEngine` for topic-based routing (`wire_dispatchers`, OMN-2215).
+1. Register memory wire models with `RegistryMessageType`.
+2. Verify that domain handler classes are importable (`wire_handlers`).
+3. Create and freeze a `MessageDispatchEngine` for topic-based routing (`wire_dispatchers`).
 4. Publish node introspection events so the platform registration orchestrator can discover each memory node.
-5. Subscribe to all Kafka input topics declared in node `contract.yaml` files (`start_consumers`, OMN-2213).
+5. Subscribe to all Kafka input topics declared in node `contract.yaml` files (`start_consumers`).
 
 The plugin activates only when the `OMNIMEMORY_ENABLED` environment variable is set, enabling graceful degradation in kernels that do not require the memory domain. See [`OMNIMEMORY_ENABLED` in the environment variables reference](../environment_variables.md#service-level-configuration) for configuration details and expected values.
 
@@ -30,11 +30,12 @@ All runtime modules live under `src/omnimemory/runtime/`:
 | `dispatch_handlers.py` | `create_memory_dispatch_engine`, bridge handlers |
 | `contract_topics.py` | Contract-driven topic discovery |
 | `adapters.py` | `AdapterKafkaPublisher`, event bus protocols |
-| `introspection.py` | `publish_memory_introspection`, `MemoryNodeIntrospectionProxy` |
+| `introspection.py` | `publish_memory_introspection`, `MemoryNodeIntrospectionProxy`, dynamic node discovery |
+| `handler_lifecycle.py` | Lifecycle handler for runtime tick and shutdown signals |
 
 ---
 
-## PluginMemory (OMN-2216)
+## PluginMemory
 
 **Class**: `PluginMemory`
 **File**: `src/omnimemory/runtime/plugin.py`
@@ -97,15 +98,15 @@ if plugin and plugin.should_activate(config):
 The plugin is declared in `pyproject.toml` so ONEX kernels can discover it automatically via `importlib.metadata`:
 
 ```toml
-[tool.poetry.plugins."onex.domain_plugins"]
+[project.entry-points."onex.domain_plugins"]
 memory = "omnimemory.runtime.plugin:PluginMemory"
 ```
 
-The entry point group `onex.domain_plugins` is the shared discovery namespace. The key `memory` matches `PluginMemory.plugin_id`.
+The entry point group `onex.domain_plugins` is the shared discovery namespace. The key `memory` matches `PluginMemory.plugin_id`. This uses the hatchling build backend (`[project.entry-points]`), not the legacy Poetry plugin table.
 
 ---
 
-## Wire Model Registration (OMN-2217)
+## Wire Model Registration
 
 **Function**: `register_memory_message_types`
 **File**: `src/omnimemory/runtime/message_type_registration.py`
@@ -167,7 +168,7 @@ registered.append("ModelNewCommandRequest")
 
 ---
 
-## MessageDispatchEngine Integration (OMN-2215)
+## MessageDispatchEngine Integration
 
 **Factory**: `create_memory_dispatch_engine`
 **File**: `src/omnimemory/runtime/dispatch_handlers.py`
@@ -258,7 +259,7 @@ engine = create_memory_dispatch_engine(
 
 ---
 
-## Contract-Driven Topic Discovery (OMN-2213)
+## Contract-Driven Topic Discovery
 
 **Module**: `src/omnimemory/runtime/contract_topics.py`
 
@@ -349,7 +350,7 @@ If a `contract.yaml` is missing, contains invalid YAML, or belongs to a package 
 
 ---
 
-## Protocol Adapters (OMN-2214)
+## Protocol Adapters
 
 **File**: `src/omnimemory/runtime/adapters.py`
 
@@ -392,21 +393,14 @@ During `wire_dispatchers`, the plugin publishes STARTUP introspection events for
 
 ### Registered Memory Nodes
 
+`MEMORY_NODES` is no longer a hardcoded tuple. It is built dynamically at module import time via contract discovery:
+
 ```python
-MEMORY_NODES: tuple[_NodeDescriptor, ...] = (
-    # Orchestrators
-    _NodeDescriptor("memory_lifecycle_orchestrator", EnumNodeKind.ORCHESTRATOR),
-    _NodeDescriptor("agent_coordinator_orchestrator", EnumNodeKind.ORCHESTRATOR),
-    # Compute nodes
-    _NodeDescriptor("similarity_compute", EnumNodeKind.COMPUTE),
-    _NodeDescriptor("semantic_analyzer_compute", EnumNodeKind.COMPUTE),
-    # Effect nodes (also receive heartbeat tasks)
-    _NodeDescriptor("intent_event_consumer_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("intent_query_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("intent_storage_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("memory_retrieval_effect", EnumNodeKind.EFFECT),
-    _NodeDescriptor("memory_storage_effect", EnumNodeKind.EFFECT),
-)
+MEMORY_NODES: tuple[_NodeDescriptor, ...] = discover_memory_nodes()
 ```
+
+`discover_memory_nodes()` calls `_discover_nodes_from_contracts(base_package="omnimemory.nodes")`, which scans every `node_*/contract.yaml` under the `omnimemory.nodes` package using `importlib.resources`. Each contract's `node_type` field determines the `EnumNodeKind`. Nodes without a `contract.yaml` are skipped automatically.
+
+This means the registered set reflects the actual on-disk contracts at import time. As of the current codebase, 15 nodes with `contract.yaml` are discovered (see README for the full inventory).
 
 Node IDs are deterministic: `uuid5(NAMESPACE_DNS, f"omnimemory.{node_name}")`. This ensures STARTUP and SHUTDOWN events for the same logical node always carry the same `node_id`, regardless of which proxy object published them.

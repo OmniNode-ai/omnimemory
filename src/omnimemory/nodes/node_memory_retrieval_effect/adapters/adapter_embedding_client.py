@@ -21,7 +21,7 @@ Example::
 
     async def example():
         # URL must be provided explicitly (from environment variable)
-        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
         config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
@@ -42,7 +42,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-import httpx
+import httpx  # transport-import-ok node-purity-ok: effect-node embedding client httpx (designated I/O boundary), OMN-13283
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -92,7 +92,7 @@ class EmbeddingClient:
     Example using context manager::
 
         import os
-        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
         config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
@@ -105,7 +105,7 @@ class EmbeddingClient:
     Example using manual lifecycle::
 
         import os
-        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
         config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
         await client.connect()
@@ -211,7 +211,7 @@ class EmbeddingClient:
         Example::
 
             import os
-            embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+            embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
             config = ModelEmbeddingClientConfig(base_url=embedding_url)
             async with EmbeddingClient(config) as client:
                 embedding = await client.get_embedding("Hello world")
@@ -363,7 +363,7 @@ class EmbeddingClient:
         Example::
 
             import os
-            embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+            embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
             config = ModelEmbeddingClientConfig(base_url=embedding_url)
             async with EmbeddingClient(config) as client:
                 texts = ["Hello", "World", "Test"]
@@ -397,7 +397,7 @@ class EmbeddingClient:
         Example::
 
             import os
-            embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+            embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
             config = ModelEmbeddingClientConfig(base_url=embedding_url)
             client = EmbeddingClient(config)
             async with client:

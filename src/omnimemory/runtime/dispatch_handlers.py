@@ -40,23 +40,30 @@ from omnibase_core.enums.enum_node_kind import EnumNodeKind
 from omnibase_core.models.core.model_envelope_metadata import ModelEnvelopeMetadata
 from omnibase_core.models.dispatch.model_dispatch_route import ModelDispatchRoute
 from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
-from omnibase_core.runtime.runtime_message_dispatch import MessageDispatchEngine
+from omnibase_infra.models.dispatch.model_dispatch_context import ModelDispatchContext
+from omnibase_infra.runtime.message_dispatch_engine import MessageDispatchEngine
 
 from omnimemory.runtime.contract_topics import canonical_topic_to_dispatch_alias
 from omnimemory.topics import EnumMemoryCommandTopic as MemoryCommandTopic
 from omnimemory.topics import EnumMemoryEventTopic as MemoryEventTopic
 
 if TYPE_CHECKING:
-    from omnibase_core.protocols.handler.protocol_handler_context import (
-        ProtocolHandlerContext,
-    )
-
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
     )
     from omnimemory.runtime.handler_lifecycle import HandlerMemoryLifecycle
 
 logger = logging.getLogger(__name__)
+
+DispatchReturn = str | list[str] | None
+
+
+def _get_dispatch_payload(message: object) -> object:
+    """Return payload for both envelope and raw-payload dispatch APIs."""
+    if isinstance(message, ModelEventEnvelope):
+        return message.payload
+    return message
+
 
 # =============================================================================
 # Dependency Protocols (structural typing for dispatch handler deps)
@@ -167,8 +174,8 @@ def create_intent_classified_dispatch_handler(
     consumer: ProtocolIntentEventConsumer,
     correlation_id: UUID | None = None,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for intent-classified events.
 
@@ -186,14 +193,14 @@ def create_intent_classified_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> HandlerIntentEventConsumer._handle_message()."""
         ctx_correlation_id = (
             correlation_id or getattr(context, "correlation_id", None) or uuid4()
         )
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
 
         if not isinstance(payload, dict):
             msg = (
@@ -217,7 +224,7 @@ def create_intent_classified_dispatch_handler(
             ctx_correlation_id,
         )
 
-        return ""
+        return []
 
     return _handle
 
@@ -236,8 +243,8 @@ def create_intent_query_dispatch_handler(
     publish_topic: str | None = None,
     correlation_id: UUID | None = None,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for intent-query-requested events.
 
@@ -264,8 +271,8 @@ def create_intent_query_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> HandlerIntentQuery.execute()."""
         from omnimemory.nodes.node_intent_query_effect.models import (
             ModelIntentQueryRequestedEvent,
@@ -275,7 +282,7 @@ def create_intent_query_dispatch_handler(
             correlation_id or getattr(context, "correlation_id", None) or uuid4()
         )
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
 
         # Parse payload into ModelIntentQueryRequestedEvent
         if isinstance(payload, ModelIntentQueryRequestedEvent):
@@ -340,7 +347,7 @@ def create_intent_query_dispatch_handler(
                     ctx_correlation_id,
                 )
 
-        return ""
+        return []
 
     return _handle
 
@@ -355,8 +362,8 @@ def create_lifecycle_noop_dispatch_handler(
     topic_label: str = "lifecycle",
     correlation_id: UUID | None = None,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a no-op dispatch handler for lifecycle orchestrator topics.
 
@@ -375,14 +382,14 @@ def create_lifecycle_noop_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """No-op handler: lifecycle orchestrator not yet wired."""
         ctx_correlation_id = (
             correlation_id or getattr(context, "correlation_id", None) or uuid4()
         )
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
         payload_keys: list[str] = []
         if isinstance(payload, dict):
             payload_keys = list(payload.keys())
@@ -394,7 +401,7 @@ def create_lifecycle_noop_dispatch_handler(
             ctx_correlation_id,
             payload_keys,
         )
-        return ""
+        return []
 
     return _handle
 
@@ -403,8 +410,8 @@ def create_lifecycle_dispatch_handler(
     *,
     correlation_id: UUID | None = None,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a no-op dispatch handler for lifecycle orchestrator topics.
 
@@ -444,6 +451,10 @@ def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers 
     Returns:
         Fully-populated retrieval config ready for ``HandlerMemoryRetrieval``.
     """
+    from omnimemory.nodes.node_memory_retrieval_effect.contract_descriptor import (
+        contract_qdrant_host,
+        contract_qdrant_port,
+    )
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
     )
@@ -457,10 +468,15 @@ def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers 
     qdrant_config = (
         None
         if use_stubs
+        # OMN-13562 Wave-1: resolve the Qdrant host/port through the
+        # retrieval node's overlay-declared descriptor (the qdrant owner)
+        # instead of direct os.environ reads. Fails closed on unset QDRANT_HOST.
         else ModelHandlerQdrantConfig(
-            qdrant_host=os.environ["QDRANT_HOST"],
-            qdrant_port=int(os.environ["QDRANT_PORT"]),
-            embedding_server_url=os.environ["LLM_EMBEDDING_URL"],
+            qdrant_host=contract_qdrant_host(),
+            qdrant_port=contract_qdrant_port(),
+            embedding_server_url=os.environ[
+                "LLM_EMBEDDING_URL"
+            ],  # url-authority-ok: legacy dispatch bootstrap config; Phase-3 DI debt OMN-2584
         )
     )
     return ModelHandlerMemoryRetrievalConfig(
@@ -473,8 +489,8 @@ def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handle
     *,
     correlation_id: UUID | None = None,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch handler for memory-retrieval-requested commands.
 
@@ -509,14 +525,14 @@ def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handle
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> HandlerMemoryRetrieval.execute()."""
         ctx_correlation_id = (
             correlation_id or getattr(context, "correlation_id", None) or uuid4()
         )
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
 
         # Parse payload into ModelMemoryRetrievalRequest
         if isinstance(payload, ModelMemoryRetrievalRequest):
@@ -573,8 +589,8 @@ def _create_graph_memory_dispatch_handler(
     *,
     adapter: object,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for graph memory operations.
 
@@ -592,12 +608,12 @@ def _create_graph_memory_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> AdapterGraphMemory operation."""
         ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
         if not isinstance(payload, dict):
             msg = (
                 f"Unexpected payload type {type(payload).__name__} "
@@ -616,7 +632,7 @@ def _create_graph_memory_dispatch_handler(
             ctx_correlation_id,
         )
 
-        return ""
+        return []
 
     return _handle
 
@@ -630,8 +646,8 @@ def _create_intent_graph_dispatch_handler(
     *,
     adapter: object,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for intent graph operations.
 
@@ -645,12 +661,12 @@ def _create_intent_graph_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> AdapterIntentGraph operation."""
         ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
         if not isinstance(payload, dict):
             msg = (
                 f"Unexpected payload type {type(payload).__name__} "
@@ -669,7 +685,7 @@ def _create_intent_graph_dispatch_handler(
             ctx_correlation_id,
         )
 
-        return ""
+        return []
 
     return _handle
 
@@ -683,8 +699,8 @@ def _create_navigation_history_dispatch_handler(
     *,
     handler: object,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for navigation history sessions.
 
@@ -697,12 +713,12 @@ def _create_navigation_history_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> HandlerNavigationHistoryReducer."""
         ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
         if not isinstance(payload, dict):
             msg = (
                 f"Unexpected payload type {type(payload).__name__} "
@@ -719,7 +735,7 @@ def _create_navigation_history_dispatch_handler(
             ctx_correlation_id,
         )
 
-        return ""
+        return []
 
     return _handle
 
@@ -733,8 +749,8 @@ def _create_semantic_compute_dispatch_handler(
     *,
     handler: object,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for semantic analysis requests.
 
@@ -747,12 +763,12 @@ def _create_semantic_compute_dispatch_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> HandlerSemanticCompute."""
         ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
 
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
         if not isinstance(payload, dict):
             msg = (
                 f"Unexpected payload type {type(payload).__name__} "
@@ -769,7 +785,7 @@ def _create_semantic_compute_dispatch_handler(
             ctx_correlation_id,
         )
 
-        return ""
+        return []
 
     return _handle
 
@@ -783,8 +799,8 @@ def _create_lifecycle_bridge_handler(
     *,
     lifecycle: HandlerMemoryLifecycle,
 ) -> Callable[
-    [ModelEventEnvelope[object], ProtocolHandlerContext],
-    Awaitable[str],
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
 ]:
     """Create a dispatch engine handler for lifecycle commands.
 
@@ -800,13 +816,13 @@ def _create_lifecycle_bridge_handler(
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
-        context: ProtocolHandlerContext,
-    ) -> str:
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
         """Bridge handler: envelope -> HandlerMemoryLifecycle."""
         ctx_correlation_id = getattr(context, "correlation_id", None) or uuid4()
 
         topic = getattr(envelope, "event_type", None) or "unknown"
-        payload = envelope.payload
+        payload = _get_dispatch_payload(envelope)
         command = payload.get("command", "") if isinstance(payload, dict) else ""
 
         logger.info(
@@ -839,7 +855,7 @@ def _create_lifecycle_bridge_handler(
                 ctx_correlation_id,
             )
 
-        return ""
+        return []
 
     return _handle
 
@@ -905,9 +921,9 @@ def create_memory_dispatch_engine(
     intent_classified_handler = create_intent_classified_dispatch_handler(
         consumer=intent_consumer,
     )
-    engine.register_handler(
-        handler_id="memory-intent-classified-handler",
-        handler=intent_classified_handler,
+    engine.register_dispatcher(
+        dispatcher_id="memory-intent-classified-handler",
+        dispatcher=intent_classified_handler,
         category=EnumMessageCategory.EVENT,
         node_kind=EnumNodeKind.EFFECT,
         message_types=None,
@@ -931,9 +947,9 @@ def create_memory_dispatch_engine(
         publish_callback=publish_callback,
         publish_topic=topics.get("intent_query"),
     )
-    engine.register_handler(
-        handler_id="memory-intent-query-handler",
-        handler=intent_query_dispatch_handler,
+    engine.register_dispatcher(
+        dispatcher_id="memory-intent-query-handler",
+        dispatcher=intent_query_dispatch_handler,
         category=EnumMessageCategory.COMMAND,
         node_kind=EnumNodeKind.EFFECT,
         message_types=None,
@@ -955,9 +971,9 @@ def create_memory_dispatch_engine(
     # Uses HandlerMemoryRetrieval with mock backends so retrieval commands
     # are served without external dependencies (OMN-2437).
     retrieval_handler = create_memory_retrieval_dispatch_handler()
-    engine.register_handler(
-        handler_id="memory-retrieval-handler",
-        handler=retrieval_handler,
+    engine.register_dispatcher(
+        dispatcher_id="memory-retrieval-handler",
+        dispatcher=retrieval_handler,
         category=EnumMessageCategory.COMMAND,
         node_kind=EnumNodeKind.EFFECT,
         message_types=None,
@@ -987,9 +1003,9 @@ def create_memory_dispatch_engine(
         semantic_handler=semantic_compute_handler,
     )
     lifecycle_handler = _create_lifecycle_bridge_handler(lifecycle=_lifecycle)
-    engine.register_handler(
-        handler_id="memory-lifecycle-handler",
-        handler=lifecycle_handler,
+    engine.register_dispatcher(
+        dispatcher_id="memory-lifecycle-handler",
+        dispatcher=lifecycle_handler,
         category=EnumMessageCategory.COMMAND,
         node_kind=EnumNodeKind.ORCHESTRATOR,
         message_types=None,
@@ -1035,9 +1051,9 @@ def create_memory_dispatch_engine(
         graph_memory_handler = _create_graph_memory_dispatch_handler(
             adapter=graph_memory_adapter,
         )
-        engine.register_handler(
-            handler_id="memory-graph-memory-handler",
-            handler=graph_memory_handler,
+        engine.register_dispatcher(
+            dispatcher_id="memory-graph-memory-handler",
+            dispatcher=graph_memory_handler,
             category=EnumMessageCategory.COMMAND,
             node_kind=EnumNodeKind.EFFECT,
             message_types=None,
@@ -1060,9 +1076,9 @@ def create_memory_dispatch_engine(
         intent_graph_handler = _create_intent_graph_dispatch_handler(
             adapter=intent_graph_adapter,
         )
-        engine.register_handler(
-            handler_id="memory-intent-graph-handler",
-            handler=intent_graph_handler,
+        engine.register_dispatcher(
+            dispatcher_id="memory-intent-graph-handler",
+            dispatcher=intent_graph_handler,
             category=EnumMessageCategory.COMMAND,
             node_kind=EnumNodeKind.EFFECT,
             message_types=None,
@@ -1085,9 +1101,9 @@ def create_memory_dispatch_engine(
         nav_dispatch_handler = _create_navigation_history_dispatch_handler(
             handler=navigation_history_handler,
         )
-        engine.register_handler(
-            handler_id="memory-navigation-history-handler",
-            handler=nav_dispatch_handler,
+        engine.register_dispatcher(
+            dispatcher_id="memory-navigation-history-handler",
+            dispatcher=nav_dispatch_handler,
             category=EnumMessageCategory.COMMAND,
             node_kind=EnumNodeKind.REDUCER,
             message_types=None,
@@ -1110,9 +1126,9 @@ def create_memory_dispatch_engine(
         semantic_dispatch_handler = _create_semantic_compute_dispatch_handler(
             handler=semantic_compute_handler,
         )
-        engine.register_handler(
-            handler_id="memory-semantic-compute-handler",
-            handler=semantic_dispatch_handler,
+        engine.register_dispatcher(
+            dispatcher_id="memory-semantic-compute-handler",
+            dispatcher=semantic_dispatch_handler,
             category=EnumMessageCategory.COMMAND,
             node_kind=EnumNodeKind.COMPUTE,
             message_types=None,
@@ -1135,7 +1151,7 @@ def create_memory_dispatch_engine(
     logger.info(
         "Memory dispatch engine created and frozen (routes=%d, handlers=%d)",
         engine.route_count,
-        engine.handler_count,
+        engine.dispatcher_count,
     )
 
     return engine
@@ -1265,10 +1281,10 @@ def create_dispatch_callback(
             )
 
             logger.debug(
-                "Dispatch result: status=%s, handler=%s, duration=%.2fms "
+                "Dispatch result: status=%s, dispatcher=%s, duration=%.2fms "
                 "(correlation_id=%s)",
                 result.status,
-                result.handler_id,
+                result.dispatcher_id,
                 result.duration_ms,
                 msg_correlation_id,
             )

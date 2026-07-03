@@ -24,7 +24,7 @@ Example::
     async def example():
         config = ModelEmbeddingHttpClientConfig(
             provider="local",
-            base_url="http://localhost:8100",  # set via LLM_EMBEDDING_URL env var in production
+            base_url="http://localhost:8100",  # url-authority-ok: doc example for local embedding adapter configuration
             model="gte-qwen2",
         )
         client = EmbeddingHttpClient(config)

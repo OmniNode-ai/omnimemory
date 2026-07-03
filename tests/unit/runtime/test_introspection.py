@@ -650,13 +650,13 @@ class TestDiscoverMemoryNodes:
         """All nodes from the former MEMORY_NODES tuple must be discoverable."""
         discovered = discover_memory_nodes()
         discovered_names = {d.name for d in discovered}
-        # These 9 nodes existed in the original hardcoded tuple
+        # These 8 nodes remain after removing node_intent_event_consumer_effect
+        # (OMN-13701: canonical owner is omnimarket; duplicate caused dual-consumer race)
         expected_names = {
             "node_memory_lifecycle_orchestrator",
             "node_agent_coordinator_orchestrator",
             "node_similarity_compute",
             "node_semantic_analyzer_compute",
-            "node_intent_event_consumer_effect",
             "node_intent_query_effect",
             "node_intent_storage_effect",
             "node_memory_retrieval_effect",

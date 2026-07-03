@@ -21,7 +21,7 @@ Example::
 
     async def example():
         # URL must be provided explicitly (from environment variable)
-        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]
+        embedding_url = os.environ["OMNIMEMORY__EMBEDDING__SERVER_URL"]  # url-authority-ok: docstring example for legacy env-supplied embedding endpoint, OMN-2584
         config = ModelEmbeddingClientConfig(base_url=embedding_url)
         client = EmbeddingClient(config)
 
