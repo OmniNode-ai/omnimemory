@@ -273,6 +273,10 @@ known-first-party = ["omnimemory"]
     "ERA001",  # Commented-out code in examples
     "T201",  # print() is intentional user-facing output
 ]
+# Dep-provenance gate CLI (OMN-13873) — user-facing print() diagnostics
+"scripts/check_dep_provenance.py" = [
+    "T201",  # print() is intentional user-facing CLI output
+]
 # Root foundation validators are user-facing CLI scripts.
 "validate_foundation*.py" = [
     "T201",  # print() is intentional user-facing output
@@ -290,6 +294,8 @@ known-first-party = ["omnimemory"]
 "src/omnimemory/tools/contract_linter.py" = ["T201"]
 # Performance benchmark test — uses print() for results output
 "tests/test_performance.py" = ["T201"]
+# Dep-provenance gate test (OMN-13873) — importlib spec+loader guard assert
+"tests/scripts/test_check_dep_provenance.py" = ["PT018"]
 # Test-only rules - acceptable in test files
 "tests/**/*" = [
     "SLF001",  # Private member accessed (tests need to verify internals)
@@ -409,8 +415,8 @@ omninode-memory = { workspace = true }
 # OMN-13837: bump to spi 0.23 / core 0.46.1 release tags. omnibase-infra
 # has no release tag carrying the spi-0.23 pins yet; pin the immutable rev
 # that first carried them until the coordinated infra release lands.
-omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.46.1" }
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "v0.46.1" }  # raw-override-ok: OMN-13878
 omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", rev = "00e5a02a511da691d22d5301b73dd2b0d7400e4a" }
-omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", tag = "v0.23.0" }
-omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", tag = "v0.5.0" }
+omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", tag = "v0.23.0" }  # raw-override-ok: OMN-13878
+omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", tag = "v0.5.0" }  # raw-override-ok: OMN-13878
 omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", tag = "v0.4.0" }
