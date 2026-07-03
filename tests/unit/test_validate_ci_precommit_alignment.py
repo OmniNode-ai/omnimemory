@@ -338,6 +338,11 @@ class TestPrecommitHooksCoveredByAlignments:
             "reject-deploy-gate-skip-token",
             "reject-deploy-gate-skip-token-commit-msg",
             "validate-validator-requirements",
+            # CI counterpart is the standalone dep-provenance-gate.yml workflow
+            # (OMN-13873), not a ci.yml job, so it is excluded from the
+            # ci.yml-scoped EXPECTED_ALIGNMENTS — same as check-url-authority
+            # and validate-validator-requirements above.
+            "check-dep-provenance",
         }
     )
 
