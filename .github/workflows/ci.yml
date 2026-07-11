@@ -579,15 +579,48 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  no-noncanonical-lifecycle-classes:
+    name: no-noncanonical-lifecycle-classes
+    # OMN-14350: non-canonical lifecycle-class ratchet. Unconditional (never skips);
+    # wired into required CI Summary via needs: + strict success-only verdict check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.8.3"
+      - name: Ratchet non-canonical lifecycle-word classes against frozen allowlist (OMN-14350)
+        run: |
+          uv run --no-project \
+            --with 'omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@63635097705d832e0ee9c4811093efb31349105c' \
+            python -m omnibase_core.validators.no_noncanonical_lifecycle_classes \
+            --check-stale \
+            --allowlist .onex_ratchets/noncanonical_class_allowlist.yaml \
+            src/omnimemory
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes]
     if: always()
 
     steps:
       - name: Check test results
         run: |
+          # OMN-14350: strict fail-closed gate on the non-canonical lifecycle-class
+          # ratchet - only 'success' passes; skipped/cancelled/failure ALL block. It is
+          # in needs: so this job WAITS for it (no race).
+          if [[ "${{ needs.no-noncanonical-lifecycle-classes.result }}" != "success" ]]; then
+            echo "::error::no-noncanonical-lifecycle-classes ratchet did not pass (result: ${{ needs.no-noncanonical-lifecycle-classes.result }}) - fail-closed (OMN-14350)"
+            exit 1
+          fi
           migration_freeze="${{ needs.migration-freeze.result }}"
           lint="${{ needs.lint.result }}"
           pyright="${{ needs.pyright.result }}"
