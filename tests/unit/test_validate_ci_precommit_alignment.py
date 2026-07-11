@@ -343,6 +343,9 @@ class TestPrecommitHooksCoveredByAlignments:
             # ci.yml-scoped EXPECTED_ALIGNMENTS — same as check-url-authority
             # and validate-validator-requirements above.
             "check-dep-provenance",
+            # CI counterpart is the standalone noncanonical-lifecycle-gate.yml
+            # workflow (OMN-14350), not a ci.yml job.
+            "no-noncanonical-lifecycle-classes",
         }
     )
 
