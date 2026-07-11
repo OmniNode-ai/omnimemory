@@ -91,6 +91,19 @@ repos:
     rev: 30a06f85bb5849902d33c8d0bdb90fc6cba0c346  # pragma: allowlist secret
     hooks:
       - id: check-stub-implementations
+
+  # OMN-14350: non-canonical lifecycle-class ratchet (fan-out from the omnibase_core
+  # canary #1430). Consumes the canonical omnibase_core remote hook and ratchets this
+  # repo's frozen residual set (.onex_ratchets/noncanonical_class_allowlist.yaml) DOWN
+  # toward zero. rev is pinned to a specific core dev SHA (never a moving ref, per the
+  # deterministic-truth doctrine). CI merge-gating is via the dedicated
+  # .github/workflows/noncanonical-lifecycle-gate.yml job; this local hook is dev-ergonomics.
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: 63635097705d832e0ee9c4811093efb31349105c  # pragma: allowlist secret
+    hooks:
+      - id: no-noncanonical-lifecycle-classes
+        args: [--allowlist, .onex_ratchets/noncanonical_class_allowlist.yaml, src/omnimemory]
+        files: ^src/omnimemory/.*\.py$
   # URL Authority Gate (OMN-13298, child of OMN-12803).
   # Ratchet: NEW fingerprints fail; existing violations grandfathered in the
   # shared baseline at omnibase_core/src/omnibase_core/validation/baselines/url_authority_baseline.json.
