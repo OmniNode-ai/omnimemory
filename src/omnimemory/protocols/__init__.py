@@ -58,7 +58,6 @@ from .error_models import (  # Error handling; Error codes
     ProtocolSystemError,
     ProtocolValidationError,
 )
-from .protocol_crawl_state_repository import ProtocolCrawlStateRepository
 from .protocol_embedding import ProtocolEmbeddingClient, ProtocolRateLimiter
 from .protocol_embedding_provider import ProtocolEmbeddingProvider, ProtocolLLMProvider
 from .protocol_handler_intent import ProtocolHandlerIntent
@@ -128,6 +127,4 @@ __all__ = [
     "ProtocolHandlerIntent",
     # Adapter protocols (for contract-driven dependency injection)
     "ProtocolIntentGraphAdapter",
-    # Crawl state repository protocol
-    "ProtocolCrawlStateRepository",
 ]

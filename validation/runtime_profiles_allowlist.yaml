@@ -10,9 +10,6 @@ allowlist:
   - node_id: node_agent_learning_retrieval_effect
     reason: OMN-13297 baseline freeze; remediate via OMN-12982 (assign correct runtime lane or document
       runtime-exempt)
-  - node_id: node_filesystem_crawler_effect
-    reason: OMN-13297 baseline freeze; remediate via OMN-12982 (assign correct runtime lane or document
-      runtime-exempt)
   - node_id: node_intent_query_effect
     reason: OMN-13297 baseline freeze; remediate via OMN-12982 (assign correct runtime lane or document
       runtime-exempt)

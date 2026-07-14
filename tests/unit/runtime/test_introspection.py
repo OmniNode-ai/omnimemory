@@ -672,7 +672,8 @@ class TestDiscoverMemoryNodes:
         discovered = discover_memory_nodes()
         discovered_names = {d.name for d in discovered}
         # These nodes have contract.yaml but were not in the original tuple
-        assert "node_filesystem_crawler_effect" in discovered_names
+        # node_filesystem_crawler_effect removed (OMN-14618): orphaned dead
+        # code, superseded by omnimarket's copy since OMN-8299.
         assert "node_kreuzberg_parse_effect" in discovered_names
 
     @pytest.mark.unit

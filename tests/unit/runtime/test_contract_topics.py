@@ -48,9 +48,6 @@ EXPECTED_RUNTIME_TICK = "onex.cmd.omnimemory.runtime-tick.v1"
 EXPECTED_ARCHIVE_MEMORY = "onex.cmd.omnimemory.archive-memory.v1"
 EXPECTED_EXPIRE_MEMORY = "onex.cmd.omnimemory.expire-memory.v1"
 
-# filesystem_crawler_effect
-EXPECTED_CRAWL_TICK = "onex.cmd.omnimemory.crawl-tick.v1"
-
 EXPECTED_SUBSCRIBE_TOPICS = {
     # EXPECTED_INTENT_CLASSIFIED removed (OMN-13701): node moved to omnimarket
     EXPECTED_INTENT_QUERY_REQUESTED,
@@ -58,7 +55,8 @@ EXPECTED_SUBSCRIBE_TOPICS = {
     EXPECTED_RUNTIME_TICK,
     EXPECTED_ARCHIVE_MEMORY,
     EXPECTED_EXPIRE_MEMORY,
-    EXPECTED_CRAWL_TICK,
+    # EXPECTED_CRAWL_TICK removed (OMN-14618): node_filesystem_crawler_effect
+    # was orphaned dead code, superseded by omnimarket's copy since OMN-8299.
 }
 
 # =============================================================================
@@ -72,7 +70,6 @@ EXPECTED_DISPATCH_MAP = {
     "memory_retrieval": "onex.evt.omnimemory.memory-retrieval-response.v1",
     "memory_storage": "onex.evt.omnimemory.memory-stored.v1",
     "memory_lifecycle": "onex.evt.omnimemory.memory-expired.v1",
-    "filesystem_crawler": "onex.evt.omnimemory.document-discovered.v1",
 }
 
 # =============================================================================
@@ -99,11 +96,8 @@ EXPECTED_ALL_PUBLISH_TOPICS = {
     "onex.evt.omnimemory.memory-archived.v1",
     "onex.evt.omnimemory.memory-archive-initiated.v1",
     "onex.evt.omnimemory.lifecycle-transition-failed.v1",
-    # filesystem_crawler_effect
-    "onex.evt.omnimemory.document-discovered.v1",
-    "onex.evt.omnimemory.document-changed.v1",
-    "onex.evt.omnimemory.document-removed.v1",
-    "onex.evt.omnimemory.document-indexed.v1",
+    # filesystem_crawler_effect topics removed (OMN-14618): node was orphaned
+    # dead code, superseded by omnimarket's copy since OMN-8299.
 }
 
 
@@ -116,15 +110,17 @@ EXPECTED_ALL_PUBLISH_TOPICS = {
 class TestCollectSubscribeTopics:
     """Validate contract-driven subscribe topic collection."""
 
-    def test_returns_exactly_six_topics(self) -> None:
-        """Remaining omnimemory nodes declare 6 subscribe topics.
+    def test_returns_exactly_five_topics(self) -> None:
+        """Remaining omnimemory nodes declare 5 subscribe topics.
 
         node_intent_event_consumer_effect was removed (OMN-13701); its topic
         onex.evt.omniintelligence.intent-classified.v1 is now consumed only
-        by omnimarket's canonical node.
+        by omnimarket's canonical node. node_filesystem_crawler_effect was
+        removed (OMN-14618): orphaned dead code, superseded by omnimarket's
+        copy since OMN-8299.
         """
         topics = collect_subscribe_topics_from_contracts()
-        assert len(topics) == 6
+        assert len(topics) == 5
 
     def test_contains_intent_query_requested_topic(self) -> None:
         """Intent query requested topic from intent_query_effect."""
@@ -151,13 +147,8 @@ class TestCollectSubscribeTopics:
         topics = collect_subscribe_topics_from_contracts()
         assert EXPECTED_EXPIRE_MEMORY in topics
 
-    def test_contains_crawl_tick_topic(self) -> None:
-        """Crawl tick command topic from filesystem_crawler_effect."""
-        topics = collect_subscribe_topics_from_contracts()
-        assert EXPECTED_CRAWL_TICK in topics
-
     def test_all_expected_topics_present(self) -> None:
-        """All 6 expected subscribe topics must be in the discovered set."""
+        """All 5 expected subscribe topics must be in the discovered set."""
         topics = set(collect_subscribe_topics_from_contracts())
         assert topics == EXPECTED_SUBSCRIBE_TOPICS
 
@@ -463,20 +454,15 @@ class TestNodePackageRegistry:
             in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
         )
 
-    def test_contains_filesystem_crawler(self) -> None:
-        """filesystem_crawler_effect must be in the package list."""
-        assert (
-            "omnimemory.nodes.node_filesystem_crawler_effect"
-            in _OMNIMEMORY_EVENT_BUS_NODE_PACKAGES
-        )
-
-    def test_exactly_six_packages(self) -> None:
-        """Exactly 6 omnimemory nodes have event_bus enabled.
+    def test_exactly_five_packages(self) -> None:
+        """Exactly 5 omnimemory nodes have event_bus enabled.
 
         node_intent_event_consumer_effect removed (OMN-13701): canonical
-        owner is omnimarket.
+        owner is omnimarket. node_filesystem_crawler_effect removed
+        (OMN-14618): orphaned dead code, superseded by omnimarket's copy
+        since OMN-8299.
         """
-        assert len(_OMNIMEMORY_EVENT_BUS_NODE_PACKAGES) == 6
+        assert len(_OMNIMEMORY_EVENT_BUS_NODE_PACKAGES) == 5
 
 
 # =============================================================================
