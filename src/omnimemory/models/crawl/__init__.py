@@ -4,7 +4,6 @@
 # Copyright (c) 2025 OmniNode Team
 """Crawl-related models for the document ingestion pipeline."""
 
-from omnimemory.models.crawl.model_crawl_state_record import ModelCrawlStateRecord
 from omnimemory.models.crawl.model_crawl_tick_command import (
     ModelCrawlTickCommand,
 )
@@ -23,7 +22,6 @@ from omnimemory.models.crawl.model_document_removed_event import (
 from omnimemory.models.crawl.types import TriggerSource
 
 __all__ = [
-    "ModelCrawlStateRecord",
     "ModelCrawlTickCommand",
     "ModelDocumentChangedEvent",
     "ModelDocumentDiscoveredEvent",

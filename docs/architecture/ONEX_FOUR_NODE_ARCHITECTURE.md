@@ -2,8 +2,8 @@
 
 # ONEX Four-Node Architecture in OmniMemory
 
-> **Version**: 0.2.1
-> **Last Updated**: 2026-06-21 (verified node inventory, COMPUTE table, and directory-naming convention against `src/omnimemory/nodes/`)
+> **Version**: 0.2.2
+> **Last Updated**: 2026-07-14 (OMN-14618: removed orphaned `node_filesystem_crawler_effect` — dead code since OMN-8299, superseded by omnimarket's copy)
 > **Status**: Active
 
 ## Overview
@@ -89,7 +89,6 @@ to produce side effects.
 | `nodes/node_intent_query_effect/` | `HandlerIntentQuery` | Queries stored intents, returns results over the event bus |
 | `nodes/node_memory_retrieval_effect/` | `HandlerMemoryRetrieval` | Retrieves memory records from Qdrant, PostgreSQL, and Memgraph |
 | `nodes/node_memory_storage_effect/` | `AdapterFilesystem` | Persists memory payloads to the filesystem adapter |
-| `nodes/node_filesystem_crawler_effect/` | `HandlerFilesystemCrawler` | Crawls the local filesystem for document discovery |
 | `nodes/node_kreuzberg_parse_effect/` | `HandlerKreuzbergParse` | Sends documents to the Kreuzberg parser service for text extraction |
 | `nodes/node_agent_learning_retrieval_effect/` | `HandlerAgentLearningRetrieval` | Retrieves learning context for agent sessions |
 | `nodes/node_persona_storage_effect/` | `HandlerPersonaStorage` | Persists persona signals and profile updates |

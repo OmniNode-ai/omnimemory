@@ -33,7 +33,6 @@ import omnimemory.nodes as _omnimemory_nodes_pkg
 from omnimemory.enums.crawl.enum_context_source_type import EnumContextSourceType
 from omnimemory.enums.crawl.enum_crawler_type import EnumCrawlerType
 from omnimemory.enums.crawl.enum_detected_doc_type import EnumDetectedDocType
-from omnimemory.models.crawl.model_crawl_state_record import ModelCrawlStateRecord
 from omnimemory.models.crawl.model_crawl_tick_command import ModelCrawlTickCommand
 from omnimemory.models.crawl.model_document_changed_event import (
     ModelDocumentChangedEvent,
@@ -596,7 +595,6 @@ class TestAllBoundaryModelsCompletenessScanned:
             "ModelDocumentDiscoveredEvent",
             "ModelDocumentChangedEvent",
             "ModelDocumentRemovedEvent",
-            "ModelCrawlStateRecord",
             "ModelCrawlTickCommand",
             "ModelMemoryRetrievalRequest",
             "ModelMemoryRetrievalResponse",
@@ -758,22 +756,8 @@ class TestCrawlBoundaryModelsFrozen:
     def test_document_removed_event_config_frozen(self) -> None:
         assert ModelDocumentRemovedEvent.model_config.get("frozen") is True
 
-    def test_crawl_state_record_config_frozen(self) -> None:
-        assert ModelCrawlStateRecord.model_config.get("frozen") is True
-
     def test_crawl_tick_command_config_frozen(self) -> None:
         assert ModelCrawlTickCommand.model_config.get("frozen") is True
-
-    def test_crawl_state_record_rejects_mutation(self) -> None:
-        record = ModelCrawlStateRecord(
-            source_ref="/docs/CLAUDE.md",
-            crawler_type=EnumCrawlerType.FILESYSTEM,
-            scope_ref="omninode/omnimemory",
-            content_fingerprint=self._CONTENT_FINGERPRINT,
-            last_crawled_at_utc=datetime.now(timezone.utc),
-        )
-        with pytest.raises(ValidationError):
-            record.source_ref = "/docs/OTHER.md"  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------

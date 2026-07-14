@@ -26,7 +26,6 @@ These components are the permanent core of omnimemory. They do not move to omnim
 All protocol interfaces remain in `src/omnimemory/protocols/`:
 
 - `ProtocolEmbedding`, `ProtocolEmbeddingProvider`
-- `ProtocolCrawlStateRepository`
 - `ProtocolHandlerIntent`
 - `ProtocolIntentGraphAdapter`
 - `ProtocolSecretsProvider`
