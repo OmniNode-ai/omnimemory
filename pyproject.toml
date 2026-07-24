@@ -176,6 +176,7 @@ ignore = [
     "PLR0912",   # Too many branches (>12)
     "PLR0913",   # Too many arguments (>5)
     "PLR0915",   # Too many statements (>50)
+    "PLR0917",   # Too many positional arguments (>5)
 
     # ==========================================================================
     # EXCEPTION HANDLING (technical debt - fix incrementally)
