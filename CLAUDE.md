@@ -1,253 +1,36 @@
 # CLAUDE.md - OmniMemory
 
-> **Python**: 3.12+ | **Framework**: ONEX 4.0 | **Package Manager**: uv (hatchling backend) | **Shared Standards**: See **`~/.claude/CLAUDE.md`** for shared development standards (Python, Git, testing, architecture principles) and infrastructure configuration (PostgreSQL, Kafka/Redpanda, Docker networking, environment variables).
+Document ingestion + semantic retrieval: models, protocols, and storage adapters for Qdrant, Memgraph, and PostgreSQL backends. Shared standards (Python, git, worktrees, PR/CI gates, layering) live in the root and `~/.claude/CLAUDE.md` and are not repeated here.
 
----
-
-## Table of Contents
-
-1. [Repo Invariants](#repo-invariants)
-2. [Non-Goals](#non-goals)
-3. [Quick Reference](#quick-reference)
-4. [Package Manager](#package-manager)
-5. [Forbidden Patterns](#forbidden-patterns)
-6. [Required Patterns](#required-patterns)
-7. [Model Exemption Pattern](#model-exemption-pattern)
-8. [SPDX Headers](#spdx-headers)
-9. [Documentation](#documentation)
-
----
+**Python**: `requires-python` in `pyproject.toml` (`>=3.12,<3.14` as of 2026-07-26) | **Build**: uv + hatchling. All Python commands run via `uv run`.
 
 ## Repo Invariants
 
-These are non-negotiable architectural truths:
+Enforced by pre-commit hooks (`.pre-commit-config.yaml`) backed by `scripts/validation/`:
 
-- **Zero `Any` types** — no `Any` anywhere in `src/`; use precise types or explicit `object`
-- **`frozen=True` on boundary-crossing models** — all models that cross handler/node boundaries must be immutable
-- **`ModelSemVer` only for version fields** — no `str`, no `str | ModelSemVer`, no validator coercion
-- **No backwards compatibility** — ever; delete old code, never deprecate
-- **Models live in `src/omnimemory/models/`** — organized by domain subdirectory; exceptions require `omnimemory-model-exempt` comment
-- **`Field(..., description="...")` on all model fields** — no bare field declarations
-- **PEP 604 unions** — `X | Y` not `Optional[X]` or `Union[X, Y]`
-- **Async-first** — all I/O operations must be `async`; no blocking calls in async contexts
+- **Minimize `Any`** — precise types or explicit `object`; gates are `mypy --strict` + pyright at the **pre-push** stage (`pre-commit install --hook-type pre-push`). "Zero `Any` in `src/`" is aspiration, not fact: a handful of adapter/handler files still import `typing.Any` (probe: `grep -rln 'from typing import.*Any' src/`); no ANN401-style ban exists.
+- **`frozen=True, extra="forbid"` on boundary-crossing models** (`validate-pydantic-patterns` hook).
+- **`ModelSemVer` only for version fields** — never `str`, never `ModelSemVer | str`, no `mode="before"` coercion validators, no helper methods hiding the duality. Callers convert with `ModelSemVer.from_str(...)` before passing.
+- **No backwards compatibility, ever** — delete old code; no deprecated functions, no `OldName = NewName` alias shims (`validate-no-backward-compatibility` hook). No legacy omnibase_3 hybrid patterns — migrated code fully conforms to the ONEX 4.0 declarative pattern.
+- **`Field(..., description="...")` on every model field** — no bare declarations.
+- **PEP 604 unions** (`X | Y`) — ruff UP007 is organizationally mandated; never add it to the ignore list (see the NOTE in `[tool.ruff.lint]`).
+- **Async-first** — all I/O is `async`; no blocking calls in async contexts.
+- **Models live in `src/omnimemory/models/<domain>/`** — enforced by `scripts/validation/validate_model_locations.py`. A model tightly coupled to one handler/adapter may live alongside it with `# omnimemory-model-exempt: <reason>` on the class-def line. The validator checks marker presence only; the reason text is free-form convention (current usage: `grep -rho "omnimemory-model-exempt: .*" src/ | sort | uniq -c`).
 
----
-
-## Non-Goals
-
-OmniMemory explicitly does **NOT**:
-
-- **Maintain backwards compatibility** — breaking changes are always acceptable; callers update or they break
-- **Accept strings where typed models are required** — no convenience coercions in validators
-- **Keep deprecated code** — the moment something is outdated, delete it; no `_deprecated` suffixes or shims
-- **Support legacy omnibase_3 patterns** — migrated code must fully conform to ONEX 4.0; no hybrid patterns
-- **Expose untyped public APIs** — every public function and method must be fully typed
-
----
-
-## Quick Reference
+## Commands
 
 ```bash
-# Setup
-uv sync --group dev
-pre-commit install
-pre-commit install --hook-type pre-push
-
-# Format and lint
-uv run ruff format src/ tests/
-uv run ruff check --fix src/ tests/
-
-# Type checking
+uv sync --group dev && pre-commit install && pre-commit install --hook-type pre-push
+uv run ruff format src/ tests/ && uv run ruff check --fix src/ tests/
 uv run mypy src/omnimemory --strict
-
-# Testing
-uv run pytest                        # All tests
-uv run pytest -m unit                # Unit tests only
-uv run pytest -m integration         # Integration tests
-uv run pytest --cov                  # With coverage report
-
-# Pre-commit validation
+uv run pytest        # markers (unit/integration/slow/memgraph/...): [tool.pytest.ini_options].markers in pyproject.toml
 pre-commit run --all-files
-pre-commit run --all-files --hook-stage pre-push
 ```
-
-**Test markers**: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.slow`, `@pytest.mark.benchmark`, `@pytest.mark.memgraph`, `@pytest.mark.embedding`
-
----
-
-## Package Manager
-
-This repository uses **uv** for dependency management. All Python commands must be run via `uv run`.
-
-```bash
-uv sync          # Install all dependencies
-uv run <command>    # Run command in venv
-uv lock              # Regenerate lockfile
-```
-
----
-
-## Forbidden Patterns
-
-### Version fields: never accept strings
-
-```python
-# WRONG - union type for backwards compatibility
-version: ModelSemVer | str
-
-# WRONG - optional string fallback
-version: ModelSemVer | None = None  # when accommodating string callers
-
-# WRONG - validator coercion for "convenience"
-@field_validator("version", mode="before")
-def convert_string(cls, v: object) -> ModelSemVer:
-    if isinstance(v, str):
-        return ModelSemVer.from_str(v)
-    return v  # type: ignore[return-value]
-
-# WRONG - helper method hiding the string/ModelSemVer duality
-def get_semver(self) -> ModelSemVer:
-    if isinstance(self.version, str):
-        return ModelSemVer.from_str(self.version)
-    return self.version
-```
-
-### Models: no Any, no bare fields, no missing frozen
-
-```python
-# WRONG - Any type
-class MyModel(BaseModel):
-    data: Any  # never
-
-# WRONG - undocumented field
-class MyModel(BaseModel):
-    name: str  # no Field(), no description
-
-# WRONG - boundary model not frozen
-class MyRequest(BaseModel):  # crosses handler boundary
-    payload: str  # missing frozen=True in ConfigDict
-```
-
-### Old code: delete, never deprecate
-
-```python
-# WRONG - keeping deprecated code
-def old_process(data):  # deprecated, use new_process instead
-    ...
-
-# WRONG - compatibility shim
-OldName = NewName  # backwards compat alias - never do this
-```
-
----
-
-## Required Patterns
-
-### Version fields: ModelSemVer only, caller converts
-
-```python
-# CORRECT - ModelSemVer directly; callers convert before passing
-class MyConfig(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
-
-    version: ModelSemVer = Field(..., description="Semantic version of this config")
-    contract_version: ModelSemVer = Field(..., description="Contract version")
-
-# Caller responsibility:
-config = MyConfig(
-    version=ModelSemVer.from_str("1.0.0"),
-    contract_version=ModelSemVer.from_str("2.0.0"),
-)
-```
-
-### Boundary-crossing models: frozen + extra="forbid"
-
-```python
-# CORRECT - immutable, strict, documented
-class MyRequest(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
-
-    query: str = Field(..., description="Search query string")
-    limit: int = Field(default=10, description="Maximum number of results to return")
-```
-
-### Models in domain subdirectory
-
-```python
-# CORRECT location: src/omnimemory/models/memory/model_memory_query.py
-class ModelMemoryQuery(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", from_attributes=True)
-
-    query: str = Field(..., description="Semantic search query")
-```
-
----
-
-## Model Exemption Pattern
-
-Some Pydantic models are exempt from the `src/omnimemory/models/` location rule when they are tightly coupled to a handler or adapter implementation. Mark them with the exemption comment:
-
-```python
-class MyHandlerConfig(  # omnimemory-model-exempt: handler config
-    BaseModel
-):
-    """Handler-specific configuration; lives alongside handler, not in models/."""
-    ...
-```
-
-**Valid exemption reasons:**
-
-| Tag | When to use |
-|-----|-------------|
-| `handler metadata` | Returned by `describe()` |
-| `handler health` | Returned by `health_check()` |
-| `handler config` | Handler-specific configuration |
-| `handler internal` | Internal implementation model not part of public API |
-| `handler result` | Handler operation result |
-| `handler command` | Command/request model for handler operations |
-| `handler event` | Event emitted by a handler |
-| `handler state` | State snapshot for handler operations |
-| `adapter config` | Adapter-specific configuration |
-| `adapter health` | Adapter health status |
-| `adapter internal` | Internal adapter implementation |
-| `projection model` | Event sourcing projection |
-| `archive record format` | Archive/storage record format |
-
-All other models belong in `src/omnimemory/models/<domain>/`.
-
----
 
 ## SPDX Headers
 
-All source files in `src/`, `tests/`, `scripts/`, `examples/` require MIT SPDX headers.
-Canonical spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`
-
-- Stamp missing headers: `onex spdx fix src tests scripts examples`
-- Check without writing: `onex spdx fix --check src tests scripts examples`
-- Bypass a file: add `# spdx-skip: <reason>` in the first 10 lines
-
----
+MIT SPDX headers required in `src/`, `tests/`, `scripts/`, `examples/` (spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`). Stamp: `onex spdx fix src tests scripts examples` (add `--check` to dry-run). TRAP: the `# spdx-skip: <reason>` bypass is honored by the `onex spdx` CLI only — the local `validate-spdx-headers` pre-commit hook just scans the first 512 bytes for `SPDX-License-Identifier: MIT` and ignores the skip token.
 
 ## Documentation
 
-| Topic | Document |
-|-------|----------|
-| Documentation index | `docs/INDEX.md` |
-| Environment variables | `docs/environment_variables.md` |
-| Handler reuse matrix | `docs/handler_reuse_matrix.md` |
-| Performance testing | `docs/PERFORMANCE_TESTING.md` |
-| PII handling | `docs/pii_handling.md` |
-| Stub protocols | `docs/stub_protocols.md` |
-| Architecture (ONEX 4-node) | `docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md` |
-| Architecture (Kafka abstraction) | `docs/architecture/ARCH_002_KAFKA_ABSTRACTION.md` |
-| Architecture (data ownership) | `docs/architecture/MEMORY_DATA_OWNERSHIP.md` |
-| CI monitoring | `docs/ci/CI_MONITORING_GUIDE.md` |
-| Runtime plugins | `docs/runtime/RUNTIME_PLUGINS.md` |
-| Market migration boundary | `docs/migrations/MARKET_MIGRATION_BOUNDARY.md` |
-| Starting memory services | `docs/runbooks/STARTING_MEMORY_SERVICES.md` |
-
-For project overview, mission, and technology stack, see `README.md`.
-
----
-
-**Python**: 3.12+ | **Package Manager**: uv | **ONEX**: 4.0+
+`docs/INDEX.md` is the index (env vars, runbooks, architecture, CI, migrations all indexed there). High-traffic: `docs/environment_variables.md` (Memgraph/Qdrant/Postgres/embedding env vars), `docs/runbooks/STARTING_MEMORY_SERVICES.md`, `docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md`.
