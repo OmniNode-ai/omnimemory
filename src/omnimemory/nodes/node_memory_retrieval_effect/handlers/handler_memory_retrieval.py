@@ -235,6 +235,28 @@ class HandlerMemoryRetrieval:
         if self._graph_handler:
             self._graph_handler.clear()
 
+    async def handle(
+        self, request: ModelMemoryRetrievalRequest
+    ) -> ModelMemoryRetrievalResponse:
+        """Canonical definition-B dispatch entrypoint (CLAUDE.md rule 7a).
+
+        This is the entrypoint the runtime auto-wiring binds — it resolves
+        ``handle_async`` then ``handle`` — and the name the omnimarket
+        dispatch-entrypoint gate (OMN-14617) looks for on every handler
+        declared in ``handler_routing.handlers[]``.
+
+        Added, never renamed: ``execute`` remains the implementation and keeps
+        its existing call sites (the mock sub-handlers, this module, and
+        ``node_memory_retrieval_effect/__init__.py``).
+
+        Args:
+            request: The retrieval request.
+
+        Returns:
+            Response with search results or error information.
+        """
+        return await self.execute(request)
+
     async def execute(
         self, request: ModelMemoryRetrievalRequest
     ) -> ModelMemoryRetrievalResponse:
