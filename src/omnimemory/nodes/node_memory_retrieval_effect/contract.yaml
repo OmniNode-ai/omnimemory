@@ -158,7 +158,12 @@ validation_rules:
   output_validation_enabled: true
   performance_validation_enabled: true
   constraint_definitions:
-    operation: "Literal['search', 'search_text', 'search_graph', 'index'] - must match enums.operation.values"
+    # OMN-15235: 'index' removed. The authoritative input model for this node,
+    # ModelMemoryRetrievalRequest.operation, is
+    # Literal['search', 'search_text', 'search_graph'] — 'index' was never a
+    # constructible operation here, so declaring it made this contract narrate a
+    # capability the node's own DTO forbids.
+    operation: "Literal['search', 'search_text', 'search_graph'] - must match ModelMemoryRetrievalRequest.operation"
     status: "Literal['success', 'error', 'no_results'] - must match enums.status.values"
     query_text: "string type for text query (required for search/search_text unless embedding provided)"
     query_embedding: "list[float] for pre-computed embedding vector"
@@ -190,6 +195,26 @@ handler_routing:
   # they are internal sub-handlers that HandlerMemoryRetrieval.execute() fans
   # out to by operation. Each exposes only execute() and requires a default-less
   # `config`, so declaring them here failed both gates. Do not re-point at them.
+  #
+  # OMN-15235: the `index` -> HandlerQdrant entry that used to close this list is
+  # REMOVED, not repointed. It was a route to a handler that cannot serve it:
+  #   * HandlerMemoryRetrieval.execute() has no `index` branch — its match covers
+  #     search/search_text/search_graph and closes with
+  #     assert_never(request.operation), so repointing (the OMN-15227 precedent
+  #     for the three mocks) would declare a route the type system forbids;
+  #   * ModelMemoryRetrievalRequest.operation, this node's declared input_model,
+  #     is Literal['search', 'search_text', 'search_graph'] — an `index` request
+  #     is not constructible, so no dispatch could ever reach the entry;
+  #   * HandlerQdrant fails both boot gates (only execute(), plus a required
+  #     default-less `config` ctor param) AND takes a duck-typed
+  #     `request: object` needing `document_id`/`content` attributes that
+  #     ModelMemoryRetrievalRequest does not carry — a seam mismatch, not just a
+  #     shape defect.
+  # HandlerQdrant itself is retained and still directly exercised by
+  # tests/unit/nodes/test_handler_qdrant.py and
+  # tests/integration/test_golden_chain_qdrant_ingestion.py; only the false ROUTE
+  # is gone. Indexing is not an operation of this retrieval node — give it its
+  # own node/contract if it is ever needed on the bus.
   handlers:
     # Semantic similarity search via Qdrant (sub-handler: HandlerQdrantMock)
     - operation: "search"
@@ -211,11 +236,6 @@ handler_routing:
       handler:
         name: "HandlerMemoryRetrieval"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_memory_retrieval"
-    # Production Qdrant handler — handles index and semantic search operations
-    - operation: "index"
-      handler:
-        name: "HandlerQdrant"
-        module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_qdrant"
   default_handler: "HandlerMemoryRetrieval"
 
 # =============================================================================

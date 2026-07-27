@@ -63,6 +63,15 @@ class HandlerQdrant:
     - ``search``: embed query text → cosine search → return ranked results.
     - ``index``: chunk text → embed chunks → upsert points to Qdrant.
 
+    NOT a runtime dispatch target — do not add this class to any
+    ``handler_routing.handlers[]`` entry (OMN-15235). It exposes ``execute``
+    rather than the canonical def-B ``handle``, requires a default-less
+    ``config`` the boot resolver cannot inject, and its ``index`` path is
+    duck-typed on ``document_id``/``content`` attributes that
+    ``ModelMemoryRetrievalRequest`` (the retrieval node's declared
+    ``input_model``) does not carry. It is called directly by its tests; the
+    node_memory_retrieval_effect contract routes nothing here.
+
     Attributes:
         config: Production Qdrant handler configuration.
     """
