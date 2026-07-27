@@ -168,6 +168,25 @@ class HandlerIntentStorageAdapter:
             self._initialized = False
             logger.info("HandlerIntentStorageAdapter shutdown")
 
+    async def handle(
+        self,
+        request: ModelIntentStorageRequest,
+    ) -> ModelIntentStorageResponse:
+        """Canonical def-B dispatch entrypoint (CLAUDE.md rule 7a).
+
+        The shared auto-wiring dispatch binder resolves ``handle_async`` then
+        ``handle`` on a declared handler class; this is the name it binds.
+        Behavior is delegated unchanged to :meth:`execute`, which is already
+        def-B shaped (single typed payload in, single typed model out, async).
+
+        Args:
+            request: The storage request.
+
+        Returns:
+            The same response :meth:`execute` would return for ``request``.
+        """
+        return await self.execute(request)
+
     async def execute(
         self,
         request: ModelIntentStorageRequest,
