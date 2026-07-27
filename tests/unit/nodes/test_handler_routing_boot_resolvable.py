@@ -84,7 +84,19 @@ _PREEXISTING_UNIMPORTABLE_TARGETS: frozenset[str] = frozenset(
     }
 )
 
-_NODES_DIR = Path(__file__).parent.parent / "src" / "omnimemory" / "nodes"
+# tests/unit/nodes/<this file> -> parents[3] is the repo root.
+#
+# Placement is load-bearing, not stylistic. omnimemory's governed test selector
+# (scripts/ci/detect_test_paths.py) maps a change under
+# src/omnimemory/nodes/** to the single path "tests/unit/nodes/", and contributes
+# NOTHING for a changed test file outside tests/unit/ (`_resolve` only inspects
+# SRC_PREFIX and TEST_UNIT_PREFIX). A future PR that adds a bad
+# handler_routing entry touches src/omnimemory/nodes/<node>/contract.yaml, so at
+# tests/ root this gate would be selected away on exactly the PRs it exists to
+# catch — green until the dev->main promotion. Here it runs on every such PR.
+# The root-level-tests-are-unselectable defect itself is OMN-15271; do not move
+# this file back to tests/ root when that lands without re-checking the mapping.
+_NODES_DIR = Path(__file__).parents[3] / "src" / "omnimemory" / "nodes"
 
 
 def _required_non_injectable_params(obj: Callable[..., Any]) -> list[str]:
