@@ -32,7 +32,9 @@ Related Tickets:
 
 from __future__ import annotations
 
+import inspect
 from datetime import UTC, datetime
+from typing import get_type_hints
 from unittest.mock import ANY, AsyncMock, MagicMock
 from uuid import UUID
 
@@ -888,3 +890,86 @@ class TestHandlerIntentStorageAdapterUnit:
         mock_adapter.shutdown.assert_called_once()
         assert handler._adapter is None
         assert handler._initialized is False
+
+
+# =============================================================================
+# Canonical def-B Dispatch Entrypoint Tests (OMN-15226 / OMN-14617)
+# =============================================================================
+
+
+class TestDefBDispatchEntrypoint:
+    """Tests for the canonical def-B ``handle()`` dispatch entrypoint.
+
+    ``HandlerIntentStorageAdapter`` is reached by the shared auto-wiring
+    dispatch binder, which resolves ``handle_async`` then ``handle``. These
+    tests pin that entrypoint so the omnimarket-side contract conversion
+    (sequential slice under OMN-15027) can pass the frozen, shrink-only
+    ``handler_dispatch_entrypoint`` gate (OMN-14617).
+    """
+
+    async def test_adapter_exposes_dispatch_entrypoint(self) -> None:
+        """The class satisfies the real gate predicate."""
+        # Predicate copied VERBATIM from omnimarket
+        # src/omnimarket/validators/handler_dispatch_entrypoint.py::has_dispatch_entrypoint
+        # (OMN-14617). omnimemory deliberately cannot import omnimarket: omnimarket already
+        # depends on omnimemory, so the reverse edge would create a dependency cycle. The
+        # REAL gate runs against the converted contract in the sequential omnimarket slice
+        # under OMN-15027; this local copy is the omnimemory-side guard against regression.
+        assert callable(
+            getattr(HandlerIntentStorageAdapter, "handle_async", None)
+        ) or callable(getattr(HandlerIntentStorageAdapter, "handle", None))
+
+    async def test_handle_has_canonical_def_b_signature(self) -> None:
+        """``handle`` is ``async (request: ModelX) -> ModelY`` (CLAUDE.md rule 7a)."""
+        handle = HandlerIntentStorageAdapter.handle
+
+        assert inspect.iscoroutinefunction(handle)
+
+        params = [
+            name for name in inspect.signature(handle).parameters if name != "self"
+        ]
+        assert params == ["request"], f"expected a single 'request' param, got {params}"
+
+        hints = get_type_hints(handle)
+        assert hints["request"] is ModelIntentStorageRequest
+        assert hints["return"] is ModelIntentStorageResponse
+
+    async def test_handle_matches_execute_for_store_request(
+        self,
+        handler_with_mock: HandlerIntentStorageAdapter,
+        mock_adapter: MagicMock,
+        sample_intent_data: ModelIntentClassificationOutput,
+    ) -> None:
+        """``handle()`` and ``execute()`` produce the same response for a store request.
+
+        Behavioral equivalence, not just an attribute check: ``execution_time_ms`` is
+        wall-clock and therefore excluded from the comparison; every other field must
+        match exactly.
+        """
+        # Arrange
+        mock_adapter.store_intent.return_value = ModelIntentStorageResult(
+            success=True,
+            intent_id=TEST_INTENT_ID,
+            created=True,
+        )
+
+        request = ModelIntentStorageRequest(
+            operation="store",
+            session_id=TEST_SESSION_ID,
+            intent_data=sample_intent_data,
+            correlation_id=TEST_CORRELATION_ID,
+        )
+
+        # Act
+        execute_response = await handler_with_mock.execute(request)
+        handle_response = await handler_with_mock.handle(request)
+
+        # Assert - same typed response, same content
+        assert isinstance(handle_response, ModelIntentStorageResponse)
+        assert handle_response.status == "success"
+        assert handle_response.model_dump(
+            exclude={"execution_time_ms"}
+        ) == execute_response.model_dump(exclude={"execution_time_ms"})
+
+        # Both paths reached the underlying adapter
+        assert mock_adapter.store_intent.call_count == 2
