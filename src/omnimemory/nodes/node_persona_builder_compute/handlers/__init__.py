@@ -3,8 +3,9 @@
 
 """Persona builder compute handlers."""
 
-from .handler_persona_classify import classify_persona
+from .handler_persona_classify import HandlerPersonaClassify, classify_persona
 
 __all__ = [
+    "HandlerPersonaClassify",
     "classify_persona",
 ]

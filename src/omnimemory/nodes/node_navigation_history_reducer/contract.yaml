@@ -28,23 +28,28 @@ handler_routing:
     minor: 0
     patch: 0
   routing_strategy: operation_match
+  # OMN-15268: the `qdrant` and `http` entries that used to open this list are
+  # REMOVED, not repointed. Three independent proofs that nothing could ever
+  # dispatch through them:
+  #   * HandlerQdrant and HandlerHttp do not exist. The module they named
+  #     exports exactly ["HandlerNavigationHistoryReducer",
+  #     "HandlerNavigationHistoryWriter"], and neither class name appears
+  #     anywhere in omnimemory src/ — getattr() raised AttributeError at boot,
+  #     so both routes resolved to nothing.
+  #   * There is no discriminator they could match. This node's declared
+  #     input_model, ModelNavigationHistoryRequest, has exactly one field
+  #     (`session: ModelNavigationSession`) — no operation/routing field — so an
+  #     operation_match strategy can never select the key "qdrant" or "http".
+  #   * They named transports, not operations. The Qdrant writes and the HTTP
+  #     embedding call they gesture at are internal to
+  #     HandlerNavigationHistoryWriter, which is reached through the retained
+  #     `reduce` route (HandlerNavigationHistoryReducer.execute() wraps the
+  #     writer). Sub-handlers are not dispatch targets — the same OMN-15235
+  #     finding, restated.
+  # No capability is lost: both code paths remain live under `reduce`. The
+  # transport declaration for this node is `metadata.transport_type: DATABASE`
+  # above, which is where a transport belongs.
   handlers:
-    - routing_key: "qdrant"
-      handler_key: "HandlerQdrant"
-      handler:
-        name: "HandlerQdrant"
-        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
-        handler_type: "QDRANT"
-      priority: 0
-      output_events: []
-    - routing_key: "http"
-      handler_key: "HandlerHttp"
-      handler:
-        name: "HandlerHttp"
-        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
-        handler_type: "HTTP"
-      priority: 0
-      output_events: []
     - routing_key: "reduce"
       handler_key: "HandlerNavigationHistoryReducer"
       handler:

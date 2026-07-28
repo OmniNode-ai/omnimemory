@@ -26,13 +26,20 @@ handlers to the container-driven shape and emptied
 rejected fix (OMN-15235 scope note 3) — a route to a handler that cannot be
 constructed is removed or repointed, never excused.
 
-**Known gap, deliberately visible.** ``_PREEXISTING_UNIMPORTABLE_TARGETS``
-freezes the omnimemory entries whose declared target does not resolve to an
-object at all (phantom class name, or flat schema with no nested
-``handler: {name, module}``). Those entries cannot be ctor-checked because there
-is nothing to inspect, so recording them here is what keeps this gate from
-silently skipping them. It is asserted by **set equality**, not membership: the
-set growing OR shrinking fails the test. Burn-down is OMN-15268.
+**The unresolvable-target baseline is now empty (OMN-15268).**
+``_PREEXISTING_UNIMPORTABLE_TARGETS`` froze the 11 omnimemory entries whose
+declared target did not resolve to an object at all — a phantom class name, or a
+flat entry with no nested ``handler: {name, module}`` for the OMN-14141 loader to
+resolve. Those entries could not be ctor-checked because there was nothing to
+inspect, so freezing them is what kept this gate from silently skipping them.
+OMN-15268 burned all 11 down (repointed, implemented, converted to nested, or
+removed with an unreachability proof — see the per-node comments in each
+``contract.yaml`` and the per-entry regression tests at the bottom of this file).
+The constant is retained, empty, and asserted **two** ways: by set equality
+against the live scan (so a new phantom/flat entry fails immediately) and by a
+closure test (so the baseline cannot be re-padded to excuse one). Both are
+required — set equality alone would pass if a future change added an entry here
+and a matching defect to a contract.
 """
 
 from __future__ import annotations
@@ -41,7 +48,7 @@ import importlib
 import inspect
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 import yaml
@@ -63,26 +70,12 @@ _CONCRETE_PARAM_KINDS = (
 _UNWIRED_DEPENDENCY_ALLOWLIST: dict[str, str] = {}
 
 # Entries whose declared target does not resolve to an object, so the ctor
-# predicate has nothing to inspect. Frozen so the ctor gate does not silently
-# skip them. Burn-down: OMN-15268. Format: "<node>::<operation>".
-_PREEXISTING_UNIMPORTABLE_TARGETS: frozenset[str] = frozenset(
-    {
-        # Phantom class names: module.Class.method appended to the module path,
-        # or a class that does not exist in the named module.
-        "node_agent_coordinator_orchestrator::subscribe",
-        "node_agent_coordinator_orchestrator::unsubscribe",
-        "node_agent_coordinator_orchestrator::list_subscriptions",
-        "node_agent_coordinator_orchestrator::notify",
-        "node_agent_learning_retrieval_effect::retrieve",
-        "node_persona_builder_compute::classify",
-        "node_navigation_history_reducer::qdrant",
-        "node_navigation_history_reducer::http",
-        # Flat schema: no nested handler: {name, module} to resolve at all.
-        "node_intent_storage_effect::store",
-        "node_intent_storage_effect::get_session",
-        "node_intent_storage_effect::get_distribution",
-    }
-)
+# predicate has nothing to inspect. EMPTY as of OMN-15268 and it stays empty:
+# the 11 frozen entries were burned down at their source, not excused here.
+# Format: "<node>::<operation>". Padding this is the rejected fix — a route
+# whose target does not exist is repointed, implemented, converted to the nested
+# schema, or removed with an unreachability proof.
+_PREEXISTING_UNIMPORTABLE_TARGETS: frozenset[str] = frozenset()
 
 # tests/unit/nodes/<this file> -> parents[3] is the repo root.
 #
@@ -225,9 +218,13 @@ def test_unimportable_target_baseline_is_exact() -> None:
     """The set of unresolvable-target entries matches the frozen baseline exactly.
 
     Set equality, not membership: a NEW phantom/flat entry fails immediately, and
-    burning one down (OMN-15268) also fails until the baseline is edited in the
-    same PR. Without this the ctor gate above would silently skip these entries,
-    and a silent skip is a check that does not exist.
+    burning one down also fails until the baseline is edited in the same PR.
+    Without this the ctor gate above would silently skip these entries, and a
+    silent skip is a check that does not exist.
+
+    The baseline is empty since OMN-15268, so this now reads as "no
+    handler_routing entry anywhere in omnimemory names a target that does not
+    resolve to an object".
     """
     unimportable = {
         route_key
@@ -236,10 +233,28 @@ def test_unimportable_target_baseline_is_exact() -> None:
     }
     assert unimportable == set(_PREEXISTING_UNIMPORTABLE_TARGETS), (
         "handler_routing entries with unresolvable targets drifted from the "
-        "OMN-15268 baseline.\n"
+        "OMN-15268 baseline (empty).\n"
         f"  newly unresolvable: {sorted(unimportable - _PREEXISTING_UNIMPORTABLE_TARGETS)}\n"
         f"  fixed (remove from _PREEXISTING_UNIMPORTABLE_TARGETS): "
         f"{sorted(_PREEXISTING_UNIMPORTABLE_TARGETS - unimportable)}"
+    )
+
+
+def test_unimportable_target_baseline_is_closed() -> None:
+    """The OMN-15268 burn-down baseline is empty and stays empty.
+
+    Set equality alone is not enough: a future change could add a phantom route
+    AND list it here, and the equality assert would pass. This closes that hole
+    the same way ``test_unwired_dependency_allowlist_is_closed`` closes the
+    ctor carve-out. There is no legitimate reason to record a route whose target
+    does not exist — repoint it, implement it, convert it to the nested
+    ``handler: {name, module}`` schema, or delete it with a written
+    unreachability proof in the contract (the OMN-15235 precedent).
+    """
+    assert not _PREEXISTING_UNIMPORTABLE_TARGETS, (
+        "_PREEXISTING_UNIMPORTABLE_TARGETS was driven to empty under OMN-15268 "
+        "and re-padding it is a rejected fix. Fix the route at its source: "
+        f"{sorted(_PREEXISTING_UNIMPORTABLE_TARGETS)}"
     )
 
 
@@ -291,3 +306,197 @@ def test_index_operation_is_absent_from_memory_retrieval_contract() -> None:
     # The authoritative seam: the DTO the runtime actually validates against.
     with pytest.raises(ValueError):
         ModelMemoryRetrievalRequest(operation="index")  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# OMN-15268 per-entry burn-down regressions.
+#
+# The set-equality gate above proves "no unresolvable target anywhere". These
+# pin the SPECIFIC disposition each of the 11 frozen entries received, so a
+# future edit cannot satisfy the aggregate gate by re-introducing the defect in
+# a different shape (e.g. re-appending a method name, or repointing a removed
+# route at some other non-dispatchable class).
+# ---------------------------------------------------------------------------
+
+
+def _contract(node: str) -> dict[str, Any]:
+    """Load one node contract.yaml as a dict."""
+    path = _NODES_DIR / node / "contract.yaml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(data, dict), f"{path} did not parse to a mapping"
+    return data
+
+
+def _routing(node: str) -> dict[str, Any]:
+    """Return the handler_routing block of one node contract."""
+    routing = _contract(node).get("handler_routing") or {}
+    assert isinstance(routing, dict)
+    return routing
+
+
+def test_coordinator_routes_the_class_not_a_method_path() -> None:
+    """OMN-15268: coordinator entries name the CLASS, never ``Class.method``.
+
+    All four operations declared ``name: "HandlerSubscription.<method>"``. The
+    OMN-14141 loader resolves ``handler.name`` with a single
+    ``getattr(module, name)`` — a dotted path is an AttributeError, not a
+    traversal — so every entry resolved to nothing at boot.
+    """
+    from omnimemory.handlers.handler_subscription import HandlerSubscription
+
+    entries = _routing("node_agent_coordinator_orchestrator").get("handlers") or []
+    assert {entry["operation"] for entry in entries} == {
+        "subscribe",
+        "unsubscribe",
+        "list_subscriptions",
+        "notify",
+    }
+    for entry in entries:
+        name = entry["handler"]["name"]
+        assert "." not in name, (
+            f"handler.name {name!r} is a dotted path again. getattr() does not "
+            "traverse dots — this resolves to nothing at boot."
+        )
+        assert name == HandlerSubscription.__name__
+        assert entry["handler"]["module"] == HandlerSubscription.__module__
+
+    # The repoint is only valid because the ctor is boot-injectable.
+    assert not _required_non_injectable_params(HandlerSubscription)
+
+
+def test_navigation_reducer_does_not_route_phantom_transports() -> None:
+    """OMN-15268: ``qdrant``/``http`` are gone and cannot be re-added by name.
+
+    Neither class exists in the module those entries named, and the node's
+    declared input_model has no operation field for an operation_match strategy
+    to key off — so both routes were doubly unreachable.
+    """
+    from omnimemory.nodes.node_navigation_history_reducer.handlers import (
+        handler_navigation_history_reducer as nav_module,
+    )
+    from omnimemory.nodes.node_navigation_history_reducer.models.model_navigation_history_request import (
+        ModelNavigationHistoryRequest,
+    )
+
+    entries = _routing("node_navigation_history_reducer").get("handlers") or []
+    keys = {entry.get("routing_key") for entry in entries}
+    assert keys == {"reduce"}, (
+        "node_navigation_history_reducer routing keys drifted. The phantom "
+        "transport routes 'qdrant'/'http' must not come back — see the "
+        f"OMN-15268 note in contract.yaml. Got: {sorted(keys)}"
+    )
+
+    # The proof those names were phantom, re-executed rather than asserted.
+    assert not hasattr(nav_module, "HandlerQdrant")
+    assert not hasattr(nav_module, "HandlerHttp")
+
+    # The proof no operation_match key could have selected them.
+    assert "operation" not in ModelNavigationHistoryRequest.model_fields
+
+
+def test_learning_retrieval_declares_no_phantom_handler() -> None:
+    """OMN-15268: the route to the never-written HandlerAgentLearningRetrieval is gone.
+
+    The module the entry named holds pure helper functions and no class. The
+    route is removed rather than repointed: none of the helpers performs the
+    retrieval this EFFECT node declares, and a bare function fails the boot ctor
+    predicate anyway.
+    """
+    from omnimemory.nodes.node_agent_learning_retrieval_effect.handlers import (
+        handler_agent_learning_retrieval as learning_module,
+    )
+
+    routing = _routing("node_agent_learning_retrieval_effect")
+    handlers = routing.get("handlers") or []
+    assert not handlers, (
+        "node_agent_learning_retrieval_effect declares a handler again. There is "
+        "no handler class in this node package — see the OMN-15268 note in "
+        "contract.yaml. If one was implemented, update this test with it."
+    )
+    assert routing.get("default_handler") is None, (
+        "default_handler names a handler that does not exist; it was set to null "
+        "under OMN-15268."
+    )
+    assert not hasattr(learning_module, "HandlerAgentLearningRetrieval")
+
+
+def test_persona_classify_target_is_a_real_def_b_handler() -> None:
+    """OMN-15268: HandlerPersonaClassify exists and is def-B shaped.
+
+    The contract reference was always correct; the class was missing. This pins
+    all three properties the route depends on: it resolves, it constructs from
+    injectable params alone, and it exposes a def-B ``handle`` over the node's
+    declared input/output models.
+    """
+    from omnimemory.nodes.node_persona_builder_compute.handlers.handler_persona_classify import (
+        HandlerPersonaClassify,
+        classify_persona,
+    )
+    from omnimemory.nodes.node_persona_builder_compute.models import (
+        ModelPersonaClassifyRequest,
+        ModelPersonaClassifyResult,
+    )
+
+    entries = _routing("node_persona_builder_compute").get("handlers") or []
+    assert len(entries) == 1
+    assert entries[0]["handler"]["name"] == HandlerPersonaClassify.__name__
+    assert entries[0]["handler"]["module"] == HandlerPersonaClassify.__module__
+
+    assert not _required_non_injectable_params(HandlerPersonaClassify)
+
+    handle = getattr(HandlerPersonaClassify, "handle", None)
+    assert callable(handle), "HandlerPersonaClassify lost its def-B entrypoint"
+    hints = inspect.signature(handle)
+    params = [p for name, p in hints.parameters.items() if name != "self"]
+    assert len(params) == 1, f"handle() is not def-B shaped: {hints}"
+
+    # Behavioral parity with the pure function it fronts, on a real payload.
+    request = ModelPersonaClassifyRequest(user_id="u-15268", signals=[])
+    result = HandlerPersonaClassify().handle(request)
+    assert isinstance(result, ModelPersonaClassifyResult)
+    assert result == classify_persona(request)
+
+
+def test_intent_storage_entries_are_nested_and_operation_keyed() -> None:
+    """OMN-15268: the flat trio now carries a nested handler ref and an operation.
+
+    ``handler`` is a REQUIRED field on ``ModelHandlerRoutingEntry``, so the flat
+    ``handler_key``-only shape could not be parsed into the routing subcontract
+    at all. The operation values are pinned against the DTO the runtime
+    validates, not against the contract's own prose.
+    """
+    from omnimemory.nodes.node_intent_storage_effect.adapters import (
+        HandlerIntentStorageAdapter,
+    )
+    from omnimemory.nodes.node_intent_storage_effect.models import (
+        ModelIntentStorageRequest,
+    )
+
+    entries = _routing("node_intent_storage_effect").get("handlers") or []
+    assert len(entries) == 3
+    operations = {entry["operation"] for entry in entries}
+    assert operations == {"store", "get_session", "get_distribution"}
+
+    for entry in entries:
+        handler = entry.get("handler")
+        assert isinstance(handler, dict), (
+            "flat handler_key shape is back — it does not satisfy the required "
+            "`handler` field on ModelHandlerRoutingEntry."
+        )
+        assert handler["name"] == HandlerIntentStorageAdapter.__name__
+        module = handler["module"]
+        assert module, "empty handler.module never imports"
+        assert getattr(importlib.import_module(module), handler["name"]) is (
+            HandlerIntentStorageAdapter
+        )
+
+    # The seam: the routed operations are exactly the DTO's Literal members —
+    # checked against the model the runtime validates, not the contract prose.
+    declared = get_args(ModelIntentStorageRequest.model_fields["operation"].annotation)
+    assert operations == set(declared), (
+        f"routed operations {sorted(operations)} drifted from "
+        f"ModelIntentStorageRequest.operation {sorted(declared)}"
+    )
+
+    assert not _required_non_injectable_params(HandlerIntentStorageAdapter)
+    assert callable(getattr(HandlerIntentStorageAdapter, "handle", None))

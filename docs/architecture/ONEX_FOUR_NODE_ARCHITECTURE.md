@@ -90,8 +90,15 @@ to produce side effects.
 | `nodes/node_memory_retrieval_effect/` | `HandlerMemoryRetrieval` | Retrieves memory records from Qdrant, PostgreSQL, and Memgraph |
 | `nodes/node_memory_storage_effect/` | `AdapterFilesystem` | Persists memory payloads to the filesystem adapter |
 | `nodes/node_kreuzberg_parse_effect/` | `HandlerKreuzbergParse` | Sends documents to the Kreuzberg parser service for text extraction |
-| `nodes/node_agent_learning_retrieval_effect/` | `HandlerAgentLearningRetrieval` | Retrieves learning context for agent sessions |
+| `nodes/node_agent_learning_retrieval_effect/` | *(none — see note)* | Contract + models + ranking helpers only; no handler class exists (OMN-15268) |
 | `nodes/node_persona_storage_effect/` | `HandlerPersonaStorage` | Persists persona signals and profile updates |
+
+> **`node_agent_learning_retrieval_effect` is not implemented.** The table
+> previously listed a `HandlerAgentLearningRetrieval` class; no such class has
+> ever existed in `src/`. The package ships the contract, the request/response
+> models, and four pure ranking/query-building helpers. OMN-15268 removed the
+> contract's route to the phantom class; the node still declares a subscribe
+> topic with nothing behind it, which is tracked separately.
 
 ### COMPUTE Nodes
 
