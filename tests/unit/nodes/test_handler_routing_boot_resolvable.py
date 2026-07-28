@@ -86,16 +86,19 @@ _PREEXISTING_UNIMPORTABLE_TARGETS: frozenset[str] = frozenset(
 
 # tests/unit/nodes/<this file> -> parents[3] is the repo root.
 #
-# Placement is load-bearing, not stylistic. omnimemory's governed test selector
-# (scripts/ci/detect_test_paths.py) maps a change under
-# src/omnimemory/nodes/** to the single path "tests/unit/nodes/", and contributes
-# NOTHING for a changed test file outside tests/unit/ (`_resolve` only inspects
-# SRC_PREFIX and TEST_UNIT_PREFIX). A future PR that adds a bad
-# handler_routing entry touches src/omnimemory/nodes/<node>/contract.yaml, so at
-# tests/ root this gate would be selected away on exactly the PRs it exists to
-# catch — green until the dev->main promotion. Here it runs on every such PR.
-# The root-level-tests-are-unselectable defect itself is OMN-15271; do not move
-# this file back to tests/ root when that lands without re-checking the mapping.
+# Placement was load-bearing when this gate landed: the governed selector
+# (scripts/ci/detect_test_paths.py) mapped a src/omnimemory/nodes/** change to
+# the single path "tests/unit/nodes/" and contributed NOTHING for a test file
+# outside tests/unit/, so at tests/ root this gate would have been selected away
+# on exactly the PRs it exists to catch. OMN-15271 closed that: tests/ root
+# modules and tests/<area>/ packages are now declared in the selector's
+# `test_families` map, a changed test file always self-selects, and an
+# undeclared test location escalates to the full suite.
+#
+# The file stays here anyway — tests/unit/nodes/ is where node-scoped unit gates
+# belong, and the mapping now reaches it either way. Moving it to tests/ root
+# would require adding a `test_families` entry with the
+# src/omnimemory/nodes/ trigger; parents[3] below assumes the current depth.
 _NODES_DIR = Path(__file__).parents[3] / "src" / "omnimemory" / "nodes"
 
 

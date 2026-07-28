@@ -53,3 +53,185 @@ adjacency:
     reverse_deps: []
   utils:
     reverse_deps: [handlers, nodes, tools]
+
+# Test locations the src-module mapping cannot reach (OMN-15271).
+#
+# omnimemory keeps its structural gates at tests/ root and its per-area suites
+# in tests/<area>/ — a deliberate layout documented in tests/conftest.py. The
+# adjacency map above only ever resolves to tests/unit/<module>/, so before
+# OMN-15271 none of these could be selected on a PR into dev: a changed root
+# test never ran, and a src/omnimemory/nodes/** change never pulled in the
+# gates that read those nodes (omnimemory#417, CI run 30310898812).
+#
+# Key = repo-relative path ('tests/<file>.py' or 'tests/<dir>/').
+# `triggers` = path prefixes whose change selects it (directory prefixes end
+# with '/', file prefixes are exact). Prefer COARSE directory triggers: a
+# too-narrow trigger stops firing silently when a file is renamed.
+# Empty `triggers` requires a `reason` — "runs nothing" must be a decision.
+#
+# Only tests/unit/<module>/ where <module> is an adjacency key above is
+# auto-covered. Everything else needs an entry: tests/ root modules,
+# tests/<area>/ packages, files directly under tests/unit/, and any
+# tests/unit/<dir>/ with no matching source module.
+#
+# FAIL-CLOSED: a test location present on disk but missing here escalates the
+# whole PR to the full suite (undeclared_test_family). Add the entry rather
+# than waiting for the promotion run to catch the regression.
+#
+# NOT covered here: non-.py fixtures under tests/. A changed *.py test file
+# always self-selects; a changed fixture still falls back to the tests/unit/
+# tree.
+test_families:
+  # --- structural gates that read the src tree directly -------------------
+  tests/test_contract_validation.py:
+    triggers:
+      - src/omnimemory/nodes/
+      - src/omnimemory/models/contracts/
+      - contracts/
+  tests/test_contract_version.py:
+    triggers:
+      - src/omnimemory/nodes/
+      - contracts/
+  tests/test_node_enforcement.py:
+    triggers:
+      - src/omnimemory/nodes/
+  tests/test_node_imports.py:
+    triggers:
+      - src/omnimemory/nodes/
+  tests/test_validation_scripts.py:
+    triggers:
+      - scripts/validation/
+
+  # --- runtime/foundation suites ------------------------------------------
+  tests/test_bootstrap.py:
+    triggers:
+      - src/omnimemory/bootstrap.py
+      - src/omnimemory/secrets.py
+      - src/omnimemory/models/config/
+  tests/test_foundation.py:
+    triggers:
+      - src/omnimemory/__init__.py
+      - src/omnimemory/protocols/
+      - src/omnimemory/models/
+  tests/test_secrets_provider.py:
+    triggers:
+      - src/omnimemory/secrets.py
+      - src/omnimemory/protocols/
+  tests/test_settings.py:
+    triggers:
+      - src/omnimemory/settings.py
+      - src/omnimemory/models/config/
+  tests/test_config_models.py:
+    triggers:
+      - src/omnimemory/models/config/
+  tests/test_semantic_compute_policy_config.py:
+    triggers:
+      - src/omnimemory/models/config/
+  tests/test_migration_progress.py:
+    triggers:
+      - src/omnimemory/models/foundation/
+
+  # --- adapter suites (coarse: the whole adapters package) ----------------
+  tests/test_concurrency.py:
+    triggers:
+      - src/omnimemory/adapters/
+  tests/test_db_url.py:
+    triggers:
+      - src/omnimemory/adapters/
+  tests/test_health_manager.py:
+    triggers:
+      - src/omnimemory/adapters/
+      - src/omnimemory/models/foundation/
+  tests/test_observability_manager.py:
+    triggers:
+      - src/omnimemory/adapters/
+  tests/test_observability_metrics.py:
+    triggers:
+      - src/omnimemory/adapters/
+  tests/test_resource_manager.py:
+    triggers:
+      - src/omnimemory/adapters/
+
+  tests/test_performance.py:
+    triggers: []
+    # Self-contained benchmark module: it copies the shapes it measures rather
+    # than importing src (see its module docstring), so no source path selects
+    # it. Runs on the promotion full suite and when the file itself changes.
+    reason: "self-contained benchmarks; no source path selects them"
+
+  # --- test packages outside tests/unit/ ----------------------------------
+  tests/nodes/:
+    triggers:
+      - src/omnimemory/nodes/
+  tests/handlers/:
+    triggers:
+      - src/omnimemory/handlers/
+      - src/omnimemory/adapters/
+  tests/models/:
+    triggers:
+      - src/omnimemory/models/
+  tests/scripts/:
+    triggers:
+      - scripts/
+  tests/integration/:
+    triggers: []
+    # Service-backed suites (Postgres/Qdrant/Memgraph/Kafka) that skip without
+    # live backends; CI has no integration job, so they are proven on the
+    # promotion full suite. A changed integration test still self-selects.
+    reason: "service-backed; proven on the promotion full suite"
+
+  # --- inside tests/unit/, but not reachable from tests/unit/<module>/ -----
+  tests/unit/scripts/:
+    triggers:
+      - scripts/
+  tests/unit/test_contract_linter.py:
+    triggers:
+      - src/omnimemory/tools/
+  tests/unit/test_detect_test_paths.py:
+    triggers:
+      - scripts/ci/
+  tests/unit/test_dispatch_retrieval_config.py:
+    triggers:
+      - src/omnimemory/runtime/
+  tests/unit/test_entry_points.py:
+    triggers:
+      - pyproject.toml
+  tests/unit/test_graphify_to_memgraph.py:
+    triggers:
+      - scripts/graphify_to_memgraph.py
+  tests/unit/test_graphify_to_qdrant.py:
+    triggers:
+      - scripts/graphify_to_qdrant.py
+  tests/unit/test_handler_subscription_notify_strict.py:
+    triggers:
+      - src/omnimemory/handlers/
+      - src/omnimemory/models/subscription/
+  tests/unit/test_ingestion_models.py:
+    triggers:
+      - src/omnimemory/models/
+      - src/omnimemory/enums/
+  tests/unit/test_model_user_persona_v1.py:
+    triggers:
+      - src/omnimemory/models/persona/
+      - src/omnimemory/enums/
+  tests/unit/test_no_duplicate_node_uuids.py:
+    triggers:
+      - src/omnimemory/nodes/
+  tests/unit/test_persona_enums.py:
+    triggers:
+      - src/omnimemory/enums/
+  tests/unit/test_scope_mapping_config.py:
+    triggers:
+      - src/omnimemory/models/config/
+      - src/omnimemory/enums/
+  tests/unit/test_sql_placeholders.py:
+    triggers:
+      - src/omnimemory/handlers/
+  tests/unit/test_validate_ci_precommit_alignment.py:
+    triggers:
+      - scripts/validate_ci_precommit_alignment.py
+      - .github/workflows/
+      - .pre-commit-config.yaml
+  tests/unit/test_validate_kafka_imports.py:
+    triggers:
+      - scripts/validation/
