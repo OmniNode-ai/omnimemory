@@ -73,9 +73,14 @@ class TestResolveTestPaths:
         result = _resolve(["tests/unit/handlers/test_foo.py"], adjacency_map)
         assert "tests/unit/handlers/" in result
 
-    def test_integration_change_ignored(self, adjacency_map: ModelAdjacencyMap) -> None:
+    def test_integration_change_selects_itself(
+        self, adjacency_map: ModelAdjacencyMap
+    ) -> None:
+        # OMN-15271: previously asserted `== []`. A changed test file that
+        # contributes nothing is the fail-open this ticket closes; integration
+        # tests skip cleanly without live backends, so selecting one is safe.
         result = _resolve(["tests/integration/test_ingestion.py"], adjacency_map)
-        assert result == []
+        assert result == ["tests/integration/test_ingestion.py"]
 
     def test_doc_only_change_ignored(self, adjacency_map: ModelAdjacencyMap) -> None:
         result = _resolve(["docs/README.md"], adjacency_map)
@@ -180,7 +185,8 @@ class TestComputeSelection:
 
     def test_selected_paths_all_exist_on_disk(self) -> None:
         # Mixed resolution: handlers/nodes exist, tools/utils do not. Only the
-        # existing directories survive filtering.
+        # existing paths survive filtering. Since OMN-15271 a selection may also
+        # name a single test file, so directories and files are checked apart.
         sel = compute_selection(
             changed_files=["src/omnimemory/handlers/handler_foo.py"],
             adjacency_path=ADJACENCY_PATH,
@@ -188,7 +194,9 @@ class TestComputeSelection:
         )
         repo_root = ADJACENCY_PATH.parent.parent.parent
         for path in sel.selected_paths:
-            assert (repo_root / path).is_dir(), f"selected non-existent path: {path}"
+            target = repo_root / path
+            exists = target.is_dir() if path.endswith("/") else target.is_file()
+            assert exists, f"selected non-existent path: {path}"
 
     def test_doc_only_returns_fallback_unit_dir(self) -> None:
         sel = compute_selection(
@@ -277,3 +285,296 @@ class TestModelTestSelection:
         data = json.loads(sel.model_dump_json())
         assert data["split_count"] == 1
         assert data["is_full_suite"] is False
+
+
+# ---------------------------------------------------------------------------
+# OMN-15271: test locations outside tests/unit/ must be selectable.
+#
+# The pre-fix selector inspected exactly two prefixes (src/omnimemory/ and
+# tests/unit/) and contributed NOTHING for anything else, so the ~25 files at
+# tests/ root -- documented as a deliberate layout in tests/conftest.py -- were
+# unselectable on the PR-into-dev path. A PR that added or edited one of them
+# went green without ever collecting it, and a src/omnimemory/nodes/** change
+# never pulled in the root-level structural gates that read those nodes.
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = ADJACENCY_PATH.parent.parent.parent
+
+# Recorded change set of omnimemory#417 (OMN-15235), CI run 30310898812.
+OMN_15235_CHANGED_FILES = [
+    "src/omnimemory/nodes/node_memory_retrieval_effect/contract.yaml",
+    "src/omnimemory/nodes/node_memory_retrieval_effect/handlers/handler_qdrant.py",
+    "tests/unit/nodes/test_handler_routing_boot_resolvable.py",
+]
+
+# Root-level structural gates that read src/omnimemory/nodes/** directly.
+NODE_STRUCTURAL_GATES = (
+    "tests/test_contract_validation.py",
+    "tests/test_contract_version.py",
+    "tests/test_node_enforcement.py",
+    "tests/test_node_imports.py",
+)
+
+
+def _covers(selected_paths: list[str], test_file: str) -> bool:
+    """True when pytest would collect `test_file` from this selection."""
+    return any(
+        test_file == path or (path.endswith("/") and test_file.startswith(path))
+        for path in selected_paths
+    )
+
+
+@pytest.mark.unit
+class TestChangedTestFileAlwaysSelected:
+    """Acceptance 1: a changed tests/**/*.py always contributes itself. Never zero."""
+
+    def test_root_level_test_change_selects_that_file(self) -> None:
+        sel = compute_selection(
+            changed_files=["tests/test_contract_validation.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert not sel.is_full_suite
+        assert "tests/test_contract_validation.py" in sel.selected_paths
+
+    def test_root_level_test_change_survives_alongside_src_change(self) -> None:
+        # The dangerous shape: a src change produces a non-empty selection, so
+        # the tests/unit/ fallback never fires and the changed root-level test
+        # is silently dropped.
+        sel = compute_selection(
+            changed_files=[
+                "src/omnimemory/handlers/handler_foo.py",
+                "tests/test_concurrency.py",
+            ],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert not sel.is_full_suite
+        assert "tests/unit/handlers/" in sel.selected_paths
+        assert "tests/test_concurrency.py" in sel.selected_paths
+
+    def test_non_unit_test_package_change_selects_that_file(self) -> None:
+        # tests/nodes/ and tests/handlers/ are real test packages outside
+        # tests/unit/ and were equally unselectable. Changed alone, nothing
+        # triggers the package, so the file must carry itself.
+        sel = compute_selection(
+            changed_files=["tests/handlers/test_handler_intent.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert not sel.is_full_suite
+        assert "tests/handlers/test_handler_intent.py" in sel.selected_paths
+
+    def test_non_unit_test_package_change_covered_alongside_src_change(self) -> None:
+        # With the package's own trigger firing, the covering directory is the
+        # selection; the file must not be dropped either way.
+        sel = compute_selection(
+            changed_files=[
+                "src/omnimemory/handlers/handler_foo.py",
+                "tests/handlers/test_handler_intent.py",
+            ],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert _covers(sel.selected_paths, "tests/handlers/test_handler_intent.py")
+
+    def test_integration_test_change_selects_that_file(self) -> None:
+        # Integration tests skip cleanly without live backends, so selecting a
+        # changed one is safe; leaving it unselected is the fail-open.
+        sel = compute_selection(
+            changed_files=[
+                "src/omnimemory/handlers/handler_foo.py",
+                "tests/integration/test_handler_subscription.py",
+            ],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert "tests/integration/test_handler_subscription.py" in sel.selected_paths
+
+    def test_file_directly_under_tests_unit_selects_itself(self) -> None:
+        # tests/unit/test_x.py has no <module> component: the old
+        # parts[2] mapping produced the non-existent directory
+        # "tests/unit/test_x.py/", which the on-disk filter then dropped.
+        sel = compute_selection(
+            changed_files=[
+                "src/omnimemory/handlers/handler_foo.py",
+                "tests/unit/test_entry_points.py",
+            ],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert "tests/unit/test_entry_points.py" in sel.selected_paths
+        assert "tests/unit/test_entry_points.py/" not in sel.selected_paths
+
+    def test_deleted_test_file_is_not_passed_to_pytest(self) -> None:
+        # A deleted path handed to pytest aborts the run (exit 4), so a changed
+        # test file that no longer exists must not be selected. Same rationale
+        # as the OMN-11576 missing-directory filter.
+        sel = compute_selection(
+            changed_files=["tests/test_deleted_by_this_pr.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert "tests/test_deleted_by_this_pr.py" not in sel.selected_paths
+        for path in sel.selected_paths:
+            assert (REPO_ROOT / path).exists(), f"selected non-existent path: {path}"
+
+
+@pytest.mark.unit
+class TestOMN15235Replay:
+    """Recorded live instance: omnimemory#417 / CI run 30310898812."""
+
+    def test_recorded_change_set_selects_root_level_node_gates(self) -> None:
+        sel = compute_selection(
+            changed_files=OMN_15235_CHANGED_FILES,
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15235-boot-resolvable",
+        )
+        assert not sel.is_full_suite
+        assert "tests/unit/nodes/" in sel.selected_paths
+        for gate in NODE_STRUCTURAL_GATES:
+            assert gate in sel.selected_paths, (
+                f"{gate} reads src/omnimemory/nodes/** but was not selected for "
+                "a contract.yaml change"
+            )
+
+    def test_contract_yaml_alone_selects_root_level_node_gates(self) -> None:
+        # The ticket's second recorded row: a future bad handler_routing entry
+        # touches only the contract, and resolved to ['tests/unit/nodes/'].
+        sel = compute_selection(
+            changed_files=[
+                "src/omnimemory/nodes/node_memory_retrieval_effect/contract.yaml"
+            ],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15235-boot-resolvable",
+        )
+        assert not sel.is_full_suite
+        for gate in NODE_STRUCTURAL_GATES:
+            assert gate in sel.selected_paths
+
+
+@pytest.mark.unit
+class TestUndeclaredFamilyEscalates:
+    """Fail-closed: an undeclared test family forces the full suite."""
+
+    def test_undeclared_root_level_test_escalates(self, tmp_path: Path) -> None:
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_brand_new_gate.py").write_text("")
+        sel = compute_selection(
+            changed_files=["src/omnimemory/handlers/handler_foo.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+            repo_root=tmp_path,
+        )
+        assert sel.is_full_suite
+        assert sel.full_suite_reason == EnumFullSuiteReason.UNDECLARED_TEST_FAMILY
+
+    def test_undeclared_test_package_escalates(self, tmp_path: Path) -> None:
+        (tmp_path / "tests" / "brand_new_pkg").mkdir(parents=True)
+        (tmp_path / "tests" / "brand_new_pkg" / "test_x.py").write_text("")
+        sel = compute_selection(
+            changed_files=["src/omnimemory/handlers/handler_foo.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+            repo_root=tmp_path,
+        )
+        assert sel.is_full_suite
+        assert sel.full_suite_reason == EnumFullSuiteReason.UNDECLARED_TEST_FAMILY
+
+
+@pytest.mark.unit
+class TestTestFamilyDeclarationsMatchDisk:
+    def test_every_family_on_disk_is_declared(
+        self, adjacency_map: ModelAdjacencyMap
+    ) -> None:
+        from scripts.ci.detect_test_paths import discover_test_families
+
+        undeclared = discover_test_families(REPO_ROOT, adjacency_map) - set(
+            adjacency_map.test_families
+        )
+        assert not undeclared, (
+            f"undeclared test families (add them to test_selection_adjacency.yaml "
+            f"with their triggers): {sorted(undeclared)}"
+        )
+
+    def test_every_declared_family_exists_on_disk(
+        self, adjacency_map: ModelAdjacencyMap
+    ) -> None:
+        stale = {
+            family
+            for family in adjacency_map.test_families
+            if not (REPO_ROOT / family).exists()
+        }
+        assert not stale, f"declared test families missing from disk: {sorted(stale)}"
+
+    def test_every_trigger_prefix_exists_on_disk(
+        self, adjacency_map: ModelAdjacencyMap
+    ) -> None:
+        # A trigger that no longer resolves silently stops firing.
+        stale = {
+            (family, trigger)
+            for family, entry in adjacency_map.test_families.items()
+            for trigger in entry.triggers
+            if not (REPO_ROOT / trigger).exists()
+        }
+        assert not stale, f"test_families triggers missing from disk: {sorted(stale)}"
+
+
+@pytest.mark.unit
+class TestNarrowingNoRegression:
+    """Narrowing on pure-src diffs must survive the OMN-15271 change."""
+
+    def test_leaf_src_change_still_narrows(self) -> None:
+        sel = compute_selection(
+            changed_files=["src/omnimemory/handlers/handler_foo.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert not sel.is_full_suite
+        assert "tests/unit/handlers/" in sel.selected_paths
+        assert "tests/unit/nodes/" in sel.selected_paths
+        assert "tests/" not in sel.selected_paths
+        assert "tests/unit/" not in sel.selected_paths
+
+    def test_leaf_src_change_pulls_no_unrelated_root_files(self) -> None:
+        sel = compute_selection(
+            changed_files=["src/omnimemory/audit/audit_io.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert not sel.is_full_suite
+        assert not [p for p in sel.selected_paths if p.startswith("tests/test_")]
+
+    def test_selector_change_still_runs_the_selector_tests(self) -> None:
+        # Adding family triggers means fewer changes fall through to the
+        # tests/unit/ fallback, so anything the fallback used to cover must now
+        # be reachable by trigger. A scripts/ci/ edit must still run this file.
+        sel = compute_selection(
+            changed_files=["scripts/ci/detect_test_paths.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert not sel.is_full_suite
+        assert _covers(sel.selected_paths, "tests/unit/test_detect_test_paths.py")
+        assert _covers(sel.selected_paths, "tests/scripts/test_check_dep_provenance.py")
+
+    def test_contract_only_change_still_runs_node_uuid_gate(self) -> None:
+        # tests/unit/test_no_duplicate_node_uuids.py sits directly under
+        # tests/unit/, so tests/unit/nodes/ never covered it.
+        sel = compute_selection(
+            changed_files=[
+                "src/omnimemory/nodes/node_memory_retrieval_effect/contract.yaml"
+            ],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="jonah/omn-15271-selector",
+        )
+        assert _covers(sel.selected_paths, "tests/unit/test_no_duplicate_node_uuids.py")
+
+    def test_main_branch_still_full_suite_with_root_changes(self) -> None:
+        sel = compute_selection(
+            changed_files=["tests/test_contract_validation.py"],
+            adjacency_path=ADJACENCY_PATH,
+            ref_name="main",
+        )
+        assert sel.is_full_suite
+        assert sel.full_suite_reason == EnumFullSuiteReason.MAIN_BRANCH

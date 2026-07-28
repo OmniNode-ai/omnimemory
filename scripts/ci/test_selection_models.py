@@ -18,11 +18,19 @@ class EnumFullSuiteReason(StrEnum):
     MERGE_GROUP = "merge_group"
     SCHEDULED = "scheduled"
     FEATURE_FLAG_OFF = "feature_flag_off"
+    UNDECLARED_TEST_FAMILY = "undeclared_test_family"
 
 
+# A selected path is either a directory (trailing slash) or a single test file.
+# File selection exists because omnimemory keeps ~25 structural test modules at
+# tests/ root by design (see the layout note in tests/conftest.py); before
+# OMN-15271 those files could not be expressed here at all, so they were never
+# selected on the PR-into-dev path.
 TestPath = Annotated[
     str,
-    StringConstraints(pattern=r"^tests(/[A-Za-z0-9_./-]+)?/$|^tests/$"),
+    StringConstraints(
+        pattern=r"^tests/([A-Za-z0-9_.-]+/)*$|^tests/([A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.py$"
+    ),
 ]
 ModuleName = Annotated[
     str,
