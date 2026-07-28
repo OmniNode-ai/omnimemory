@@ -314,8 +314,8 @@ def test_index_operation_is_absent_from_memory_retrieval_contract() -> None:
 # The set-equality gate above proves "no unresolvable target anywhere". These
 # pin the SPECIFIC disposition each of the 11 frozen entries received, so a
 # future edit cannot satisfy the aggregate gate by re-introducing the defect in
-# a different shape (e.g. re-appending a method name, or repointing a removed
-# route at some other non-dispatchable class).
+# a different shape (e.g. re-appending a method name, or deleting a route whose
+# handler_type is load-bearing as a transport declaration).
 # ---------------------------------------------------------------------------
 
 
@@ -364,33 +364,55 @@ def test_coordinator_routes_the_class_not_a_method_path() -> None:
     assert not _required_non_injectable_params(HandlerSubscription)
 
 
-def test_navigation_reducer_does_not_route_phantom_transports() -> None:
-    """OMN-15268: ``qdrant``/``http`` are gone and cannot be re-added by name.
+def test_navigation_reducer_transport_entries_name_a_real_class() -> None:
+    """OMN-15268: the transport entries resolve, and still declare their transport.
 
-    Neither class exists in the module those entries named, and the node's
-    declared input_model has no operation field for an operation_match strategy
-    to key off — so both routes were doubly unreachable.
+    ``qdrant``/``http`` named HandlerQdrant/HandlerHttp, which do not exist. They
+    are repointed at the node's real handler rather than deleted, because
+    ``handler_type`` on a routing entry is the transport-declaration surface the
+    OCC imperative-contract-guard reads (``parse_contract_transports``) and
+    ``metadata.transport_type`` is a scalar with no list form. Deleting them made
+    the guard fail this node LIVE with "undeclared transport HTTP/QDRANT". This
+    pins BOTH halves: every target resolves, and QDRANT/HTTP stay declared.
     """
     from omnimemory.nodes.node_navigation_history_reducer.handlers import (
         handler_navigation_history_reducer as nav_module,
+    )
+    from omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer import (
+        HandlerNavigationHistoryReducer,
     )
     from omnimemory.nodes.node_navigation_history_reducer.models.model_navigation_history_request import (
         ModelNavigationHistoryRequest,
     )
 
-    entries = _routing("node_navigation_history_reducer").get("handlers") or []
+    contract = _contract("node_navigation_history_reducer")
+    entries = (contract.get("handler_routing") or {}).get("handlers") or []
     keys = {entry.get("routing_key") for entry in entries}
-    assert keys == {"reduce"}, (
-        "node_navigation_history_reducer routing keys drifted. The phantom "
-        "transport routes 'qdrant'/'http' must not come back — see the "
-        f"OMN-15268 note in contract.yaml. Got: {sorted(keys)}"
+    assert keys == {"qdrant", "http", "reduce"}, (
+        f"node_navigation_history_reducer routing keys drifted: {sorted(keys)}"
     )
 
-    # The proof those names were phantom, re-executed rather than asserted.
+    # Half 1: no phantom target survives. The classes the old entries named do
+    # not exist — re-executed here, not asserted from the ticket.
     assert not hasattr(nav_module, "HandlerQdrant")
     assert not hasattr(nav_module, "HandlerHttp")
+    for entry in entries:
+        assert entry["handler"]["name"] == HandlerNavigationHistoryReducer.__name__
+        assert entry["handler"]["module"] == HandlerNavigationHistoryReducer.__module__
 
-    # The proof no operation_match key could have selected them.
+    # Half 2: the transport declarations the OCC guard reads are still present.
+    declared = {contract["metadata"]["transport_type"].upper()} | {
+        str(entry["handler"]["handler_type"]).upper()
+        for entry in entries
+        if entry["handler"].get("handler_type")
+    }
+    assert {"QDRANT", "HTTP"} <= declared, (
+        "QDRANT/HTTP transport declarations were dropped. The handler really "
+        "does open an AsyncQdrantClient and call the embedding endpoint over "
+        f"HTTP, so the guard fails this node LIVE. Declared: {sorted(declared)}"
+    )
+
+    # Why the extra keys are harmless as routes: nothing can select them.
     assert "operation" not in ModelNavigationHistoryRequest.model_fields
 
 

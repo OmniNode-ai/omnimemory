@@ -28,28 +28,55 @@ handler_routing:
     minor: 0
     patch: 0
   routing_strategy: operation_match
-  # OMN-15268: the `qdrant` and `http` entries that used to open this list are
-  # REMOVED, not repointed. Three independent proofs that nothing could ever
-  # dispatch through them:
-  #   * HandlerQdrant and HandlerHttp do not exist. The module they named
-  #     exports exactly ["HandlerNavigationHistoryReducer",
-  #     "HandlerNavigationHistoryWriter"], and neither class name appears
-  #     anywhere in omnimemory src/ — getattr() raised AttributeError at boot,
-  #     so both routes resolved to nothing.
-  #   * There is no discriminator they could match. This node's declared
-  #     input_model, ModelNavigationHistoryRequest, has exactly one field
-  #     (`session: ModelNavigationSession`) — no operation/routing field — so an
-  #     operation_match strategy can never select the key "qdrant" or "http".
-  #   * They named transports, not operations. The Qdrant writes and the HTTP
-  #     embedding call they gesture at are internal to
-  #     HandlerNavigationHistoryWriter, which is reached through the retained
-  #     `reduce` route (HandlerNavigationHistoryReducer.execute() wraps the
-  #     writer). Sub-handlers are not dispatch targets — the same OMN-15235
-  #     finding, restated.
-  # No capability is lost: both code paths remain live under `reduce`. The
-  # transport declaration for this node is `metadata.transport_type: DATABASE`
-  # above, which is where a transport belongs.
+  # OMN-15268: the `qdrant` and `http` entries named HandlerQdrant and
+  # HandlerHttp — classes that do not exist. That module's __all__ is
+  # ["HandlerNavigationHistoryReducer", "HandlerNavigationHistoryWriter"], and
+  # neither phantom name appears anywhere in omnimemory src/, so getattr()
+  # raised AttributeError and both entries resolved to nothing at boot.
+  #
+  # They are REPOINTED at the node's real handler, not deleted. Deleting them
+  # was the first attempt and it is WRONG, proven by CI: `handler_type` on a
+  # routing entry is the transport-DECLARATION surface the OCC
+  # imperative-contract-guard reads (handler_contract_compliance.py
+  # parse_contract_transports: metadata.transport_type +
+  # handler_routing.handlers[].handler_type). Dropping the entries dropped the
+  # QDRANT and HTTP declarations, and the guard immediately failed this node
+  # LIVE with "undeclared transport HTTP/QDRANT used in handler" — the module
+  # really does open an AsyncQdrantClient and call the embedding endpoint over
+  # HTTP. `metadata.transport_type` is a single scalar (DATABASE here) and has
+  # no list form, so these entries are currently the ONLY way to declare a
+  # node's second and third transports.
+  #
+  # So what these two entries are is transport facets of one handler, not two
+  # extra dispatch targets. All three now name the same real class, which is
+  # also handler_config.handler_class and default_handler. The I/O they declare
+  # is performed by HandlerNavigationHistoryWriter, which
+  # HandlerNavigationHistoryReducer.execute() wraps.
+  #
+  # They remain non-selectable as routes, deliberately and harmlessly: this
+  # node's declared input_model, ModelNavigationHistoryRequest, has exactly one
+  # field (`session: ModelNavigationSession`) — no operation field — so
+  # operation_match can never pick "qdrant" or "http" over the default. Do not
+  # "clean this up" by deleting them without first giving the transport
+  # declaration a real node-level home; overloading routing entries to carry
+  # transports is the actual defect and is filed separately.
   handlers:
+    - routing_key: "qdrant"
+      handler_key: "HandlerNavigationHistoryReducer"
+      handler:
+        name: "HandlerNavigationHistoryReducer"
+        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
+        handler_type: "QDRANT"
+      priority: 0
+      output_events: []
+    - routing_key: "http"
+      handler_key: "HandlerNavigationHistoryReducer"
+      handler:
+        name: "HandlerNavigationHistoryReducer"
+        module: "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer"
+        handler_type: "HTTP"
+      priority: 0
+      output_events: []
     - routing_key: "reduce"
       handler_key: "HandlerNavigationHistoryReducer"
       handler:
