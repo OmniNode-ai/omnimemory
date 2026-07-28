@@ -80,6 +80,26 @@ tags:
 # Routing Strategy:
 #   - operation_match: Match by action/operation field in request
 # =============================================================================
+#
+# OMN-15268: all four entries used to declare
+# ``name: "HandlerSubscription.<method>"``. ``handler.name`` is resolved by the
+# OMN-14141 nested loader as ``getattr(import_module(module), name)`` — a single
+# attribute lookup, not a dotted path — so every one of them raised
+# AttributeError and resolved to nothing at boot. The method suffix encoded the
+# per-operation entrypoint in a field the loader never reads.
+#
+# Disposition: REPOINT at the real class (the ticket's option 1). It exists, it
+# is this node's declared HandlerSubscription dependency above, and
+# ``__init__.py`` of this node package already constructs exactly
+# ``HandlerSubscription(container)``. Its ctor takes only ``container``, which is
+# boot-injectable, so all four entries now pass the OMN-13603 ctor gate too.
+#
+# RESIDUAL, disclosed not hidden: HandlerSubscription exposes subscribe() /
+# unsubscribe() / list_subscriptions() / notify() but no def-B
+# ``handle``/``handle_async`` dispatch entrypoint, so it is still in the
+# OMN-14617 class-C set (report-only in OMN-15268, tracked separately). This
+# change fixes the resolvability defect; it does not claim the node is
+# dispatchable end-to-end.
 handler_routing:
   version:
     major: 1
@@ -90,22 +110,22 @@ handler_routing:
     # Register an agent's subscription to a memory topic
     - operation: "subscribe"
       handler:
-        name: "HandlerSubscription.subscribe"
+        name: "HandlerSubscription"
         module: "omnimemory.handlers.handler_subscription"
     # Remove an agent's subscription from a memory topic
     - operation: "unsubscribe"
       handler:
-        name: "HandlerSubscription.unsubscribe"
+        name: "HandlerSubscription"
         module: "omnimemory.handlers.handler_subscription"
     # List all subscriptions for a given agent
     - operation: "list_subscriptions"
       handler:
-        name: "HandlerSubscription.list_subscriptions"
+        name: "HandlerSubscription"
         module: "omnimemory.handlers.handler_subscription"
     # Publish notification event to Kafka for subscriber consumption
     - operation: "notify"
       handler:
-        name: "HandlerSubscription.notify"
+        name: "HandlerSubscription"
         module: "omnimemory.handlers.handler_subscription"
   default_handler: null
 

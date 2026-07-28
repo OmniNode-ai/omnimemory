@@ -40,6 +40,23 @@ algorithm:
       cap: 1.0
   normalization_method: "none"
 
+# OMN-15268: this routing entry was correct and the CODE was missing —
+# HandlerPersonaClassify did not exist, so the declared target resolved to
+# nothing at boot. The class now exists in the module named below, with the
+# canonical def-B `handle(request: ModelPersonaClassifyRequest) ->
+# ModelPersonaClassifyResult` delegating to the pure `classify_persona`
+# function. The handler ref is unchanged; only `handler_key` was corrected,
+# because it named a `Class.method` pair that no loader resolves.
+#
+# Two additions make the single route actually selectable rather than merely
+# declared. `operation:` is the field operation_match keys off — `routing_key`
+# reaches it only through contract_normalizer.normalize_handler_routing, so the
+# discriminator was dependent on a normalization pass. And `default_handler` now
+# names this handler: ModelPersonaClassifyRequest carries no operation field at
+# all (user_id / signals / existing_profile), so on a strict operation_match
+# read there is nothing for the key "classify" to match against; the default is
+# what makes the node's only handler reachable. This is a one-handler COMPUTE
+# node, so there is no ambiguity about which handler the default names.
 handler_routing:
   version:
     major: 1
@@ -47,14 +64,15 @@ handler_routing:
     patch: 0
   routing_strategy: operation_match
   handlers:
-    - routing_key: "classify"
-      handler_key: "HandlerPersonaClassify.classify"
+    - operation: "classify"
+      routing_key: "classify"
+      handler_key: "HandlerPersonaClassify"
       handler:
         name: "HandlerPersonaClassify"
         module: "omnimemory.nodes.node_persona_builder_compute.handlers.handler_persona_classify"
       priority: 0
       output_events: []
-  default_handler: null
+  default_handler: "HandlerPersonaClassify"
 
 tags:
   - persona

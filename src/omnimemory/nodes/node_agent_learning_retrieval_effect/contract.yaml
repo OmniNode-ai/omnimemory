@@ -104,21 +104,37 @@ validation_rules:
     max_results: "int (1-20) - maximum results to return"
 
 # === HANDLER ROUTING ===
+# OMN-15268: the `retrieve` -> HandlerAgentLearningRetrieval entry and the
+# matching default_handler are REMOVED. The class does not exist and never did:
+#
+#   * `grep -rn HandlerAgentLearningRetrieval src/` matches only this contract.
+#     The module the entry named,
+#     handlers/handler_agent_learning_retrieval.py, contains four module-level
+#     pure functions (compute_freshness_score, build_error_query_text,
+#     build_context_query_text, rank_and_merge) and no class at all — so
+#     getattr() raised AttributeError at boot and the route resolved to nothing.
+#   * Nothing constructs or dispatches it. This node package ships no handler
+#     class in any form: adapters/ and clients/ hold only an __init__, and the
+#     node's own __init__ re-exports models only.
+#   * Repointing is not available. The functions are query-building and ranking
+#     HELPERS — none of them performs the Qdrant retrieval this EFFECT node
+#     declares, and a bare function fails the boot ctor predicate anyway (its
+#     required, default-less parameters are not injectable).
+#
+# Removing the false route does NOT make this node work — it stops the contract
+# from claiming a dispatcher that was never written. The real gap is larger and
+# is tracked separately: this node still declares subscribe_topics below with no
+# handler behind them (phantom subscription). Implementing the retrieval handler
+# is its own lane; inventing one here would be manufacturing behavior under a
+# resolvability ticket.
 handler_routing:
   version:
     major: 1
     minor: 0
     patch: 0
   routing_strategy: default
-  handlers:
-    - routing_key: "retrieve"
-      handler_key: "HandlerAgentLearningRetrieval"
-      handler:
-        name: "HandlerAgentLearningRetrieval"
-        module: "omnimemory.nodes.node_agent_learning_retrieval_effect.handlers.handler_agent_learning_retrieval"
-      priority: 0
-      output_events: []
-  default_handler: "HandlerAgentLearningRetrieval"
+  handlers: []
+  default_handler: null
 
 # === EVENT BUS SUBCONTRACT ===
 event_bus:

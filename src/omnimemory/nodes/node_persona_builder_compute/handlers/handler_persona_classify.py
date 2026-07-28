@@ -6,6 +6,9 @@
 Takes a batch of PersonaSignal events and an optional existing PersonaProfile,
 produces an updated PersonaProfile using conservative update rules.
 
+``HandlerPersonaClassify`` is the dispatch surface; ``classify_persona`` is the
+pure function it delegates to and remains the standalone/test entry point.
+
 CONSERVATISM RULES (prevent thrashing on weak evidence):
 - technical_level: requires 3+ sessions with consistent high-confidence (>0.7)
   signals before changing level. One anomalous session does NOT shift the level.
@@ -19,11 +22,20 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from omnimemory.enums import EnumPreferredTone, EnumTechnicalLevel
 from omnimemory.models.persona import ModelPersonaSignal, ModelUserPersonaV1
 
 from ..models import ModelPersonaClassifyRequest, ModelPersonaClassifyResult
+
+if TYPE_CHECKING:
+    from omnibase_core.container import ModelONEXContainer
+
+__all__ = [
+    "HandlerPersonaClassify",
+    "classify_persona",
+]
 
 # Confidence threshold for signals to influence technical_level
 _TECH_LEVEL_CONFIDENCE_THRESHOLD = 0.7
@@ -213,3 +225,53 @@ def _classify_domains(
         domains[domain] = min(current + _DOMAIN_INCREMENT, _DOMAIN_CAP)
 
     return domains
+
+
+class HandlerPersonaClassify:
+    """Dispatch handler for the persona-builder COMPUTE node.
+
+    OMN-15268: ``contract.yaml`` has declared
+    ``handler: {name: HandlerPersonaClassify, module: <this module>}`` since the
+    node was written, but the class never existed — this module held only the
+    ``classify_persona`` function and its private helpers, so the boot loader's
+    ``getattr(module, "HandlerPersonaClassify")`` raised AttributeError and the
+    ``classify`` route resolved to nothing. The contract reference was correct;
+    the code was missing. Pointing the route at the bare function instead was not
+    an option: ``classify_persona(request)`` has a required, default-less
+    ``request`` parameter, which the boot ctor predicate reads as an
+    unresolvable dependency (only ``event_bus``/``container``/``ownership_query``
+    are injectable), so it would trade an unresolvable target for a quarantined
+    one.
+
+    Canonical def-B shape (CLAUDE.md rule 7a): ``handle(request: ModelX) -> ModelY``
+    over the node's declared ``input_model``/``output_model``. ``handle`` is
+    deliberately synchronous — this is a COMPUTE node with no I/O, and the
+    auto-wiring dispatch callback awaits a handler result only when it is a
+    coroutine. Behavior is delegated unchanged to :func:`classify_persona`, which
+    stays the standalone/test entry point.
+    """
+
+    def __init__(self, container: ModelONEXContainer | None = None) -> None:
+        """Initialize the handler.
+
+        Args:
+            container: ONEX container, accepted for parity with the
+                container-driven handler pattern and to keep the constructor
+                boot-injectable. Classification is pure, so nothing is resolved
+                from it; it is optional so the handler stays constructible in a
+                unit test without standing up a container.
+        """
+        self._container = container
+
+    def handle(
+        self, request: ModelPersonaClassifyRequest
+    ) -> ModelPersonaClassifyResult:
+        """Canonical def-B dispatch entrypoint for the ``classify`` operation.
+
+        Args:
+            request: Signals plus the optional existing profile to update.
+
+        Returns:
+            The updated persona snapshot, or an ``insufficient_data`` result.
+        """
+        return classify_persona(request)

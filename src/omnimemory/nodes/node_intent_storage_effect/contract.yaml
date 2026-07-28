@@ -140,20 +140,54 @@ handler_routing:
     minor: 0
     patch: 0
   routing_strategy: operation_match
+  # OMN-15268: converted from the flat `handler_key` shape to the nested
+  # `handler: {name, module}` mapping the OMN-14141 fail-closed loader requires.
+  # `handler` is a REQUIRED field on ModelHandlerRoutingEntry, so the flat shape
+  # did not merely under-specify the target — the block could not be parsed into
+  # the routing subcontract at all, and the normalizer's fallback fills
+  # `module: ""`, which then fails to import. Either way the node advertised
+  # three operations with zero resolvable dispatchers while every other check
+  # stayed green.
+  #
+  # `operation:` is now declared explicitly alongside the legacy `routing_key:`.
+  # operation_match keys off `entry.operation`; `routing_key` reaches it only via
+  # contract_normalizer.normalize_handler_routing, so relying on it left the
+  # discriminator dependent on a normalization pass rather than on the contract.
+  # The three values match ModelIntentStorageRequest.operation
+  # (Literal['store', 'get_session', 'get_distribution']) field-for-field.
+  #
+  # HandlerIntentStorageAdapter gained a def-B `handle(request) -> response`
+  # entrypoint in OMN-15226, and both of its ctor params are defaulted, so these
+  # entries satisfy the dispatch-entrypoint (OMN-14617) and boot-resolvability
+  # (OMN-13603) predicates as well as resolvability.
+  #
+  # Module is the `adapters` PACKAGE, whose __init__ re-exports the class —
+  # verbatim the seam omnimarket's copy of this contract pins (OMN-15236). The
+  # deeper `adapters.adapter_intent_storage` module is equally importable; the
+  # package path keeps the two repos' declarations identical.
   handlers:
     # Store operation: persist a classified intent linked to a session
-    - routing_key: "store"
-      handler_key: "HandlerIntentStorageAdapter"
+    - operation: "store"
+      routing_key: "store"
+      handler:
+        name: "HandlerIntentStorageAdapter"
+        module: "omnimemory.nodes.node_intent_storage_effect.adapters"
       priority: 0
       output_events: []
     # Get session operation: retrieve intents for a specific session
-    - routing_key: "get_session"
-      handler_key: "HandlerIntentStorageAdapter"
+    - operation: "get_session"
+      routing_key: "get_session"
+      handler:
+        name: "HandlerIntentStorageAdapter"
+        module: "omnimemory.nodes.node_intent_storage_effect.adapters"
       priority: 0
       output_events: []
     # Get distribution operation: aggregate intent category distribution
-    - routing_key: "get_distribution"
-      handler_key: "HandlerIntentStorageAdapter"
+    - operation: "get_distribution"
+      routing_key: "get_distribution"
+      handler:
+        name: "HandlerIntentStorageAdapter"
+        module: "omnimemory.nodes.node_intent_storage_effect.adapters"
       priority: 0
       output_events: []
   default_handler: null
