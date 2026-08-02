@@ -104,10 +104,10 @@ test_families:
   tests/gates/:
     triggers:
       - src/omnimemory/
-    # OMN-15639 consumer-group authorization gate. It AST-walks the WHOLE src
-    # tree default-deny, so its trigger must be the whole src tree: a narrower
-    # trigger would let a non-conformant group name land in an untriggered
-    # package. Coarse on purpose.
+      # OMN-15639 consumer-group authorization gate. It AST-walks the WHOLE src
+      # tree default-deny, so its trigger must be the whole src tree: a narrower
+      # trigger would let a non-conformant group name land in an untriggered
+      # package. Coarse on purpose.
 
   # --- runtime/foundation suites ------------------------------------------
   tests/test_bootstrap.py:
