@@ -86,9 +86,18 @@ class TestResolveTestPaths:
         result = _resolve(["docs/README.md"], adjacency_map)
         assert result == []
 
-    def test_unknown_src_module_ignored(self, adjacency_map: ModelAdjacencyMap) -> None:
+    def test_unknown_src_module_selects_only_whole_src_gates(
+        self, adjacency_map: ModelAdjacencyMap
+    ) -> None:
+        # OMN-15639: previously asserted `== []`. An unknown src module still
+        # pulls in NO adjacency-resolved tests/unit/<module>/ dir -- that is the
+        # original intent and is unchanged. It now additionally selects
+        # tests/gates/, whose trigger is the whole src tree because the
+        # consumer-group authorization gate AST-walks all of src default-deny.
+        # A new module is exactly where an unauthorized group literal would
+        # hide, so firing the gate there is the fail-closed behaviour.
         result = _resolve(["src/omnimemory/nonexistent_module/foo.py"], adjacency_map)
-        assert result == []
+        assert result == ["tests/gates/"]
 
     def test_result_is_sorted(self, adjacency_map: ModelAdjacencyMap) -> None:
         result = _resolve(
