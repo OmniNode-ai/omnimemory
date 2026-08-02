@@ -413,10 +413,14 @@ override-dependencies = [
 
 [tool.uv.sources]
 omninode-memory = { workspace = true }
-# OMN-13878: omnibase-core/spi/compat now resolve from PyPI (released versions
-# match the former git tags: core v0.46.1, spi v0.23.0, compat v0.5.0).
-# omnibase-infra has no release tag carrying the spi-0.23 pins yet; keep the
-# immutable rev until the coordinated infra release lands (infra is not in the
-# dep-provenance forbidden set).
+# OMN-15639: consume the canonical consumer-group util from the core dev squash
+# commit. This is intentionally an immutable dev commit, not a feature head,
+# until the coordinated core release carrying the util is published.
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", rev = "dc35561cfa068752202dde7aa58d8966822858ad" } # raw-override-ok: OMN-15639
+# OMN-13878: spi/compat now resolve from PyPI (released versions match the
+# former git tags: spi v0.23.0, compat v0.5.0). omnibase-infra has no release
+# tag carrying the spi-0.23 pins yet; keep the immutable rev until the
+# coordinated infra release lands (infra is not in the dep-provenance forbidden
+# set).
 omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", rev = "00e5a02a511da691d22d5301b73dd2b0d7400e4a" }
 omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", tag = "v0.4.0" }

@@ -77,6 +77,11 @@ if TYPE_CHECKING:
     from omnimemory.handlers.adapters.adapter_graph_memory import AdapterGraphMemory
     from omnimemory.runtime.introspection import MemoryNodeIntrospectionProxy
 
+from omnibase_core.enums.enum_consumer_group_purpose import EnumConsumerGroupPurpose
+from omnibase_core.event_bus.util_consumer_group import derive_consumer_group_id
+from omnibase_core.models.event_bus.model_consumer_group_scope import (
+    ModelConsumerGroupScope,
+)
 from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
@@ -108,6 +113,16 @@ logger = logging.getLogger(__name__)
 
 MEMORY_SUBSCRIBE_TOPICS: list[str] = collect_subscribe_topics_from_contracts()
 """All input topics the memory plugin subscribes to (contract-driven)."""
+
+
+MEMORY_CONSUMER_GROUP_TAG = "memory"
+"""Scope tag distinguishing the memory domain group from the kernel's own group.
+
+Rendered by the canonical grammar as the ``.__i.`` infix, giving
+``{env}.{service}.{node}.consume.{version}.__i.memory``. It replaces the
+pre-OMN-15639 ``f"{config.consumer_group}-memory"`` literal, which carried no
+env token and therefore matched none of the granted MSK IAM group patterns.
+"""
 
 
 async def _probe_tcp_reachable(host: str, port: int, timeout: float = 5.0) -> bool:
@@ -691,23 +706,55 @@ class PluginMemory:
                 reason="Event bus does not support subscribe",
             )
 
+        # Fail closed: the consumer group name is derived from the node
+        # identity, so without one there is no authorized name to subscribe
+        # with. Guessing a fallback is the OMN-15639 defect class -- it mints a
+        # group the MSK IAM policy does not grant and fails at the broker
+        # instead of here. Matches the kernel's own graceful-degradation
+        # contract (service_kernel logs and continues when runtime_config has
+        # no 'name'), so this is a skip, not a crash.
+        if config.node_identity is None:
+            return ModelDomainPluginResult.skipped(
+                plugin_id=self.plugin_id,
+                reason=(
+                    "config.node_identity is None; cannot derive an "
+                    "IAM-authorized consumer group. Set 'name' in "
+                    "runtime_config.yaml to enable memory consumers."
+                ),
+            )
+
+        unsubscribe_callbacks: list[Callable[[], Awaitable[None]]] = []
+
         try:
+            # Canonical grammar (OMN-15639): the group name is derived, never
+            # written. Yields
+            # {env}.omnimemory.{node_name}.consume.{version}.__i.memory, which the
+            # onex-dev.* MSK IAM pattern matches by construction because the env
+            # token is a prefix rather than an interpolated suffix.
+            consumer_group_id = derive_consumer_group_id(
+                env=config.node_identity.env,
+                service=config.node_identity.service,
+                node_name=config.node_identity.node_name,
+                version=config.node_identity.version,
+                purpose=EnumConsumerGroupPurpose.CONSUME,
+                scope=ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG),
+            )
+
             # Build per-topic handler map (dispatch engine guaranteed non-None)
             topic_handlers = self._build_topic_handlers(correlation_id)
-
-            unsubscribe_callbacks: list[Callable[[], Awaitable[None]]] = []
 
             for topic in MEMORY_SUBSCRIBE_TOPICS:
                 handler = topic_handlers[topic]
                 logger.info(
                     "Subscribing to memory topic: %s "
-                    "(mode=dispatch_engine, correlation_id=%s)",
+                    "(mode=dispatch_engine, group_id=%s, correlation_id=%s)",
                     topic,
+                    consumer_group_id,
                     correlation_id,
                 )
                 unsub = await config.event_bus.subscribe(
                     topic=topic,
-                    group_id=f"{config.consumer_group}-memory",
+                    group_id=consumer_group_id,
                     on_message=handler,
                 )
                 unsubscribe_callbacks.append(unsub)

@@ -36,14 +36,24 @@ from .conftest import StubConfig, StubEventBus
 # =============================================================================
 
 
+class _NodeIdentity:
+    """Kernel-shaped node identity for canonical consumer-group derivation."""
+
+    env = "onex-dev"
+    service = "omnimemory"
+    node_name = "omnimemory"
+    version = "v1"
+
+
 def _make_config(
     event_bus: object | None = None,
     correlation_id: object | None = None,
+    node_identity: object | None = None,
 ) -> object:
     """Create a minimal ModelDomainPluginConfig-compatible object."""
     bus = event_bus if event_bus is not None else StubEventBus()
     cid = correlation_id if correlation_id is not None else uuid4()
-    return StubConfig(event_bus=bus, correlation_id=cid)
+    return StubConfig(event_bus=bus, correlation_id=cid, node_identity=node_identity)
 
 
 # =============================================================================
@@ -316,7 +326,7 @@ class TestPluginWireDispatchers:
         """wire_dispatchers should store the event_bus reference for shutdown."""
         event_bus = StubEventBus()
         plugin = PluginMemory()
-        config = _make_config(event_bus=event_bus)
+        config = _make_config(event_bus=event_bus, node_identity=_NodeIdentity())
 
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
 
@@ -398,7 +408,7 @@ class TestPluginStartConsumers:
 
         event_bus = StubEventBus()
         plugin = PluginMemory()
-        config = _make_config(event_bus=event_bus)
+        config = _make_config(event_bus=event_bus, node_identity=_NodeIdentity())
 
         await plugin.wire_dispatchers(config)  # type: ignore[arg-type]
         result = await plugin.start_consumers(config)  # type: ignore[arg-type]
