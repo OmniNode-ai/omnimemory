@@ -723,25 +723,25 @@ class PluginMemory:
                 ),
             )
 
-        # Canonical grammar (OMN-15639): the group name is derived, never
-        # written. Yields
-        # {env}.omnimemory.{node_name}.consume.{version}.__i.memory, which the
-        # onex-dev.* MSK IAM pattern matches by construction because the env
-        # token is a prefix rather than an interpolated suffix.
-        consumer_group_id = derive_consumer_group_id(
-            env=config.node_identity.env,
-            service=config.node_identity.service,
-            node_name=config.node_identity.node_name,
-            version=config.node_identity.version,
-            purpose=EnumConsumerGroupPurpose.CONSUME,
-            scope=ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG),
-        )
+        unsubscribe_callbacks: list[Callable[[], Awaitable[None]]] = []
 
         try:
+            # Canonical grammar (OMN-15639): the group name is derived, never
+            # written. Yields
+            # {env}.omnimemory.{node_name}.consume.{version}.__i.memory, which the
+            # onex-dev.* MSK IAM pattern matches by construction because the env
+            # token is a prefix rather than an interpolated suffix.
+            consumer_group_id = derive_consumer_group_id(
+                env=config.node_identity.env,
+                service=config.node_identity.service,
+                node_name=config.node_identity.node_name,
+                version=config.node_identity.version,
+                purpose=EnumConsumerGroupPurpose.CONSUME,
+                scope=ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG),
+            )
+
             # Build per-topic handler map (dispatch engine guaranteed non-None)
             topic_handlers = self._build_topic_handlers(correlation_id)
-
-            unsubscribe_callbacks: list[Callable[[], Awaitable[None]]] = []
 
             for topic in MEMORY_SUBSCRIBE_TOPICS:
                 handler = topic_handlers[topic]

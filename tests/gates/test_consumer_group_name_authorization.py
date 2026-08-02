@@ -60,6 +60,7 @@ design (call-site enumeration, default-deny).
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -68,9 +69,13 @@ SRC_ROOT = REPO_ROOT / "src" / "omnimemory"
 # Keyword arguments that carry a Kafka consumer group name to a bus/transport.
 _GROUP_KEYWORDS = frozenset({"group_id", "consumer_group", "kafka_group_id"})
 
-# Field/variable names that hold a consumer group name.
-_GROUP_NAME_PATTERN = frozenset(
-    {"group", "group_id", "consumer_group", "consumer_group_id"}
+# Field/variable names that hold a consumer group name, including the known
+# near-miss spellings CodeRabbit flagged. Do not match arbitrary "*_group"
+# locals; unrelated variables such as invalid_group are not Kafka group names.
+_GROUP_NAME_PATTERN = re.compile(
+    r"^(?:group|group_id|group_name|consumer_group|consumer_group_id|"
+    r"consumer_group_name|memory_group|memory_group_id|memory_group_name|"
+    r"kafka_group|kafka_group_id|kafka_group_name)$"
 )
 
 # Functions that MINT a group name from structured inputs (a node identity or a
@@ -161,7 +166,8 @@ def _collect_derived_bindings(tree: ast.Module) -> set[str]:
         if grown == derived:
             break
         derived = grown
-    return derived
+    rebound = {name for name, value in pairs if not _value_is_canonical(value, derived)}
+    return derived - rebound
 
 
 def _value_is_canonical(value: ast.expr, derived_bindings: set[str]) -> bool:
@@ -224,9 +230,18 @@ def _scan_source(source: str, relpath: str) -> list[str]:
         elif isinstance(node, ast.AnnAssign) and node.value is not None:
             if isinstance(node.target, ast.Name):
                 assignments.append((node.target.id, node.value))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            args = node.args
+            positional = args.posonlyargs + args.args
+            defaulted = positional[len(positional) - len(args.defaults) :]
+            for arg, default in zip(defaulted, args.defaults, strict=True):
+                assignments.append((arg.arg, default))
+            for arg, kw_default in zip(args.kwonlyargs, args.kw_defaults, strict=True):
+                if kw_default is not None:
+                    assignments.append((arg.arg, kw_default))
 
         for name, value in assignments:
-            if name.lower() not in _GROUP_NAME_PATTERN:
+            if not _GROUP_NAME_PATTERN.search(name.lower()):
                 continue
             if _value_is_canonical(value, derived_bindings):
                 continue
@@ -262,8 +277,7 @@ def test_no_unmigrated_group_literals_in_src() -> None:
     assert not unexpected, (
         "Non-conformant consumer group name(s) in src/omnimemory. Every group "
         "name must come from omnibase_core.event_bus.util_consumer_group "
-        "(compute_consumer_group_id / derive_prefixed_group_id / "
-        "apply_instance_discriminator) so it is IAM-authorized by "
+        f"({' / '.join(sorted(_CANONICAL_DERIVATIONS))}) so it is IAM-authorized by "
         "construction:\n  " + "\n  ".join(unexpected)
     )
 
@@ -326,6 +340,33 @@ def test_checker_rejects_laundered_literal() -> None:
         "bus.subscribe(group_id=apply_instance_discriminator(group_id=x, instance_id=y))\n",
         "probe.py",
     )
+
+
+def test_checker_rejects_rebound_derived_name() -> None:
+    """A later non-canonical rebind removes a name from the derived set."""
+    findings = _scan_source(
+        "base = compute_consumer_group_id(identity, purpose)\n"
+        "base = 'onex-runtime-memory'\n"
+        "bus.subscribe(topic='t', group_id=base)\n",
+        "probe.py",
+    )
+    assert findings, "literal rebind retained derived authorization"
+
+
+def test_checker_rejects_group_named_parameter_defaults() -> None:
+    """Function defaults on group-like names are group-name producers too."""
+    findings = _scan_source(
+        "def subscribe(group_id='onex-runtime-memory'):\n"
+        "    pass\n"
+        "async def consume(*, memory_group_id='onex-runtime-memory'):\n"
+        "    pass\n"
+        "kafka_group = 'onex-runtime-memory'\n",
+        "probe.py",
+    )
+    assert len(findings) == 3, findings
+    assert any("group_id is assigned" in f for f in findings)
+    assert any("memory_group_id is assigned" in f for f in findings)
+    assert any("kafka_group is assigned" in f for f in findings)
 
 
 def test_checker_accepts_derived_names_including_binding_chains() -> None:
