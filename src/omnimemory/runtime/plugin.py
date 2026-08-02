@@ -78,10 +78,10 @@ if TYPE_CHECKING:
     from omnimemory.runtime.introspection import MemoryNodeIntrospectionProxy
 
 from omnibase_core.enums.enum_consumer_group_purpose import EnumConsumerGroupPurpose
+from omnibase_core.event_bus.util_consumer_group import derive_consumer_group_id
 from omnibase_core.models.event_bus.model_consumer_group_scope import (
     ModelConsumerGroupScope,
 )
-from omnibase_core.utils.util_consumer_group import compute_consumer_group_id
 from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
@@ -118,8 +118,8 @@ MEMORY_SUBSCRIBE_TOPICS: list[str] = collect_subscribe_topics_from_contracts()
 MEMORY_CONSUMER_GROUP_TAG = "memory"
 """Scope tag distinguishing the memory domain group from the kernel's own group.
 
-Rendered by the canonical grammar as the ``.__e.`` infix, giving
-``{env}.{service}.{node}.consume.{version}.__e.memory``. It replaces the
+Rendered by the canonical grammar as the ``.__i.`` infix, giving
+``{env}.{service}.{node}.consume.{version}.__i.memory``. It replaces the
 pre-OMN-15639 ``f"{config.consumer_group}-memory"`` literal, which carried no
 env token and therefore matched none of the granted MSK IAM group patterns.
 """
@@ -725,12 +725,15 @@ class PluginMemory:
 
         # Canonical grammar (OMN-15639): the group name is derived, never
         # written. Yields
-        # {env}.omnimemory.{node_name}.consume.{version}.__e.memory, which the
+        # {env}.omnimemory.{node_name}.consume.{version}.__i.memory, which the
         # onex-dev.* MSK IAM pattern matches by construction because the env
         # token is a prefix rather than an interpolated suffix.
-        consumer_group_id = compute_consumer_group_id(
-            config.node_identity,
-            EnumConsumerGroupPurpose.CONSUME,
+        consumer_group_id = derive_consumer_group_id(
+            env=config.node_identity.env,
+            service=config.node_identity.service,
+            node_name=config.node_identity.node_name,
+            version=config.node_identity.version,
+            purpose=EnumConsumerGroupPurpose.CONSUME,
             scope=ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG),
         )
 

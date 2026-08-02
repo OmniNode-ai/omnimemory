@@ -77,7 +77,7 @@ async def _subscribed_group_ids(config: Any, bus: StubEventBus) -> list[str]:
 @pytest.mark.usefixtures("stub_introspection")
 async def test_memory_subscription_group_is_iam_authorized() -> None:
     """Every group id the plugin subscribes with matches a pinned IAM pattern."""
-    from omnibase_core.utils.util_consumer_group import is_authorized_group_name
+    from omnibase_core.event_bus.util_consumer_group import is_authorized_group_name
 
     bus = StubEventBus()
     config = StubConfig(

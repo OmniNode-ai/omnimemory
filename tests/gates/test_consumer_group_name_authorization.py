@@ -5,7 +5,7 @@
 """AC3 consumer-group authorization gate for OmniMemory (OMN-15639).
 
 Every Kafka consumer group name this repo can mint must be derivable from the
-canonical grammar in ``omnibase_core.utils.util_consumer_group`` and must match
+canonical grammar in ``omnibase_core.event_bus.util_consumer_group`` and must match
 one of the six MSK IAM group patterns granted to the managed data plane.
 
 Two independent assertions, both fail-closed:
@@ -75,10 +75,11 @@ _GROUP_NAME_PATTERN = frozenset(
 
 # Functions that MINT a group name from structured inputs (a node identity or a
 # reserved prefix). Their result is canonical by construction. Sourced from
-# omnibase_core.utils.util_consumer_group -- see the OMN-15639 seam table.
+# omnibase_core.event_bus.util_consumer_group -- see the OMN-15639 seam table.
 _MINTING_DERIVATIONS = frozenset(
     {
         "compute_consumer_group_id",
+        "derive_consumer_group_id",
         "derive_prefixed_group_id",
     }
 )
@@ -260,7 +261,7 @@ def test_no_unmigrated_group_literals_in_src() -> None:
 
     assert not unexpected, (
         "Non-conformant consumer group name(s) in src/omnimemory. Every group "
-        "name must come from omnibase_core.utils.util_consumer_group "
+        "name must come from omnibase_core.event_bus.util_consumer_group "
         "(compute_consumer_group_id / derive_prefixed_group_id / "
         "apply_instance_discriminator) so it is IAM-authorized by "
         "construction:\n  " + "\n  ".join(unexpected)
@@ -355,12 +356,12 @@ def test_derived_memory_group_is_iam_authorized() -> None:
     from omnibase_core.enums.enum_consumer_group_purpose import (
         EnumConsumerGroupPurpose,
     )
+    from omnibase_core.event_bus.util_consumer_group import (
+        derive_consumer_group_id,
+        is_authorized_group_name,
+    )
     from omnibase_core.models.event_bus.model_consumer_group_scope import (
         ModelConsumerGroupScope,
-    )
-    from omnibase_core.utils.util_consumer_group import (
-        compute_consumer_group_id,
-        is_authorized_group_name,
     )
 
     from omnimemory.runtime.plugin import MEMORY_CONSUMER_GROUP_TAG
@@ -371,9 +372,12 @@ def test_derived_memory_group_is_iam_authorized() -> None:
         node_name = "memory_domain_plugin"
         version = "v1"
 
-    derived = compute_consumer_group_id(
-        _Identity(),
-        EnumConsumerGroupPurpose.CONSUME,
+    derived = derive_consumer_group_id(
+        env=_Identity.env,
+        service=_Identity.service,
+        node_name=_Identity.node_name,
+        version=_Identity.version,
+        purpose=EnumConsumerGroupPurpose.CONSUME,
         scope=ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG),
     )
 
@@ -405,7 +409,7 @@ def test_seam_scope_field_name_is_ephemeral_tag() -> None:
     ``ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG)``. The
     OMN-15639 seam table pins the util's module path and function signatures but
     NOT that model's field names, so ``ephemeral_tag`` is the one seam field
-    this lane inferred (from the ``.__e.`` grammar infix) rather than read off
+    this lane inferred (from the ``.__i.`` grammar infix) rather than read off
     the table. If the core lane names it ``ephemeral`` / ``tag`` /
     ``ephemeral_scope``, both lanes can be individually green while the pair is
     a runtime ``TypeError`` -- exactly the PAIR_INCOMPATIBLE class. Assert it
@@ -428,7 +432,7 @@ def test_unauthorized_env_token_is_not_authorized() -> None:
     """The derived grammar is only conformant for an MSK-granted env token.
 
     Residual proof leg made executable. The derived name is
-    ``{env}.omnimemory.{node}.consume.{version}.__e.memory`` and ``env`` comes
+    ``{env}.omnimemory.{node}.consume.{version}.__i.memory`` and ``env`` comes
     from the kernel, whose documented default is ``local``
     (``ONEX_ENVIRONMENT``; ``omnibase_infra`` ``service_kernel.py`` feeds it into
     ``ModelNodeIdentity(env=...)``). The granted pattern set authorizes
@@ -440,12 +444,12 @@ def test_unauthorized_env_token_is_not_authorized() -> None:
     from omnibase_core.enums.enum_consumer_group_purpose import (
         EnumConsumerGroupPurpose,
     )
+    from omnibase_core.event_bus.util_consumer_group import (
+        derive_consumer_group_id,
+        is_authorized_group_name,
+    )
     from omnibase_core.models.event_bus.model_consumer_group_scope import (
         ModelConsumerGroupScope,
-    )
-    from omnibase_core.utils.util_consumer_group import (
-        compute_consumer_group_id,
-        is_authorized_group_name,
     )
 
     from omnimemory.runtime.plugin import MEMORY_CONSUMER_GROUP_TAG
@@ -456,9 +460,12 @@ def test_unauthorized_env_token_is_not_authorized() -> None:
         node_name = "memory_domain_plugin"
         version = "v1"
 
-    derived_under_default_env = compute_consumer_group_id(
-        _Identity(),
-        EnumConsumerGroupPurpose.CONSUME,
+    derived_under_default_env = derive_consumer_group_id(
+        env=_Identity.env,
+        service=_Identity.service,
+        node_name=_Identity.node_name,
+        version=_Identity.version,
+        purpose=EnumConsumerGroupPurpose.CONSUME,
         scope=ModelConsumerGroupScope(ephemeral_tag=MEMORY_CONSUMER_GROUP_TAG),
     )
 
