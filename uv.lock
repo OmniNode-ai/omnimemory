@@ -1236,6 +1236,7 @@ dependencies = [
     { name = "tree-sitter" },
     { name = "tree-sitter-python" },
 ]
+
 [[package]]
 name = "omnibase-infra"
 version = "0.38.4"
@@ -1343,7 +1344,7 @@ requires-dist = [
     { name = "asyncio-mqtt", specifier = ">=0.16.2,<1.0.0" },
     { name = "asyncpg", specifier = ">=0.31.0,<1.0.0" },
     { name = "cachetools", specifier = ">=6.2.4,<8.0.0" },
-    { name = "fastapi", specifier = ">=0.136.3,<0.141.0" },
+    { name = "fastapi", specifier = ">=0.136.3,<0.142.0" },
     { name = "httpx", specifier = ">=0.28.1,<1.0.0" },
     { name = "httpx", marker = "extra == 'graph'", specifier = ">=0.28.1,<1.0.0" },
     { name = "mcp", specifier = ">=1.27.2,<2.0.0" },
