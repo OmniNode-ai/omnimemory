@@ -16,7 +16,7 @@ authors = [{ name = "OmniNode.ai", email = "contact@omninode.ai" }]
 keywords = ["omninode", "memory", "rag", "embeddings", "semantic-search", "onex"]
 dependencies = [
     # Core MCP integration for Archon connectivity
-    "mcp>=1.27.2,<2.0.0",
+    "mcp>=1.27.2,<3.0.0",
 
     # HTTP client for MCP calls and API communication
     "httpx>=0.28.1,<1.0.0",
