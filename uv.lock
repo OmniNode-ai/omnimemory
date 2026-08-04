@@ -1236,6 +1236,7 @@ dependencies = [
     { name = "tree-sitter" },
     { name = "tree-sitter-python" },
 ]
+
 [[package]]
 name = "omnibase-infra"
 version = "0.38.4"
@@ -1346,7 +1347,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.136.3,<0.141.0" },
     { name = "httpx", specifier = ">=0.28.1,<1.0.0" },
     { name = "httpx", marker = "extra == 'graph'", specifier = ">=0.28.1,<1.0.0" },
-    { name = "mcp", specifier = ">=1.27.2,<2.0.0" },
+    { name = "mcp", specifier = ">=1.27.2,<3.0.0" },
     { name = "neo4j", marker = "extra == 'graph'", specifier = ">=5.0.0,<6.0.0" },
     { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?rev=dc35561cfa068752202dde7aa58d8966822858ad" },
     { name = "omnibase-infra", git = "https://github.com/OmniNode-ai/omnibase_infra.git?rev=00e5a02a511da691d22d5301b73dd2b0d7400e4a" },
