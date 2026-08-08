@@ -44,8 +44,10 @@ services:
       QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
       QDRANT__STORAGE__ON_DISK_PAYLOAD: true
       QDRANT__LOG_LEVEL: INFO
-      # Authentication (optional - set QDRANT_API_KEY in .env to enable)
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+      # Authentication disabled (OMN-15745): QDRANT_API_KEY was set-but-empty in shared .env,
+      # which Qdrant treats as "auth enabled, key=empty string" -> rejects all real callers with 401.
+      # Do not re-add QDRANT__SERVICE__API_KEY here until a real key is provisioned end-to-end
+      # (client + server); use docker-compose.prod.yml overlay for that.
     volumes:
       - qdrant_data:/qdrant/storage
       - qdrant_snapshots:/qdrant/snapshots
