@@ -63,6 +63,8 @@ jobs:
           private-key: ${{ secrets.ONEXBOT_OCC_PRIVATE_KEY }}
           owner: OmniNode-ai
           repositories: omnimemory
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Checkout (onexbot-occ-writer app token so the bot PR triggers CI)
         uses: actions/checkout@v7

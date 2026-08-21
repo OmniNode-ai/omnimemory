@@ -202,6 +202,7 @@ jobs:
           private-key: ${{ secrets.ONEXBOT_OCC_PRIVATE_KEY }}
           owner: OmniNode-ai
           repositories: omnibase_infra
+          permission-contents: write
 
       - name: Dispatch plugin-release to omnibase_infra
         if: steps.token_check.outputs.has_token == 'true'
