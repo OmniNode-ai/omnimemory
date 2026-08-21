@@ -26,10 +26,23 @@ jobs:
     outputs:
       version: ${{ steps.tag.outputs.tag }}
     steps:
+      # OMN-16343: mint an installation token for the org-owned app
+      # onexbot-occ-writer. Push restrictions on main cannot authorize the
+      # default workflow GITHUB_TOKEN (proven live on omnibase_core, GH006,
+      # 2026-08-21); the Sync main step below pushes as this app identity
+      # instead by having checkout persist this token for git operations.
+      - name: Mint onexbot-occ-writer app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ONEXBOT_OCC_APP_ID }}
+          private-key: ${{ secrets.ONEXBOT_OCC_PRIVATE_KEY }}
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Assert clean working tree
         run: |
@@ -128,10 +141,15 @@ jobs:
       # tags are cut from dev; dev CI + this job already validated it).
       # Promotion PRs to main are retired -- main protection now empties
       # required_status_checks on main and restricts pushes to this job's
-      # automation identity, so no separate token/secret is needed: the
-      # same GITHUB_TOKEN persisted by actions/checkout@v7 above already
-      # authenticates this push. Uses raw_tag (not the rc/namespace-normalized
-      # tag) because that is the actual git ref (e.g. omnimemory/v0.17.1).
+      # automation identity. OMN-16343: the default workflow GITHUB_TOKEN
+      # cannot be authorized by push restrictions (proven live on
+      # omnibase_core, GH006, 2026-08-21), so this push authenticates as
+      # the org-owned app onexbot-occ-writer via the installation token
+      # persisted by actions/checkout@v7 above (steps.app-token.outputs.token).
+      # Restrictions re-add on main happens only after an observed release
+      # sync proves this token path. Uses raw_tag (not the rc/namespace-
+      # normalized tag) because that is the actual git ref (e.g.
+      # omnimemory/v0.17.1).
       - name: Sync main to release tag
         if: ${{ !contains(steps.tag.outputs.tag, 'rc') }}
         env:
