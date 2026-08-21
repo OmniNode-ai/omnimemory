@@ -38,9 +38,11 @@ jobs:
           test -z "$(git ls-files --others --exclude-standard)"
 
       - name: Validate tag matches pyproject.toml version
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
+            TAG="$RELEASE_TAG"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
@@ -88,9 +90,17 @@ jobs:
 
       - name: Set release tag
         id: tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RAW_TAG="${{ inputs.tag }}"
+            case "$RELEASE_TAG" in
+              ''|*[!A-Za-z0-9.+_-]*)
+                echo "::error::release tag contains unsupported characters"
+                exit 1
+                ;;
+            esac
+            RAW_TAG="$RELEASE_TAG"
           else
             RAW_TAG="${GITHUB_REF_NAME}"
           fi
@@ -124,9 +134,11 @@ jobs:
       # tag) because that is the actual git ref (e.g. omnimemory/v0.17.1).
       - name: Sync main to release tag
         if: ${{ !contains(steps.tag.outputs.tag, 'rc') }}
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.raw_tag }}
         run: |
           set -euo pipefail
-          TAG="${{ steps.tag.outputs.raw_tag }}"
+          TAG="$RELEASE_TAG"
           TAG_SHA=$(git rev-list -n 1 "$TAG")
           echo "Resolved tag $TAG -> commit $TAG_SHA"
           git push origin "${TAG_SHA}:refs/heads/main"
