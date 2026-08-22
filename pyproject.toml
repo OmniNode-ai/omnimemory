@@ -418,9 +418,8 @@ omninode-memory = { workspace = true }
 # until the coordinated core release carrying the util is published.
 omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", rev = "dc35561cfa068752202dde7aa58d8966822858ad" } # raw-override-ok: OMN-15639
 # OMN-13878: spi/compat now resolve from PyPI (released versions match the
-# former git tags: spi v0.23.0, compat v0.5.0). omnibase-infra has no release
-# tag carrying the spi-0.23 pins yet; keep the immutable rev until the
-# coordinated infra release lands (infra is not in the dep-provenance forbidden
-# set).
-omnibase-infra = { git = "https://github.com/OmniNode-ai/omnibase_infra.git", rev = "00e5a02a511da691d22d5301b73dd2b0d7400e4a" }
+# former git tags: spi v0.23.0, compat v0.5.0). omnibase-infra v0.38.9 is now
+# published on PyPI carrying the spi-0.23 pins (OMN-15604 cascade-leg
+# recovery), so the immutable-rev override is no longer needed; resolves from
+# PyPI via the >=0.38.4,<0.39.0 constraint above.
 omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", tag = "v0.4.0" }
