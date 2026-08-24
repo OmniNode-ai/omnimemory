@@ -21,6 +21,7 @@ any value other than ``signal``.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,18 @@ pytestmark = pytest.mark.unit
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS_DIR = _REPO_ROOT / ".github" / "workflows"
+
+_TIMEOUT_METHOD_RE = re.compile(r"--timeout-method=(\S+)")
+
+
+def _has_pytest_token(run: str) -> bool:
+    """True when a non-comment line of the run script invokes pytest."""
+    return any(
+        token == "pytest" or token.endswith("/pytest")
+        for line in run.splitlines()
+        if not line.lstrip().startswith("#")
+        for token in line.split()
+    )
 
 
 def _all_workflow_run_commands() -> list[tuple[str, str, str]]:
@@ -62,13 +75,16 @@ def test_no_workflow_pytest_invocation_uses_thread_timeout_method() -> None:
 
     # Positive control: the scanner must actually be seeing ci.yml's pytest
     # steps — an empty scan would vacuously pass while enforcing nothing.
-    assert any(source == "ci.yml" and "pytest" in run for source, _, run in commands)
+    assert any(
+        source == "ci.yml" and _has_pytest_token(run) for source, _, run in commands
+    )
 
     violations = [
         f"{source}::{job}: {line.strip()}"
         for source, job, run in commands
         for line in run.splitlines()
-        if "--timeout-method=" in line and "--timeout-method=signal" not in line
+        for method in _TIMEOUT_METHOD_RE.findall(line)
+        if method != "signal"
     ]
     assert violations == [], (
         "workflow passes a non-signal --timeout-method (banned by OMN-15977; "
