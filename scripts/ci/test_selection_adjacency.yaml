@@ -191,6 +191,9 @@ test_families:
   tests/unit/scripts/:
     triggers:
       - scripts/
+  tests/unit/test_ci_workflow_shape.py:
+    triggers:
+      - .github/workflows/
   tests/unit/test_contract_linter.py:
     triggers:
       - src/omnimemory/tools/
