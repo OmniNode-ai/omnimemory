@@ -275,8 +275,8 @@ OMNIMEMORY__QDRANT__ON_DISK=true
 
 ### `safe_db_url_display`
 
-**Module**: `omnimemory.utils.db_url`
-**Import**: `from omnimemory.utils import safe_db_url_display`
+**Module**: `omnimemory.adapters.adapter_db_url` (re-exported from `omnimemory.adapters`)
+**Import**: `from omnimemory.adapters import safe_db_url_display`
 
 A helper that strips credentials from a PostgreSQL connection URL so the result is safe to include in log messages, error text, and diagnostic output.
 
@@ -299,7 +299,7 @@ def safe_db_url_display(url: str) -> str: ...
 **Example**:
 
 ```python
-from omnimemory.utils import safe_db_url_display
+from omnimemory.adapters import safe_db_url_display
 
 url = "postgresql://omnimemory:super_secret@<db-host>:5436/omnimemory"
 print(safe_db_url_display(url))
@@ -440,7 +440,8 @@ Beyond settings validation, the `bootstrap()` function performs runtime validati
 3. **Qdrant**: Validates URL format, warns if API key missing
 
 ```python
-from omnimemory import load_settings, bootstrap
+from omnimemory.settings import load_settings
+from omnimemory.bootstrap import bootstrap
 
 # Load and validate settings from environment
 settings = load_settings()  # Validates env vars, raises ValidationError on failure
@@ -581,7 +582,7 @@ export OMNIMEMORY__QDRANT_ENABLED=true
 ### Verify Configuration
 
 ```python
-from omnimemory import load_settings
+from omnimemory.settings import load_settings
 
 try:
     settings = load_settings()
