@@ -6,7 +6,11 @@
 
 OmniMemory includes a comprehensive PII (Personally Identifiable Information) detection system to ensure privacy compliance and data security in memory storage operations. This guide covers integration patterns, configuration options, and best practices for using the `PIIDetector` utility.
 
-**Location**: `src/omnimemory/utils/pii_detector.py`
+**Location**: `src/omnimemory/adapters/adapter_pii_detector.py`. `PIIDetector`,
+`PIIType`, and the `Model*` PII result/match/config classes below are all
+re-exported from `omnimemory.adapters` (backed by
+`src/omnimemory/models/utils/model_pii_*.py`) — import from `omnimemory.adapters`,
+not a submodule path.
 
 ---
 
@@ -51,13 +55,13 @@ The detector includes specialized patterns for common API key formats:
 ### PIIDetector Class
 
 ```python
-from omnimemory.utils.pii_detector import PIIDetector, PIIDetectorConfig
+from omnimemory.adapters import PIIDetector, ModelPIIDetectorConfig
 
 # Default configuration
 detector = PIIDetector()
 
 # Custom configuration
-config = PIIDetectorConfig(
+config = ModelPIIDetectorConfig(
     high_confidence=0.98,
     medium_confidence=0.90,
     low_confidence=0.60,
@@ -68,30 +72,30 @@ config = PIIDetectorConfig(
 detector = PIIDetector(config=config)
 ```
 
-### PIIDetectionResult
+### ModelPIIDetectionResult
 
 The detection result provides comprehensive information:
 
 ```python
 from pydantic import BaseModel, Field
 
-class PIIDetectionResult(BaseModel):
+class ModelPIIDetectionResult(BaseModel):
     """Result of PII detection scan."""
     has_pii: bool = Field(description="Whether any PII was detected")
-    matches: List[PIIMatch] = Field(default_factory=list, description="List of all PII matches found")
+    matches: List[ModelPIIMatch] = Field(default_factory=list, description="List of all PII matches found")
     sanitized_content: str = Field(description="Content with PII masked/removed")
     pii_types_detected: Set[PIIType] = Field(default_factory=set, description="Types of PII found")
     scan_duration_ms: float = Field(description="Scan performance metric")
 ```
 
-### PIIMatch
+### ModelPIIMatch
 
 Each detected PII item includes:
 
 ```python
 from pydantic import BaseModel, Field
 
-class PIIMatch(BaseModel):
+class ModelPIIMatch(BaseModel):
     """A detected PII match in content."""
     pii_type: PIIType = Field(description="Type of PII (EMAIL, SSN, etc.)")
     value: str = Field(description="The detected PII value (may be masked)")
@@ -131,7 +135,7 @@ result = detector.detect_pii(content, sensitivity_level="high")
 ### Basic Usage
 
 ```python
-from omnimemory.utils.pii_detector import PIIDetector, PIIType
+from omnimemory.adapters import PIIDetector, PIIType
 
 detector = PIIDetector()
 
@@ -151,7 +155,7 @@ if result.has_pii:
 **Pattern 1: Pre-Storage Validation**
 
 ```python
-from omnimemory.utils.pii_detector import PIIDetector
+from omnimemory.adapters import PIIDetector
 
 class MemoryStorageNode:
     def __init__(self):
@@ -249,7 +253,7 @@ class MemoryValidator:
 ### Vector Memory Integration
 
 ```python
-from omnimemory.utils.pii_detector import PIIDetector
+from omnimemory.adapters import PIIDetector
 
 class VectorMemoryNode:
     def __init__(self):
@@ -284,7 +288,7 @@ class VectorMemoryNode:
 
 ```python
 from typing import List, Tuple
-from omnimemory.utils.pii_detector import PIIDetector, PIIDetectionResult
+from omnimemory.adapters import PIIDetector, ModelPIIDetectionResult
 
 class BatchMemoryProcessor:
     def __init__(self):
@@ -293,7 +297,7 @@ class BatchMemoryProcessor:
     def process_batch(
         self,
         items: List[str]
-    ) -> Tuple[List[str], List[PIIDetectionResult]]:
+    ) -> Tuple[List[str], List[ModelPIIDetectionResult]]:
         """Process batch of items with PII detection."""
 
         sanitized_items = []
@@ -308,7 +312,7 @@ class BatchMemoryProcessor:
 
     def get_batch_statistics(
         self,
-        results: List[PIIDetectionResult]
+        results: List[ModelPIIDetectionResult]
     ) -> dict:
         """Compute statistics for batch processing."""
 
@@ -333,12 +337,12 @@ class BatchMemoryProcessor:
 
 ## Configuration Options
 
-### PIIDetectorConfig
+### ModelPIIDetectorConfig
 
 ```python
-from omnimemory.utils.pii_detector import PIIDetectorConfig
+from omnimemory.adapters import ModelPIIDetectorConfig
 
-config = PIIDetectorConfig(
+config = ModelPIIDetectorConfig(
     # Confidence thresholds
     high_confidence=0.98,           # For definite patterns (SSN with dashes)
     medium_high_confidence=0.95,    # For strong patterns (emails)
@@ -360,7 +364,7 @@ config = PIIDetectorConfig(
 
 ```python
 # Production preset - strict detection, performance optimized
-PRODUCTION_CONFIG = PIIDetectorConfig(
+PRODUCTION_CONFIG = ModelPIIDetectorConfig(
     high_confidence=0.98,
     medium_confidence=0.92,
     low_confidence=0.80,
@@ -369,7 +373,7 @@ PRODUCTION_CONFIG = PIIDetectorConfig(
 )
 
 # Development preset - balanced detection
-DEVELOPMENT_CONFIG = PIIDetectorConfig(
+DEVELOPMENT_CONFIG = ModelPIIDetectorConfig(
     high_confidence=0.95,
     medium_confidence=0.85,
     low_confidence=0.70,
@@ -378,7 +382,7 @@ DEVELOPMENT_CONFIG = PIIDetectorConfig(
 )
 
 # Audit preset - aggressive detection
-AUDIT_CONFIG = PIIDetectorConfig(
+AUDIT_CONFIG = ModelPIIDetectorConfig(
     high_confidence=0.90,
     medium_confidence=0.75,
     low_confidence=0.50,
@@ -439,7 +443,7 @@ audit_result = detector.detect_pii(audit_data, sensitivity_level="high")
 ### 4. Handle Detection Errors Gracefully
 
 ```python
-async def safe_detect_pii(self, content: str) -> PIIDetectionResult:
+async def safe_detect_pii(self, content: str) -> ModelPIIDetectionResult:
     """Detect PII with graceful error handling."""
     try:
         return self.pii_detector.detect_pii(content)
@@ -452,7 +456,7 @@ async def safe_detect_pii(self, content: str) -> PIIDetectionResult:
     except Exception as e:
         logger.error("PII detection failed", error=str(e))
         # Fail safe: assume PII present
-        return PIIDetectionResult(
+        return ModelPIIDetectionResult(
             has_pii=True,
             matches=[],
             sanitized_content="[CONTENT_REDACTED_DUE_TO_ERROR]",
@@ -552,7 +556,7 @@ class PIISanitizationError(PIIError):
 
 ```python
 import pytest
-from omnimemory.utils.pii_detector import PIIDetector, PIIType
+from omnimemory.adapters import PIIDetector, PIIType
 
 class TestPIIDetector:
     def setup_method(self):
@@ -657,13 +661,13 @@ The `max_text_length` setting controls memory usage and scan time:
 
 ```python
 # Production preset - optimized for performance
-config = PIIDetectorConfig(
+config = ModelPIIDetectorConfig(
     max_text_length=50000,      # 50KB limit
     max_matches_per_type=50,    # Limit match processing
 )
 
 # Large document processing - accept higher memory/time
-config = PIIDetectorConfig(
+config = ModelPIIDetectorConfig(
     max_text_length=200000,     # 200KB limit
     max_matches_per_type=500,   # More matches allowed
 )
@@ -706,7 +710,7 @@ class BatchPIIProcessor:
         self.detector = PIIDetector()
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
-    async def process_batch(self, items: List[str]) -> List[PIIDetectionResult]:
+    async def process_batch(self, items: List[str]) -> List[ModelPIIDetectionResult]:
         """Process batch with controlled parallelism."""
         loop = asyncio.get_event_loop()
 
