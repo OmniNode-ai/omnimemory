@@ -1,6 +1,8 @@
 # OmniMemory
 
+[![CI](https://github.com/OmniNode-ai/omnimemory/actions/workflows/ci.yml/badge.svg)](https://github.com/OmniNode-ai/omnimemory/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![ONEX 4.0](https://img.shields.io/badge/ONEX-4.0-purple.svg)](https://github.com/OmniNode-ai/omnibase_core)
 [![Linting: ruff](https://img.shields.io/badge/linting-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy%20strict-blue.svg)](https://mypy.readthedocs.io/)
