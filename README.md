@@ -220,7 +220,7 @@ See [OmniMemory → OmniMarket Node Migration Boundary](https://github.com/OmniN
 
 ## Documentation
 
-OmniMemory's documentation lives in the **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)**. This README is the repository's landing page; everything below is the full index of OmniMemory pages there. Each path under `docs/` in this repository is a pointer stub to its page.
+OmniMemory's documentation lives in the **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)**. This README is the repository's landing page; everything below is the full index of OmniMemory pages there. Every path under `docs/` that was migrated is now a pointer stub to its page — with three deliberate exceptions listed under **Kept in this repository** below, which remain full documents because they are out of scope for the public knowledge base.
 
 **Architecture**
 - [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md) — the EFFECT / COMPUTE / REDUCER / ORCHESTRATOR archetypes applied to memory
@@ -242,6 +242,9 @@ OmniMemory's documentation lives in the **[OmniNode knowledge base](https://gith
 
 **Kept in this repository** — operating context and platform-convention files that must ship beside the code:
 [CLAUDE.md](CLAUDE.md) · [AGENT.md](AGENT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [LICENSE](LICENSE) · [CHANGELOG.md](CHANGELOG.md)
+
+The three full documents still under `docs/` — CI/agent-config and point-in-time records that the public knowledge base does not carry:
+[docs/ci/CI_MONITORING_GUIDE.md](docs/ci/CI_MONITORING_GUIDE.md) · [docs/stub_protocols.md](docs/stub_protocols.md) · [docs/db-split/fk-audit.md](docs/db-split/fk-audit.md)
 
 ---
 

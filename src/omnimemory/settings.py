@@ -196,7 +196,7 @@ class QdrantSettings(BaseSettings):
     Optional backend for vector memory storage.
 
     Environment variables (prefix: OMNIMEMORY__QDRANT__):
-        URL: Qdrant server URL (default: http://localhost:6333)
+        URL: Qdrant server URL (required, no default)
         API_KEY: Qdrant API key (optional)
         COLLECTION_NAME: Default collection name (default: omnimemory)
         VECTOR_SIZE: Vector embedding dimensions (default: 1024)
