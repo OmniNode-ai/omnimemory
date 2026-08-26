@@ -1,4 +1,4 @@
-> **Navigation**: [Home](./INDEX.md) > Reference
+> **Navigation**: [Home](../README.md) > Reference
 
 # Stub Protocols and Compatibility Layer
 

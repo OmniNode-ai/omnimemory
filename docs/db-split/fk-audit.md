@@ -1,4 +1,4 @@
-> **Navigation**: [Home](../INDEX.md) > DB Split
+> **Navigation**: [Home](../../README.md) > DB Split
 
 # FK Audit: omnimemory
 

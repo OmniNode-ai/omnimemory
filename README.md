@@ -20,7 +20,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 
 3. **Storage integration owner for Qdrant, Memgraph, Valkey, and Kreuzberg adapters.** The concrete adapter implementations for all memory-layer storage backends live in `omnimemory`. These adapters implement the domain protocols and are injected at runtime via the DI container.
 
-**What is migrating to omnimarket:** The 15 runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket`. Protocols, models, adapters, and the runtime plugin stay here. See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
+**What is migrating to omnimarket:** The runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket`. Protocols, models, adapters, and the runtime plugin stay here. See [OmniMemory → OmniMarket Node Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md).
 
 ---
 
@@ -31,7 +31,7 @@ OmniMemory holds three distinct ownership roles in the ONEX platform:
 - **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `handlers/adapters/` and `nodes/*/adapters/`
 - **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/` registered as `onex.domain_plugins`
 - **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
-- **Node handlers** — 15 runnable nodes in `src/omnimemory/nodes/` (migrating to omnimarket)
+- **Node handlers** — 13 contract-carrying nodes in `src/omnimemory/nodes/` (migrating to omnimarket)
 
 ## What This Repo Does Not Own
 
@@ -52,14 +52,14 @@ Follows the [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/omnibas
 
 ### Node inventory
 
-- **Effect nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `agent_learning_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`, `intent_event_consumer_effect`, `filesystem_crawler_effect`, `kreuzberg_parse_effect`, `persona_storage_effect`
+- **Effect nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `agent_learning_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`, `kreuzberg_parse_effect`, `persona_storage_effect`
 - **Compute nodes** — `semantic_analyzer_compute`, `similarity_compute`, `persona_builder_compute`
 - **Reducer nodes** — `navigation_history_reducer`, `memory_consolidator_reducer` (stub — no contract.yaml)
 - **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`
 
-> `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in an earlier cleanup pass; they never had a `contract.yaml` and are no longer present in the repository.
+> `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in an earlier cleanup pass; they never had a `contract.yaml` and are no longer present in the repository. `node_filesystem_crawler_effect` and `node_intent_event_consumer_effect` have since been removed as well, once their `omnimarket` counterparts became canonical.
 
-> _Verified against `src/omnimemory/nodes/` on 2026-06-21: 16 node directories, 15 with `contract.yaml`; `node_memory_consolidator_reducer` is the contract-less stub._
+> _Verified against `src/omnimemory/nodes/` on 2026-08-26: 14 node directories, 13 with `contract.yaml`; `node_memory_consolidator_reducer` is the contract-less stub._
 
 ### Memory evolution (planned phases)
 
@@ -85,7 +85,7 @@ OmniMemory's `docker-compose.yml` owns the **memory-layer data services**:
 | Kafka / Redpanda | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) | Platform-wide event bus, shared by all services |
 | PostgreSQL | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) | Platform-wide relational database, shared by all services |
 
-See [docs/architecture/MEMORY_DATA_OWNERSHIP.md](docs/architecture/MEMORY_DATA_OWNERSHIP.md) for detailed service boundaries and adapter ownership.
+See [OmniMemory Memory Data Ownership](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-memory-data-ownership.md) for detailed service boundaries and adapter ownership.
 
 ---
 
@@ -113,7 +113,7 @@ Default service ports (all configurable via `.env`):
 - Valkey: `localhost:6379`
 - Kreuzberg parser: `localhost:8090`
 
-See [docs/runbooks/STARTING_MEMORY_SERVICES.md](docs/runbooks/STARTING_MEMORY_SERVICES.md) for the full startup runbook including health checks and troubleshooting.
+See [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md) in the knowledge base for the full startup runbook including health checks and troubleshooting.
 
 ### Install and run tests
 
@@ -122,7 +122,7 @@ uv sync --group dev
 uv run pytest tests/ -m unit
 ```
 
-For configuration options see [docs/environment_variables.md](docs/environment_variables.md).
+For configuration options see [OmniMemory Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md).
 
 ### Minimal usage example
 
@@ -214,21 +214,34 @@ pre-commit run --all-files
 
 Nodes are migrating to omnimarket. The migration preserves the protocol-adapter-handler split: handlers move, adapters stay.
 
-See [docs/migrations/MARKET_MIGRATION_BOUNDARY.md](docs/migrations/MARKET_MIGRATION_BOUNDARY.md).
+See [OmniMemory → OmniMarket Node Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md).
 
 ---
 
 ## Documentation
 
-Full documentation index: **[docs/INDEX.md](docs/INDEX.md)**
+OmniMemory's documentation lives in the **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)**. This README is the repository's landing page; everything below is the full index of OmniMemory pages there. Each path under `docs/` in this repository is a pointer stub to its page.
 
-Key docs:
-- [Architecture: ONEX Four-Node Pattern](docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md)
-- [Architecture: Memory Data Ownership](docs/architecture/MEMORY_DATA_OWNERSHIP.md)
-- [Migration: Market Migration Boundary](docs/migrations/MARKET_MIGRATION_BOUNDARY.md)
-- [Runbook: Starting Memory Services](docs/runbooks/STARTING_MEMORY_SERVICES.md)
-- [Reference: Environment Variables](docs/environment_variables.md)
-- [Runtime: Plugin System](docs/runtime/RUNTIME_PLUGINS.md)
+**Architecture**
+- [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md) — the EFFECT / COMPUTE / REDUCER / ORCHESTRATOR archetypes applied to memory
+- [ARCH-002: Kafka Abstraction Rule](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-arch-002-kafka-abstraction.md) — why nodes never speak to a broker directly
+
+**Reference**
+- [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md) — every setting, type, default and constraint
+- [Memory Data Ownership](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-memory-data-ownership.md) — which repository owns which storage service
+- [Runtime Plugin System](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-runtime-plugins.md) — how `PluginMemory` wires into the ONEX kernel
+- [Handler Reuse Matrix](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-handler-reuse-matrix.md) — which `omnibase_infra` handler each memory node reuses
+
+**Guides**
+- [PII Handling](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-pii-handling.md) — detection, sanitization and storage-path integration
+- [Performance Testing](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-performance-testing.md) — SLA targets, benchmarks and how to read them
+- [Market Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md) — what moves to `omnimarket` and what stays
+
+**Runbooks**
+- [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md) — bringing the storage layer up, health checks, troubleshooting
+
+**Kept in this repository** — operating context and platform-convention files that must ship beside the code:
+[CLAUDE.md](CLAUDE.md) · [AGENT.md](AGENT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [LICENSE](LICENSE) · [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
