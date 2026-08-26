@@ -1,4 +1,4 @@
-> **Navigation**: [Home](../INDEX.md) > CI > CI Monitoring Guide
+> **Navigation**: [Home](../../README.md) > CI > CI Monitoring Guide
 
 # CI Monitoring Guide
 

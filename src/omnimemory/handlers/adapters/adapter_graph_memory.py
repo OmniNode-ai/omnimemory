@@ -138,7 +138,8 @@ __all__ = [
 # Cypher Query Templates
 # =============================================================================
 # All templates use parameterized queries to prevent injection attacks.
-# See docs/handler_reuse_matrix.md Security section for guidelines.
+# See the Security section of the handler reuse matrix in the knowledge base:
+# https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-handler-reuse-matrix.md
 
 
 class CypherTemplates:
