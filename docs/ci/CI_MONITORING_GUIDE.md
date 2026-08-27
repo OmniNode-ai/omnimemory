@@ -3,7 +3,7 @@
 # CI Monitoring Guide
 
 > **Purpose**: Reference for CI checks, local reproduction, and failure triage
-> **Last Updated**: 2026-02-19
+> **Last Updated**: 2026-08-27
 
 ---
 
@@ -21,6 +21,8 @@ OmniMemory CI runs on GitHub Actions and is defined in the following workflow fi
 | `.github/workflows/docs-validate.yml` | All PRs | Validates documentation structure and links |
 | `.github/workflows/cr-thread-gate.yml` | All PRs | Fails if unresolved CodeRabbit review threads exist |
 | `.github/workflows/pr-title-check.yml` | All PRs | Enforces `OMN-XXXX` ticket reference in PR title |
+| `.github/workflows/call-occ-autobind.yml` | All PRs | Publishes the OCC-autobind command that mints this PR's evidence companion |
+| `.github/workflows/call-occ-companion-effect.yml` | All PRs | Publishes the OCC-companion-effect command that stamps `Evidence-Source: OCC#<n>` onto the PR body |
 
 The full validation pipeline (`ci.yml`) runs in three phases:
 
@@ -223,6 +225,38 @@ poetry run python scripts/validate_ci_precommit_alignment.py
 **Architecture handshake**: The `check-handshake` job verifies that `.claude/architecture-handshake.md` matches the canonical source in the `OmniNode-ai/omnibase_core` repository. This ensures cross-repo architectural contracts stay in sync. If this check fails, update `.claude/architecture-handshake.md` from `omnibase_core/architecture-handshakes/`.
 
 **Concurrency**: The test suite uses `cancel-in-progress: true` so that pushing new commits to an open PR cancels the previous run, conserving CI resources.
+
+---
+
+### Runner routing
+
+Most jobs in `ci.yml` hardcode `ubuntu-latest`. The jobs that do not read the shared
+`OMNI_RUNNER_SELECTOR_V1` seam:
+
+```yaml
+runs-on: >-
+  ${{ (fork PR)
+      && fromJSON(vars.OMNI_PUBLIC_PR_RUNS_ON_JSON || '["ubuntu-latest"]')
+      || fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]') }}
+```
+
+Fork PRs go to GitHub-hosted runners; same-repo PRs go to the self-hosted `omnibase-ci`
+fleet, which is the only runner class that can reach the tailnet-only package mirror and
+lane broker. `contract-compliance` in `ci.yml` is the job that most depends on this — its
+`uv sync` resolves against the tailnet mirror and cannot complete from a hosted runner.
+
+**The OCC publishers are deliberately NOT on that seam.** `occ-autobind` and
+`occ-companion-effect` reach the reusable workflows in `OmniNode-ai/omniclaude`, whose
+trusted branch reads a dedicated `OMNI_OCC_AUTOBIND_RUNS_ON_JSON` with a literal
+`["self-hosted","omnibase-ci"]` fallback. That variable is deliberately left unset, so the
+literal is the operating value and the pin holds by construction.
+
+The separation exists because these two publishers write to a tailnet-only lane broker, and
+they mint the evidence line the receipt gate hard-fails without. Sharing
+one variable with unrelated lint/test jobs meant a single routing change could stop every
+merge in every OCC-gated repo rather than merely turning some checks red. Re-pointing either
+publisher back at `OMNI_TRUSTED_CI_RUNS_ON_JSON` reads as a harmless consistency tidy-up in
+review and is guarded against in the omniclaude and omnimarket test suites; do not do it.
 
 ---
 
