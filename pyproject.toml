@@ -61,7 +61,10 @@ dependencies = [
     # ONEX dependencies - versioned releases from PyPI
     # OMN-13837: relax spi/core/infra pins so consumers on spi>=0.23
     # can transitively resolve omninode-memory.
-    "omnibase-core>=0.46.1,<0.47.0",
+    # OMN-16760: floor raised to 0.46.13, the released version carrying the
+    # OMN-15639 consumer-group util that the retired git-source override held
+    # this pin open for.
+    "omnibase-core>=0.46.13,<0.47.0",
     "omnibase-spi>=0.23.0,<0.24.0",
     "omnibase-infra>=0.38.4,<0.39.0",
 
@@ -409,7 +412,8 @@ markers = [
 # Override transitive pins so our direct pins win.
 override-dependencies = [
     # OMN-13837: relaxed spi/core/infra to unblock the omnimarket-as-dependency chain.
-    "omnibase-core>=0.46.1,<0.47.0",
+    # OMN-16760: floor raised to 0.46.13 to match [project].dependencies.
+    "omnibase-core>=0.46.13,<0.47.0",
     "omnibase-spi>=0.23.0,<0.24.0",
     "omnibase-infra>=0.38.4,<0.39.0",
     "omnibase-compat>=0.5.0,<0.6.0",
@@ -420,10 +424,14 @@ override-dependencies = [
 
 [tool.uv.sources]
 omninode-memory = { workspace = true }
-# OMN-15639: consume the canonical consumer-group util from the core dev squash
-# commit. This is intentionally an immutable dev commit, not a feature head,
-# until the coordinated core release carrying the util is published.
-omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", rev = "dc35561cfa068752202dde7aa58d8966822858ad" } # raw-override-ok: OMN-15639
+# OMN-16760: the omnibase-core git-source override (rev dc35561cf, opened under
+# OMN-15639 to carry the canonical consumer-group util ahead of a release) is
+# retired. dc35561cf is an ancestor of the v0.46.13 tag commit 2a5ac713, so the
+# util now ships in the PyPI wheel and core resolves from PyPI via the
+# >=0.46.13,<0.47.0 constraint above. The override also hard-blocked the
+# dependency cascade: `uv lock --upgrade-package` cannot move a
+# [tool.uv.sources] git pin, so check_dep_provenance.py --check-movable failed
+# the `Bump omnimemory` leg closed on every core release (OMN-15604 class).
 # OMN-13878: spi/compat now resolve from PyPI (released versions match the
 # former git tags: spi v0.23.0, compat v0.5.0). omnibase-infra v0.38.9 is now
 # published on PyPI carrying the spi-0.23 pins (OMN-15604 cascade-leg
