@@ -63,21 +63,42 @@
 #
 # MANUAL REPLAY ENTRYPOINT (OMN-14993): `workflow_dispatch` lets an operator
 # manually re-request a mint for a PR whose original `pull_request` event was
-# swallowed (e.g. the pre-fix 422 bug, OMN-14981/OMN-14939). This ONLY works
-# for a PR that is currently OPEN and non-draft -- the downstream F-17 guard
-# in omnimarket's handler_occ_companion_compute.py deliberately refuses to
-# author a companion for a closed/merged/draft PR (added after incident
-# occ#4333), so `scripts/ci/occ_manual_replay_precheck.py` refuses BEFORE
-# publish for those states rather than let the request silently vanish
-# downstream. Merged/closed-PR replay is explicitly OUT OF SCOPE -- see
-# OMN-14993 and OMN-14991 Recommendation 4 for why building that is a
-# separate, deliberate design decision, not a trigger-wiring change. The
+# swallowed (e.g. the pre-fix 422 bug, OMN-14981/OMN-14939), or whose mint was
+# lost to the merge/queue-latency race. `scripts/ci/occ_manual_replay_precheck.py`
+# refuses BEFORE publish for the states the downstream F-17 guard in
+# omnimarket's handler_occ_companion_compute.py would decline, rather than let
+# the request silently vanish several hops downstream. The
 # `occ-companion-effect-manual-replay` job below deliberately duplicates the
 # reusable's checkout/pip/run GHA glue (not the publish LOGIC itself, which
 # stays sourced from omnimarket) rather than threading override inputs
 # through the shared cross-repo reusable used by every born-path caller.
 #
-# Ticket: OMN-15014, OMN-14160, OMN-14993
+# DEAD ENTRYPOINT, REPAIRED (OMN-16665): the precheck step below has referenced
+# `scripts/ci/occ_manual_replay_precheck.py` since the OMN-14993 fan-out, but
+# the script itself was never fanned out with it -- it existed only in
+# omnibase_infra, omniclaude and omniweb. Every manual replay dispatched in this
+# repo therefore died at `python3: can't open file ...: [Errno 2] No such file
+# or directory` (live: run 33019346585, conclusion=failure, exit 2, at the
+# precheck step). It failed CLOSED, so no bad command was ever published, but
+# the documented remediation for a missing companion was a dead end here. The
+# script now exists in this repo. Overlaps OMN-16664; the same gap is open in
+# omnimarket, omnibase_core, omnibase_compat, omnidash, omnibase_spi and
+# omniintelligence.
+#
+# MERGED-PR REPLAY, NOW IN SCOPE (OMN-16665): merged-PR replay used to be
+# explicitly out of scope (OMN-14993 / OMN-14991 Recommendation 4) on the
+# grounds that it needed "a new, deliberately-scoped override of F-17 ...
+# which is real design work". OMN-16665 did that work after this repo lost
+# omnimemory#447's companion to the race: the PR opened 19:35:00Z and merged
+# 19:46:09Z while the self-hosted runner fleet held the publisher job until
+# 19:47:34Z, so the command reached the broker after the merge and the mint
+# was declined -- and reported on the SUCCESS topic. The `allow_merged_replay`
+# input below arms omnimarket's `ModelOccCompanionRequest.allow_merged_replay`,
+# which authors the companion for a MERGED PR only. A closed-UNMERGED PR stays
+# refused regardless: nothing was lost by not authoring a companion for an
+# abandoned PR, and occ#4333 is why.
+#
+# Ticket: OMN-15014, OMN-14160, OMN-14993, OMN-16665
 
 name: OCC Companion Effect Publisher
 
@@ -89,12 +110,23 @@ on:
       pr_number:
         description: >
           PR number to manually re-request an occ-companion-effect mint for
-          (OMN-14993). Only works for a PR that is currently OPEN and
-          non-draft -- a closed/merged/draft PR is refused before publish
-          (see scripts/ci/occ_manual_replay_precheck.py); it is not silently
+          (OMN-14993). Works for a PR that is currently OPEN and non-draft, or
+          for a MERGED PR when allow_merged_replay is set. A closed-unmerged or
+          draft PR is refused before publish (see
+          scripts/ci/occ_manual_replay_precheck.py); it is not silently
           accepted and dropped downstream.
         required: true
         type: string
+      allow_merged_replay:
+        description: >
+          Author the companion for a PR that MERGED without one (OMN-16665) --
+          the merge/queue-latency race, where the mint command reaches the
+          broker after the PR has already merged. Leave false for an ordinary
+          replay. This does NOT apply to a closed-unmerged PR: that decline
+          (occ#4333) stands regardless.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
@@ -144,8 +176,15 @@ jobs:
             > pr_state.json
           jq 'del(.body)' pr_state.json
 
-      - name: Precheck -- refuse closed/merged/draft (F-17 boundary, OMN-14993)
-        run: python3 scripts/ci/occ_manual_replay_precheck.py pr_state.json
+      - name: Precheck -- refuse closed/draft, and merged unless armed (OMN-14993, OMN-16665)
+        env:
+          ALLOW_MERGED_REPLAY: ${{ inputs.allow_merged_replay }}
+        run: |
+          args=(pr_state.json)
+          if [[ "${ALLOW_MERGED_REPLAY}" == "true" ]]; then
+            args+=(--allow-merged-replay)
+          fi
+          python3 scripts/ci/occ_manual_replay_precheck.py "${args[@]}"
 
       - name: Ticket gate (mirrors the reusable's defensive gate, OMN-13990 H4)
         run: |
@@ -183,6 +222,10 @@ jobs:
           RUNNER_IS_TRUSTED: "true"
           PR_REPO: ${{ github.repository }}
           LANE: dev
+          # OMN-16665: threaded onto the published command so the compute node's
+          # F-17 override is armed by the SAME operator decision the precheck
+          # above validated. The publisher reads only the literal "true".
+          ALLOW_MERGED_REPLAY: ${{ inputs.allow_merged_replay }}
         working-directory: .occ-companion-effect-src
         run: |
           PR_HEAD_SHA="$(jq -r .headRefOid ../pr_state.json)"

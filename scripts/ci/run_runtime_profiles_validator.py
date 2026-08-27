@@ -30,7 +30,7 @@ SRC_ROOT = Path("src")
 def main() -> int:
     result = ValidatorRuntimeProfiles(allowlist_path=ALLOWLIST_PATH).validate(SRC_ROOT)
     for issue in result.issues:
-        print(  # noqa: T201
+        print(
             f"[{issue.severity.value}] {issue.file_path}:{issue.line_number}: {issue.message}"
         )
     return 0 if result.is_valid else 1

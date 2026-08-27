@@ -253,6 +253,13 @@ ignore = [
 known-first-party = ["omnimemory"]
 
 [tool.ruff.lint.per-file-ignores]
+# CI helper scripts are GHA-step entrypoints: they are invoked as
+# `python3 scripts/ci/<name>.py ...` from a workflow, so their user-facing
+# output IS print() to the step log and their exit code IS the contract.
+"scripts/ci/*" = [
+    "T201",  # print() is intentional user-facing output in a CI step
+    "EXE001",  # invoked as `python3 <path>`, never as an executable
+]
 # Validation scripts need special rules for security, naming, and documentation
 "scripts/validation/*" = [
     "S602",  # subprocess call with shell=True
