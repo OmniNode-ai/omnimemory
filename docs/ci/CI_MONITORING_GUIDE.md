@@ -252,7 +252,7 @@ trusted branch reads a dedicated `OMNI_OCC_AUTOBIND_RUNS_ON_JSON` with a literal
 literal is the operating value and the pin holds by construction.
 
 The separation exists because these two publishers write to a tailnet-only lane broker, and
-they mint the `Evidence-Source: OCC#<n>` line the receipt gate hard-fails without. Sharing
+they mint the evidence line the receipt gate hard-fails without. Sharing
 one variable with unrelated lint/test jobs meant a single routing change could stop every
 merge in every OCC-gated repo rather than merely turning some checks red. Re-pointing either
 publisher back at `OMNI_TRUSTED_CI_RUNS_ON_JSON` reads as a harmless consistency tidy-up in
