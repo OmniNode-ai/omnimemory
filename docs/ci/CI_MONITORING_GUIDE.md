@@ -240,10 +240,17 @@ runs-on: >-
       || fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]') }}
 ```
 
-Fork PRs go to GitHub-hosted runners; same-repo PRs go to the self-hosted `omnibase-ci`
-fleet, which is the only runner class that can reach the tailnet-only package mirror and
-lane broker. `contract-compliance` in `ci.yml` is the job that most depends on this — its
-`uv sync` resolves against the tailnet mirror and cannot complete from a hosted runner.
+Fork PRs go to GitHub-hosted runners; same-repo PRs follow whatever
+`OMNI_TRUSTED_CI_RUNS_ON_JSON` resolves to — historically the self-hosted `omnibase-ci`
+fleet, which is the only runner class that can reach the tailnet-only lane broker.
+
+**Correction (OMN-16682, 2026-08-27).** An earlier revision of this section claimed
+`contract-compliance` in `ci.yml` "cannot complete from a hosted runner" because its
+`uv sync` resolves against the tailnet mirror. That was measured and is **wrong for this
+repo**: under a real seam flip to `["ubuntu-latest"]`, `ci.yml` went fully green on hosted
+runners — all 16 jobs including `Contract Compliance Check` and the required `CI Summary`.
+Treat the tailnet-mirror dependency as unproven here rather than as established fact, and
+measure per repo instead of inheriting this claim.
 
 **The OCC publishers are deliberately NOT on that seam.** `occ-autobind` and
 `occ-companion-effect` reach the reusable workflows in `OmniNode-ai/omniclaude`, whose
