@@ -180,6 +180,15 @@ test_families:
   tests/scripts/:
     triggers:
       - scripts/
+  tests/workflows/:
+    triggers:
+      - .github/workflows/
+      # OMN-16509. These suites extract the live Bash out of .github/workflows/*.yml
+      # and execute it against a stubbed CLI, so the workflow YAML is their only
+      # upstream — no src/ path can select them. Coarse on the whole workflows
+      # directory on purpose: a per-file trigger would silently stop firing the
+      # moment a workflow is renamed, which is exactly the failure mode the
+      # surrounding comment warns about.
   tests/integration/:
     triggers: []
     # Service-backed suites (Postgres/Qdrant/Memgraph/Kafka) that skip without
