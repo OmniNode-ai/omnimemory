@@ -96,6 +96,24 @@ jobs:
           PR: ${{ steps.resolve.outputs.pr }}
         run: |
           set -euo pipefail
+          # OMN-13138/13214: on a queue-controlled branch the merge method is
+          # set by the merge queue, so passing an explicit --squash is
+          # rejected ("The merge strategy for dev is set by the merge queue")
+          # and the PR is NEVER enqueued (sits CLEAN + auto-merge armed
+          # forever). Try bare --auto FIRST so that regime keeps working if a
+          # queue returns.
+          #
+          # OMN-16509 (porting the OMN-16501 fix landed in omniclaude#2033,
+          # merge bfa618e22): dev is NOT currently queue-controlled -- verified
+          # live for this repo 2026-08-28, mergeQueue(branch:"dev") == null and
+          # {auto:true, squash:true, merge:false, rebase:false} -- and gh's CLI
+          # refuses a method-less --auto when run non-interactively even on a
+          # squash-only repo ("--merge, --rebase, or --squash required when not
+          # running interactively"), leaving a permanently red Enable
+          # Auto-Merge check. Retry with --squash (this repo's one enabled
+          # method) ONLY on that specific gh-CLI-side error string, so a
+          # genuine queue-controlled rejection is never retried with an
+          # explicit method and the OMN-13214 regime is untouched.
           if output=$(gh pr merge "$PR" --repo "$GH_REPO" --auto 2>&1); then
             echo "auto-merge enabled: $output"
             exit 0
@@ -103,6 +121,19 @@ jobs:
           if echo "$output" | grep -qiE "already enqueued|already queued|auto-merge already enabled"; then
             echo "auto-merge not newly enabled (expected): $output"
             exit 0
+          fi
+          if echo "$output" | grep -qiE "required when not running interactively"; then
+            echo "bare --auto rejected (no active merge queue): $output"
+            if output=$(gh pr merge "$PR" --repo "$GH_REPO" --auto --squash 2>&1); then
+              echo "auto-merge enabled (squash): $output"
+              exit 0
+            fi
+            if echo "$output" | grep -qiE "already enqueued|already queued|auto-merge already enabled"; then
+              echo "auto-merge not newly enabled (expected): $output"
+              exit 0
+            fi
+            echo "auto-merge failed: $output"
+            exit 1
           fi
           echo "auto-merge failed: $output"
           exit 1
