@@ -46,7 +46,11 @@ class ModelSearchResult(BaseModel):
         score: Relevance/similarity score (0.0-1.0). For semantic search,
             this is cosine similarity. For text search, this may be a
             normalized relevance score. For graph traversal, this represents
-            path weight or distance.
+            path weight or distance. For hybrid search, this is the fused
+            rank-fusion score normalized against the top hit, so the top
+            result scores 1.0 and every score is consistent with the returned
+            ordering; it is comparable within one response only, never across
+            responses or against a raw backend score (OMN-16765).
         distance: Optional raw distance metric from vector search.
         path: Optional traversal path for graph search results (list of
             snapshot IDs from start to this result).

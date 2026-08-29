@@ -46,6 +46,7 @@ __all__ = [
     "MIN_VECTOR_COSINE",
     "RRF_K_DEFAULT",
     "fuse_rrf",
+    "fuse_rrf_scores",
     "select_relevant",
 ]
 
@@ -96,16 +97,46 @@ def select_relevant(
     return [doc_id for doc_id, score in entries if score >= min_score]
 
 
-def fuse_rrf(
+def fuse_rrf_scores(
     *legs: Sequence[str],
     k: int = RRF_K_DEFAULT,
-) -> list[str]:
-    """Fuse ranked document id lists by Reciprocal Rank Fusion.
+) -> dict[str, float]:
+    """Accumulate Reciprocal Rank Fusion scores per document.
 
     Each document accumulates ``1 / (k + rank)`` from every leg that returned
     it, with ``rank`` counted from 1. A document returned by both legs therefore
     accumulates both terms, and that accumulation is the entire mechanism by
     which agreement between legs is rewarded.
+
+    Args:
+        *legs: One ranked list of document ids per leg, best first.
+        k: Smoothing constant. See :data:`RRF_K_DEFAULT`.
+
+    Returns:
+        Fused score per document id. Values are small by construction (with
+        ``k = 60`` a rank-1 hit contributes ~0.0164) and are meaningful only
+        relative to each other within one query — never across queries, and
+        never as an absolute relevance.
+
+    Raises:
+        ValueError: If ``k`` is negative, which would make the reciprocal
+            undefined or negative for low ranks.
+    """
+    if k < 0:
+        raise ValueError(f"RRF k must be non-negative, got {k}")
+
+    scores: dict[str, float] = {}
+    for leg in legs:
+        for rank, doc_id in enumerate(leg, start=1):
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
+    return scores
+
+
+def fuse_rrf(
+    *legs: Sequence[str],
+    k: int = RRF_K_DEFAULT,
+) -> list[str]:
+    """Fuse ranked document id lists by Reciprocal Rank Fusion.
 
     Ties are broken by document id, ascending. RRF produces exact ties whenever
     two documents occupy the same rank in their respective legs, which on any
@@ -120,15 +151,7 @@ def fuse_rrf(
         Every document id from every leg, deduplicated, in fused order.
 
     Raises:
-        ValueError: If ``k`` is negative, which would make the reciprocal
-            undefined or negative for low ranks.
+        ValueError: If ``k`` is negative.
     """
-    if k < 0:
-        raise ValueError(f"RRF k must be non-negative, got {k}")
-
-    scores: dict[str, float] = {}
-    for leg in legs:
-        for rank, doc_id in enumerate(leg, start=1):
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
-
+    scores = fuse_rrf_scores(*legs, k=k)
     return sorted(scores, key=lambda doc_id: (-scores[doc_id], doc_id))

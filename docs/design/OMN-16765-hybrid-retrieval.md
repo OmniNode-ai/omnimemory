@@ -389,7 +389,7 @@ stops regressing, which is the signal to reconsider the gating.
   `search_graph` take the same paths they did before.
 
 **Step 2 is complete and red.** `tests/unit/nodes/test_hybrid_retrieval_fusion.py`
-against `tests/fixtures/omn16765/hybrid_retrieval_corpus.json`: **8 passed,
+against `tests/unit/nodes/fixtures/omn16765/hybrid_retrieval_corpus.json`: **8 passed,
 5 failed**, every failure `ModuleNotFoundError: handler_fusion`.
 
 The split is deliberate. The five NDCG self-tests and three corpus guards pass

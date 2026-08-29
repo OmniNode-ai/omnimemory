@@ -64,6 +64,7 @@ from .handler_fusion import (
     MIN_LEXICAL_TS_RANK,
     MIN_VECTOR_COSINE,
     fuse_rrf,
+    fuse_rrf_scores,
     select_relevant,
 )
 from .handler_graph_mock import HandlerGraphMock
@@ -386,24 +387,37 @@ class HandlerMemoryRetrieval:
             for result in (*lexical_response.results, *vector_response.results)
         }
 
-        fused_ids = fuse_rrf(
-            select_relevant(
-                [
-                    (str(r.snapshot.snapshot_id), r.score)
-                    for r in vector_response.results
-                ],
-                MIN_VECTOR_COSINE,
-            ),
-            select_relevant(
-                [
-                    (str(r.snapshot.snapshot_id), r.score)
-                    for r in lexical_response.results
-                ],
-                MIN_LEXICAL_TS_RANK,
-            ),
+        vector_leg = select_relevant(
+            [(str(r.snapshot.snapshot_id), r.score) for r in vector_response.results],
+            MIN_VECTOR_COSINE,
+        )
+        lexical_leg = select_relevant(
+            [(str(r.snapshot.snapshot_id), r.score) for r in lexical_response.results],
+            MIN_LEXICAL_TS_RANK,
         )
 
-        results = [by_id[doc_id] for doc_id in fused_ids][: request.limit]
+        fused_ids = fuse_rrf(vector_leg, lexical_leg)
+        fused_scores = fuse_rrf_scores(vector_leg, lexical_leg)
+
+        # Re-score against the fusion, rather than carrying each leg's own
+        # number through. Returning a raw backend score alongside a fused
+        # ordering lets the two contradict each other: a document promoted
+        # because both legs agreed on it can sit above one with a higher raw
+        # cosine, and a caller sorting by `score` would then reorder the very
+        # ranking this operation exists to produce.
+        #
+        # Normalised against the top hit because the field is declared
+        # `ge=0.0, le=1.0` and documented as a relevance score. Raw RRF values
+        # are ~0.016-0.033, which satisfy the bound while reading as "3%
+        # relevant". Dividing by the maximum is monotonic, so the ordering is
+        # untouched; only the scale changes.
+        top_score = max(fused_scores.values(), default=0.0)
+        results = [
+            by_id[doc_id].model_copy(
+                update={"score": fused_scores[doc_id] / top_score if top_score else 0.0}
+            )
+            for doc_id in fused_ids
+        ][: request.limit]
 
         logger.debug(
             "Hybrid search fused %d vector and %d lexical results into %d",

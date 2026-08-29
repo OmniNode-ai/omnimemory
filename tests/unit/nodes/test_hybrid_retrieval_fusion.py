@@ -359,3 +359,43 @@ def test_fuse_rrf_rejects_negative_k() -> None:
 
     with pytest.raises(ValueError, match="non-negative"):
         fuse_rrf(["a"], k=-1)
+
+
+@pytest.mark.unit
+def test_fuse_rrf_scores_and_fuse_rrf_cannot_diverge() -> None:
+    """fuse_rrf derives its order from fuse_rrf_scores; the handler uses both.
+
+    If the two ever disagreed, the handler would attach a score from one and an
+    ordering from the other -- exactly the defect the normalisation exists to
+    prevent.
+    """
+    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
+        fuse_rrf,
+        fuse_rrf_scores,
+    )
+
+    for q in load_corpus():
+        vector = ranked_ids(q["vector"])  # type: ignore[arg-type]
+        lexical = ranked_ids(q["lexical"])  # type: ignore[arg-type]
+        order = fuse_rrf(vector, lexical)
+        scores = fuse_rrf_scores(vector, lexical)
+
+        assert set(order) == set(scores), q["query_id"]
+        values = [scores[doc_id] for doc_id in order]
+        assert values == sorted(values, reverse=True), q["query_id"]
+
+
+@pytest.mark.unit
+def test_fuse_rrf_scores_rewards_agreement_between_legs() -> None:
+    """A document both legs return must outscore one only a single leg returned.
+
+    This is the whole mechanism of rank fusion; if it stops holding, RRF has
+    been broken rather than merely retuned.
+    """
+    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
+        fuse_rrf_scores,
+    )
+
+    scores = fuse_rrf_scores(["both", "vector_only"], ["both", "lexical_only"])
+    assert scores["both"] > scores["vector_only"]
+    assert scores["both"] > scores["lexical_only"]
