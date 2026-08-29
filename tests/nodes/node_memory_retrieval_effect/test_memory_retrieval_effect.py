@@ -1203,3 +1203,72 @@ class TestHybridSearch:
                 operation="search_hybrid",
                 query_embedding=[0.1] * 1024,
             )
+
+    @pytest.mark.asyncio
+    async def test_repeated_calls_return_identical_scores(
+        self,
+        handler: HandlerMemoryRetrieval,
+    ) -> None:
+        """Decay reads the clock, so the operation must still be reproducible.
+
+        Regression guard. An un-truncated `datetime.now()` makes two calls
+        microseconds apart return scores differing at ~1e-10, which breaks
+        `handle() == execute()` and makes any response comparison flaky. The
+        reference time is truncated to the hour; sub-second precision is
+        meaningless against a decay constant expressed per day.
+        """
+        await handler.initialize()
+        handler.seed_snapshots(
+            [
+                create_snapshot("authentication token validation", tags=("auth",)),
+                create_snapshot("token refresh and expiry", tags=("auth",)),
+            ]
+        )
+        request = ModelMemoryRetrievalRequest(
+            operation="search_hybrid",
+            query_text="authentication token",
+            limit=10,
+        )
+
+        first = await handler.execute(request)
+        second = await handler.execute(request)
+        assert [r.score for r in first.results] == [r.score for r in second.results]
+        assert [str(r.snapshot.snapshot_id) for r in first.results] == [
+            str(r.snapshot.snapshot_id) for r in second.results
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_stale_snapshot_is_ranked_below_a_fresh_one(
+        self,
+        handler: HandlerMemoryRetrieval,
+    ) -> None:
+        """Decay is actually applied on this path, not merely importable.
+
+        ModelMemorySnapshot is frozen and carries no last_accessed_at, so this
+        exercises the created_at-only degradation the OMN-16765 ruling
+        specified.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        fresh = create_snapshot("authentication token validation", tags=("auth",))
+        stale = create_snapshot("authentication token validation rules", tags=("auth",))
+        stale = stale.model_copy(
+            update={"created_at": datetime.now(UTC) - timedelta(days=400)}
+        )
+
+        await handler.initialize()
+        handler.seed_snapshots([fresh, stale])
+
+        response = await handler.execute(
+            ModelMemoryRetrievalRequest(
+                operation="search_hybrid",
+                query_text="authentication token",
+                limit=10,
+            )
+        )
+
+        ids = [str(r.snapshot.snapshot_id) for r in response.results]
+        if str(fresh.snapshot_id) in ids and str(stale.snapshot_id) in ids:
+            assert ids.index(str(fresh.snapshot_id)) < ids.index(
+                str(stale.snapshot_id)
+            ), "a 400-day-old snapshot outranked a fresh one; decay is not applied"
