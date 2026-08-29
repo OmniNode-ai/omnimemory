@@ -25,12 +25,26 @@ class TestComputeFreshnessScore:
     def test_one_week(self) -> None:
         now = datetime.now(tz=timezone.utc)
         score = compute_freshness_score(now - timedelta(weeks=1), now)
-        assert 0.85 < score < 0.95
+        assert score == pytest.approx(0.9003, abs=0.0005)
 
     def test_four_weeks(self) -> None:
+        """Pins 0.657, not the "~60%" the docstring used to claim (OMN-16765).
+
+        This assertion was previously ``0.60 < score < 0.72``. That band is
+        wide enough to contain both the true value and the wrong one, so it
+        could never catch the drift it was nominally guarding — which is why
+        the docstring stayed wrong. Pinned to the actual value instead.
+        """
         now = datetime.now(tz=timezone.utc)
         score = compute_freshness_score(now - timedelta(weeks=4), now)
-        assert 0.60 < score < 0.72
+        assert score == pytest.approx(0.6570, abs=0.0005)
+
+    def test_where_the_documented_sixty_percent_actually_falls(self) -> None:
+        """0.600 is a 34-day figure. Recorded so the number in the old
+        docstring has a home, rather than being deleted and forgotten."""
+        now = datetime.now(tz=timezone.utc)
+        score = compute_freshness_score(now - timedelta(days=34), now)
+        assert score == pytest.approx(0.600, abs=0.001)
 
     def test_future_date_clamps_to_one(self) -> None:
         now = datetime.now(tz=timezone.utc)

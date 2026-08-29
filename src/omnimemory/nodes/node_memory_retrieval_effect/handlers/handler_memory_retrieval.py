@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, assert_never
 
 if TYPE_CHECKING:
@@ -60,10 +61,10 @@ from ..models import (
     ModelMemoryRetrievalResponse,
 )
 from .handler_db_mock import HandlerDbMock
+from .handler_decay import activation_decay
 from .handler_fusion import (
     MIN_LEXICAL_TS_RANK,
     MIN_VECTOR_COSINE,
-    fuse_rrf,
     fuse_rrf_scores,
     select_relevant,
 )
@@ -396,11 +397,39 @@ class HandlerMemoryRetrieval:
             MIN_LEXICAL_TS_RANK,
         )
 
-        fused_ids = fuse_rrf(vector_leg, lexical_leg)
         fused_scores = fuse_rrf_scores(vector_leg, lexical_leg)
 
-        # Re-score against the fusion, rather than carrying each leg's own
-        # number through. Returning a raw backend score alongside a fused
+        # Activation decay, applied AFTER fusion as a multiplicative modulation
+        # on the fused score -- not as a third ranked list inside the fusion.
+        # That ordering is the architecture plan's §4.2 composed read path.
+        #
+        # `now` is captured once and shared by every result, so two documents
+        # of identical age cannot be scored against different reference points
+        # within one response.
+        #
+        # It is also truncated to the hour, which makes the operation
+        # reproducible: without it, two calls microseconds apart return scores
+        # differing at ~1e-10, so `handle()` and `execute()` stop being
+        # observably identical and any response comparison becomes flaky.
+        # Truncating is not a workaround for that test -- sub-second precision
+        # is meaningless against a decay constant expressed per *day*. At
+        # lambda = 0.015/day a whole hour of drift moves the multiplier by
+        # ~0.06%, well inside the noise the constant already carries.
+        #
+        # ModelMemorySnapshot carries created_at and no last_accessed_at, so on
+        # this path the decay degrades to created_at alone -- the ruled shape
+        # (OMN-16765). handler_decay takes the freshest timestamp available
+        # rather than assuming which fields exist.
+        now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+        ranked_scores = {
+            doc_id: score
+            * activation_decay(by_id[doc_id].snapshot.created_at, None, now=now)
+            for doc_id, score in fused_scores.items()
+        }
+        ranked_ids = sorted(ranked_scores, key=lambda d: (-ranked_scores[d], d))
+
+        # Re-score against the final ranking, rather than carrying each leg's
+        # own number through. Returning a raw backend score alongside a fused
         # ordering lets the two contradict each other: a document promoted
         # because both legs agreed on it can sit above one with a higher raw
         # cosine, and a caller sorting by `score` would then reorder the very
@@ -411,16 +440,19 @@ class HandlerMemoryRetrieval:
         # are ~0.016-0.033, which satisfy the bound while reading as "3%
         # relevant". Dividing by the maximum is monotonic, so the ordering is
         # untouched; only the scale changes.
-        top_score = max(fused_scores.values(), default=0.0)
+        top_score = max(ranked_scores.values(), default=0.0)
         results = [
             by_id[doc_id].model_copy(
-                update={"score": fused_scores[doc_id] / top_score if top_score else 0.0}
+                update={
+                    "score": ranked_scores[doc_id] / top_score if top_score else 0.0
+                }
             )
-            for doc_id in fused_ids
+            for doc_id in ranked_ids
         ][: request.limit]
 
         logger.debug(
-            "Hybrid search fused %d vector and %d lexical results into %d",
+            "Hybrid search fused %d vector and %d lexical results into %d "
+            "(decay applied on created_at)",
             len(vector_response.results),
             len(lexical_response.results),
             len(results),

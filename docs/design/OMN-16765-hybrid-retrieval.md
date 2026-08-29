@@ -5,13 +5,13 @@ SPDX-License-Identifier: MIT
 
 # OMN-16765 — Hybrid vector + full-text retrieval with rank fusion
 
-**Status:** draft, for review
+**Status:** steps 1–3 merged (`cc08790`); step 4 implemented and measured
 **Author:** Lakshman Patel
 **Ticket:** [OMN-16765](https://linear.app/omninode/issue/OMN-16765)
-**Verified against:** `dev` @ `1c84840`
+**Verified against:** `dev` @ `efc2f52`
 
-This is the Step 1 design note required by §4 of the ticket. It must be reviewed
-before implementation code is written.
+The Step 1 design note required by §4 of the ticket, kept current as the work
+landed rather than frozen at its pre-implementation state.
 
 ---
 
@@ -62,7 +62,7 @@ Per §3 of the ticket ("do not introduce a parallel retrieval entry point") and
 and `search_text` unchanged"), fusion is added as a fourth operation behind the
 existing protocol. Existing callers are untouched.
 
-Adding an operation is a four-point change, and the contract records what
+Adding an operation is a seven-point change, and the contract records what
 happens when it is done partially. `contract.yaml` carries a long comment
 explaining that the `index` operation was **removed rather than repointed**,
 because `ModelMemoryRetrievalRequest.operation` is
@@ -70,7 +70,7 @@ because `ModelMemoryRetrievalRequest.operation` is
 `HandlerMemoryRetrieval.execute()` closes its match with
 `assert_never(request.operation)` — so a declared route the Literal cannot
 express is a route the type system forbids. `search_hybrid` therefore changes
-all four points together:
+all seven points together:
 
 | # | File | Change |
 |---|---|---|
@@ -101,7 +101,7 @@ contract declares a `health_check` operation that is *not* in the request
 `inputs: []` and appears identically in five node contracts; it is a
 platform-level operation that never constructs a `ModelMemoryRetrievalRequest`,
 so the Literal has nothing to express. `search_hybrid` does take a request, so
-it does need all five points.
+it does need all seven points.
 
 Fusion lives in its own module rather than as a method on
 `HandlerMemoryRetrieval`. The rank-fusion function is pure — it maps two ranked
@@ -334,6 +334,87 @@ The decay function itself already exists and is unchanged:
 implements `math.exp(-0.015 * days_old)` on `created_at`. The plan's description
 of this as "a one-line change" is still accurate *for that handler*.
 
+### Ruled, and measured
+
+The ruling (2026-08-29): decay reads **the freshest timestamp the model
+actually carries** — `max()` over whichever of `{created_at, last_accessed_at}`
+exists. On the snapshot path that degrades to `created_at`; on
+`ModelMemoryItem` / `ModelMemoryData` both terms apply. `last_accessed_at` is
+**not** plumbed into frozen core, and whether that costs anything is measured
+rather than assumed.
+
+Implemented in `handlers/handler_decay.py`, applied multiplicatively **after**
+fusion in `_execute_hybrid`, per plan §4.2.
+
+Two implementation details that are not obvious from the ruling:
+
+* **The fallback is needed per *instance*, not per model.**
+  `ModelMemoryItem.last_accessed_at` and `ModelMemoryData.last_accessed_at` are
+  both `datetime | None`, so a model that declares the field can still present
+  nothing for a given record.
+* **`freshest_timestamp` takes `max()` rather than preferring
+  `last_accessed_at` whenever it is non-null.** Clock skew or an
+  independently-stamped backfill can put access before creation; preferring the
+  field would silently age every affected record. Future timestamps clamp to
+  1.0 for the same reason — skew must not buy rank.
+
+The reference time is captured once per response and **truncated to the hour**.
+Without that, two calls microseconds apart return scores differing at ~1e-10,
+which breaks `handle() == execute()`. Sub-second precision is meaningless
+against a per-*day* constant: an hour of drift moves the multiplier ~0.06%.
+
+#### Measured result
+
+Corpus extended to 32 queries / 62 documents with a per-document timestamp map
+and a `recency` family. **Every recency query is built so retrieval alone ranks
+the wrong document first** — the stale document deliberately outscores the fresh
+one on both legs. `test_retrieval_alone_gets_the_recency_family_wrong` asserts
+that premise, so the family cannot rot into a tautology.
+
+| Family | fusion only | + decay | delta |
+|---|---|---|---|
+| `recency` | 0.6309 | **1.0000** | **+0.3691** |
+| `exact_token` | 0.9186 | 0.9186 | +0.0000 |
+| `paraphrase` | 0.9777 | 0.9777 | +0.0000 |
+| `agreement` | 1.0000 | 1.0000 | +0.0000 |
+
+Decay is inert on the three relevance-discriminated families, which is what a
+recency signal should be.
+
+#### What the frozen-core limitation costs
+
+RC-05..08 give both documents an **identical `created_at`**, so a
+`created_at`-only decay has no signal there at all — only the access term can
+separate them.
+
+| | NDCG@10 |
+|---|---|
+| `created_at` only | 0.6309 |
+| + `last_accessed_at` | 1.0000 |
+| **delta** | **+0.3691** |
+
+**Read that honestly.** It is not "the frozen core costs 0.37 in production".
+It is: *where documents share a creation time and differ only in access,
+`created_at`-only decay recovers nothing* — structural rather than a corpus
+artefact — and **how often that shape occurs in real data is unmeasured**. The
+timestamps are authored, not observed access data. That is the caveat to weigh
+before the cross-repo core change is filed on the strength of this number.
+
+#### A limitation this design carries
+
+Found while building the family, and kept rather than engineered away: a filler
+document 14 days old **displaced a 400-day-old correct answer**.
+`exp(-0.015 × 400)` is ~0.002 against ~0.81, which overwhelms any ranking
+signal from RRF, whose adjacent ranks sit within ~2% of each other.
+
+Multiplicative post-fusion decay cannot distinguish "old and wrong" from "old
+and right" — it only sees age. Removing the filler was correct for the arm
+under test (it was measuring two variables at once) but would have deleted the
+evidence, so `test_decay_can_promote_a_fresh_irrelevant_document` asserts the
+ratio directly. **Where a corpus has a wide age spread and relevance does not
+correlate with age, decay should be expected to cost accuracy rather than buy
+it.**
+
 ### The open item
 
 **On this node's path, `last_accessed_at` is not reachable, so the plan's
@@ -375,7 +456,7 @@ so PR 1 proceeds regardless. Flagging now rather than discovering it mid-PR.
 | 1 | This note | drafted, awaiting review |
 | 2 | Fixture corpus + failing NDCG@10 test | **done — RED confirmed** |
 | 3 | `search_hybrid` + `handler_fusion.py` | **done — GREEN** |
-| 4 | Activation decay | separate PR; blocked on the §6 decision |
+| 4 | Activation decay | **done — wired, measured** |
 
 ### Measured result
 

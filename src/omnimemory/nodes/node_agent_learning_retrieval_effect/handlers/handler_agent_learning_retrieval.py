@@ -18,7 +18,15 @@ from datetime import datetime
 
 
 def compute_freshness_score(created_at: datetime, now: datetime) -> float:
-    """Exponential decay: ~90% at 1 week, ~60% at 4 weeks."""
+    """Exponential decay: 0.900 at 1 week, 0.657 at 4 weeks, 0.600 at ~34 days.
+
+    The four-week figure previously read "~60%" here (OMN-16765). It is 0.657 —
+    ``exp(-0.015 * 28)``. 0.600 is a 34-day value, not a 28-day one. The
+    constant is unchanged; only its description was wrong.
+
+    Exact values are pinned in ``TestComputeFreshnessScore`` so this docstring
+    cannot drift from the maths again.
+    """
     delta = now - created_at
     days_old = max(0.0, delta.total_seconds() / 86400)
     return math.exp(-0.015 * days_old)
