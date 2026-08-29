@@ -64,7 +64,8 @@ dependencies = [
     # OMN-16760: floor raised to 0.46.13, the released version carrying the
     # OMN-15639 consumer-group util that the retired git-source override held
     # this pin open for.
-    "omnibase-core>=0.46.13,<0.47.0",
+    # OMN-16950: widened to 0.47.x.
+    "omnibase-core>=0.47.0,<0.48.0",
     "omnibase-spi>=0.23.0,<0.24.0",
     "omnibase-infra>=0.38.4,<0.39.0",
 
@@ -413,7 +414,8 @@ markers = [
 override-dependencies = [
     # OMN-13837: relaxed spi/core/infra to unblock the omnimarket-as-dependency chain.
     # OMN-16760: floor raised to 0.46.13 to match [project].dependencies.
-    "omnibase-core>=0.46.13,<0.47.0",
+    # OMN-16950: widened to 0.47.x to match [project].dependencies.
+    "omnibase-core>=0.47.0,<0.48.0",
     "omnibase-spi>=0.23.0,<0.24.0",
     "omnibase-infra>=0.38.4,<0.39.0",
     "omnibase-compat>=0.5.0,<0.6.0",
