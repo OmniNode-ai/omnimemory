@@ -186,6 +186,43 @@ numbers later.
 legs accumulates both reciprocal-rank terms — that accumulation is the whole
 mechanism by which agreement between legs is rewarded.
 
+### What score the caller gets back
+
+Results carry the **fused** score, normalised against the top hit — not the
+score the originating leg gave them.
+
+This is correctness, not presentation. Carrying each leg's own number through
+lets the score and the ordering contradict each other: a document promoted
+*because both legs agreed on it* can sit above one with a higher raw cosine, so
+a caller sorting by `score` would silently reorder the very ranking this
+operation exists to produce. Found in review on
+[omnimemory#459](https://github.com/OmniNode-ai/omnimemory/pull/459);
+`test_scores_never_contradict_the_returned_ordering` is the guard.
+
+`fuse_rrf` is therefore split into `fuse_rrf_scores` (accumulate) and `fuse_rrf`
+(order), so the handler draws the score it attaches and the order it returns
+from a single source and they cannot drift.
+`test_fuse_rrf_scores_and_fuse_rrf_cannot_diverge` guards that.
+
+Normalisation is against the maximum because `ModelSearchResult.score` is
+declared `ge=0.0, le=1.0` and documented as a relevance score. Raw RRF values
+are ~0.016–0.033: they satisfy the bound while reporting a perfect match as "3%
+relevant". Dividing by the top score is monotonic, so ordering is untouched and
+only the scale changes.
+
+**This is not the score normalisation rejected above, and the distinction
+matters.** §4 rejects normalising the two legs' scores onto a shared scale *as
+an input to fusion* — that would be a fitted parameter with no principled value,
+and it would have to be fitted on the same corpus used to evaluate the result,
+which is circular. What happens here is a monotonic rescale of a single
+already-fused quantity on the way out: it changes no ranking decision and
+introduces no tunable. The first would corrupt the measurement; the second
+cannot.
+
+The consequence for callers is recorded on `ModelSearchResult`: a hybrid score
+is comparable **within one response only** — never across responses, and never
+against a raw backend score from `search` or `search_text`.
+
 ---
 
 ## 5. Measurement — deterministic fixture corpus, NDCG@10
@@ -381,12 +418,22 @@ stops regressing, which is the signal to reconsider the gating.
 
 ### Gate results
 
-* `mypy --strict` — clean, 311 source files.
+* `mypy --strict` — clean, 311 source files, and clean on the test module
+  itself.
 * `pre-commit run --all-files` — 42 hooks, 0 failures.
-* Full suite — 2619 passed, 200 skipped (skips are pre-existing, Memgraph
+* Full suite — 2625 passed, 200 skipped (skips are pre-existing, Memgraph
   unavailable locally).
 * Existing retrieval callers unchanged: `search`, `search_text` and
   `search_graph` take the same paths they did before.
+* Verified against `omnibase-core` 0.47.0 after OMN-16950 widened the cap.
+
+One known-flaky exclusion, stated rather than quietly passed over:
+`test_cosine_batch_performance` measures 107.9 ms against a 100 ms threshold on
+this machine and fails identically on clean `dev`, so it is unrelated to this
+change. Worth knowing that `ci.yml:410` sets `PERF_THRESHOLD_MS: "100"`, which
+overrides the test module's own CI default of 1000 ms — a tolerance the module
+comments were written to provide *because* "CI runners are significantly slower
+than local machines and have unpredictable variance".
 
 **Step 2 is complete and red.** `tests/unit/nodes/test_hybrid_retrieval_fusion.py`
 against `tests/unit/nodes/fixtures/omn16765/hybrid_retrieval_corpus.json`: **8 passed,
