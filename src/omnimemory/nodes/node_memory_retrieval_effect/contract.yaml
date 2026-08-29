@@ -80,6 +80,13 @@ actions:
     inputs: ["snapshot_id", "traversal_depth", "relationship_types"]
     outputs: ["results", "total_count"]
 
+  # OMN-16765: fused semantic + full-text retrieval. Additive — 'search' and
+  # 'search_text' are unchanged and existing callers are unaffected.
+  - name: "search_hybrid"
+    description: "Fused semantic and full-text retrieval, combined by rank fusion"
+    inputs: ["query_text", "limit", "tags"]
+    outputs: ["results", "total_count"]
+
   - name: "health_check"
     description: "Check node health status"
     inputs: []
@@ -159,11 +166,14 @@ validation_rules:
   performance_validation_enabled: true
   constraint_definitions:
     # OMN-15235: 'index' removed. The authoritative input model for this node,
-    # ModelMemoryRetrievalRequest.operation, is
-    # Literal['search', 'search_text', 'search_graph'] — 'index' was never a
+    # ModelMemoryRetrievalRequest.operation, is a Literal — 'index' was never a
     # constructible operation here, so declaring it made this contract narrate a
     # capability the node's own DTO forbids.
-    operation: "Literal['search', 'search_text', 'search_graph'] - must match ModelMemoryRetrievalRequest.operation"
+    # OMN-16765: 'search_hybrid' added. Added to the DTO Literal in the same
+    # change, so the two stay aligned — that alignment is enforced by
+    # TestHandlerRoutingKeyAlignment, which derives the legal routing keys from
+    # this line.
+    operation: "Literal['search', 'search_text', 'search_graph', 'search_hybrid'] - must match ModelMemoryRetrievalRequest.operation"
     status: "Literal['success', 'error', 'no_results'] - must match enums.status.values"
     query_text: "string type for text query (required for search/search_text unless embedding provided)"
     query_embedding: "list[float] for pre-computed embedding vector"
@@ -228,6 +238,13 @@ handler_routing:
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_memory_retrieval"
     # Graph traversal via Neo4j/Memgraph (sub-handler: HandlerGraphMock)
     - operation: "search_graph"
+      handler:
+        name: "HandlerMemoryRetrieval"
+        module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_memory_retrieval"
+    # Fused semantic + full-text retrieval (OMN-16765). Fans out to the 'search'
+    # and 'search_text' sub-handlers and fuses their rankings; introduces no new
+    # sub-handler of its own.
+    - operation: "search_hybrid"
       handler:
         name: "HandlerMemoryRetrieval"
         module: "omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_memory_retrieval"

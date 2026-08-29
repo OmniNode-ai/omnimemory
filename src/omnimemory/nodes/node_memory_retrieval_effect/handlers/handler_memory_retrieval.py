@@ -60,6 +60,13 @@ from ..models import (
     ModelMemoryRetrievalResponse,
 )
 from .handler_db_mock import HandlerDbMock
+from .handler_fusion import (
+    MIN_LEXICAL_TS_RANK,
+    MIN_VECTOR_COSINE,
+    fuse_rrf,
+    fuse_rrf_scores,
+    select_relevant,
+)
 from .handler_graph_mock import HandlerGraphMock
 from .handler_qdrant_mock import HandlerQdrantMock
 
@@ -308,6 +315,18 @@ class HandlerMemoryRetrieval:
                         )
                     return await self._graph_handler.execute(request)
 
+                case "search_hybrid":
+                    if not self._qdrant_handler or not self._db_handler:
+                        return ModelMemoryRetrievalResponse(
+                            status="error",
+                            error_message=(
+                                f"{self.__class__.__name__}: Hybrid search needs "
+                                f"both the Qdrant and Database handlers for "
+                                f"operation '{request.operation}'"
+                            ),
+                        )
+                    return await self._execute_hybrid(request)
+
                 case _:
                     assert_never(request.operation)
 
@@ -323,6 +342,96 @@ class HandlerMemoryRetrieval:
                     f"for operation '{request.operation}'"
                 ),
             )
+
+    async def _execute_hybrid(
+        self, request: ModelMemoryRetrievalRequest
+    ) -> ModelMemoryRetrievalResponse:
+        """Fan out to the semantic and full-text legs, then fuse their rankings.
+
+        The two legs are dispatched concurrently — they share no state and
+        neither depends on the other's result. Each is sent as the operation it
+        already implements, so this adds no new behaviour to either sub-handler.
+
+        Ranking is a two-step process, and the steps are deliberately distinct:
+        each leg is first filtered against its own relevance floor, then the
+        survivors are fused by rank. Fusing first would let a leg that matched
+        nothing useful contribute its best-of-a-bad-set at full rank-1 weight
+        and displace a leg that answered correctly. See ``handler_fusion``.
+
+        Args:
+            request: The originating ``search_hybrid`` request.
+
+        Returns:
+            One response carrying the fused, deduplicated ranking, truncated to
+            the request's limit. If either leg errors, that error is returned
+            rather than a half-fused ranking presented as a whole answer.
+        """
+        if self._qdrant_handler is None or self._db_handler is None:
+            raise RuntimeError("Hybrid search requires both Qdrant and DB handlers")
+
+        vector_response, lexical_response = await asyncio.gather(
+            self._qdrant_handler.execute(
+                request.model_copy(update={"operation": "search"})
+            ),
+            self._db_handler.execute(
+                request.model_copy(update={"operation": "search_text"})
+            ),
+        )
+
+        for leg_response in (vector_response, lexical_response):
+            if leg_response.status == "error":
+                return leg_response
+
+        by_id = {
+            str(result.snapshot.snapshot_id): result
+            for result in (*lexical_response.results, *vector_response.results)
+        }
+
+        vector_leg = select_relevant(
+            [(str(r.snapshot.snapshot_id), r.score) for r in vector_response.results],
+            MIN_VECTOR_COSINE,
+        )
+        lexical_leg = select_relevant(
+            [(str(r.snapshot.snapshot_id), r.score) for r in lexical_response.results],
+            MIN_LEXICAL_TS_RANK,
+        )
+
+        fused_ids = fuse_rrf(vector_leg, lexical_leg)
+        fused_scores = fuse_rrf_scores(vector_leg, lexical_leg)
+
+        # Re-score against the fusion, rather than carrying each leg's own
+        # number through. Returning a raw backend score alongside a fused
+        # ordering lets the two contradict each other: a document promoted
+        # because both legs agreed on it can sit above one with a higher raw
+        # cosine, and a caller sorting by `score` would then reorder the very
+        # ranking this operation exists to produce.
+        #
+        # Normalised against the top hit because the field is declared
+        # `ge=0.0, le=1.0` and documented as a relevance score. Raw RRF values
+        # are ~0.016-0.033, which satisfy the bound while reading as "3%
+        # relevant". Dividing by the maximum is monotonic, so the ordering is
+        # untouched; only the scale changes.
+        top_score = max(fused_scores.values(), default=0.0)
+        results = [
+            by_id[doc_id].model_copy(
+                update={"score": fused_scores[doc_id] / top_score if top_score else 0.0}
+            )
+            for doc_id in fused_ids
+        ][: request.limit]
+
+        logger.debug(
+            "Hybrid search fused %d vector and %d lexical results into %d",
+            len(vector_response.results),
+            len(lexical_response.results),
+            len(results),
+        )
+
+        return ModelMemoryRetrievalResponse(
+            status="success" if results else "no_results",
+            results=results,
+            total_count=len(results),
+            query_embedding_used=vector_response.query_embedding_used,
+        )
 
     async def shutdown(self) -> None:
         """Shutdown the handler and all sub-handlers."""

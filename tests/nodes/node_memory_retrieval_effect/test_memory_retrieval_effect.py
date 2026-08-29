@@ -1089,3 +1089,117 @@ class TestQdrantMockConfigCrossFieldValidation:
 
         with pytest.raises(ValidationError):
             config.use_real_embeddings = True  # type: ignore[misc]
+
+
+# =============================================================================
+# Hybrid Search Tests (OMN-16765)
+# =============================================================================
+
+
+class TestHybridSearch:
+    """Tests for fused semantic + full-text search (search_hybrid operation)."""
+
+    @pytest.mark.asyncio
+    async def test_scores_never_contradict_the_returned_ordering(
+        self,
+        handler: HandlerMemoryRetrieval,
+    ) -> None:
+        """The returned score must be non-increasing down the result list.
+
+        Regression guard. Results were previously carried through from
+        whichever leg produced them, so ``score`` held a raw cosine or
+        ``ts_rank`` while the ordering came from rank fusion. The two could
+        disagree: a document promoted because both legs agreed on it could sit
+        above one with a higher raw score, and any caller sorting by ``score``
+        would silently reorder the ranking this operation exists to produce.
+        """
+        await handler.initialize()
+        handler.seed_snapshots(
+            [
+                create_snapshot("authentication token validation", tags=("auth",)),
+                create_snapshot("user authentication login flow", tags=("auth",)),
+                create_snapshot("database connection pooling", tags=("db",)),
+                create_snapshot("token refresh and expiry", tags=("auth",)),
+            ]
+        )
+
+        response = await handler.execute(
+            ModelMemoryRetrievalRequest(
+                operation="search_hybrid",
+                query_text="authentication token",
+                limit=10,
+            )
+        )
+
+        assert response.status in {"success", "no_results"}
+        scores = [r.score for r in response.results]
+        assert scores == sorted(scores, reverse=True), (
+            f"score order contradicts result order: {scores}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_top_result_is_normalized_to_one(
+        self,
+        handler: HandlerMemoryRetrieval,
+    ) -> None:
+        """Raw RRF scores are ~0.016-0.033; the field is declared 0.0-1.0.
+
+        Normalising against the top hit keeps the declared bound meaningful
+        instead of reporting a perfect match as "3% relevant".
+        """
+        await handler.initialize()
+        handler.seed_snapshots(
+            [
+                create_snapshot("authentication token validation", tags=("auth",)),
+                create_snapshot("database connection pooling", tags=("db",)),
+            ]
+        )
+
+        response = await handler.execute(
+            ModelMemoryRetrievalRequest(
+                operation="search_hybrid",
+                query_text="authentication token",
+                limit=10,
+            )
+        )
+
+        if response.results:
+            assert response.results[0].score == pytest.approx(1.0)
+            assert all(0.0 <= r.score <= 1.0 for r in response.results)
+
+    @pytest.mark.asyncio
+    async def test_respects_limit(
+        self,
+        handler: HandlerMemoryRetrieval,
+    ) -> None:
+        """Truncation happens after fusion, so the limit applies to the fused
+        ranking rather than to either leg's own top-N."""
+        await handler.initialize()
+        handler.seed_snapshots(
+            [
+                create_snapshot(f"authentication item {i}", tags=("auth",))
+                for i in range(8)
+            ]
+        )
+
+        response = await handler.execute(
+            ModelMemoryRetrievalRequest(
+                operation="search_hybrid",
+                query_text="authentication",
+                limit=3,
+            )
+        )
+
+        assert len(response.results) <= 3
+        assert response.total_count == len(response.results)
+
+    def test_requires_query_text(self) -> None:
+        """An embedding-only hybrid request would silently degrade to a
+        vector-only search under a name that promises otherwise."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="requires 'query_text'"):
+            ModelMemoryRetrievalRequest(
+                operation="search_hybrid",
+                query_embedding=[0.1] * 1024,
+            )

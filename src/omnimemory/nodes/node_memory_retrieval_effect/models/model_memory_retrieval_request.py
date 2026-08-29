@@ -94,9 +94,11 @@ class ModelMemoryRetrievalRequest(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    operation: Literal["search", "search_text", "search_graph"] = Field(
-        ...,
-        description="The search operation to perform",
+    operation: Literal["search", "search_text", "search_graph", "search_hybrid"] = (
+        Field(
+            ...,
+            description="The search operation to perform",
+        )
     )
 
     query_text: str | None = Field(
@@ -158,6 +160,14 @@ class ModelMemoryRetrievalRequest(BaseModel):
             - search: query_text OR query_embedding required
             - search_text: query_text required
             - search_graph: snapshot_id required
+            - search_hybrid: query_text required
+
+        ``search_hybrid`` requires ``query_text`` specifically, not
+        ``query_embedding``: it fans out to the full-text leg as well as the
+        semantic one, and full-text search has nothing to match on given only a
+        vector. Accepting an embedding-only hybrid request would silently
+        degrade it to a vector-only search under a name that promises otherwise
+        (OMN-16765).
 
         Returns:
             Self: The validated instance.
@@ -176,4 +186,7 @@ class ModelMemoryRetrievalRequest(BaseModel):
         elif self.operation == "search_graph":
             if self.snapshot_id is None:
                 raise ValueError("'search_graph' operation requires 'snapshot_id'")
+        elif self.operation == "search_hybrid":
+            if self.query_text is None:
+                raise ValueError("'search_hybrid' operation requires 'query_text'")
         return self
