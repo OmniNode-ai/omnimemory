@@ -13,7 +13,7 @@ Design decisions this file encodes, all argued in
 * **Marker is ``unit``, not ``integration``.** ``pyproject.toml`` defines
   ``unit`` as "no external dependencies". This test opens no connection and
   touches no network — both retrieval legs are pre-computed and checked into
-  ``tests/fixtures/omn16765/hybrid_retrieval_corpus.json``. Sections 4 and 5 of
+  ``tests/unit/nodes/fixtures/omn16765/hybrid_retrieval_corpus.json``. §4/§5 of
   the ticket say "integration test"; that wording predates the ruling requiring
   the measurement be deterministic and CI-runnable, and ``ci.yml`` starts no
   service containers, so an integration-shaped test could not pass the merge
@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 import pytest
 
@@ -80,8 +80,12 @@ def dcg_at_k(gains: Sequence[int], k: int) -> float:
     the gap between "the answer" and "merely related" larger than the gap
     between "related" and "irrelevant".
     """
-    return sum(
-        (2**rel - 1) / math.log2(i + 2) for i, rel in enumerate(gains[:k]) if rel > 0
+    return float(
+        sum(
+            (2**rel - 1) / math.log2(i + 2)
+            for i, rel in enumerate(gains[:k])
+            if rel > 0
+        )
     )
 
 
@@ -141,15 +145,56 @@ def test_ndcg_ignores_documents_beyond_k() -> None:
 # =============================================================================
 
 
-def load_corpus() -> list[dict[str, object]]:
-    """Load the checked-in labelled corpus."""
+class LegEntry(TypedDict):
+    """One pre-computed result from a single retrieval leg."""
+
+    doc_id: str
+    score: float
+
+
+class CorpusQuery(TypedDict):
+    """One labelled query: both legs' results plus graded relevance."""
+
+    query_id: str
+    family: str
+    query: str
+    vector: list[LegEntry]
+    lexical: list[LegEntry]
+    labels: dict[str, int]
+    note: NotRequired[str]
+
+
+def load_corpus() -> list[CorpusQuery]:
+    """Load and shape-check the checked-in labelled corpus.
+
+    Validating here rather than trusting the decode keeps the JSON boundary
+    honest: every downstream test then indexes a known shape instead of
+    suppressing type errors at each access. A malformed corpus fails with a
+    message naming the query, not with a KeyError three tests away.
+    """
     with CORPUS_PATH.open(encoding="utf-8") as fh:
-        return list(json.load(fh)["queries"])
+        raw = json.load(fh)
+
+    queries: list[CorpusQuery] = []
+    for entry in raw["queries"]:
+        for field in ("query_id", "family", "query", "vector", "lexical", "labels"):
+            if field not in entry:
+                raise ValueError(f"corpus entry missing {field!r}: {entry!r}")
+        for leg in ("vector", "lexical"):
+            for item in entry[leg]:
+                if not isinstance(item.get("doc_id"), str) or not isinstance(
+                    item.get("score"), int | float
+                ):
+                    raise ValueError(
+                        f"{entry['query_id']}: malformed {leg} entry {item!r}"
+                    )
+        queries.append(entry)
+    return queries
 
 
-def ranked_ids(leg: Sequence[dict[str, object]]) -> list[str]:
+def ranked_ids(leg: Sequence[LegEntry]) -> list[str]:
     """Extract document ids from a pre-computed leg, preserving rank order."""
-    return [str(entry["doc_id"]) for entry in leg]
+    return [entry["doc_id"] for entry in leg]
 
 
 @pytest.mark.unit
@@ -160,7 +205,7 @@ def test_corpus_is_present_and_well_formed() -> None:
         assert q["family"] in {"exact_token", "paraphrase", "agreement"}
         assert q["query"]
         assert q["labels"], f"{q['query_id']} has no relevance labels"
-        assert 2 in q["labels"].values(), (  # type: ignore[union-attr]
+        assert 2 in q["labels"].values(), (
             f"{q['query_id']} has no grade-2 answer, so NDCG cannot discriminate"
         )
 
@@ -186,10 +231,10 @@ def test_corpus_is_discriminating_by_construction() -> None:
     for q in load_corpus():
         if q["family"] != "exact_token":
             continue
-        labels: dict[str, int] = q["labels"]  # type: ignore[assignment]
+        labels = q["labels"]
         answer = next(doc for doc, grade in labels.items() if grade == 2)
-        vector_rank = ranked_ids(q["vector"]).index(answer)  # type: ignore[arg-type]
-        lexical_rank = ranked_ids(q["lexical"]).index(answer)  # type: ignore[arg-type]
+        vector_rank = ranked_ids(q["vector"]).index(answer)
+        lexical_rank = ranked_ids(q["lexical"]).index(answer)
         assert lexical_rank < vector_rank, (
             f"{q['query_id']}: lexical must out-rank vector for this family"
         )
@@ -200,9 +245,9 @@ def test_corpus_is_discriminating_by_construction() -> None:
 # =============================================================================
 
 
-def scored(leg: Sequence[dict[str, object]]) -> list[tuple[str, float]]:
+def scored(leg: Sequence[LegEntry]) -> list[tuple[str, float]]:
     """Extract ``(doc_id, score)`` pairs from a pre-computed leg, in rank order."""
-    return [(str(e["doc_id"]), float(e["score"])) for e in leg]  # type: ignore[arg-type]
+    return [(e["doc_id"], float(e["score"])) for e in leg]
 
 
 def _scores_by_family(*, gated: bool) -> dict[str, tuple[float, float]]:
@@ -225,9 +270,9 @@ def _scores_by_family(*, gated: bool) -> dict[str, tuple[float, float]]:
     totals: dict[str, list[tuple[float, float]]] = {}
 
     for q in load_corpus():
-        labels: dict[str, int] = q["labels"]  # type: ignore[assignment]
-        vector_scored = scored(q["vector"])  # type: ignore[arg-type]
-        lexical_scored = scored(q["lexical"])  # type: ignore[arg-type]
+        labels = q["labels"]
+        vector_scored = scored(q["vector"])
+        lexical_scored = scored(q["lexical"])
 
         if gated:
             vector_leg = select_relevant(vector_scored, MIN_VECTOR_COSINE)
@@ -313,8 +358,8 @@ def test_fusion_is_deterministic() -> None:
     )
 
     q = load_corpus()[0]
-    vector = ranked_ids(q["vector"])  # type: ignore[arg-type]
-    lexical = ranked_ids(q["lexical"])  # type: ignore[arg-type]
+    vector = ranked_ids(q["vector"])
+    lexical = ranked_ids(q["lexical"])
     first = fuse_rrf(vector, lexical)
     for _ in range(5):
         assert fuse_rrf(vector, lexical) == first
@@ -332,8 +377,8 @@ def test_fusion_preserves_every_input_document() -> None:
     )
 
     for q in load_corpus():
-        vector = ranked_ids(q["vector"])  # type: ignore[arg-type]
-        lexical = ranked_ids(q["lexical"])  # type: ignore[arg-type]
+        vector = ranked_ids(q["vector"])
+        lexical = ranked_ids(q["lexical"])
         fused = fuse_rrf(vector, lexical)
         assert set(fused) == set(vector) | set(lexical), q["query_id"]
         assert len(fused) == len(set(fused)), f"{q['query_id']}: duplicate in output"
@@ -375,8 +420,8 @@ def test_fuse_rrf_scores_and_fuse_rrf_cannot_diverge() -> None:
     )
 
     for q in load_corpus():
-        vector = ranked_ids(q["vector"])  # type: ignore[arg-type]
-        lexical = ranked_ids(q["lexical"])  # type: ignore[arg-type]
+        vector = ranked_ids(q["vector"])
+        lexical = ranked_ids(q["lexical"])
         order = fuse_rrf(vector, lexical)
         scores = fuse_rrf_scores(vector, lexical)
 
