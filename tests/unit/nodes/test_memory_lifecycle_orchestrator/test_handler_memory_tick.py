@@ -131,7 +131,7 @@ def tick_envelope(
         envelope_timestamp=fixed_now,
         correlation_id=correlation_id,
         payload=runtime_tick,
-        source_service="test-runtime",
+        source_tool="test-runtime",
         event_type="RuntimeTick",
     )
 
