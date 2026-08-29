@@ -200,9 +200,9 @@ def ranked_ids(leg: Sequence[LegEntry]) -> list[str]:
 @pytest.mark.unit
 def test_corpus_is_present_and_well_formed() -> None:
     queries = load_corpus()
-    assert len(queries) == 24
+    assert len(queries) == 32
     for q in queries:
-        assert q["family"] in {"exact_token", "paraphrase", "agreement"}
+        assert q["family"] in {"exact_token", "paraphrase", "agreement", "recency"}
         assert q["query"]
         assert q["labels"], f"{q['query_id']} has no relevance labels"
         assert 2 in q["labels"].values(), (
@@ -216,7 +216,12 @@ def test_corpus_families_are_balanced() -> None:
     counts: dict[str, int] = {}
     for q in queries:
         counts[str(q["family"])] = counts.get(str(q["family"]), 0) + 1
-    assert counts == {"exact_token": 8, "paraphrase": 8, "agreement": 8}
+    assert counts == {
+        "exact_token": 8,
+        "paraphrase": 8,
+        "agreement": 8,
+        "recency": 8,
+    }
 
 
 @pytest.mark.unit
@@ -284,6 +289,10 @@ def _scores_by_family(*, gated: bool) -> dict[str, tuple[float, float]]:
         baseline = ndcg_at_k([doc for doc, _ in vector_scored], labels, NDCG_K)
         fused = ndcg_at_k(fuse_rrf(vector_leg, lexical_leg), labels, NDCG_K)
 
+        if q["family"] == "recency":
+            # Scored by the decay tests instead: these queries are built so
+            # retrieval ranks the wrong document first, which is the point.
+            continue
         totals.setdefault(str(q["family"]), []).append((baseline, fused))
 
     return {

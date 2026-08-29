@@ -8,13 +8,15 @@
       "query": "the query string a user would issue",
       "vector": "ranked results from the semantic leg, best first. score is cosine similarity in [0,1].",
       "lexical": "ranked results from the full-text leg, best first. score is Postgres ts_rank, unbounded and NOT comparable to cosine.",
-      "labels": "graded relevance. 2 = the correct answer, 1 = related but not the answer, 0 = irrelevant. Documents absent from this map are graded 0."
+      "labels": "graded relevance. 2 = the correct answer, 1 = related but not the answer, 0 = irrelevant. Documents absent from this map are graded 0.",
+      "documents": "per-document timestamps. created_at always present; last_accessed_at null where the model does not carry it or the record has no value."
     },
     "size_note": "24 queries, 8 per family. This deliberately departs from the architecture plan's '50 known error -> resolution pairs' (plan section 7). That 50 was sized for a production precision benchmark over real error/resolution data. This corpus tests a fusion function, where discriminating power comes from covering the cases where the two legs disagree, not from volume. 50 hand-authored synthetic queries would be padding rather than signal. Extending is mechanical if a larger set is ever wanted.",
     "authored_by": "Lakshman Patel",
-    "labels_are": "hand-judged, not generated"
+    "labels_are": "hand-judged, not generated",
+    "reference_now": "2026-08-29T12:00:00+00:00",
+    "recency_note": "The recency family is built so retrieval alone ranks the WRONG document first -- the stale doc outscores the fresh one on both legs. Only decay corrects it. RC-01..04 discriminate on created_at (both decay variants agree; control arm). RC-05..08 have identical created_at on both documents, so a created_at-only decay cannot separate them at all and only the last_accessed_at term can -- that arm is what measures the cost of the frozen-core limitation. Timestamps are authored, not observed access data. Filler documents are deliberately excluded from this family: a third document at a different age makes the arm measure decay-vs-relevance as well as the variable under test. That interaction is real and is asserted separately in test_decay_can_promote_a_fresh_irrelevant_document."
   },
-
   "queries": [
     {
       "query_id": "ET-01",
@@ -22,22 +24,62 @@
       "query": "NotImplementedError use_stub_handlers",
       "note": "Exact identifier. The semantic leg drifts to prose about stubbing in general.",
       "vector": [
-        {"doc_id": "d_stub_overview", "score": 0.81},
-        {"doc_id": "d_mock_patterns", "score": 0.78},
-        {"doc_id": "d_testing_guide", "score": 0.74},
-        {"doc_id": "d_handler_init_raise", "score": 0.71},
-        {"doc_id": "d_di_container", "score": 0.66},
-        {"doc_id": "d_config_flags", "score": 0.61},
-        {"doc_id": "d_lifecycle", "score": 0.55},
-        {"doc_id": "d_qdrant_setup", "score": 0.49}
+        {
+          "doc_id": "d_stub_overview",
+          "score": 0.81
+        },
+        {
+          "doc_id": "d_mock_patterns",
+          "score": 0.78
+        },
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.74
+        },
+        {
+          "doc_id": "d_handler_init_raise",
+          "score": 0.71
+        },
+        {
+          "doc_id": "d_di_container",
+          "score": 0.66
+        },
+        {
+          "doc_id": "d_config_flags",
+          "score": 0.61
+        },
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.55
+        },
+        {
+          "doc_id": "d_qdrant_setup",
+          "score": 0.49
+        }
       ],
       "lexical": [
-        {"doc_id": "d_handler_init_raise", "score": 0.913},
-        {"doc_id": "d_config_flags", "score": 0.402},
-        {"doc_id": "d_stub_overview", "score": 0.188},
-        {"doc_id": "d_testing_guide", "score": 0.091}
+        {
+          "doc_id": "d_handler_init_raise",
+          "score": 0.913
+        },
+        {
+          "doc_id": "d_config_flags",
+          "score": 0.402
+        },
+        {
+          "doc_id": "d_stub_overview",
+          "score": 0.188
+        },
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.091
+        }
       ],
-      "labels": {"d_handler_init_raise": 2, "d_config_flags": 1, "d_stub_overview": 1}
+      "labels": {
+        "d_handler_init_raise": 2,
+        "d_config_flags": 1,
+        "d_stub_overview": 1
+      }
     },
     {
       "query_id": "ET-02",
@@ -45,21 +87,58 @@
       "query": "compute_freshness_score",
       "note": "Bare function name. Vector leg returns decay prose; the defining file ranks 5th.",
       "vector": [
-        {"doc_id": "d_decay_concept", "score": 0.84},
-        {"doc_id": "d_ranking_overview", "score": 0.79},
-        {"doc_id": "d_recency_weighting", "score": 0.76},
-        {"doc_id": "d_lifecycle", "score": 0.70},
-        {"doc_id": "d_freshness_impl", "score": 0.68},
-        {"doc_id": "d_agent_learnings", "score": 0.62},
-        {"doc_id": "d_tier_multiplier", "score": 0.57},
-        {"doc_id": "d_scoring_notes", "score": 0.51}
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.84
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.79
+        },
+        {
+          "doc_id": "d_recency_weighting",
+          "score": 0.76
+        },
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.7
+        },
+        {
+          "doc_id": "d_freshness_impl",
+          "score": 0.68
+        },
+        {
+          "doc_id": "d_agent_learnings",
+          "score": 0.62
+        },
+        {
+          "doc_id": "d_tier_multiplier",
+          "score": 0.57
+        },
+        {
+          "doc_id": "d_scoring_notes",
+          "score": 0.51
+        }
       ],
       "lexical": [
-        {"doc_id": "d_freshness_impl", "score": 1.042},
-        {"doc_id": "d_agent_learnings", "score": 0.371},
-        {"doc_id": "d_decay_concept", "score": 0.116}
+        {
+          "doc_id": "d_freshness_impl",
+          "score": 1.042
+        },
+        {
+          "doc_id": "d_agent_learnings",
+          "score": 0.371
+        },
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.116
+        }
       ],
-      "labels": {"d_freshness_impl": 2, "d_agent_learnings": 1, "d_decay_concept": 1}
+      "labels": {
+        "d_freshness_impl": 2,
+        "d_agent_learnings": 1,
+        "d_decay_concept": 1
+      }
     },
     {
       "query_id": "ET-03",
@@ -67,19 +146,50 @@
       "query": "OMNIMEMORY_USE_STUB_HANDLERS",
       "note": "Environment variable name. Pure lexical win.",
       "vector": [
-        {"doc_id": "d_env_overview", "score": 0.77},
-        {"doc_id": "d_config_flags", "score": 0.75},
-        {"doc_id": "d_deployment", "score": 0.72},
-        {"doc_id": "d_stub_overview", "score": 0.69},
-        {"doc_id": "d_dispatch_handlers", "score": 0.64},
-        {"doc_id": "d_lifecycle", "score": 0.53}
+        {
+          "doc_id": "d_env_overview",
+          "score": 0.77
+        },
+        {
+          "doc_id": "d_config_flags",
+          "score": 0.75
+        },
+        {
+          "doc_id": "d_deployment",
+          "score": 0.72
+        },
+        {
+          "doc_id": "d_stub_overview",
+          "score": 0.69
+        },
+        {
+          "doc_id": "d_dispatch_handlers",
+          "score": 0.64
+        },
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.53
+        }
       ],
       "lexical": [
-        {"doc_id": "d_dispatch_handlers", "score": 1.220},
-        {"doc_id": "d_env_overview", "score": 0.544},
-        {"doc_id": "d_config_flags", "score": 0.301}
+        {
+          "doc_id": "d_dispatch_handlers",
+          "score": 1.22
+        },
+        {
+          "doc_id": "d_env_overview",
+          "score": 0.544
+        },
+        {
+          "doc_id": "d_config_flags",
+          "score": 0.301
+        }
       ],
-      "labels": {"d_dispatch_handlers": 2, "d_env_overview": 1, "d_config_flags": 1}
+      "labels": {
+        "d_dispatch_handlers": 2,
+        "d_env_overview": 1,
+        "d_config_flags": 1
+      }
     },
     {
       "query_id": "ET-04",
@@ -87,19 +197,50 @@
       "query": "assert_never request.operation",
       "note": "Code fragment. Semantic leg returns match-statement prose.",
       "vector": [
-        {"doc_id": "d_match_stmt", "score": 0.80},
-        {"doc_id": "d_typing_guide", "score": 0.77},
-        {"doc_id": "d_exhaustiveness", "score": 0.73},
-        {"doc_id": "d_router_impl", "score": 0.69},
-        {"doc_id": "d_operation_literal", "score": 0.65},
-        {"doc_id": "d_contract_yaml", "score": 0.58}
+        {
+          "doc_id": "d_match_stmt",
+          "score": 0.8
+        },
+        {
+          "doc_id": "d_typing_guide",
+          "score": 0.77
+        },
+        {
+          "doc_id": "d_exhaustiveness",
+          "score": 0.73
+        },
+        {
+          "doc_id": "d_router_impl",
+          "score": 0.69
+        },
+        {
+          "doc_id": "d_operation_literal",
+          "score": 0.65
+        },
+        {
+          "doc_id": "d_contract_yaml",
+          "score": 0.58
+        }
       ],
       "lexical": [
-        {"doc_id": "d_router_impl", "score": 0.988},
-        {"doc_id": "d_exhaustiveness", "score": 0.412},
-        {"doc_id": "d_operation_literal", "score": 0.229}
+        {
+          "doc_id": "d_router_impl",
+          "score": 0.988
+        },
+        {
+          "doc_id": "d_exhaustiveness",
+          "score": 0.412
+        },
+        {
+          "doc_id": "d_operation_literal",
+          "score": 0.229
+        }
       ],
-      "labels": {"d_router_impl": 2, "d_operation_literal": 1, "d_exhaustiveness": 1}
+      "labels": {
+        "d_router_impl": 2,
+        "d_operation_literal": 1,
+        "d_exhaustiveness": 1
+      }
     },
     {
       "query_id": "ET-05",
@@ -107,18 +248,45 @@
       "query": "handler_db_mock.py",
       "note": "Filename with extension. Vector embedding of a filename is near-meaningless.",
       "vector": [
-        {"doc_id": "d_mock_patterns", "score": 0.72},
-        {"doc_id": "d_testing_guide", "score": 0.70},
-        {"doc_id": "d_postgres_leg", "score": 0.67},
-        {"doc_id": "d_db_mock_impl", "score": 0.64},
-        {"doc_id": "d_handler_family", "score": 0.60},
-        {"doc_id": "d_fts_concept", "score": 0.54}
+        {
+          "doc_id": "d_mock_patterns",
+          "score": 0.72
+        },
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.7
+        },
+        {
+          "doc_id": "d_postgres_leg",
+          "score": 0.67
+        },
+        {
+          "doc_id": "d_db_mock_impl",
+          "score": 0.64
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.6
+        },
+        {
+          "doc_id": "d_fts_concept",
+          "score": 0.54
+        }
       ],
       "lexical": [
-        {"doc_id": "d_db_mock_impl", "score": 1.410},
-        {"doc_id": "d_handler_family", "score": 0.333}
+        {
+          "doc_id": "d_db_mock_impl",
+          "score": 1.41
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.333
+        }
       ],
-      "labels": {"d_db_mock_impl": 2, "d_handler_family": 1}
+      "labels": {
+        "d_db_mock_impl": 2,
+        "d_handler_family": 1
+      }
     },
     {
       "query_id": "ET-06",
@@ -126,18 +294,46 @@
       "query": "\"repository policy scope does not match its tenant and instance\"",
       "note": "Quoted error string. Exactly the case section 2 of the ticket names.",
       "vector": [
-        {"doc_id": "d_policy_concept", "score": 0.83},
-        {"doc_id": "d_tenant_model", "score": 0.79},
-        {"doc_id": "d_authz_overview", "score": 0.75},
-        {"doc_id": "d_scope_ref_guide", "score": 0.71},
-        {"doc_id": "d_grant_validator", "score": 0.67},
-        {"doc_id": "d_instance_ids", "score": 0.61}
+        {
+          "doc_id": "d_policy_concept",
+          "score": 0.83
+        },
+        {
+          "doc_id": "d_tenant_model",
+          "score": 0.79
+        },
+        {
+          "doc_id": "d_authz_overview",
+          "score": 0.75
+        },
+        {
+          "doc_id": "d_scope_ref_guide",
+          "score": 0.71
+        },
+        {
+          "doc_id": "d_grant_validator",
+          "score": 0.67
+        },
+        {
+          "doc_id": "d_instance_ids",
+          "score": 0.61
+        }
       ],
       "lexical": [
-        {"doc_id": "d_grant_validator", "score": 1.655},
-        {"doc_id": "d_scope_ref_guide", "score": 0.478}
+        {
+          "doc_id": "d_grant_validator",
+          "score": 1.655
+        },
+        {
+          "doc_id": "d_scope_ref_guide",
+          "score": 0.478
+        }
       ],
-      "labels": {"d_grant_validator": 2, "d_scope_ref_guide": 1, "d_instance_ids": 1}
+      "labels": {
+        "d_grant_validator": 2,
+        "d_scope_ref_guide": 1,
+        "d_instance_ids": 1
+      }
     },
     {
       "query_id": "ET-07",
@@ -145,19 +341,50 @@
       "query": "ModelHandlerQdrantConfig",
       "note": "Class name. Vector leg returns config prose across the package.",
       "vector": [
-        {"doc_id": "d_config_overview", "score": 0.79},
-        {"doc_id": "d_qdrant_setup", "score": 0.76},
-        {"doc_id": "d_pydantic_models", "score": 0.72},
-        {"doc_id": "d_qdrant_config_model", "score": 0.68},
-        {"doc_id": "d_di_container", "score": 0.63},
-        {"doc_id": "d_env_overview", "score": 0.56}
+        {
+          "doc_id": "d_config_overview",
+          "score": 0.79
+        },
+        {
+          "doc_id": "d_qdrant_setup",
+          "score": 0.76
+        },
+        {
+          "doc_id": "d_pydantic_models",
+          "score": 0.72
+        },
+        {
+          "doc_id": "d_qdrant_config_model",
+          "score": 0.68
+        },
+        {
+          "doc_id": "d_di_container",
+          "score": 0.63
+        },
+        {
+          "doc_id": "d_env_overview",
+          "score": 0.56
+        }
       ],
       "lexical": [
-        {"doc_id": "d_qdrant_config_model", "score": 1.187},
-        {"doc_id": "d_dispatch_handlers", "score": 0.395},
-        {"doc_id": "d_qdrant_setup", "score": 0.204}
+        {
+          "doc_id": "d_qdrant_config_model",
+          "score": 1.187
+        },
+        {
+          "doc_id": "d_dispatch_handlers",
+          "score": 0.395
+        },
+        {
+          "doc_id": "d_qdrant_setup",
+          "score": 0.204
+        }
       ],
-      "labels": {"d_qdrant_config_model": 2, "d_dispatch_handlers": 1, "d_qdrant_setup": 1}
+      "labels": {
+        "d_qdrant_config_model": 2,
+        "d_dispatch_handlers": 1,
+        "d_qdrant_setup": 1
+      }
     },
     {
       "query_id": "ET-08",
@@ -165,38 +392,93 @@
       "query": "exp(-0.015 * days_old)",
       "note": "Literal formula. Lexical matches the implementing file; vector returns decay theory.",
       "vector": [
-        {"doc_id": "d_decay_concept", "score": 0.86},
-        {"doc_id": "d_recency_weighting", "score": 0.81},
-        {"doc_id": "d_scoring_notes", "score": 0.77},
-        {"doc_id": "d_ranking_overview", "score": 0.72},
-        {"doc_id": "d_freshness_impl", "score": 0.69},
-        {"doc_id": "d_lifecycle", "score": 0.60}
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.86
+        },
+        {
+          "doc_id": "d_recency_weighting",
+          "score": 0.81
+        },
+        {
+          "doc_id": "d_scoring_notes",
+          "score": 0.77
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.72
+        },
+        {
+          "doc_id": "d_freshness_impl",
+          "score": 0.69
+        },
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.6
+        }
       ],
       "lexical": [
-        {"doc_id": "d_freshness_impl", "score": 1.503},
-        {"doc_id": "d_decay_concept", "score": 0.267}
+        {
+          "doc_id": "d_freshness_impl",
+          "score": 1.503
+        },
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.267
+        }
       ],
-      "labels": {"d_freshness_impl": 2, "d_decay_concept": 1, "d_recency_weighting": 1}
+      "labels": {
+        "d_freshness_impl": 2,
+        "d_decay_concept": 1,
+        "d_recency_weighting": 1
+      }
     },
-
     {
       "query_id": "PA-01",
       "family": "paraphrase",
       "query": "how do we stop old memories from crowding out fresh ones",
       "note": "No shared tokens with the answer. Lexical leg is useless here.",
       "vector": [
-        {"doc_id": "d_decay_concept", "score": 0.88},
-        {"doc_id": "d_recency_weighting", "score": 0.82},
-        {"doc_id": "d_lifecycle", "score": 0.76},
-        {"doc_id": "d_ranking_overview", "score": 0.70},
-        {"doc_id": "d_tier_multiplier", "score": 0.64},
-        {"doc_id": "d_scoring_notes", "score": 0.58}
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_recency_weighting",
+          "score": 0.82
+        },
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.76
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.7
+        },
+        {
+          "doc_id": "d_tier_multiplier",
+          "score": 0.64
+        },
+        {
+          "doc_id": "d_scoring_notes",
+          "score": 0.58
+        }
       ],
       "lexical": [
-        {"doc_id": "d_testing_guide", "score": 0.071},
-        {"doc_id": "d_env_overview", "score": 0.044}
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.071
+        },
+        {
+          "doc_id": "d_env_overview",
+          "score": 0.044
+        }
       ],
-      "labels": {"d_decay_concept": 2, "d_recency_weighting": 1, "d_lifecycle": 1}
+      "labels": {
+        "d_decay_concept": 2,
+        "d_recency_weighting": 1,
+        "d_lifecycle": 1
+      }
     },
     {
       "query_id": "PA-02",
@@ -204,16 +486,38 @@
       "query": "why does searching by meaning miss things when you know the exact name",
       "note": "Describes the hybrid-search motivation without naming it.",
       "vector": [
-        {"doc_id": "d_fts_concept", "score": 0.87},
-        {"doc_id": "d_hybrid_rationale", "score": 0.84},
-        {"doc_id": "d_ranking_overview", "score": 0.74},
-        {"doc_id": "d_postgres_leg", "score": 0.68},
-        {"doc_id": "d_qdrant_setup", "score": 0.62}
+        {
+          "doc_id": "d_fts_concept",
+          "score": 0.87
+        },
+        {
+          "doc_id": "d_hybrid_rationale",
+          "score": 0.84
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.74
+        },
+        {
+          "doc_id": "d_postgres_leg",
+          "score": 0.68
+        },
+        {
+          "doc_id": "d_qdrant_setup",
+          "score": 0.62
+        }
       ],
       "lexical": [
-        {"doc_id": "d_testing_guide", "score": 0.058}
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.058
+        }
       ],
-      "labels": {"d_hybrid_rationale": 2, "d_fts_concept": 1, "d_ranking_overview": 1}
+      "labels": {
+        "d_hybrid_rationale": 2,
+        "d_fts_concept": 1,
+        "d_ranking_overview": 1
+      }
     },
     {
       "query_id": "PA-03",
@@ -221,15 +525,33 @@
       "query": "what keeps two services from drifting apart while code is being moved between them",
       "note": "Migration boundary, described obliquely.",
       "vector": [
-        {"doc_id": "d_migration_boundary", "score": 0.85},
-        {"doc_id": "d_handler_family", "score": 0.78},
-        {"doc_id": "d_contract_yaml", "score": 0.71},
-        {"doc_id": "d_di_container", "score": 0.63}
+        {
+          "doc_id": "d_migration_boundary",
+          "score": 0.85
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.78
+        },
+        {
+          "doc_id": "d_contract_yaml",
+          "score": 0.71
+        },
+        {
+          "doc_id": "d_di_container",
+          "score": 0.63
+        }
       ],
       "lexical": [
-        {"doc_id": "d_deployment", "score": 0.062}
+        {
+          "doc_id": "d_deployment",
+          "score": 0.062
+        }
       ],
-      "labels": {"d_migration_boundary": 2, "d_handler_family": 1}
+      "labels": {
+        "d_migration_boundary": 2,
+        "d_handler_family": 1
+      }
     },
     {
       "query_id": "PA-04",
@@ -237,15 +559,34 @@
       "query": "combining two different rankings into one ordering",
       "note": "Rank fusion, no jargon.",
       "vector": [
-        {"doc_id": "d_rrf_explainer", "score": 0.89},
-        {"doc_id": "d_hybrid_rationale", "score": 0.80},
-        {"doc_id": "d_ranking_overview", "score": 0.75},
-        {"doc_id": "d_scoring_notes", "score": 0.66}
+        {
+          "doc_id": "d_rrf_explainer",
+          "score": 0.89
+        },
+        {
+          "doc_id": "d_hybrid_rationale",
+          "score": 0.8
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.75
+        },
+        {
+          "doc_id": "d_scoring_notes",
+          "score": 0.66
+        }
       ],
       "lexical": [
-        {"doc_id": "d_ranking_overview", "score": 0.129}
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.129
+        }
       ],
-      "labels": {"d_rrf_explainer": 2, "d_ranking_overview": 1, "d_hybrid_rationale": 1}
+      "labels": {
+        "d_rrf_explainer": 2,
+        "d_ranking_overview": 1,
+        "d_hybrid_rationale": 1
+      }
     },
     {
       "query_id": "PA-05",
@@ -253,15 +594,34 @@
       "query": "making sure a test gives the same answer on every machine",
       "note": "Determinism requirement, paraphrased.",
       "vector": [
-        {"doc_id": "d_determinism", "score": 0.86},
-        {"doc_id": "d_testing_guide", "score": 0.79},
-        {"doc_id": "d_ci_pipeline", "score": 0.72},
-        {"doc_id": "d_mock_patterns", "score": 0.64}
+        {
+          "doc_id": "d_determinism",
+          "score": 0.86
+        },
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.79
+        },
+        {
+          "doc_id": "d_ci_pipeline",
+          "score": 0.72
+        },
+        {
+          "doc_id": "d_mock_patterns",
+          "score": 0.64
+        }
       ],
       "lexical": [
-        {"doc_id": "d_ci_pipeline", "score": 0.093}
+        {
+          "doc_id": "d_ci_pipeline",
+          "score": 0.093
+        }
       ],
-      "labels": {"d_determinism": 2, "d_testing_guide": 1, "d_ci_pipeline": 1}
+      "labels": {
+        "d_determinism": 2,
+        "d_testing_guide": 1,
+        "d_ci_pipeline": 1
+      }
     },
     {
       "query_id": "PA-06",
@@ -269,13 +629,29 @@
       "query": "storing something once so repeated lookups in one request are cheap",
       "note": "Memoization, described functionally.",
       "vector": [
-        {"doc_id": "d_memoization", "score": 0.88},
-        {"doc_id": "d_perf_notes", "score": 0.77},
-        {"doc_id": "d_request_scope", "score": 0.73},
-        {"doc_id": "d_di_container", "score": 0.61}
+        {
+          "doc_id": "d_memoization",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_perf_notes",
+          "score": 0.77
+        },
+        {
+          "doc_id": "d_request_scope",
+          "score": 0.73
+        },
+        {
+          "doc_id": "d_di_container",
+          "score": 0.61
+        }
       ],
       "lexical": [],
-      "labels": {"d_memoization": 2, "d_request_scope": 1, "d_perf_notes": 1}
+      "labels": {
+        "d_memoization": 2,
+        "d_request_scope": 1,
+        "d_perf_notes": 1
+      }
     },
     {
       "query_id": "PA-07",
@@ -283,13 +659,28 @@
       "query": "letting a document that people keep opening stay near the top",
       "note": "Access-based freshness. Answer shares no tokens.",
       "vector": [
-        {"doc_id": "d_recency_weighting", "score": 0.87},
-        {"doc_id": "d_decay_concept", "score": 0.81},
-        {"doc_id": "d_scoring_notes", "score": 0.71},
-        {"doc_id": "d_lifecycle", "score": 0.65}
+        {
+          "doc_id": "d_recency_weighting",
+          "score": 0.87
+        },
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.81
+        },
+        {
+          "doc_id": "d_scoring_notes",
+          "score": 0.71
+        },
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.65
+        }
       ],
       "lexical": [],
-      "labels": {"d_recency_weighting": 2, "d_decay_concept": 1}
+      "labels": {
+        "d_recency_weighting": 2,
+        "d_decay_concept": 1
+      }
     },
     {
       "query_id": "PA-08",
@@ -297,144 +688,820 @@
       "query": "keeping the public interface the same while changing what happens underneath",
       "note": "Behind-the-protocol constraint from section 3 of the ticket.",
       "vector": [
-        {"doc_id": "d_protocol_stability", "score": 0.85},
-        {"doc_id": "d_handler_family", "score": 0.76},
-        {"doc_id": "d_contract_yaml", "score": 0.70},
-        {"doc_id": "d_di_container", "score": 0.62}
+        {
+          "doc_id": "d_protocol_stability",
+          "score": 0.85
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.76
+        },
+        {
+          "doc_id": "d_contract_yaml",
+          "score": 0.7
+        },
+        {
+          "doc_id": "d_di_container",
+          "score": 0.62
+        }
       ],
       "lexical": [
-        {"doc_id": "d_contract_yaml", "score": 0.084}
+        {
+          "doc_id": "d_contract_yaml",
+          "score": 0.084
+        }
       ],
-      "labels": {"d_protocol_stability": 2, "d_contract_yaml": 1, "d_handler_family": 1}
+      "labels": {
+        "d_protocol_stability": 2,
+        "d_contract_yaml": 1,
+        "d_handler_family": 1
+      }
     },
-
     {
       "query_id": "AG-01",
       "family": "agreement",
       "query": "reciprocal rank fusion k constant",
       "note": "Both legs agree. Fusion must not disturb this.",
       "vector": [
-        {"doc_id": "d_rrf_explainer", "score": 0.91},
-        {"doc_id": "d_ranking_overview", "score": 0.74},
-        {"doc_id": "d_hybrid_rationale", "score": 0.69},
-        {"doc_id": "d_scoring_notes", "score": 0.60}
+        {
+          "doc_id": "d_rrf_explainer",
+          "score": 0.91
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.74
+        },
+        {
+          "doc_id": "d_hybrid_rationale",
+          "score": 0.69
+        },
+        {
+          "doc_id": "d_scoring_notes",
+          "score": 0.6
+        }
       ],
       "lexical": [
-        {"doc_id": "d_rrf_explainer", "score": 1.332},
-        {"doc_id": "d_ranking_overview", "score": 0.298}
+        {
+          "doc_id": "d_rrf_explainer",
+          "score": 1.332
+        },
+        {
+          "doc_id": "d_ranking_overview",
+          "score": 0.298
+        }
       ],
-      "labels": {"d_rrf_explainer": 2, "d_ranking_overview": 1}
+      "labels": {
+        "d_rrf_explainer": 2,
+        "d_ranking_overview": 1
+      }
     },
     {
       "query_id": "AG-02",
       "family": "agreement",
       "query": "Qdrant vector search configuration",
       "vector": [
-        {"doc_id": "d_qdrant_setup", "score": 0.90},
-        {"doc_id": "d_config_overview", "score": 0.75},
-        {"doc_id": "d_qdrant_config_model", "score": 0.71},
-        {"doc_id": "d_env_overview", "score": 0.63}
+        {
+          "doc_id": "d_qdrant_setup",
+          "score": 0.9
+        },
+        {
+          "doc_id": "d_config_overview",
+          "score": 0.75
+        },
+        {
+          "doc_id": "d_qdrant_config_model",
+          "score": 0.71
+        },
+        {
+          "doc_id": "d_env_overview",
+          "score": 0.63
+        }
       ],
       "lexical": [
-        {"doc_id": "d_qdrant_setup", "score": 1.101},
-        {"doc_id": "d_qdrant_config_model", "score": 0.522},
-        {"doc_id": "d_config_overview", "score": 0.241}
+        {
+          "doc_id": "d_qdrant_setup",
+          "score": 1.101
+        },
+        {
+          "doc_id": "d_qdrant_config_model",
+          "score": 0.522
+        },
+        {
+          "doc_id": "d_config_overview",
+          "score": 0.241
+        }
       ],
-      "labels": {"d_qdrant_setup": 2, "d_qdrant_config_model": 1, "d_config_overview": 1}
+      "labels": {
+        "d_qdrant_setup": 2,
+        "d_qdrant_config_model": 1,
+        "d_config_overview": 1
+      }
     },
     {
       "query_id": "AG-03",
       "family": "agreement",
       "query": "Postgres full text search tsvector",
       "vector": [
-        {"doc_id": "d_postgres_leg", "score": 0.89},
-        {"doc_id": "d_fts_concept", "score": 0.80},
-        {"doc_id": "d_hybrid_rationale", "score": 0.68}
+        {
+          "doc_id": "d_postgres_leg",
+          "score": 0.89
+        },
+        {
+          "doc_id": "d_fts_concept",
+          "score": 0.8
+        },
+        {
+          "doc_id": "d_hybrid_rationale",
+          "score": 0.68
+        }
       ],
       "lexical": [
-        {"doc_id": "d_postgres_leg", "score": 1.244},
-        {"doc_id": "d_fts_concept", "score": 0.611}
+        {
+          "doc_id": "d_postgres_leg",
+          "score": 1.244
+        },
+        {
+          "doc_id": "d_fts_concept",
+          "score": 0.611
+        }
       ],
-      "labels": {"d_postgres_leg": 2, "d_fts_concept": 1}
+      "labels": {
+        "d_postgres_leg": 2,
+        "d_fts_concept": 1
+      }
     },
     {
       "query_id": "AG-04",
       "family": "agreement",
       "query": "memory lifecycle stale expired transitions",
       "vector": [
-        {"doc_id": "d_lifecycle", "score": 0.88},
-        {"doc_id": "d_decay_concept", "score": 0.73},
-        {"doc_id": "d_recency_weighting", "score": 0.66}
+        {
+          "doc_id": "d_lifecycle",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.73
+        },
+        {
+          "doc_id": "d_recency_weighting",
+          "score": 0.66
+        }
       ],
       "lexical": [
-        {"doc_id": "d_lifecycle", "score": 1.309},
-        {"doc_id": "d_decay_concept", "score": 0.352}
+        {
+          "doc_id": "d_lifecycle",
+          "score": 1.309
+        },
+        {
+          "doc_id": "d_decay_concept",
+          "score": 0.352
+        }
       ],
-      "labels": {"d_lifecycle": 2, "d_decay_concept": 1}
+      "labels": {
+        "d_lifecycle": 2,
+        "d_decay_concept": 1
+      }
     },
     {
       "query_id": "AG-05",
       "family": "agreement",
       "query": "contract yaml handler routing operations",
       "vector": [
-        {"doc_id": "d_contract_yaml", "score": 0.87},
-        {"doc_id": "d_handler_family", "score": 0.76},
-        {"doc_id": "d_router_impl", "score": 0.70},
-        {"doc_id": "d_operation_literal", "score": 0.64}
+        {
+          "doc_id": "d_contract_yaml",
+          "score": 0.87
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.76
+        },
+        {
+          "doc_id": "d_router_impl",
+          "score": 0.7
+        },
+        {
+          "doc_id": "d_operation_literal",
+          "score": 0.64
+        }
       ],
       "lexical": [
-        {"doc_id": "d_contract_yaml", "score": 1.398},
-        {"doc_id": "d_router_impl", "score": 0.407},
-        {"doc_id": "d_handler_family", "score": 0.219}
+        {
+          "doc_id": "d_contract_yaml",
+          "score": 1.398
+        },
+        {
+          "doc_id": "d_router_impl",
+          "score": 0.407
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.219
+        }
       ],
-      "labels": {"d_contract_yaml": 2, "d_router_impl": 1, "d_handler_family": 1}
+      "labels": {
+        "d_contract_yaml": 2,
+        "d_router_impl": 1,
+        "d_handler_family": 1
+      }
     },
     {
       "query_id": "AG-06",
       "family": "agreement",
       "query": "dependency injection container wiring handlers",
       "vector": [
-        {"doc_id": "d_di_container", "score": 0.86},
-        {"doc_id": "d_handler_family", "score": 0.74},
-        {"doc_id": "d_dispatch_handlers", "score": 0.68}
+        {
+          "doc_id": "d_di_container",
+          "score": 0.86
+        },
+        {
+          "doc_id": "d_handler_family",
+          "score": 0.74
+        },
+        {
+          "doc_id": "d_dispatch_handlers",
+          "score": 0.68
+        }
       ],
       "lexical": [
-        {"doc_id": "d_di_container", "score": 1.176},
-        {"doc_id": "d_dispatch_handlers", "score": 0.463}
+        {
+          "doc_id": "d_di_container",
+          "score": 1.176
+        },
+        {
+          "doc_id": "d_dispatch_handlers",
+          "score": 0.463
+        }
       ],
-      "labels": {"d_di_container": 2, "d_dispatch_handlers": 1}
+      "labels": {
+        "d_di_container": 2,
+        "d_dispatch_handlers": 1
+      }
     },
     {
       "query_id": "AG-07",
       "family": "agreement",
       "query": "CI pipeline test sharding pytest split",
       "vector": [
-        {"doc_id": "d_ci_pipeline", "score": 0.88},
-        {"doc_id": "d_testing_guide", "score": 0.75},
-        {"doc_id": "d_determinism", "score": 0.66}
+        {
+          "doc_id": "d_ci_pipeline",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.75
+        },
+        {
+          "doc_id": "d_determinism",
+          "score": 0.66
+        }
       ],
       "lexical": [
-        {"doc_id": "d_ci_pipeline", "score": 1.427},
-        {"doc_id": "d_testing_guide", "score": 0.338}
+        {
+          "doc_id": "d_ci_pipeline",
+          "score": 1.427
+        },
+        {
+          "doc_id": "d_testing_guide",
+          "score": 0.338
+        }
       ],
-      "labels": {"d_ci_pipeline": 2, "d_testing_guide": 1}
+      "labels": {
+        "d_ci_pipeline": 2,
+        "d_testing_guide": 1
+      }
     },
     {
       "query_id": "AG-08",
       "family": "agreement",
       "query": "tenant authorization scope ref instance",
       "vector": [
-        {"doc_id": "d_scope_ref_guide", "score": 0.87},
-        {"doc_id": "d_tenant_model", "score": 0.79},
-        {"doc_id": "d_authz_overview", "score": 0.72},
-        {"doc_id": "d_instance_ids", "score": 0.66}
+        {
+          "doc_id": "d_scope_ref_guide",
+          "score": 0.87
+        },
+        {
+          "doc_id": "d_tenant_model",
+          "score": 0.79
+        },
+        {
+          "doc_id": "d_authz_overview",
+          "score": 0.72
+        },
+        {
+          "doc_id": "d_instance_ids",
+          "score": 0.66
+        }
       ],
       "lexical": [
-        {"doc_id": "d_scope_ref_guide", "score": 1.288},
-        {"doc_id": "d_instance_ids", "score": 0.549},
-        {"doc_id": "d_tenant_model", "score": 0.277}
+        {
+          "doc_id": "d_scope_ref_guide",
+          "score": 1.288
+        },
+        {
+          "doc_id": "d_instance_ids",
+          "score": 0.549
+        },
+        {
+          "doc_id": "d_tenant_model",
+          "score": 0.277
+        }
       ],
-      "labels": {"d_scope_ref_guide": 2, "d_tenant_model": 1, "d_instance_ids": 1}
+      "labels": {
+        "d_scope_ref_guide": 2,
+        "d_tenant_model": 1,
+        "d_instance_ids": 1
+      }
+    },
+    {
+      "query_id": "RC-01",
+      "family": "recency",
+      "query": "current retry policy for effect nodes",
+      "note": "retrieval ranks d_retry_legacy first; only created recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_retry_legacy",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_retry_current",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_retry_legacy",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_retry_current",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_retry_current": 2,
+        "d_retry_legacy": 0
+      }
+    },
+    {
+      "query_id": "RC-02",
+      "family": "recency",
+      "query": "supported contract schema version",
+      "note": "retrieval ranks d_schema_v1 first; only created recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_schema_v1",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_schema_v2",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_schema_v1",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_schema_v2",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_schema_v2": 2,
+        "d_schema_v1": 0
+      }
+    },
+    {
+      "query_id": "RC-03",
+      "family": "recency",
+      "query": "how tenants are provisioned today",
+      "note": "retrieval ranks d_tenancy_2025 first; only created recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_tenancy_2025",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_tenancy_2026",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_tenancy_2025",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_tenancy_2026",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_tenancy_2026": 2,
+        "d_tenancy_2025": 0
+      }
+    },
+    {
+      "query_id": "RC-04",
+      "family": "recency",
+      "query": "active kafka bootstrap configuration",
+      "note": "retrieval ranks d_kafka_retired first; only created recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_kafka_retired",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_kafka_now",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_kafka_retired",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_kafka_now",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_kafka_now": 2,
+        "d_kafka_retired": 0
+      }
+    },
+    {
+      "query_id": "RC-05",
+      "family": "recency",
+      "query": "memory lifecycle orchestration entry point",
+      "note": "retrieval ranks d_lifecycle_dead first; only accessed recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_lifecycle_dead",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_lifecycle_live",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_lifecycle_dead",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_lifecycle_live",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_lifecycle_live": 2,
+        "d_lifecycle_dead": 0
+      }
+    },
+    {
+      "query_id": "RC-06",
+      "family": "recency",
+      "query": "embedding adapter still in use",
+      "note": "retrieval ranks d_embed_orphan first; only accessed recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_embed_orphan",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_embed_live",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_embed_orphan",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_embed_live",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_embed_live": 2,
+        "d_embed_orphan": 0
+      }
+    },
+    {
+      "query_id": "RC-07",
+      "family": "recency",
+      "query": "which projection view backs the dashboard",
+      "note": "retrieval ranks d_view_superseded first; only accessed recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_view_superseded",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_view_live",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_view_superseded",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_view_live",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_view_live": 2,
+        "d_view_superseded": 0
+      }
+    },
+    {
+      "query_id": "RC-08",
+      "family": "recency",
+      "query": "canonical dispatch entrypoint",
+      "note": "retrieval ranks d_dispatch_stale first; only accessed recency corrects it",
+      "vector": [
+        {
+          "doc_id": "d_dispatch_stale",
+          "score": 0.88
+        },
+        {
+          "doc_id": "d_dispatch_live",
+          "score": 0.86
+        }
+      ],
+      "lexical": [
+        {
+          "doc_id": "d_dispatch_stale",
+          "score": 1.1
+        },
+        {
+          "doc_id": "d_dispatch_live",
+          "score": 1.02
+        }
+      ],
+      "labels": {
+        "d_dispatch_live": 2,
+        "d_dispatch_stale": 0
+      }
     }
-  ]
+  ],
+  "documents": {
+    "d_agent_learnings": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_authz_overview": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_ci_pipeline": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_config_flags": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_config_overview": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_contract_yaml": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_db_mock_impl": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_decay_concept": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_deployment": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_determinism": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_di_container": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_dispatch_handlers": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_env_overview": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_exhaustiveness": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_freshness_impl": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_fts_concept": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_grant_validator": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_handler_family": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_handler_init_raise": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_hybrid_rationale": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_instance_ids": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_lifecycle": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_match_stmt": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_memoization": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_migration_boundary": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_mock_patterns": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_operation_literal": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_perf_notes": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_policy_concept": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_postgres_leg": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_protocol_stability": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_pydantic_models": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_qdrant_config_model": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_qdrant_setup": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_ranking_overview": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_recency_weighting": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_request_scope": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_router_impl": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_rrf_explainer": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_scope_ref_guide": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_scoring_notes": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_stub_overview": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_tenant_model": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_testing_guide": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_tier_multiplier": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_typing_guide": {
+      "created_at": "2026-08-15T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_retry_current": {
+      "created_at": "2026-08-26T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_retry_legacy": {
+      "created_at": "2025-07-05T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_schema_v2": {
+      "created_at": "2026-08-20T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_schema_v1": {
+      "created_at": "2025-08-14T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_tenancy_2026": {
+      "created_at": "2026-08-23T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_tenancy_2025": {
+      "created_at": "2025-04-16T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_kafka_now": {
+      "created_at": "2026-08-27T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_kafka_retired": {
+      "created_at": "2025-11-02T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_lifecycle_live": {
+      "created_at": "2025-07-25T12:00:00+00:00",
+      "last_accessed_at": "2026-08-27T12:00:00+00:00"
+    },
+    "d_lifecycle_dead": {
+      "created_at": "2025-07-25T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_embed_live": {
+      "created_at": "2025-08-29T12:00:00+00:00",
+      "last_accessed_at": "2026-08-24T12:00:00+00:00"
+    },
+    "d_embed_orphan": {
+      "created_at": "2025-08-29T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_view_live": {
+      "created_at": "2025-11-02T12:00:00+00:00",
+      "last_accessed_at": "2026-08-28T12:00:00+00:00"
+    },
+    "d_view_superseded": {
+      "created_at": "2025-11-02T12:00:00+00:00",
+      "last_accessed_at": null
+    },
+    "d_dispatch_live": {
+      "created_at": "2025-06-05T12:00:00+00:00",
+      "last_accessed_at": "2026-08-22T12:00:00+00:00"
+    },
+    "d_dispatch_stale": {
+      "created_at": "2025-06-05T12:00:00+00:00",
+      "last_accessed_at": null
+    }
+  }
 }
