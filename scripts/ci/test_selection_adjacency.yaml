@@ -197,6 +197,15 @@ test_families:
     reason: "service-backed; proven on the promotion full suite"
 
   # --- inside tests/unit/, but not reachable from tests/unit/<module>/ -----
+  # OMN-17236: PII detector behavioral suite. `adapters` is not an adjacency
+  # key, so tests/unit/adapters/ is not auto-covered. Triggers are coarse on
+  # purpose: the suite pins both the detector patterns and the two live
+  # callers inside node_intent_storage_effect, and a false positive in either
+  # is a hard refusal on the storage path.
+  tests/unit/adapters/:
+    triggers:
+      - src/omnimemory/adapters/
+      - src/omnimemory/nodes/node_intent_storage_effect/
   tests/unit/scripts/:
     triggers:
       - scripts/
