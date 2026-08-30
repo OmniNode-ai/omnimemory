@@ -106,7 +106,16 @@ class PIIDetector:
             ],
             PIIType.PHONE: [
                 ModelPIIPatternConfig(
-                    pattern=r"(\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",
+                    # OMN-17236: the leading/trailing guards keep a ten-digit
+                    # run from matching *inside* a longer token (a credit card
+                    # number, a UUID, a numeric order id). Without them PHONE
+                    # won overlap de-duplication against CREDIT_CARD and left
+                    # the card's trailing digits in the sanitized output.
+                    pattern=(
+                        r"(?<![0-9A-Za-z_-])"
+                        r"(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
+                        r"(?![0-9A-Za-z_-])"
+                    ),
                     confidence=self.config.medium_confidence,
                     mask_template="***-***-****",
                 ),
@@ -118,7 +127,14 @@ class PIIDetector:
             ],
             PIIType.SSN: [
                 ModelPIIPatternConfig(
-                    pattern=r"\b\d{3}-\d{2}-\d{4}\b",
+                    # OMN-17236: apply the same area/group/serial exclusions
+                    # documented on _build_ssn_validation_pattern to the
+                    # separated form, and accept the space separator (which
+                    # was previously not detected at all).
+                    pattern=(
+                        r"\b(?!(?:000|666|9\d{2}))\d{3}[- ]"
+                        r"(?!00)\d{2}[- ](?!0000)\d{4}\b"
+                    ),
                     confidence=self.config.high_confidence,
                     mask_template="***-**-****",
                 ),
@@ -132,9 +148,16 @@ class PIIDetector:
             ],
             PIIType.CREDIT_CARD: [
                 ModelPIIPatternConfig(
-                    # Implemented: Visa (4xxx), Mastercard (51-55xx), Amex (34xx/37xx)
-                    # NOT implemented: Discover (starts with 6011, 65, or 644-649)
-                    pattern=r"\b4\d{15}\b|\b5[1-5]\d{14}\b|\b3[47]\d{13}\b",
+                    # Implemented: Visa (4xxx), Mastercard (51-55xx),
+                    # Amex (34xx/37xx), Discover (6011, 65xx, 644-649).
+                    # OMN-17236: Discover was previously absent. It had been
+                    # masked only by accident, as a PHONE false positive; once
+                    # the PHONE boundary guard landed it would have passed
+                    # through the persistence path entirely unredacted.
+                    pattern=(
+                        r"\b4\d{15}\b|\b5[1-5]\d{14}\b|\b3[47]\d{13}\b"
+                        r"|\b6(?:011|5\d{2}|4[4-9]\d)\d{12}\b"
+                    ),
                     confidence=self.config.medium_confidence,
                     mask_template="****-****-****-****",
                 )
