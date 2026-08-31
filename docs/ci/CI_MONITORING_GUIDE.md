@@ -3,7 +3,7 @@
 # CI Monitoring Guide
 
 > **Purpose**: Reference for CI checks, local reproduction, and failure triage
-> **Last Updated**: 2026-08-27
+> **Last Updated**: 2026-08-31
 
 ---
 
@@ -19,7 +19,6 @@ OmniMemory CI runs on GitHub Actions and is defined in the following workflow fi
 | `.github/workflows/omni-standards-compliance.yml` | All PRs | Platform-wide naming, typing, and pattern compliance |
 | `.github/workflows/stale-todo-gate.yml` | All PRs | Blocks unresolved TODO annotations |
 | `.github/workflows/docs-validate.yml` | All PRs | Validates documentation structure and links |
-| `.github/workflows/cr-thread-gate.yml` | All PRs | Fails if unresolved CodeRabbit review threads exist |
 | `.github/workflows/pr-title-check.yml` | All PRs | Enforces `OMN-XXXX` ticket reference in PR title |
 | `.github/workflows/call-occ-autobind.yml` | All PRs | Publishes the OCC-autobind command that mints this PR's evidence companion |
 | `.github/workflows/call-occ-companion-effect.yml` | All PRs | Publishes the OCC-companion-effect command that stamps `Evidence-Source: OCC#<n>` onto the PR body |
