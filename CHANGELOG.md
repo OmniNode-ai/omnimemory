@@ -1,3 +1,32 @@
+## v0.18.1 (2026-08-31)
+
+Patch release cut to ship the OMN-17236 PII detector pattern fixes, which merged
+to `dev` about four hours after the v0.18.0 tag and so missed that release.
+
+### Security
+- fix(OMN-17236): PHONE pattern gains leading/trailing boundary guards. Without
+  them any ten-digit run matched inside a longer token, and because PHONE is
+  registered before CREDIT_CARD at equal confidence it won overlap dedup — a
+  Visa number sanitized to `***-***-****111111`, leaking the card's trailing six
+  digits into stored content. The same false positive matched UUIDs, so storage
+  requests whose `user_context` carried a run/session UUID were refused. (#466)
+- fix(OMN-17236): SSN area/group/serial validity exclusions now apply to the
+  separated form as well as the undashed one, and the space separator is
+  detected (`123 45 6789` previously passed through unredacted). (#466)
+- fix(OMN-17236): Discover added to the CREDIT_CARD pattern. It had been masked
+  only by accident, as a PHONE false positive; once the PHONE boundary guard
+  landed it would otherwise have passed through entirely unredacted. (#466)
+- fix(OMN-17184): close all 14 open Dependabot alerts (8 high). (#467)
+
+### Tests
+- test(OMN-17236): 170 behavioral tests for the live PII detector across two
+  modules, covering both live call paths. The detector previously had none. (#466)
+
+### Chores
+- chore(OMN-16997): bump omnibase-infra to 0.38.14. (#464)
+- chore(deps): refresh omninode sibling locks. (#468)
+- docs(OMN-16933): drop the deleted cr-thread-gate row from the CI guide. (#469)
+
 ## v0.16.0 (2026-05-21)
 
 ### Features
