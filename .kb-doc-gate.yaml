@@ -1,0 +1,15 @@
+# KB doc gate config — OMN-16602 (omnimemory Wave-4 documentation migration).
+#
+# Canonical docs live in the OmniNode knowledge base; this repo's markdown is
+# now zero outside the allowed set, so the gate runs in whole-tree `strict`
+# mode rather than `diff`. Strict fails a PR when ANY tracked markdown outside
+# the allowed set exists on the branch, which is what keeps a scrubbed repo
+# scrubbed. Validator + allowed set: omniclaude/scripts/kb_doc_gate.py.
+#
+# No repo-specific `allowed:` entries: everything that survives here
+# (README.md, CLAUDE.md, .claude/**, CHANGELOG.md, LICENSE, SECURITY.md,
+# .github/**) is already in the validator's DEFAULT_ALLOWED. Do not add an
+# `allowed:` glob to keep a new doc — move the doc to the knowledge base.
+#
+# A `mode:` here always wins over the caller workflow's `--mode` argument.
+mode: strict

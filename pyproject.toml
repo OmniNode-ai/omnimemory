@@ -91,7 +91,7 @@ graph = [
 [project.urls]
 Homepage = "https://github.com/OmniNode-ai/omnimemory"
 Repository = "https://github.com/OmniNode-ai/omnimemory"
-Documentation = "https://github.com/OmniNode-ai/omnimemory/tree/main/docs"
+Documentation = "https://github.com/OmniNode-ai/knowledge-base"
 Issues = "https://github.com/OmniNode-ai/omnimemory/issues"
 Changelog = "https://github.com/OmniNode-ai/omnimemory/blob/main/CHANGELOG.md"
 
