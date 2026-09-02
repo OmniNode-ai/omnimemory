@@ -8,7 +8,8 @@ This is the Step 2 deliverable: the failing test, written before the fusion
 implementation exists.
 
 Design decisions this file encodes, all argued in
-``docs/design/OMN-16765-hybrid-retrieval.md``:
+https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/decisions/omnimemory-omn16765-hybrid-retrieval-design.md
+(migrated from docs/design/OMN-16765-hybrid-retrieval.md, OMN-16602):
 
 * **Marker is ``unit``, not ``integration``.** ``pyproject.toml`` defines
   ``unit`` as "no external dependencies". This test opens no connection and

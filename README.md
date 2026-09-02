@@ -18,217 +18,12 @@
 
 **Memory persistence, recall, and semantic retrieval for the OmniNode platform.** OmniMemory provides ONEX (OmniNode eXecution)-compliant nodes and handlers for storing agent context, indexing embeddings, querying intent graphs, and managing the full memory lifecycle across distributed omni agents.
 
-## Where This Fits
-
-OmniMemory holds three distinct ownership roles in the ONEX platform:
-
-1. **Domain owner for memory persistence and retrieval semantics.** OmniMemory defines the authoritative models, protocols, and lifecycle rules for all memory operations: what a memory item is, how it is stored, how it is retrieved, and how it ages. These primitives do not move to other packages.
-
-2. **Runtime plugin owner for memory nodes.** `PluginMemory` (registered as the `onex.domain_plugins` entry point) is the kernel lifecycle hook for the memory domain. It wires message types, verifies handler imports, initializes the dispatch engine, and subscribes to Kafka topics at runtime.
-
-3. **Storage integration owner for Qdrant, Memgraph, Valkey, and Kreuzberg adapters.** The concrete adapter implementations for all memory-layer storage backends live in `omnimemory`. These adapters implement the domain protocols and are injected at runtime via the DI container.
-
-**What is migrating to omnimarket:** The runnable ONEX node handler implementations (those with `contract.yaml`) are moving to `omnimarket`. Protocols, models, adapters, and the runtime plugin stay here. See [OmniMemory → OmniMarket Node Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md).
-
----
-
-## What This Repo Owns
-
-- **Domain models** — all memory, crawl, persona, intent, and intelligence Pydantic models in `src/omnimemory/models/`
-- **Protocol interfaces** — `ProtocolEmbeddingClient`, `ProtocolEmbeddingProvider`, `ProtocolIntentGraphAdapter`, `ProtocolSecretsProvider`, and all base protocols in `src/omnimemory/protocols/`
-- **Storage adapters** — Qdrant, Memgraph, Valkey, and filesystem adapter implementations in `handlers/adapters/` and `nodes/*/adapters/`
-- **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/` registered as `onex.domain_plugins`
-- **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
-- **Node handlers** — 13 contract-carrying nodes in `src/omnimemory/nodes/` (migrating to omnimarket)
-
-## What This Repo Does Not Own
-
-| Resource | Owner |
-|----------|-------|
-| Kafka / Redpanda (platform event bus) | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) |
-| PostgreSQL (platform relational DB) | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) |
-| ONEX kernel, node execution, contracts | [`omnibase_core`](https://github.com/OmniNode-ai/omnibase_core) |
-| Protocol interfaces for platform boundaries | [`omnibase_spi`](https://github.com/OmniNode-ai/omnibase_spi) |
-| Portable workflow packages and node runtime (post-migration) | [`omnimarket`](https://github.com/OmniNode-ai/omnimarket) |
-| Dashboard projections and read-model surfaces | [`omnidash`](https://github.com/OmniNode-ai/omnidash) |
-
----
-
-## Architecture
-
-Follows the [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/omnibase_core/blob/main/docs/architecture/ONEX_FOUR_NODE_ARCHITECTURE.md) (EFFECT, COMPUTE, REDUCER, ORCHESTRATOR) applied to memory operations.
-
-### Node inventory
-
-- **Effect nodes** — `memory_storage_effect`, `memory_retrieval_effect`, `agent_learning_retrieval_effect`, `intent_storage_effect`, `intent_query_effect`, `kreuzberg_parse_effect`, `persona_storage_effect`
-- **Compute nodes** — `semantic_analyzer_compute`, `similarity_compute`, `persona_builder_compute`
-- **Reducer nodes** — `navigation_history_reducer`, `memory_consolidator_reducer` (stub — no contract.yaml)
-- **Orchestrator nodes** — `memory_lifecycle_orchestrator`, `agent_coordinator_orchestrator`
-
-> `node_persona_lifecycle_orchestrator` and `node_persona_retrieval_effect` were decommissioned in an earlier cleanup pass; they never had a `contract.yaml` and are no longer present in the repository. `node_filesystem_crawler_effect` and `node_intent_event_consumer_effect` have since been removed as well, once their `omnimarket` counterparts became canonical.
-
-> _Verified against `src/omnimemory/nodes/` on 2026-08-26: 14 node directories, 13 with `contract.yaml`; `node_memory_consolidator_reducer` is the contract-less stub._
-
-### Memory evolution (planned phases)
-
-The architecture plan (`omni_home/docs/plans/2026-04-07-plan-omnimemory-architecture.md`) describes five enhancement phases: surprise gating on the write path, activation decay for retrieval ranking, memory cube isolation for multi-agent boundaries, Hebbian association strengthening, and hybrid vector+FTS search. These are planned, not yet implemented.
-
----
-
-## Infrastructure Ownership
-
-OmniMemory's `docker-compose.yml` owns the **memory-layer data services**:
-
-| Service | Container | Default Port | Purpose |
-|---------|-----------|--------------|---------|
-| Qdrant | `omnimemory-qdrant` | 6333 (HTTP), 6334 (gRPC) | Vector database for semantic memory |
-| Memgraph | `omnimemory-memgraph` | 7687 (Bolt), 7444 (HTTP) | Graph database for relationship/intent queries |
-| Valkey | `omnimemory-valkey` | 6379 | In-memory cache and session storage |
-| Kreuzberg | `omnimemory-kreuzberg-parser` | 8090 | Document text extraction service |
-
-**Not owned here** — these services are managed by other repositories:
-
-| Service | Owner Repository | Why |
-|---------|-----------------|-----|
-| Kafka / Redpanda | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) | Platform-wide event bus, shared by all services |
-| PostgreSQL | [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra) | Platform-wide relational database, shared by all services |
-
-See [OmniMemory Memory Data Ownership](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-memory-data-ownership.md) for detailed service boundaries and adapter ownership.
-
----
-
-## Quick Start
-
-### Memory services only
-
-```bash
-git clone https://github.com/OmniNode-ai/omnimemory.git
-cd omnimemory
-
-# Start platform infra first (Kafka + PostgreSQL — owned by omnibase_infra)
-infra-up
-
-# Start memory data services
-docker compose up -d
-
-# Verify all services are healthy
-docker compose ps
-```
-
-Default service ports (all configurable via `.env`):
-- Qdrant REST: `localhost:6333`
-- Memgraph Bolt: `localhost:7687`
-- Valkey: `localhost:6379`
-- Kreuzberg parser: `localhost:8090`
-
-See [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md) in the knowledge base for the full startup runbook including health checks and troubleshooting.
-
-### Install and run tests
-
-```bash
-uv sync --group dev
-uv run pytest tests/ -m unit
-```
-
-For configuration options see [OmniMemory Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md).
-
-### Minimal usage example
-
-```python
-import asyncio
-from uuid import uuid4
-
-from omnibase_core.container import ModelONEXContainer
-from omnimemory.handlers.adapters.models import ModelIntentClassificationOutput
-from omnimemory.handlers.handler_intent import HandlerIntent
-
-
-async def main() -> None:
-    container = ModelONEXContainer()
-    handler = HandlerIntent(container)
-
-    await handler.initialize(connection_uri="bolt://localhost:7687")
-
-    result = await handler.store_intent(
-        session_id="session_123",
-        intent_data=ModelIntentClassificationOutput(
-            intent_category="debugging",
-            confidence=0.92,
-            keywords=["error", "traceback"],
-        ),
-        correlation_id=str(uuid4()),
-    )
-
-    query_result = await handler.query_session(
-        session_id="session_123",
-        min_confidence=0.5,
-    )
-
-    await handler.shutdown()
-
-
-asyncio.run(main())
-```
-
----
-
-## Directory Structure
-
-```text
-src/omnimemory/
-├── audit/              # I/O audit logging
-├── enums/              # Domain enumerations (memory types, operation types, lifecycle states)
-├── errors/             # Structured error types
-├── handlers/           # HandlerIntent, HandlerSubscription + adapters
-├── models/             # Pydantic models (memory, crawl, persona, intent, intelligence)
-├── nodes/              # EFFECT, COMPUTE, REDUCER, ORCHESTRATOR node implementations
-│   └── <node>/
-│       ├── adapters/   # Stays in omnimemory (protocol implementations)
-│       └── handlers/   # Migrating to omnimarket
-├── adapters/           # Shared utilities with adapter_* prefix (PII detection, retry, health, metrics)
-├── protocols/          # Protocol interfaces (embedding, intent graph, secrets)
-├── runtime/            # PluginMemory, DI container wiring, dispatch, introspection
-└── tools/              # Contract linter and validators
-```
-
----
-
-## Development and Test Commands
-
-```bash
-# Install all dependencies
-uv sync --group dev
-
-# Format and lint
-uv run ruff format src/ tests/
-uv run ruff check --fix src/ tests/
-
-# Type checking
-uv run mypy src/omnimemory/ --strict
-
-# Run all tests
-uv run pytest tests/ -v
-
-# Unit tests only (no external services required)
-uv run pytest tests/ -m unit
-
-# Pre-commit validation
-pre-commit run --all-files
-```
-
----
-
-## Migration Status
-
-Nodes are migrating to omnimarket. The migration preserves the protocol-adapter-handler split: handlers move, adapters stay.
-
-See [OmniMemory → OmniMarket Node Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md).
-
----
-
 ## Documentation
 
-OmniMemory's documentation lives in the **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)**. This README is the repository's landing page; everything below is the full index of OmniMemory pages there. Every path under `docs/` that was migrated is now a pointer stub to its page — with three deliberate exceptions listed under **Kept in this repository** below, which remain full documents because they are out of scope for the public knowledge base.
+**Every OmniMemory document lives in the OmniNode knowledge base, not in this repository.** This README is the landing page and the full index; there are no `docs/` pages here to read.
+
+- **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)** — public documentation home.
+- **[knowledge-base-internal](https://github.com/OmniNode-ai/knowledge-base-internal)** — repo-internal, named-author, and cross-repo reference content.
 
 **Architecture**
 - [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md) — the EFFECT / COMPUTE / REDUCER / ORCHESTRATOR archetypes applied to memory
@@ -248,19 +43,67 @@ OmniMemory's documentation lives in the **[OmniNode knowledge base](https://gith
 **Runbooks**
 - [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md) — bringing the storage layer up, health checks, troubleshooting
 
-**Kept in this repository** — operating context and platform-convention files that must ship beside the code:
-[CLAUDE.md](CLAUDE.md) · [AGENT.md](AGENT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [LICENSE](LICENSE) · [CHANGELOG.md](CHANGELOG.md)
+**Internal reference** (knowledge-base-internal)
+- [Hybrid Retrieval Design (OMN-16765)](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/decisions/omnimemory-omn16765-hybrid-retrieval-design.md) — RRF fusion design decisions and rejected alternatives
+- [CI Monitoring Guide](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omnimemory-ci-monitoring-guide.md) — job list and failure-triage table
+- [Stub Protocols Status](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omnimemory-stub-protocols-status.md) — internal implementation-status tracker
+- [OmniNode Brand Guide](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omninode-brand-guide.md) — cross-repo palette, lockup rules, README banner recipe
 
-The three full documents still under `docs/` — CI/agent-config and point-in-time records that the public knowledge base does not carry:
-[docs/ci/CI_MONITORING_GUIDE.md](docs/ci/CI_MONITORING_GUIDE.md) · [docs/stub_protocols.md](docs/stub_protocols.md) · [docs/db-split/fk-audit.md](docs/db-split/fk-audit.md)
+Only this README, [CLAUDE.md](CLAUDE.md), [CHANGELOG.md](CHANGELOG.md), [LICENSE](LICENSE), [SECURITY.md](SECURITY.md) and the `.claude/` and `.github/` trees carry markdown in this repository. The `kb-doc-gate` required check runs in `strict` mode (see [`.kb-doc-gate.yaml`](.kb-doc-gate.yaml)) and fails any PR that reintroduces documentation here.
+
+---
+
+## What This Repo Owns
+
+- **Domain models** — memory, crawl, persona, intent, and intelligence Pydantic models in `src/omnimemory/models/`
+- **Protocol interfaces** — `ProtocolEmbeddingClient`, `ProtocolEmbeddingProvider`, `ProtocolIntentGraphAdapter`, `ProtocolSecretsProvider` and the base protocols in `src/omnimemory/protocols/`
+- **Storage adapters** — Qdrant, Memgraph, Valkey and filesystem implementations in `handlers/adapters/` and `nodes/*/adapters/`
+- **Runtime plugin** — `PluginMemory` in `src/omnimemory/runtime/`, registered as `onex.domain_plugins`
+- **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
+- **Node handlers** — contract-carrying nodes in `src/omnimemory/nodes/`, migrating to `omnimarket`
+
+Not owned here: Kafka/Redpanda and PostgreSQL ([`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra)), the ONEX kernel and contracts ([`omnibase_core`](https://github.com/OmniNode-ai/omnibase_core)), platform-boundary protocols ([`omnibase_spi`](https://github.com/OmniNode-ai/omnibase_spi)), the post-migration node runtime ([`omnimarket`](https://github.com/OmniNode-ai/omnimarket)), and dashboard read models ([`omnidash`](https://github.com/OmniNode-ai/omnidash)). See [Memory Data Ownership](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-memory-data-ownership.md) for the full boundary table, and [Market Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md) for what is moving.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/OmniNode-ai/omnimemory.git
+cd omnimemory
+
+# Start platform infra first (Kafka + PostgreSQL — owned by omnibase_infra)
+infra-up
+
+# Start the memory data services (Qdrant 6333, Memgraph 7687, Valkey 6379, Kreuzberg 8090)
+docker compose up -d
+docker compose ps
+
+# Install and run the fast test suite
+uv sync --group dev
+uv run pytest tests/ -m unit
+```
+
+Ports and every other setting are configurable — see [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md). The full startup runbook, with health checks and troubleshooting, is [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md).
+
+## Development
+
+```bash
+uv run ruff format src/ tests/ && uv run ruff check --fix src/ tests/
+uv run mypy src/omnimemory/ --strict
+uv run pytest tests/ -v
+pre-commit run --all-files
+```
+
+Repo invariants, enforced conventions and the pre-commit/pre-push split are in [CLAUDE.md](CLAUDE.md).
 
 ---
 
 ## Security, Contributing, and License
 
 - [SECURITY.md](SECURITY.md)
-- [CONTRIBUTING.md](CONTRIBUTING.md)
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [CONTRIBUTING.md](.github/CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md)
 - [LICENSE](LICENSE)
 
-Open an issue or email contact@omninode.ai.
+Open an issue or email <contact@omninode.ai>.

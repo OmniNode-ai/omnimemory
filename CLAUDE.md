@@ -31,6 +31,24 @@ pre-commit run --all-files
 
 MIT SPDX headers required in `src/`, `tests/`, `scripts/`, `examples/` (spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`). Stamp: `onex spdx fix src tests scripts examples` (add `--check` to dry-run). TRAP: the `# spdx-skip: <reason>` bypass is honored by the `onex spdx` CLI only — the local `validate-spdx-headers` pre-commit hook just scans the first 512 bytes for `SPDX-License-Identifier: MIT` and ignores the skip token.
 
+## Cross-Repo
+
+- Shared platform standards: `~/.claude/CLAUDE.md`
+- Core models and ONEX kernel: [`omnibase_core`](https://github.com/OmniNode-ai/omnibase_core)
+- Platform protocols: [`omnibase_spi`](https://github.com/OmniNode-ai/omnibase_spi)
+- Event bus and PostgreSQL: [`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra)
+
+## Domain Rules
+
+- Qdrant for vector storage, Memgraph for intent/relationship graphs, PostgreSQL for metadata.
+- Document ingestion + semantic retrieval pipeline; PII detection runs before storage.
+- Runnable node handlers (`contract.yaml`) are migrating to `omnimarket`; protocols, models, adapters and `PluginMemory` stay here.
+
 ## Documentation
 
-Documentation lives in the [OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base); the README carries the full pointer index and every migrated path under `docs/` is a stub pointing at its page. Three full documents deliberately remain: `docs/ci/CI_MONITORING_GUIDE.md`, `docs/stub_protocols.md`, `docs/db-split/fk-audit.md`. High-traffic: [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md) (Memgraph/Qdrant/Postgres/embedding env vars), [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md), [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md). What stays in-repo: this file, `AGENT.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, and the CI/agent-config and point-in-time files under `docs/` that are out of scope for the public knowledge base.
+Every OmniMemory document lives in the OmniNode knowledge base, not in this repository. The only markdown that remains here is this file, the root `README.md`, `CHANGELOG.md`, `LICENSE`, `SECURITY.md`, and the `.claude/` and `.github/` trees — enforced by the required `kb-doc-gate` check running in `strict` mode (`.kb-doc-gate.yaml`). A pointer stub is not a removal: the README's Documentation section carries the signposting role for the whole repo and is the full page index.
+
+- Public: <https://github.com/OmniNode-ai/knowledge-base>
+- Internal (repo-internal, named-author, or cross-repo content): <https://github.com/OmniNode-ai/knowledge-base-internal>
+
+High-traffic pages: [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md), [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md), [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md), [PII Handling](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-pii-handling.md).
