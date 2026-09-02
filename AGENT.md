@@ -7,7 +7,7 @@
 - **Documentation index**: `README.md` — every page lives in the OmniNode knowledge base; each path under `docs/` is a pointer stub
 - **Architecture**: <https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md>
 - **PII handling**: <https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-pii-handling.md>
-- **Stub status**: `docs/stub_protocols.md` (in-repo: internal implementation-status tracker)
+- **Stub status**: <https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omnimemory-stub-protocols-status.md> (migrated OMN-16602: internal implementation-status tracker)
 - **Conventions**: `CLAUDE.md`
 
 ## Commands
