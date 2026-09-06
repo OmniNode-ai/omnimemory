@@ -23,7 +23,6 @@
 **Every OmniMemory document lives in the OmniNode knowledge base, not in this repository.** This README is the landing page and the full index; there are no `docs/` pages here to read.
 
 - **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)** — public documentation home.
-- **[knowledge-base-internal](https://github.com/OmniNode-ai/knowledge-base-internal)** — repo-internal, named-author, and cross-repo reference content.
 
 **Architecture**
 - [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md) — the EFFECT / COMPUTE / REDUCER / ORCHESTRATOR archetypes applied to memory
@@ -42,12 +41,6 @@
 
 **Runbooks**
 - [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md) — bringing the storage layer up, health checks, troubleshooting
-
-**Internal reference** (knowledge-base-internal)
-- [Hybrid Retrieval Design (OMN-16765)](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/decisions/omnimemory-omn16765-hybrid-retrieval-design.md) — RRF fusion design decisions and rejected alternatives
-- [CI Monitoring Guide](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omnimemory-ci-monitoring-guide.md) — job list and failure-triage table
-- [Stub Protocols Status](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omnimemory-stub-protocols-status.md) — internal implementation-status tracker
-- [OmniNode Brand Guide](https://github.com/OmniNode-ai/knowledge-base-internal/blob/main/reference/omninode-brand-guide.md) — cross-repo palette, lockup rules, README banner recipe
 
 Only this README, [CLAUDE.md](CLAUDE.md), [CHANGELOG.md](CHANGELOG.md), [LICENSE](LICENSE), [SECURITY.md](SECURITY.md) and the `.claude/` and `.github/` trees carry markdown in this repository. The `kb-doc-gate` required check runs in `strict` mode (see [`.kb-doc-gate.yaml`](.kb-doc-gate.yaml)) and fails any PR that reintroduces documentation here.
 
