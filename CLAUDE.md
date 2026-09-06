@@ -49,6 +49,5 @@ MIT SPDX headers required in `src/`, `tests/`, `scripts/`, `examples/` (spec: `o
 Every OmniMemory document lives in the OmniNode knowledge base, not in this repository. The only markdown that remains here is this file, the root `README.md`, `CHANGELOG.md`, `LICENSE`, `SECURITY.md`, and the `.claude/` and `.github/` trees — enforced by the required `kb-doc-gate` check running in `strict` mode (`.kb-doc-gate.yaml`). A pointer stub is not a removal: the README's Documentation section carries the signposting role for the whole repo and is the full page index.
 
 - Public: <https://github.com/OmniNode-ai/knowledge-base>
-- Internal (repo-internal, named-author, or cross-repo content): <https://github.com/OmniNode-ai/knowledge-base-internal>
 
 High-traffic pages: [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md), [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md), [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md), [PII Handling](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-pii-handling.md).
