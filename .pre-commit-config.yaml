@@ -139,11 +139,12 @@ repos:
     rev: v0.21.0
     hooks:
       - id: yamlfmt
-        # .kb-doc-gate.yaml is excluded deliberately (OMN-16602): the shared
-        # .yamlfmt sets include_document_start:true, and the kb-doc-gate
-        # validator's restricted YAML parser fails closed (exit 2) on the
-        # bare '---' marker yamlfmt would insert.
-        exclude: ^(\.github/|\.kb-doc-gate\.yaml$)
+        # .kb-doc-gate.yaml and .public-repo-hygiene.yaml are excluded
+        # deliberately (OMN-16602 / OMN-18016): the shared .yamlfmt sets
+        # include_document_start:true, and the gate validators' restricted YAML
+        # parsers fail closed (exit 2) on the bare '---' marker yamlfmt would
+        # insert.
+        exclude: ^(\.github/|\.kb-doc-gate\.yaml$|\.public-repo-hygiene\.yaml$)
 
   # Essential file formatting (standard across ecosystem)
   - repo: https://github.com/pre-commit/pre-commit-hooks
