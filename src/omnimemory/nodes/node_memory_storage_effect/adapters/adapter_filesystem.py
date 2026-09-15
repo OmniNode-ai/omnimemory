@@ -40,6 +40,7 @@ import asyncio
 import json
 import logging
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 
 from omnibase_infra.errors.error_infra import InfraConnectionError
@@ -59,6 +60,13 @@ __all__ = [
     "HandlerFileSystemAdapter",
     "ModelFileSystemAdapterConfig",
 ]
+
+
+def _as_mapping(value: object) -> Mapping[str, object]:
+    """Return a mapping view for handler payloads that are dict-shaped."""
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 def _is_not_found_infra_error(error: InfraConnectionError) -> bool:
@@ -309,8 +317,8 @@ class HandlerFileSystemAdapter:
                 if result.result is None or result.result.get("status") != "success":
                     error_msg = "Directory creation returned no result"
                     if result.result:
-                        error_msg = result.result.get(
-                            "error", "Directory creation failed"
+                        error_msg = str(
+                            result.result.get("error", "Directory creation failed")
                         )
                     raise RuntimeError(
                         f"Failed to create snapshots directory "
@@ -593,8 +601,13 @@ class HandlerFileSystemAdapter:
         try:
             result = await self._handler.execute(envelope)
             if result.result and result.result.get("status") == "success":
-                payload = result.result.get("payload", {})
+                payload = _as_mapping(result.result.get("payload", {}))
                 content = payload.get("content", "")
+                if not isinstance(content, str | bytes | bytearray):
+                    return ModelMemoryStorageResponse(
+                        status="error",
+                        error_message="Snapshot file content was not JSON text",
+                    )
 
                 # Import here to avoid circular imports
                 from omnibase_core.models.omnimemory import ModelMemorySnapshot
@@ -925,13 +938,16 @@ class HandlerFileSystemAdapter:
         try:
             result = await self._handler.execute(envelope)
             if result.result and result.result.get("status") == "success":
-                payload = result.result.get("payload", {})
-                entries = payload.get("entries", [])
+                payload = _as_mapping(result.result.get("payload", {}))
+                raw_entries = payload.get("entries", [])
+                entries = raw_entries if isinstance(raw_entries, list) else []
                 # Extract snapshot IDs from filenames
                 snapshot_ids = [
-                    Path(entry.get("name", "")).stem
+                    Path(str(entry_mapping.get("name", ""))).stem
                     for entry in entries
-                    if entry.get("name", "").endswith(".json")
+                    if isinstance(entry, dict)
+                    for entry_mapping in [_as_mapping(entry)]
+                    if str(entry_mapping.get("name", "")).endswith(".json")
                 ]
                 return ModelMemoryStorageResponse(
                     status="success",

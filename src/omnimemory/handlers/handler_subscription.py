@@ -127,7 +127,11 @@ from omnimemory.runtime.adapters import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
+    from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
     from omnibase_infra.handlers.handler_db import HandlerDb as _DbHandlerType
+    from omnibase_infra.handlers.models.model_db_query_response import (
+        ModelDbQueryResponse,
+    )
 else:
     _DbHandlerType = object
 
@@ -166,7 +170,9 @@ class _DbHandlerProtocol(Protocol):
 
     async def initialize(self, config: dict[str, object]) -> None: ...
 
-    async def execute(self, envelope: dict[str, object]) -> object: ...
+    async def execute(
+        self, envelope: dict[str, object]
+    ) -> ModelHandlerOutput[ModelDbQueryResponse]: ...
 
     async def shutdown(self) -> None: ...
 
@@ -191,7 +197,31 @@ def _create_db_handler() -> _DbHandlerType:
         raise TypeError(
             f"{handler_cls.__qualname__} does not satisfy _DbHandlerProtocol"
         )
-    return instance
+    return cast("_DbHandlerType", instance)
+
+
+def _db_envelope(
+    operation: str, sql: str, parameters: list[object]
+) -> dict[str, object]:
+    """Build the typed DB handler envelope expected by HandlerDb."""
+    payload: dict[str, object] = {"sql": sql, "parameters": parameters}
+    return {"operation": operation, "payload": payload}
+
+
+def _db_rows(
+    output: ModelHandlerOutput[ModelDbQueryResponse],
+) -> list[dict[str, object]]:
+    """Extract DB rows from a typed handler output."""
+    if output.result is None:
+        return []
+    return output.result.payload.rows
+
+
+def _int_from_db(value: object, default: int = 0) -> int:
+    """Convert scalar DB values used for counts, falling back on invalid shapes."""
+    if isinstance(value, int | str | bytes | bytearray):
+        return int(value)
+    return default
 
 
 # Cache key patterns
@@ -1184,13 +1214,7 @@ class HandlerSubscription:
                 json.dumps(subscription.metadata) if subscription.metadata else None,
             ]
 
-        envelope = {
-            "operation": "db.execute",
-            "payload": {
-                "sql": sql,
-                "parameters": params,
-            },
-        }
+        envelope = _db_envelope("db.execute", sql, list(params))
         await db_handler.execute(envelope)
 
     async def _soft_delete_subscription(self, subscription_id: str) -> None:
@@ -1206,17 +1230,15 @@ class HandlerSubscription:
             SET status = $1, updated_at = $2
             WHERE id = $3
         """
-        envelope = {
-            "operation": "db.execute",
-            "payload": {
-                "sql": sql,
-                "parameters": [
-                    EnumSubscriptionStatus.DELETED.value,
-                    datetime.now(timezone.utc).isoformat(),
-                    subscription_id,
-                ],
-            },
-        }
+        envelope = _db_envelope(
+            "db.execute",
+            sql,
+            [
+                EnumSubscriptionStatus.DELETED.value,
+                datetime.now(timezone.utc).isoformat(),
+                subscription_id,
+            ],
+        )
         await db_handler.execute(envelope)
 
     async def _get_subscription_by_agent_and_topic(
@@ -1241,16 +1263,14 @@ class HandlerSubscription:
             FROM subscriptions
             WHERE agent_id = $1 AND topic = $2 AND status != $3
         """
-        envelope = {
-            "operation": "db.query",
-            "payload": {
-                "sql": sql,
-                "parameters": [agent_id, topic, EnumSubscriptionStatus.DELETED.value],
-            },
-        }
+        envelope = _db_envelope(
+            "db.query",
+            sql,
+            [agent_id, topic, EnumSubscriptionStatus.DELETED.value],
+        )
         result = await db_handler.execute(envelope)
 
-        rows = result.result.get("payload", {}).get("rows", [])
+        rows = _db_rows(result)
         if not rows:
             return None
 
@@ -1282,18 +1302,12 @@ class HandlerSubscription:
             WHERE agent_id = $1 AND status = $2
             ORDER BY created_at DESC
         """
-        parameters: list[str | int] = [agent_id, EnumSubscriptionStatus.ACTIVE.value]
+        parameters: list[object] = [agent_id, EnumSubscriptionStatus.ACTIVE.value]
 
-        envelope = {
-            "operation": "db.query",
-            "payload": {
-                "sql": sql,
-                "parameters": parameters,
-            },
-        }
+        envelope = _db_envelope("db.query", sql, parameters)
         result = await db_handler.execute(envelope)
 
-        rows = result.result.get("payload", {}).get("rows", [])
+        rows = _db_rows(result)
         return [self._row_to_subscription(row) for row in rows]
 
     async def _get_subscriptions_with_count_from_db(
@@ -1340,23 +1354,17 @@ class HandlerSubscription:
             offset,
         ]
 
-        envelope = {
-            "operation": "db.query",
-            "payload": {
-                "sql": sql,
-                "parameters": parameters,
-            },
-        }
+        envelope = _db_envelope("db.query", sql, list(parameters))
         result = await db_handler.execute(envelope)
 
-        rows = result.result.get("payload", {}).get("rows", [])
+        rows = _db_rows(result)
 
         if not rows:
             # No results - total count is 0
             return [], 0
 
         # Extract total_count from the first row (same for all rows due to OVER())
-        total_count = int(rows[0]["total_count"])
+        total_count = _int_from_db(rows[0]["total_count"])
 
         # Convert rows to subscriptions
         subscriptions = [self._row_to_subscription(row) for row in rows]
@@ -1467,18 +1475,15 @@ class HandlerSubscription:
             count_sql = """
                 SELECT COUNT(*) as count FROM subscriptions WHERE status = $1
             """
-            count_envelope = {
-                "operation": "db.query",
-                "payload": {
-                    "sql": count_sql,
-                    "parameters": [EnumSubscriptionStatus.ACTIVE.value],
-                },
-            }
+            count_envelope = _db_envelope(
+                "db.query",
+                count_sql,
+                [EnumSubscriptionStatus.ACTIVE.value],
+            )
             count_result = await db_handler.execute(count_envelope)
-            total_count = int(
-                count_result.result.get("payload", {})
-                .get("rows", [{}])[0]
-                .get("count", 0)
+            count_rows = _db_rows(count_result)
+            total_count = (
+                _int_from_db(count_rows[0].get("count", 0)) if count_rows else 0
             )
 
             if total_count == 0:
@@ -1499,19 +1504,17 @@ class HandlerSubscription:
                     ORDER BY id
                     LIMIT $2 OFFSET $3
                 """
-                envelope = {
-                    "operation": "db.query",
-                    "payload": {
-                        "sql": sql,
-                        "parameters": [
-                            EnumSubscriptionStatus.ACTIVE.value,
-                            config.cache_rebuild_batch_size,
-                            offset,
-                        ],
-                    },
-                }
+                envelope = _db_envelope(
+                    "db.query",
+                    sql,
+                    [
+                        EnumSubscriptionStatus.ACTIVE.value,
+                        config.cache_rebuild_batch_size,
+                        offset,
+                    ],
+                )
                 result = await db_handler.execute(envelope)
-                rows = result.result.get("payload", {}).get("rows", [])
+                rows = _db_rows(result)
 
                 if not rows:
                     break
@@ -1601,16 +1604,14 @@ class HandlerSubscription:
             SELECT id FROM subscriptions
             WHERE topic = $1 AND status = $2
         """
-        envelope = {
-            "operation": "db.query",
-            "payload": {
-                "sql": sql,
-                "parameters": [topic, EnumSubscriptionStatus.ACTIVE.value],
-            },
-        }
+        envelope = _db_envelope(
+            "db.query",
+            sql,
+            [topic, EnumSubscriptionStatus.ACTIVE.value],
+        )
         result = await db_handler.execute(envelope)
 
-        rows = result.result.get("payload", {}).get("rows", [])
+        rows = _db_rows(result)
         subscription_ids = {str(row["id"]) for row in rows}
 
         # Rebuild cache for this topic (best-effort - don't fail if cache write fails)
@@ -1751,16 +1752,10 @@ class HandlerSubscription:
                 FROM subscriptions
                 WHERE id IN ({placeholders})
             """
-            envelope = {
-                "operation": "db.query",
-                "payload": {
-                    "sql": sql,
-                    "parameters": missing_ids,
-                },
-            }
+            envelope = _db_envelope("db.query", sql, list(missing_ids))
             result = await db_handler.execute(envelope)
 
-            rows = result.result.get("payload", {}).get("rows", [])
+            rows = _db_rows(result)
             for row in rows:
                 subscription = self._row_to_subscription(row)
                 subscriptions.append(subscription)
@@ -1866,13 +1861,7 @@ class HandlerSubscription:
         db_healthy = False
         if self._db_handler:
             try:
-                envelope = {
-                    "operation": "db.query",
-                    "payload": {
-                        "sql": "SELECT 1",
-                        "parameters": [],
-                    },
-                }
+                envelope = _db_envelope("db.query", "SELECT 1", [])
                 await self._db_handler.execute(envelope)
                 db_healthy = True
             except Exception as e:
