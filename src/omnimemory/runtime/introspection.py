@@ -32,7 +32,7 @@ import asyncio
 import importlib.resources
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import NAMESPACE_DNS, UUID, uuid5
 
 import yaml
@@ -43,6 +43,9 @@ from omnibase_infra.models.discovery import ModelIntrospectionConfig
 
 if TYPE_CHECKING:
     from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
+    from omnibase_infra.protocols.protocol_introspection_event_bus import (
+        ProtocolIntrospectionEventBus,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +188,7 @@ MEMORY_NODES: tuple[_NodeDescriptor, ...] = discover_memory_nodes()
 # =============================================================================
 
 
-class MemoryNodeIntrospectionProxy(MixinNodeIntrospection):  # type: ignore[misc]  # Why: mixin requires partial node interface; omnibase_infra lacks py.typed
+class MemoryNodeIntrospectionProxy(MixinNodeIntrospection):
     """Proxy that uses MixinNodeIntrospection to publish on behalf of a node.
 
     Memory nodes are thin shells that run inside the plugin lifecycle.
@@ -199,8 +202,7 @@ class MemoryNodeIntrospectionProxy(MixinNodeIntrospection):  # type: ignore[misc
     Note on mixin usage: This is an intentional proxy pattern, not a proper
     mixin usage. The proxy deliberately provides only the subset of the node
     interface that the mixin requires (the ``initialize_introspection`` call
-    and the ``name`` property). The ``# type: ignore[misc]`` suppresses the
-    mypy error from inheriting a mixin without a full node base class.
+    and the ``name`` property).
     """
 
     def __init__(
@@ -212,7 +214,7 @@ class MemoryNodeIntrospectionProxy(MixinNodeIntrospection):  # type: ignore[misc
             node_id=descriptor.node_id,
             node_type=descriptor.node_type,
             node_name=descriptor.name,
-            event_bus=event_bus,
+            event_bus=cast("ProtocolIntrospectionEventBus | None", event_bus),
             version=descriptor.version,
         )
         self.initialize_introspection(config)
