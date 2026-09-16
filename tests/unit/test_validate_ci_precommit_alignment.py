@@ -337,6 +337,7 @@ class TestPrecommitHooksCoveredByAlignments:
             "onex-validate-runtime-profiles",
             "reject-deploy-gate-skip-token",
             "reject-deploy-gate-skip-token-commit-msg",
+            "strip-ai-coauthor-trailer",
             "validate-validator-requirements",
             # CI counterpart is the standalone dep-provenance-gate.yml workflow
             # (OMN-13873), not a ci.yml job, so it is excluded from the
