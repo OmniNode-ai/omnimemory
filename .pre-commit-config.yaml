@@ -582,7 +582,7 @@ repos:
           - architecture-handshakes/validator-requirements-baseline.yaml
 
 # Configuration
-default_install_hook_types: [pre-commit, pre-push]
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
 default_stages: [pre-commit]
 fail_fast: false
 
