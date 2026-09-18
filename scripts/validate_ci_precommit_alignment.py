@@ -62,6 +62,12 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ("validate-kafka-imports", "onex-validation", "validate_kafka_imports.py"),
     ("validate-model-locations", "onex-validation", "validate_model_locations.py"),
     ("validate-no-env-fallbacks", "onex-validation", "validate_no_env_fallbacks.py"),
+    # Secrets scanning (OMN-18669). The local hook and the CI job MUST select
+    # the same files against the same baseline with the same exclusions: if
+    # they diverge, a commit passes locally and the required check fails, or
+    # worse, the reverse. That is exactly what this alignment test exists to
+    # catch, so the pair is declared here rather than excluded.
+    ("detect-secrets", "detect-secrets", "detect-secrets-hook"),
     # Infrastructure hooks
     ("migration-freeze-check", "migration-freeze", "check_migration_freeze.sh"),
     # New hooks from OMN-2218
