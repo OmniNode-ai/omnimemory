@@ -347,6 +347,15 @@ class TestPrecommitHooksCoveredByAlignments:
             # CI counterpart is the standalone noncanonical-lifecycle-gate.yml
             # workflow (OMN-14350), not a ci.yml job.
             "no-noncanonical-lifecycle-classes",
+            # OMN-18669. Excluded because EXPECTED_ALIGNMENTS pairs a hook to a
+            # job in ci.yml, and this hook's CI counterpart is a STANDALONE
+            # required workflow (.github/workflows/secrets-baseline-wiring.yml,
+            # context `secrets-baseline-wiring / secrets-baseline-wiring`) — the
+            # same shape as reject-deploy-gate-skip-token and check-url-authority
+            # above. It is NOT a formatting hook and it DOES have a CI
+            # counterpart; the pair is kept converged by pinning both surfaces to
+            # one omniclaude SHA rather than by this list.
+            "secrets-baseline-wired",
         }
     )
 
