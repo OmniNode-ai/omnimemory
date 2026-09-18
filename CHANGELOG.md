@@ -1,3 +1,15 @@
+## v0.18.2 (2026-09-18)
+
+### Release
+- Cut omnimemory from dev at 0.18.2 by the scheduled release train.
+- 3 release-relevant commit(s) merged since v0.18.1.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.1
+- chore(deps, OMN-13902): refresh omninode sibling locks [bot] (#504)
+- docs(OMN-16602): scrub omnimemory docs to zero residual and require kb-doc-gate strict (#473)
+- build(deps-dev): update neo4j requirement from <6.0.0,>=5.0.0 to >=5.0.0,<7.0.0 (#471)
+
 ## v0.18.1 (2026-08-31)
 
 Patch release cut to ship the OMN-17236 PII detector pattern fixes, which merged
