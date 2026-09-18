@@ -209,6 +209,16 @@ test_families:
   tests/unit/scripts/:
     triggers:
       - scripts/
+  tests/unit/test_auto_tag_app_token_push_omn18662.py:
+    triggers:
+      - .github/workflows/
+      # OMN-18662. It parses auto-tag-on-merge.yml and asserts the two
+      # conditions that let an App-token tag push start release.yml. The
+      # workflow directory is its only upstream; no src path selects it.
+      # Coarse on the whole directory on purpose, per the warning above: a
+      # per-file trigger stops firing silently the moment a workflow is
+      # renamed, and this one also scans every sibling workflow for a
+      # re-introduced call to the shared reusable tagger.
   tests/unit/test_ci_workflow_shape.py:
     triggers:
       - .github/workflows/
