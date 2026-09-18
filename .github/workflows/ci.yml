@@ -624,10 +624,87 @@ jobs:
             --allowlist .onex_ratchets/noncanonical_class_allowlist.yaml \
             src/omnimemory
 
+  # ============================================================================
+  # Detect Secrets - the CI half of the .secrets.baseline gate (OMN-18669)
+  # ============================================================================
+  # This repository carried a committed `.secrets.baseline` that NO hook and NO
+  # workflow read. Measured 2026-09-18 (integration probe R9): the file was
+  # present, the repository looked protected, and a full scan against it
+  # surfaced 47 findings in 18 files nothing had ever been asked to approve.
+  # Nobody had loosened a gate -- there was no gate.
+  #
+  # Uses detect-secrets-hook, which compares findings to the baseline on the
+  # full equality model (hashed_secret + type) and exits non-zero only for
+  # findings NOT already baselined. Same pin, same baseline and the same
+  # exclusions as the `detect-secrets` pre-commit hook in
+  # .pre-commit-config.yaml -- if the two selections differ, a commit passes
+  # locally and this check fails, or worse, the reverse.
+  #
+  # Wired into the required `CI Summary` context through needs: below, with a
+  # strict success-only verdict, so it gates merges rather than advising.
+  detect-secrets:
+    name: Detect Secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # detect-secrets is a CI-only scanning tool, not a project dependency.
+      # Installed via pip (not uv) because it is not declared in pyproject.toml.
+      - name: Install detect-secrets
+        run: pip install detect-secrets==1.5.0
+
+      - name: Run detect-secrets-hook
+        run: |
+          # -n/--no-verify (OMN-15063): several plugins (SlackDetector,
+          # StripeDetector, ...) call the live vendor API to "verify" each
+          # regex-matched candidate, then silently drop anything that comes
+          # back VERIFIED_FALSE. A negative or uncertain live-verification
+          # result must not silently remove a finding (fail-closed). Never
+          # remove this flag without re-proving the miss is fixed another way.
+          set +e
+          git ls-files -z | xargs -0 detect-secrets-hook \
+            --no-verify \
+            --baseline .secrets.baseline \
+            --exclude-files 'uv\.lock' \
+            --exclude-files '\.venv/' \
+            --exclude-files 'tests/fixtures/' \
+            --exclude-files '\.git/' \
+            --exclude-files '\.secrets\.baseline' \
+            --exclude-files '\.github/workflows/.*\.ya?ml'  # workflow YAML legitimately references the secrets context
+          HOOK_EXIT=$?
+          set -e
+
+          if [[ $HOOK_EXIT -eq 0 ]]; then
+            echo "## Secrets Scan" >> $GITHUB_STEP_SUMMARY
+            echo "No new secrets detected (all findings are baselined)." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## New Secrets Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Findings are present that .secrets.baseline does not carry." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "If they are real, remove them and rotate under the credential-rotation" >> $GITHUB_STEP_SUMMARY
+            echo "runbook. If they are false positives, audit them into the baseline:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo 'detect-secrets scan --no-verify --exclude-files "uv\.lock" --exclude-files "\.venv/" --exclude-files "tests/fixtures/" --exclude-files "\.git/" --exclude-files "\.secrets\.baseline" --exclude-files "\.github/workflows/.*\.ya?ml" --force-use-all-plugins > .secrets.baseline' >> $GITHUB_STEP_SUMMARY
+            echo 'detect-secrets audit .secrets.baseline' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Never loosen the hook or widen the exclusions to clear this." >> $GITHUB_STEP_SUMMARY
+            exit $HOOK_EXIT
+          fi
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets]
     if: always()
 
     steps:
@@ -638,6 +715,13 @@ jobs:
           # in needs: so this job WAITS for it (no race).
           if [[ "${{ needs.no-noncanonical-lifecycle-classes.result }}" != "success" ]]; then
             echo "::error::no-noncanonical-lifecycle-classes ratchet did not pass (result: ${{ needs.no-noncanonical-lifecycle-classes.result }}) - fail-closed (OMN-14350)"
+            exit 1
+          fi
+          # OMN-18669: strict fail-closed gate on the secrets scan - only 'success'
+          # passes; skipped/cancelled/failure ALL block. A secrets gate that a
+          # skipped job can satisfy is the state this ticket exists to remove.
+          if [[ "${{ needs.detect-secrets.result }}" != "success" ]]; then
+            echo "::error::detect-secrets did not pass (result: ${{ needs.detect-secrets.result }}) - fail-closed (OMN-18669)"
             exit 1
           fi
           migration_freeze="${{ needs.migration-freeze.result }}"
