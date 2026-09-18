@@ -595,7 +595,8 @@ class TestAlignmentCount:
         Update the expected count here when legitimately adding or removing
         alignment entries.
         """
-        expected_count = 19
+        # 20 as of OMN-18669, which added the detect-secrets pair.
+        expected_count = 20
         assert len(EXPECTED_ALIGNMENTS) == expected_count, (
             f"EXPECTED_ALIGNMENTS has {len(EXPECTED_ALIGNMENTS)} entries, "
             f"expected {expected_count}. If you added or removed entries, "

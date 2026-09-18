@@ -14,7 +14,7 @@
 #
 # Applied via: gh api repos/OmniNode-ai/omnimemory/branches/main/protection -X PUT
 # Mode: strict (branch must be up-to-date before merging)
-# Total required checks: 11
+# Total required checks: 12
 
 required_checks:
   # -- Phase 1: Quick Validation (parallel, ~2-5 min) -------------------------
@@ -74,6 +74,19 @@ required_checks:
     conditional: true
     condition: "Skipped when no Python/Markdown files changed in the PR diff"
     rationale: "Prevents AI-generated slop patterns from entering the codebase (OMN-2972)"
+
+  - name: "Detect Secrets"
+    workflow: ci.yml
+    job_id: detect-secrets
+    conditional: false
+    rationale: >-
+      OMN-18669. Judges the tracked set against .secrets.baseline with
+      detect-secrets-hook. Gates merges through the required CI Summary
+      context, which needs: this job and accepts only a success result --
+      skipped, cancelled and failure all block. Its selection and exclusions
+      are identical to the detect-secrets pre-commit hook by construction;
+      tests/unit/test_validate_ci_precommit_alignment.py fails if the pair
+      drifts apart.
 
   # -- Phase 2: Full Test Suite ------------------------------------------------
 
