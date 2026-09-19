@@ -209,11 +209,12 @@ jobs:
       # project locks (0.47.17) predates that packaging, so under `uv run` it
       # cannot find a spec at all and exits 1 with "gitignore-baseline.yaml not
       # found". Both surfaces are kept converged by naming one sha, the same way
-      # secrets-baseline-wired is handled. When omnibase_core#1710 merges and a
-      # release carrying the packaged spec lands in uv.lock, this step and the
-      # hook should both move to that release together.
+      # secrets-baseline-wired is handled. omnibase_core#1710 merged 2026-09-19T15:45:29Z, so this is now a
+      # commit on dev, not a PR branch. When a RELEASE carrying the packaged
+      # spec reaches uv.lock, this step and the hook should both move to it
+      # together and this --with can go away.
       - name: Validate gitignore baseline (OMN-18033)
-        run: uv run --isolated --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core.git@7705bc377091517a008948cc9a6c8da56fd24afb" python -m omnibase_core.validators.gitignore_baseline .
+        run: uv run --isolated --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core.git@5d562ab415bcbeb60eb852f5fb6d80b455da1624" python -m omnibase_core.validators.gitignore_baseline .
 
       - name: ONEX validation summary
         if: always()
