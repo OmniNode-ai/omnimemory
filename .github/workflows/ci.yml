@@ -202,6 +202,19 @@ jobs:
       - name: Validate no silent env fallbacks
         run: uv run python scripts/validation/validate_no_env_fallbacks.py
 
+      # SYNC: Pre-commit hook 'validate-gitignore-baseline' at pre-commit stage (OMN-18033)
+      # Pinned to the SAME omnibase_core sha as the hook's additional_dependencies,
+      # deliberately NOT the lockfile. The validator reads the baseline spec
+      # packaged inside the omnibase_core wheel; the released omnibase-core this
+      # project locks (0.47.17) predates that packaging, so under `uv run` it
+      # cannot find a spec at all and exits 1 with "gitignore-baseline.yaml not
+      # found". Both surfaces are kept converged by naming one sha, the same way
+      # secrets-baseline-wired is handled. When omnibase_core#1710 merges and a
+      # release carrying the packaged spec lands in uv.lock, this step and the
+      # hook should both move to that release together.
+      - name: Validate gitignore baseline (OMN-18033)
+        run: uv run --isolated --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core.git@7705bc377091517a008948cc9a6c8da56fd24afb" python -m omnibase_core.validators.gitignore_baseline .
+
       - name: ONEX validation summary
         if: always()
         run: |
