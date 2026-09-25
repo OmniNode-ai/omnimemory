@@ -202,6 +202,18 @@ jobs:
       - name: Validate no silent env fallbacks
         run: uv run python scripts/validation/validate_no_env_fallbacks.py
 
+      # SYNC: Pre-commit hook 'no-hardcoded-bolt-fallback' at pre-commit stage
+      - name: Validate no hardcoded bolt fallback (whole-tree backstop)
+        run: bash scripts/check_no_hardcoded_bolt.sh
+
+      # SYNC: Pre-commit hook 'kafka-no-hardcoded-fallback' at pre-commit stage
+      - name: Validate no hardcoded Kafka fallback (whole-tree backstop)
+        run: bash scripts/validation/check_kafka_no_hardcoded_fallback.sh
+
+      # SYNC: Pre-commit hook 'no-internal-ips' at pre-commit stage
+      - name: Validate no internal IPs (whole-tree backstop)
+        run: bash scripts/validation/check_no_internal_ips.sh
+
       # SYNC: Pre-commit hook 'validate-gitignore-baseline' at pre-commit stage (OMN-18033)
       # Pinned to the SAME omnibase_core sha as the hook's additional_dependencies,
       # deliberately NOT the lockfile. The validator reads the baseline spec
@@ -232,6 +244,9 @@ jobs:
           echo "- Kafka import boundary enforcement (ARCH-002)" >> $GITHUB_STEP_SUMMARY
           echo "- Pydantic model location enforcement" >> $GITHUB_STEP_SUMMARY
           echo "- No silent env fallbacks (OMN-10735)" >> $GITHUB_STEP_SUMMARY
+          echo "- No hardcoded bolt fallback" >> $GITHUB_STEP_SUMMARY
+          echo "- No hardcoded Kafka fallback" >> $GITHUB_STEP_SUMMARY
+          echo "- No hardcoded internal IPs" >> $GITHUB_STEP_SUMMARY
 
   # Phase 1 - Transport Import Guard (ARCH-002)
   # SYNC: Pre-commit hook 'validate-no-transport-imports' (omnibase_core remote hook)
