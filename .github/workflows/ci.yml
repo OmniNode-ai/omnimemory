@@ -150,7 +150,7 @@ jobs:
   onex-validation:
     name: ONEX Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -161,6 +161,9 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+
+      - name: Run the whole-tree pre-commit suite
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
