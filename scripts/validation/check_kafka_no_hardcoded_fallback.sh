@@ -13,13 +13,18 @@
 set -euo pipefail
 
 FAILED=0
+if [[ $# -gt 0 ]]; then
+    TARGETS=("$@")
+else
+    TARGETS=(src/)
+fi
 
 # R1: os.getenv("KAFKA_*", non-empty) pattern in src/
 MATCHES=$(grep -rn --include="*.py" \
     --exclude-dir=".venv" \
     --exclude-dir="node_modules" \
     -E "os\.getenv\([[:space:]]*[\"']KAFKA_[^\"']+[\"'][[:space:]]*,[[:space:]]*[\"'][^\"']+[\"']" \
-    src/ 2>/dev/null | \
+    "${TARGETS[@]}" 2>/dev/null | \
     grep -v "# kafka-fallback-ok" | \
     grep -v "# noqa" || true)
 
@@ -39,7 +44,7 @@ IP_MATCHES=$(grep -rn --include="*.py" \
     --exclude-dir=".venv" \
     --exclude-dir="node_modules" \
     -E "192\.168\.[0-9]+\.[0-9]+:(9092|19092|29092|29093)" \
-    src/ 2>/dev/null | \
+    "${TARGETS[@]}" 2>/dev/null | \
     grep -v "# kafka-fallback-ok" | \
     grep -v "# noqa" | \
     grep -v "# onex-allow-internal-ip" || true)
@@ -58,7 +63,7 @@ LOCALHOST_MATCHES=$(grep -rn --include="*.py" \
     --exclude-dir=".venv" \
     --exclude-dir="node_modules" \
     -E "localhost:9092" \
-    src/ 2>/dev/null | \
+    "${TARGETS[@]}" 2>/dev/null | \
     grep -v "# kafka-fallback-ok" | \
     grep -v "# noqa" || true)
 
