@@ -144,6 +144,11 @@ def main() -> int:
         for path in selected
     ):
         selected = [(Path.cwd() / "src").resolve()]
+    else:
+        for path in selected:
+            if not path.is_file() and not path.is_dir():
+                print(f"Path not found: {path}")
+                return 1
 
     files_to_check: set[Path] = set()
     for path in selected:

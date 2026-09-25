@@ -8,8 +8,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def test_filename_scanners_only_check_supplied_file(tmp_path: Path) -> None:
@@ -79,6 +81,13 @@ def _hook_script_path(hook_id: str) -> str:
     return script.group(0)
 
 
+def _onex_validation_commands() -> list[str]:
+    workflow = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))
+    job = workflow["jobs"]["onex-validation"]
+    assert job["name"] == "ONEX Validation"
+    return [step["run"] for step in job["steps"] if "run" in step]
+
+
 def test_staged_hooks_have_whole_tree_ci_backstops() -> None:
     hooks = {
         "no-hardcoded-bolt-fallback": "scripts/check_no_hardcoded_bolt.sh",
@@ -86,16 +95,16 @@ def test_staged_hooks_have_whole_tree_ci_backstops() -> None:
             "scripts/validation/check_kafka_no_hardcoded_fallback.sh"
         ),
         "no-internal-ips": "scripts/validation/check_no_internal_ips.sh",
+        "validate-model-locations": ("scripts/validation/validate_model_locations.py"),
     }
-    workflows = "\n".join(
-        workflow.read_text(encoding="utf-8")
-        for workflow in (REPO_ROOT / ".github" / "workflows").glob("*.yml")
-    )
+    commands = "\n".join(_onex_validation_commands())
 
     for hook_id, expected_script in hooks.items():
         script = _hook_script_path(hook_id)
         assert script == expected_script
-        assert script in workflows, f"{hook_id} has no whole-tree CI backstop"
+        assert script in commands, (
+            f"{hook_id} has no whole-tree CI backstop in onex-validation"
+        )
 
 
 @pytest.mark.parametrize(
