@@ -194,6 +194,11 @@ test_families:
       # directory on purpose: a per-file trigger would silently stop firing the
       # moment a workflow is renamed, which is exactly the failure mode the
       # surrounding comment warns about.
+  tests/fixtures/:
+    triggers: []
+    # Data fixtures only, with no pytest modules; their sole consumer is the
+    # OMN-19666 shell guard run by the pre-commit hook.
+    reason: "data fixtures consumed only by the OMN-19666 pre-commit shell guard"
   tests/integration/:
     triggers: []
     # Service-backed suites (Postgres/Qdrant/Memgraph/Kafka) that skip without
