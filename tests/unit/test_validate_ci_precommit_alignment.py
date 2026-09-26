@@ -604,8 +604,9 @@ class TestAlignmentCount:
         Update the expected count here when legitimately adding or removing
         alignment entries.
         """
-        # 21 as of OMN-18033, which added the validate-gitignore-baseline pair.
-        expected_count = 21
+        # 22 as of OMN-19666, which added the
+        # no-git-precommit-additional-dependencies pair (21 as of OMN-18033).
+        expected_count = 22
         assert len(EXPECTED_ALIGNMENTS) == expected_count, (
             f"EXPECTED_ALIGNMENTS has {len(EXPECTED_ALIGNMENTS)} entries, "
             f"expected {expected_count}. If you added or removed entries, "

@@ -202,6 +202,10 @@ jobs:
       - name: Validate no silent env fallbacks
         run: uv run python scripts/validation/validate_no_env_fallbacks.py
 
+      # CI counterpart of the no-git-precommit-additional-dependencies hook.
+      - name: Pre-commit dependencies come from package indexes (OMN-19666)
+        run: bash tests/test_precommit_additional_dependencies_omn19666.sh
+
       # SYNC: Pre-commit hook 'validate-gitignore-baseline' at pre-commit stage (OMN-18033)
       # This step and the hook both pin released omnibase-core==0.47.23,
       # matching uv.lock and carrying the packaged baseline spec; move them together.

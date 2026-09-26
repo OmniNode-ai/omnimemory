@@ -62,6 +62,12 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ("validate-kafka-imports", "onex-validation", "validate_kafka_imports.py"),
     ("validate-model-locations", "onex-validation", "validate_model_locations.py"),
     ("validate-no-env-fallbacks", "onex-validation", "validate_no_env_fallbacks.py"),
+    # OMN-19666
+    (
+        "no-git-precommit-additional-dependencies",
+        "onex-validation",
+        "test_precommit_additional_dependencies_omn19666.sh",
+    ),
     # OMN-18033. Declared here rather than excluded: the CI counterpart is a
     # step in ci.yml's onex-validation job, not a standalone workflow. Both
     # surfaces run the same validator from the same pinned omnibase_core sha,
