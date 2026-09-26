@@ -101,6 +101,11 @@ test_families:
   tests/test_validation_scripts.py:
     triggers:
       - scripts/validation/
+  tests/test_precommit_staged_scope_omn19612.py:
+    triggers:
+      - scripts/
+      - .pre-commit-config.yaml
+      - .github/workflows/ci.yml
   tests/gates/:
     triggers:
       - src/omnimemory/

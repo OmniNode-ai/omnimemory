@@ -187,20 +187,23 @@ repos:
       # NOTE: Both pre-commit and CI use check-only mode. Run `ruff format src/ tests/`
       # and `ruff check --fix src/ tests/` manually to auto-fix issues.
       - id: ruff-format
-        name: ruff format (check entire codebase)
+        name: ruff format (check staged files)
         # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
         # Both pre-commit and CI use --check for consistent validation
-        args: [--check, src/, tests/]
-        pass_filenames: false
+        args: [--check]
+        pass_filenames: true
+        types: [python]
+        files: ^(src|tests)/
         stages: [pre-commit]
 
       - id: ruff
-        name: ruff check (lint entire codebase)
+        name: ruff check (lint staged files)
         # SYNCHRONIZED WITH CI: Identical to .github/workflows/test.yml lint job
         # Both pre-commit and CI use check-only mode (no --fix)
         # Note: The ruff hook already runs "ruff check", so we only pass paths
-        args: [src/, tests/]
-        pass_filenames: false
+        pass_filenames: true
+        types: [python]
+        files: ^(src|tests)/
         stages: [pre-commit]
 
   # Type checking with mypy (using local environment for exact CI match)
@@ -301,18 +304,18 @@ repos:
         name: ONEX No Silent Env Fallbacks
         entry: python scripts/validation/validate_no_env_fallbacks.py
         language: python
-        pass_filenames: false
-        files: ^src/.*\.py$
+        pass_filenames: true
+        files: ^(src/.*\.py|scripts/validation/validate_no_env_fallbacks\.py)$
         stages: [pre-commit]
 
       # ONEX No Backward Compatibility Anti-Pattern Detection
       - id: validate-no-backward-compatibility
         name: ONEX Backward Compatibility Anti-Pattern Detection
         entry: python scripts/validation/validate_no_backward_compatibility.py
-        args: ['-d', 'src/']
         language: python
-        pass_filenames: false
-        files: ^.*\.py$
+        pass_filenames: true
+        types_or: [python, yaml]
+        files: ^(src/.*\.py|scripts/validation/validate_no_backward_compatibility\.py|\.pre-commit-config\.yaml)$
         stages: [pre-commit]
 
       # ONEX Enum Member Casing Validation
@@ -341,9 +344,8 @@ repos:
       - id: onex-validate-naming
         name: ONEX Naming Convention Validation
         entry: python scripts/validation/validate_naming.py
-        args: ['src/']
         language: python
-        pass_filenames: false
+        pass_filenames: true
         files: ^src/.*\.py$
         exclude: ^tests/.*\.py$
         stages: [pre-commit]
@@ -354,9 +356,8 @@ repos:
       - id: validate-http-imports
         name: ONEX HTTP Import Boundary Enforcement
         entry: python scripts/validation/validate_http_imports.py
-        args: ['src/']
         language: python
-        pass_filenames: false
+        pass_filenames: true
         files: ^src/.*\.py$
         exclude: ^tests/.*\.py$
         stages: [pre-commit]
@@ -367,9 +368,8 @@ repos:
       - id: validate-kafka-imports
         name: ONEX Kafka Import Boundary Enforcement (ARCH-002)
         entry: python scripts/validation/validate_kafka_imports.py
-        args: ['src/']
         language: python
-        pass_filenames: false
+        pass_filenames: true
         # NOTE: This filter is coupled to ENFORCED_PATHS in the script
         # (scripts/validation/validate_kafka_imports.py). If ENFORCED_PATHS
         # changes, update this pattern to match so the hook triggers correctly.
@@ -383,9 +383,8 @@ repos:
       - id: validate-model-locations
         name: ONEX Pydantic Model Location Enforcement
         entry: python scripts/validation/validate_model_locations.py
-        args: ['src/']
         language: python
-        pass_filenames: false
+        pass_filenames: true
         files: ^src/.*\.py$
         exclude: ^tests/.*\.py$
         stages: [pre-commit]
@@ -422,12 +421,9 @@ repos:
       - id: no-internal-ips
         name: Block hardcoded internal IPs
         language: system
-        entry: >
-          bash -c 'grep -rInE --include="*.py" --include="*.sh" --include="*.yml" --include="*.yaml" --include="*.toml"
-          --include="*.md" "(192\.168\.|10\.(0|1|2)\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)" src/ tests/ docs/
-          .github/ 2>/dev/null | grep -v "onex-allow-internal-ip" && echo "ERROR: hardcoded internal IP
-          found (add # onex-allow-internal-ip to suppress)" && exit 1 || exit 0'
-        pass_filenames: false
+        entry: bash scripts/validation/check_no_internal_ips.sh
+        pass_filenames: true
+        files: ^(src|tests|docs|\.github)/.*\.(py|sh|ya?ml|toml|md)$
         stages: [pre-commit]
       - id: check-ai-slop
         name: Check for AI-slop patterns
@@ -473,7 +469,8 @@ repos:
         name: "No hardcoded bolt://localhost URIs"
         language: script
         entry: scripts/check_no_hardcoded_bolt.sh
-        pass_filenames: false
+        pass_filenames: true
+        files: ^src/.*\.py$
         types: [python]
         stages: [pre-commit]
 
@@ -486,7 +483,8 @@ repos:
         name: Reject hardcoded Kafka broker address fallbacks
         entry: bash scripts/validation/check_kafka_no_hardcoded_fallback.sh
         language: system
-        pass_filenames: false
+        pass_filenames: true
+        files: ^src/.*\.py$
         types: [python]
         stages: [pre-commit]
 

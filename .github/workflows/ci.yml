@@ -150,7 +150,7 @@ jobs:
   onex-validation:
     name: ONEX Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -161,6 +161,9 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked --reinstall-package omnibase-core --reinstall-package omnibase-spi --reinstall-package omnibase-infra
+
+      - name: Run the whole-tree pre-commit suite
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
       # SYNC: Pre-commit hook 'validate-pydantic-patterns' at pre-commit stage
       - name: Validate Pydantic patterns
@@ -202,6 +205,22 @@ jobs:
       - name: Validate no silent env fallbacks
         run: uv run python scripts/validation/validate_no_env_fallbacks.py
 
+      # SYNC: Pre-commit hook 'validate-model-locations' at pre-commit stage
+      - name: Validate model locations
+        run: uv run python scripts/validation/validate_model_locations.py src/
+
+      # SYNC: Pre-commit hook 'no-hardcoded-bolt-fallback' at pre-commit stage
+      - name: Validate no hardcoded bolt fallback (whole-tree backstop)
+        run: bash scripts/check_no_hardcoded_bolt.sh
+
+      # SYNC: Pre-commit hook 'kafka-no-hardcoded-fallback' at pre-commit stage
+      - name: Validate no hardcoded Kafka fallback (whole-tree backstop)
+        run: bash scripts/validation/check_kafka_no_hardcoded_fallback.sh
+
+      # SYNC: Pre-commit hook 'no-internal-ips' at pre-commit stage
+      - name: Validate no internal IPs (whole-tree backstop)
+        run: bash scripts/validation/check_no_internal_ips.sh
+
       # CI counterpart of the no-git-precommit-additional-dependencies hook.
       - name: Pre-commit dependencies come from package indexes (OMN-19666)
         run: bash tests/test_precommit_additional_dependencies_omn19666.sh
@@ -229,6 +248,9 @@ jobs:
           echo "- Kafka import boundary enforcement (ARCH-002)" >> $GITHUB_STEP_SUMMARY
           echo "- Pydantic model location enforcement" >> $GITHUB_STEP_SUMMARY
           echo "- No silent env fallbacks (OMN-10735)" >> $GITHUB_STEP_SUMMARY
+          echo "- No hardcoded bolt fallback" >> $GITHUB_STEP_SUMMARY
+          echo "- No hardcoded Kafka fallback" >> $GITHUB_STEP_SUMMARY
+          echo "- No hardcoded internal IPs" >> $GITHUB_STEP_SUMMARY
 
   # Phase 1 - Transport Import Guard (ARCH-002)
   # SYNC: Pre-commit hook 'validate-no-transport-imports' (omnibase_core remote hook)

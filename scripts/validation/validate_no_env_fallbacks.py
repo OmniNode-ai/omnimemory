@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
@@ -89,7 +88,19 @@ def main() -> int:
 
     all_violations: list[tuple[str, int, str]] = []
 
-    for py_file in sorted(SRC_DIR.rglob("*.py")):
+    paths = (
+        [Path(raw).resolve() for raw in sys.argv[1:]]
+        if len(sys.argv) > 1
+        else [SRC_DIR]
+    )
+    py_files: set[Path] = set()
+    for path in paths:
+        if path.is_file() and path.suffix == ".py":
+            py_files.add(path)
+        elif path.is_dir():
+            py_files.update(path.rglob("*.py"))
+
+    for py_file in sorted(py_files):
         if any(part in SKIP_DIRS for part in py_file.parts):
             continue
         for lineno, line in scan_file(py_file):

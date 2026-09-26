@@ -6,16 +6,20 @@
 # Docstrings (triple-quoted blocks) and test files are exempt.
 # This is the memory-pipeline equivalent of kafka-no-hardcoded-fallback.
 #
-# Usage: called by pre-commit (pass_filenames: false, scans src/ directly)
+# Usage: called by pre-commit with staged filenames; no args scans src/.
 # Exempt: files matching *test_*, *conftest*, */tests/*
 set -euo pipefail
 
 VIOLATIONS=0
 
-while IFS= read -r -d '' file; do
+scan_file() {
+    local file="$1"
     # Skip test files
-    case "$file" in
-        *test_* | *conftest* | */tests/*) continue ;;
+    case "$(basename "$file")" in
+        test_* | *_test.py | conftest.py) return ;;
+    esac
+    case "/$file/" in
+        */tests/*) return ;;
     esac
 
     if grep -n 'bolt://localhost' "$file" 2>/dev/null; then
@@ -24,7 +28,17 @@ while IFS= read -r -d '' file; do
         echo "       (Check plugin config, Settings model, or env helper for the project-standard pattern.)"
         VIOLATIONS=$((VIOLATIONS + 1))
     fi
-done < <(find src/ -name "*.py" -type f -print0)
+}
+
+if [[ $# -gt 0 ]]; then
+    for file in "$@"; do
+        scan_file "$file"
+    done
+else
+    while IFS= read -r -d '' file; do
+        scan_file "$file"
+    done < <(find src/ -name "*.py" -type f -print0)
+fi
 
 if [[ $VIOLATIONS -gt 0 ]]; then
     echo ""

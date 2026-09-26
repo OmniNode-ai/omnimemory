@@ -472,19 +472,24 @@ def validate_file(  # stub-ok: docstring uses ModelXxx/ServiceXxx as naming exam
 
 def main() -> int:
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: validate_naming.py [directory]")
+    raw_paths = sys.argv[1:]
+    if not raw_paths:
+        print("Usage: validate_naming.py <file-or-directory> [...]")
         return 1
 
-    directory = Path(sys.argv[1])
-    if not directory.is_dir():
-        print(f"Directory not found or not a directory: {directory}")
-        return 1
-
-    files_to_check = list(directory.rglob("*.py"))
+    files_to_check: set[Path] = set()
+    for raw_path in raw_paths:
+        path = Path(raw_path)
+        if not path.is_file() and not path.is_dir():
+            print(f"Path not found: {path}")
+            return 1
+        if path.is_file() and path.suffix == ".py":
+            files_to_check.add(path)
+        elif path.is_dir():
+            files_to_check.update(path.rglob("*.py"))
 
     all_violations: list[Violation] = []
-    for filepath in files_to_check:
+    for filepath in sorted(files_to_check):
         violations = validate_file(filepath)
         all_violations.extend(violations)
 
