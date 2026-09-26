@@ -1,3 +1,13 @@
+## v0.18.3 (2026-09-26)
+
+### Release
+- Cut omnimemory from dev at 0.18.3 by the scheduled release train.
+- 1 release-relevant commit(s) merged since v0.18.2.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.2
+- feat: judge PyPI pin resolvability before merge, with the release step's own script (#537)
+
 ## v0.18.2 (2026-09-18)
 
 ### Release
