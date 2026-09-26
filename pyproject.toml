@@ -264,6 +264,12 @@ known-first-party = ["omnimemory"]
     "T201",  # print() is intentional user-facing output in a CI step
     "EXE001",  # invoked as `python3 <path>`, never as an executable
 ]
+# OMN-19655: vendored byte-for-byte from omnibase_infra, which reviews its two
+# fixed-argv `uv` subprocess calls there (each carries `# nosec B603`). The file
+# must stay identical across the fleet, so the waiver lives here, not inline.
+"scripts/ci/verify_pypi_pin_resolvability.py" = [
+    "S603",  # fixed argv, no shell, fully-qualified uv path
+]
 # Validation scripts need special rules for security, naming, and documentation
 "scripts/validation/*" = [
     "S602",  # subprocess call with shell=True
