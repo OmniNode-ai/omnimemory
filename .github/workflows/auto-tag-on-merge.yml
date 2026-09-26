@@ -33,6 +33,10 @@ on:
 # left byte-unchanged for whatever still calls it. Precedent and shape:
 # omnibase_core#1703 and omnibase_spi#308, under OMN-18658.
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   auto-tag:
     if: >-

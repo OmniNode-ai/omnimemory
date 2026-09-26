@@ -22,6 +22,10 @@ on:
       - tests/**
   merge_group:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ban-hardcoded-runner-ip:
     # OMN-17993: pinned to an exact SHA, not @main. omniclaude main lags dev by
