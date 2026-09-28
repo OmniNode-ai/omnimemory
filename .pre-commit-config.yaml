@@ -206,6 +206,13 @@ repos:
         files: ^(src|tests)/
         stages: [pre-commit]
 
+  # OMN-19183 plan task A3.x: shrink-only baseline config/hardcoded_model_config_baseline.yaml;
+  # no inline suppression marker; pin must equal core_ref in .github/workflows/hardcoded-model-config.yml.
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: f873d2c30201c05d4be020fa0b281b5edbfb8307  # v0.47.24  # pragma: allowlist secret
+    hooks:
+      - id: check-hardcoded-model-config-compute
+
   # Type checking with mypy (using local environment for exact CI match)
   # NOTE: Uses language: system with poetry to ensure identical mypy config,
   # dependencies, and type stubs as CI. The mirrors-mypy approach failed to
@@ -613,6 +620,7 @@ repos:
         args: ['--baseline', '.secrets.baseline', '--no-verify']
         exclude: |
           (?x)^(
+            config/hardcoded_model_config_baseline\.yaml|
             uv\.lock|
             \.venv/.*|
             tests/fixtures/.*|
