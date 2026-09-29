@@ -42,6 +42,7 @@ allowed_top_level:
   - "README.md"
   - "SECURITY.md"
   - "architecture-handshakes"
+  - "config"
   - "contract.yaml"
   - "contracts"
   - "deployment"

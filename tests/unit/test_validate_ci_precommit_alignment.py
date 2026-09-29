@@ -356,6 +356,12 @@ class TestPrecommitHooksCoveredByAlignments:
             # counterpart; the pair is kept converged by pinning both surfaces to
             # one omniclaude SHA rather than by this list.
             "secrets-baseline-wired",
+            # OMN-20005: CI counterpart is the standalone workflow
+            # .github/workflows/hardcoded-model-config.yml, context
+            # hardcoded-model-config / hardcoded-model-config, pinned to the
+            # same omnibase_core commit as the hook rev; not a ci.yml job so
+            # not in EXPECTED_ALIGNMENTS.
+            "check-hardcoded-model-config-compute",
         }
     )
 

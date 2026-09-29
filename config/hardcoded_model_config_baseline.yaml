@@ -1,0 +1,53 @@
+---
+# Baseline for check-hardcoded-model-config-compute (OMN-19252).
+# Plan: knowledge-base-internal beta/plans/2026-09-23-remove-hardcoded-model-config.md
+# (task A1 and the per-repository ratchet of tasks A3.x).
+#
+# RULE: entries only leave. A finding not listed here fails. An entry that no
+# longer matches its file fails until it is removed. CI refuses a pull request
+# whose copy of this file carries an entry its base branch did not. Retired lab
+# values (family R) are never admitted. Entries are keyed by line content
+# (sha1 of the stripped line), not by line number.
+#
+# Regenerate only to SHRINK it:
+#   python -m omnibase_core.validation.hardcoded_model_config.runtime_hardcoded_model_config \
+#     --all --baseline <this file> --write-baseline
+
+schema_version: 1
+entries:
+  - path: pyproject.toml
+    family: E-LAN
+    content_sha1: 406121965f2c4f34b87405dc1d8725f587925e16
+  - path: scripts/graphify_to_qdrant.py
+    family: M
+    content_sha1: 4e1b554d77d4c5298708b0f7b584ae355807acb7
+  - path: src/omnimemory/models/config/model_embedding_config.py
+    family: M
+    content_sha1: afc41a0c4c87c6c7135d0bf961425683595b0b28
+  - path: src/omnimemory/models/config/model_qdrant_config.py
+    family: M
+    content_sha1: 31622a2314d35680b6d862f9ceda3d2d1768a4ec
+  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
+    family: M
+    content_sha1: 24adf01e2fab31bdf08fe6dd9fb5f549924dd1a2
+  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
+    family: M
+    content_sha1: 456ea2b1b71482a8b999e08591330baec2b6ad2d
+  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
+    family: M
+    content_sha1: afc41a0c4c87c6c7135d0bf961425683595b0b28
+  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
+    family: M
+    content_sha1: e499a46a9f3a931845904bc058b3d95281bf4b40
+  - path: src/omnimemory/nodes/node_navigation_history_reducer/handlers/handler_navigation_history_reducer.py
+    family: M
+    content_sha1: 4f853d37a6c51fa102b42d2ea0e775233f336d84
+  - path: src/omnimemory/runtime/plugin.py
+    family: E-LAN
+    content_sha1: eb3cab7ef94de5a3ca66ff4797bfe632a89addf2
+  - path: tests/integration/test_golden_chain_memgraph_ingestion.py
+    family: E-LAN
+    content_sha1: 84b23ad58c9198587cfd9eac7e3fa2031eb8cb5f
+  - path: tests/integration/test_golden_chain_qdrant_ingestion.py
+    family: E-LAN
+    content_sha1: 84b23ad58c9198587cfd9eac7e3fa2031eb8cb5f
