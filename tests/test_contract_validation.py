@@ -401,40 +401,44 @@ ALL_NODES_WITH_CONTRACTS: list[str] = _discover_nodes_with_contracts()
 
 
 class TestHandlerRoutingKeyAlignment:
-    """Test handler_routing.handlers routing_keys align with validation_rules.
+    """Test canonical handler_routing operations align with validation_rules.
 
-    Validates that routing_key values in handler_routing match the operation
+    Validates that operation values in handler_routing match the operation
     Literal types defined in validation_rules.constraint_definitions. This
     ensures the contract is internally consistent and prevents runtime
     routing failures.
 
-    Alignment Rules:
-        1. routing_keys should match operation/query_type Literal values
-        2. Exact match OR predictable transformation (e.g., query_{type})
-        3. 'health_check' is a valid meta-operation routing_key
-        4. Empty handlers list is valid when default_handler is set
+    Empty handlers list is valid when default_handler is set.
     """
 
     # Known meta-operations that are valid but not in constraint Literals
     META_OPERATIONS: frozenset[str] = frozenset({"health_check"})
 
-    # Known prefix transformations: {constraint_field: prefix}
-    KNOWN_PREFIXES: dict[str, str] = {
-        "query_type": "query_",
-    }
+    def test_intent_query_routes_its_typed_request_to_handler_dispatch(self) -> None:
+        """Intent query selection stays in the handler's query_type switch."""
+        contract_path = NODES_DIR / "node_intent_query_effect" / "contract.yaml"
+        with open(contract_path, encoding="utf-8") as contract_file:
+            contract: MappingResultDict = yaml.safe_load(contract_file)
+
+        routing = contract["handler_routing"]
+        assert routing["routing_strategy"] == "payload_type_match"
+        assert len(routing["handlers"]) == 1
+        entry = routing["handlers"][0]
+        assert entry["event_model"]["name"] == contract["input_model"]
+        assert entry["handler"] == {
+            "name": "HandlerIntentQuery",
+            "module": (
+                "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
+            ),
+        }
 
     @staticmethod
     def _handler_route_key(handler: dict[str, object]) -> str:
-        """Return the routing discriminator across legacy and current schemas."""
-        for field_name in ("routing_key", "operation", "event_type"):
+        """Return a canonical operation or event-type discriminator."""
+        for field_name in ("operation", "event_type"):
             value = handler.get(field_name)
             if isinstance(value, str) and value:
                 return value
-        handler_ref = handler.get("handler")
-        if isinstance(handler_ref, dict):
-            name = handler_ref.get("name")
-            if isinstance(name, str) and name:
-                return name
         return ""
 
     @staticmethod
@@ -460,10 +464,10 @@ class TestHandlerRoutingKeyAlignment:
         return set(values)
 
     @pytest.mark.parametrize("node_name", ALL_NODES_WITH_CONTRACTS)
-    def test_routing_keys_align_with_constraints(self, node_name: str) -> None:
-        """Verify routing_keys in handler_routing match constraint definitions.
+    def test_operations_align_with_constraints(self, node_name: str) -> None:
+        """Verify operation routes match constraint definitions.
 
-        For nodes using operation_match routing strategy, routing_key values
+        For nodes using operation_match routing strategy, operation values
         should correspond to the operation/query_type Literal values defined
         in validation_rules.constraint_definitions.
         """
@@ -493,10 +497,18 @@ class TestHandlerRoutingKeyAlignment:
                 return
             pytest.skip(f"No handlers and no default_handler: {node_name}")
 
-        # Extract routing_keys from handlers
-        routing_keys: set[str] = {
-            route_key for h in handlers if (route_key := self._handler_route_key(h))
-        }
+        # Extract canonical operations from handlers. Pseudo transport entries
+        # in the navigation reducer are handled by OMN-15278 and have no
+        # operation discriminator until that transport contract is migrated.
+        operations: set[str] = set()
+        for entry in handlers:
+            if not isinstance(entry, dict):
+                continue
+            handler_ref = entry.get("handler")
+            if isinstance(handler_ref, dict) and handler_ref.get("handler_type"):
+                continue
+            if operation := self._handler_route_key(entry):
+                operations.add(operation)
 
         # Get constraint definitions
         validation_rules = data.get("validation_rules", {})
@@ -520,39 +532,30 @@ class TestHandlerRoutingKeyAlignment:
             # No operation Literal found - can't validate alignment
             pytest.skip(f"No operation Literal in constraint_definitions: {node_name}")
 
-        # Determine expected routing_keys based on constraint values
-        expected_routing_keys: set[str] = set()
-
-        # Check for known prefix transformation
-        prefix = self.KNOWN_PREFIXES.get(operation_field, "")
-        if prefix:
-            # Apply prefix transformation (e.g., query_type "distribution" -> "query_distribution")
-            expected_routing_keys = {f"{prefix}{v}" for v in operation_literals}
-        else:
-            # Exact match expected
-            expected_routing_keys = operation_literals.copy()
+        # Operation routes must match the declared operation literals directly.
+        expected_operations = operation_literals.copy()
 
         # Add meta-operations
-        expected_routing_keys.update(self.META_OPERATIONS)
+        expected_operations.update(self.META_OPERATIONS)
 
-        # Validate: all routing_keys should be in expected set
-        unexpected_keys = routing_keys - expected_routing_keys
-        assert not unexpected_keys, (
-            f"Unexpected routing_keys in {node_name}: {unexpected_keys}\n"
-            f"Expected keys (based on {operation_field} Literal + meta-ops): {expected_routing_keys}\n"
-            f"Actual routing_keys: {routing_keys}"
+        # Validate: all operation values should be in expected set
+        unexpected_operations = operations - expected_operations
+        assert not unexpected_operations, (
+            f"Unexpected operations in {node_name}: {unexpected_operations}\n"
+            f"Expected operations (based on {operation_field} Literal + meta-ops): {expected_operations}\n"
+            f"Actual operations: {operations}"
         )
 
         # Warn (but don't fail) if routing_keys don't cover all expected operations
         # Some nodes may intentionally not implement all operations
-        missing_keys = expected_routing_keys - routing_keys - self.META_OPERATIONS
-        if missing_keys:
+        missing_operations = expected_operations - operations - self.META_OPERATIONS
+        if missing_operations:
             # This is informational - some operations may use default_handler
             pass  # Could add pytest.warns() here if desired
 
     @pytest.mark.parametrize("node_name", ALL_NODES_WITH_CONTRACTS)
-    def test_routing_keys_are_unique(self, node_name: str) -> None:
-        """Verify routing_keys in handler_routing are unique.
+    def test_operations_are_unique(self, node_name: str) -> None:
+        """Verify canonical operation routes are unique.
 
         Duplicate routing_keys would cause ambiguous routing behavior.
         """
@@ -571,12 +574,14 @@ class TestHandlerRoutingKeyAlignment:
         if not handlers:
             pytest.skip(f"No handlers defined: {node_name}")
 
-        routing_keys = [self._handler_route_key(h) for h in handlers]
-        unique_keys = set(routing_keys)
+        operations = [
+            operation for h in handlers if (operation := self._handler_route_key(h))
+        ]
+        unique_operations = set(operations)
 
-        assert len(routing_keys) == len(unique_keys), (
-            f"Duplicate routing_keys found in {node_name}: "
-            f"{[k for k in routing_keys if routing_keys.count(k) > 1]}"
+        assert len(operations) == len(unique_operations), (
+            f"Duplicate operations found in {node_name}: "
+            f"{[key for key in operations if operations.count(key) > 1]}"
         )
 
     @pytest.mark.parametrize("node_name", ALL_NODES_WITH_CONTRACTS)

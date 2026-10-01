@@ -140,46 +140,20 @@ validation_rules:
     limit: "int (1-1000) - maximum number of results"
 
 # === HANDLER ROUTING (Declarative Dispatch) ===
-# Maps operations to handler classes for ONEX-compliant routing
+# Routes the typed query event to the handler, which selects by query_type.
 handler_routing:
   version:
     major: 1
     minor: 0
     patch: 0
-  routing_strategy: operation_match
+  routing_strategy: payload_type_match
   handlers:
-    # Get intent distribution across categories
-    - routing_key: "query_distribution"
-      handler_key: "HandlerIntentQuery"
+    - event_model:
+        name: "ModelIntentQueryRequestedEvent"
+        module: "omnibase_core.models.events.model_intent_query_requested_event"
       handler:
         name: "HandlerIntentQuery"
         module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
-      priority: 0
-      output_events: []
-    # Get intents for a specific session
-    - routing_key: "query_session"
-      handler_key: "HandlerIntentQuery"
-      handler:
-        name: "HandlerIntentQuery"
-        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
-      priority: 0
-      output_events: []
-    # Get recent intents across all sessions
-    - routing_key: "query_recent"
-      handler_key: "HandlerIntentQuery"
-      handler:
-        name: "HandlerIntentQuery"
-        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
-      priority: 0
-      output_events: []
-    # Check node health status
-    - routing_key: "health_check"
-      handler_key: "HandlerIntentQuery"
-      handler:
-        name: "HandlerIntentQuery"
-        module: "omnimemory.nodes.node_intent_query_effect.handlers.handler_intent_query"
-      priority: 0
-      output_events: []
   default_handler: null
 
 # =============================================================================

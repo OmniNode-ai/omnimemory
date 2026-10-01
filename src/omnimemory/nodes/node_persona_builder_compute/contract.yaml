@@ -45,13 +45,10 @@ algorithm:
 # nothing at boot. The class now exists in the module named below, with the
 # canonical def-B `handle(request: ModelPersonaClassifyRequest) ->
 # ModelPersonaClassifyResult` delegating to the pure `classify_persona`
-# function. The handler ref is unchanged; only `handler_key` was corrected,
-# because it named a `Class.method` pair that no loader resolves.
+# function. The nested handler reference points directly to the implemented
+# class.
 #
-# Two additions make the single route actually selectable rather than merely
-# declared. `operation:` is the field operation_match keys off — `routing_key`
-# reaches it only through contract_normalizer.normalize_handler_routing, so the
-# discriminator was dependent on a normalization pass. And `default_handler` now
+# `operation:` is the field operation_match keys off. `default_handler` also
 # names this handler: ModelPersonaClassifyRequest carries no operation field at
 # all (user_id / signals / existing_profile), so on a strict operation_match
 # read there is nothing for the key "classify" to match against; the default is
@@ -65,13 +62,9 @@ handler_routing:
   routing_strategy: operation_match
   handlers:
     - operation: "classify"
-      routing_key: "classify"
-      handler_key: "HandlerPersonaClassify"
       handler:
         name: "HandlerPersonaClassify"
         module: "omnimemory.nodes.node_persona_builder_compute.handlers.handler_persona_classify"
-      priority: 0
-      output_events: []
   default_handler: "HandlerPersonaClassify"
 
 tags:

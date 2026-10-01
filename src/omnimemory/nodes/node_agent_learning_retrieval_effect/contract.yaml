@@ -127,15 +127,6 @@ validation_rules:
 # handler behind them (phantom subscription). Implementing the retrieval handler
 # is its own lane; inventing one here would be manufacturing behavior under a
 # resolvability ticket.
-handler_routing:
-  version:
-    major: 1
-    minor: 0
-    patch: 0
-  routing_strategy: default
-  handlers: []
-  default_handler: null
-
 # === EVENT BUS SUBCONTRACT ===
 event_bus:
   version:
