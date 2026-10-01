@@ -657,6 +657,30 @@ jobs:
             --allowlist .onex_ratchets/noncanonical_class_allowlist.yaml \
             src/omnimemory
 
+  shape-gate-independence:
+    name: Shape-Gate Independence (OMN-20298)
+    # OMN-20298: no shape-gate detector may depend on the change-control preflight.
+    # Unconditional (no needs, no if); wired into required CI Summary via needs: +
+    # strict success-only verdict check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.8.3"
+      - name: Refuse shape-gate detectors that depend on the preflight (OMN-20298)
+        run: |
+          uv run --no-project \
+            --with 'omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@5220ecf1758b4475c2963ec13171b6431fdc2224' \
+            python -m omnibase_core.validators.shape_gate_independence
+
   # ============================================================================
   # Detect Secrets - the CI half of the .secrets.baseline gate (OMN-18669)
   # ============================================================================
@@ -738,7 +762,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets, shape-gate-independence]
     if: always()
 
     steps:
@@ -749,6 +773,12 @@ jobs:
           # in needs: so this job WAITS for it (no race).
           if [[ "${{ needs.no-noncanonical-lifecycle-classes.result }}" != "success" ]]; then
             echo "::error::no-noncanonical-lifecycle-classes ratchet did not pass (result: ${{ needs.no-noncanonical-lifecycle-classes.result }}) - fail-closed (OMN-14350)"
+            exit 1
+          fi
+          # OMN-20298: strict fail-closed gate on shape-gate independence - only
+          # 'success' passes; skipped/cancelled/failure ALL block.
+          if [[ "${{ needs.shape-gate-independence.result }}" != "success" ]]; then
+            echo "::error::shape-gate-independence did not pass (result: ${{ needs.shape-gate-independence.result }}) - fail-closed (OMN-20298)"
             exit 1
           fi
           # OMN-18669: strict fail-closed gate on the secrets scan - only 'success'
