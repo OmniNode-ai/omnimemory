@@ -34,3 +34,4 @@ jobs:
     uses: OmniNode-ai/omniclaude/.github/workflows/ban-hardcoded-runner-ip.yml@2a4123cf225e4001a71478459efa85b9726ddfb0
     permissions:
       contents: read
+      pull-requests: read
