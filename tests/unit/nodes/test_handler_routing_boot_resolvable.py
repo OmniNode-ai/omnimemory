@@ -390,7 +390,7 @@ def test_navigation_reducer_transport_entries_name_a_real_class() -> None:
 
     contract = _contract("node_navigation_history_reducer")
     entries = (contract.get("handler_routing") or {}).get("handlers") or []
-    keys = {entry.get("routing_key") for entry in entries}
+    keys = {entry.get("operation") or entry.get("routing_key") for entry in entries}
     assert keys == {"qdrant", "http", "reduce"}, (
         f"node_navigation_history_reducer routing keys drifted: {sorted(keys)}"
     )

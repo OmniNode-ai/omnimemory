@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import pytest
 
-from omnimemory.runtime.wiring import wire_memory_handlers
+from omnimemory.runtime.wiring import (
+    _read_handler_spec_from_contract,
+    wire_memory_handlers,
+)
 
 from .conftest import StubConfig
 
@@ -106,3 +109,40 @@ class TestContractDrivenDiscovery:
         assert not hasattr(wiring_mod, "_HANDLER_SPECS"), (
             "_HANDLER_SPECS still exists -- migration incomplete"
         )
+
+    def test_uses_nested_handler_reference(self) -> None:
+        """Routing discovery imports the contract's declared handler directly."""
+        contract = {
+            "handler_routing": {
+                "handlers": [
+                    {
+                        "operation": "execute",
+                        "handler": {
+                            "name": "HandlerDeclared",
+                            "module": "example.handlers.custom_location",
+                        },
+                    }
+                ]
+            }
+        }
+
+        result = _read_handler_spec_from_contract(contract)
+
+        assert result == ("example.handlers.custom_location", "HandlerDeclared")
+
+    def test_does_not_infer_handler_reference_from_legacy_key(self) -> None:
+        """Legacy handler_key values do not supply a handler import target."""
+        contract = {
+            "handler_routing": {
+                "handlers": [
+                    {
+                        "handler_key": "HandlerLegacy",
+                        "operation": "execute",
+                    }
+                ]
+            }
+        }
+
+        result = _read_handler_spec_from_contract(contract)
+
+        assert result is None
