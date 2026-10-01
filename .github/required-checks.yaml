@@ -98,6 +98,18 @@ required_checks:
       through the required CI Summary context, which needs: this job and
       accepts only a success result.
 
+  - name: "Canonical File Shape (OMN-20304)"
+    workflow: ci.yml
+    job_id: canonical-file-shape
+    conditional: false
+    rationale: >-
+      OMN-20304. Refuses a new code file outside the canonical locations, new
+      imperative SKILL.md lines and any new baseline, allowlist or suppression
+      entry, against the shrink-only
+      .onex_ratchets/canonical_file_shape_baseline.txt. Gates merges through
+      the required CI Summary context, which needs: this job and accepts only a
+      success result.
+
   # -- Phase 2: Full Test Suite ------------------------------------------------
 
   - name: "Tests"
