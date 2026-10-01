@@ -24,6 +24,7 @@ Ticket: OMN-8646
 
 from __future__ import annotations
 
+import os
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -323,8 +324,16 @@ class TestGoldenChainQdrantErrors:
 async def test_smoke_qdrant_live_index_and_search() -> None:
     """Smoke test: live Qdrant on the dev host (port 6333).
 
-    Skipped when Qdrant is unreachable.
+    This test can create a collection and index points on the live service, so
+    it runs only with an explicit live-write opt-in. It is skipped by default.
     """
+    if os.environ.get("OMNIMEMORY_RUN_LIVE_QDRANT_SMOKE") != "1":
+        pytest.skip(
+            "Live Qdrant smoke test is disabled by default; set "
+            "OMNIMEMORY_RUN_LIVE_QDRANT_SMOKE=1 only when live Qdrant writes "
+            "are authorized"
+        )
+
     import socket
 
     _host = "192.168.86.201"  # onex-allow-internal-ip
