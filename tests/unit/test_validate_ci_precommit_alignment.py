@@ -610,9 +610,10 @@ class TestAlignmentCount:
         Update the expected count here when legitimately adding or removing
         alignment entries.
         """
-        # 22 as of OMN-19666, which added the
-        # no-git-precommit-additional-dependencies pair (21 as of OMN-18033).
-        expected_count = 22
+        # 23 as of OMN-20298, which added the check-shape-gate-independence pair
+        # (22 as of OMN-19666, which added the
+        # no-git-precommit-additional-dependencies pair; 21 as of OMN-18033).
+        expected_count = 23
         assert len(EXPECTED_ALIGNMENTS) == expected_count, (
             f"EXPECTED_ALIGNMENTS has {len(EXPECTED_ALIGNMENTS)} entries, "
             f"expected {expected_count}. If you added or removed entries, "
