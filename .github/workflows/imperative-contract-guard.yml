@@ -16,6 +16,6 @@ permissions:
 jobs:
   imperative-contract-guard:
     # self-gating-ok: central guard is intentionally shared across repos; caller PRs do not modify the referenced workflow.
-    uses: OmniNode-ai/onex_change_control/.github/workflows/imperative-contract-guard.yml@main
+    uses: OmniNode-ai/onex_change_control/.github/workflows/imperative-contract-guard.yml@725d2967b031d7065efd41d0751f903638202cc1
     with:
-      onex-change-control-ref: dev
+      onex-change-control-ref: 725d2967b031d7065efd41d0751f903638202cc1

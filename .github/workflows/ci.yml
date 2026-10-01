@@ -342,10 +342,21 @@ jobs:
       # Uses default GITHUB_TOKEN which has read access to public repos in the org.
       # Same pattern as omniclaude ci-cd.yml. If omnibase_core becomes private,
       # add: token: ${{ secrets.OMNIBASE_CORE_ACCESS_TOKEN }}
+      # OMN-20001: read the omnibase_core rev this repo has PINNED (the one the
+      # omnibase_core downstream pin-bump bot maintains in check-handshake.yml),
+      # never core's live default branch.
+      - name: Resolve pinned omnibase_core rev
+        id: core-pin
+        run: |
+          rev="$(grep -E '^[[:space:]]+ref: [0-9a-f]{40}$' .github/workflows/check-handshake.yml | awk '{print $2}')"
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::no single pinned omnibase_core rev in check-handshake.yml"; exit 1; }
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
       - name: Checkout omnibase_core
         uses: actions/checkout@v7
         with:
           repository: OmniNode-ai/omnibase_core
+          ref: ${{ steps.core-pin.outputs.rev }}
           path: omnibase_core
 
       - name: Verify handshake is current
@@ -604,10 +615,20 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v7
+      # OMN-20001: read the onex_change_control rev pinned in pyproject.toml,
+      # never OCC's live default branch.
+      - name: Resolve pinned onex_change_control rev
+        id: occ-pin
+        run: |
+          rev="$(grep -oE 'onex_change_control\.git@[0-9a-f]{40}' pyproject.toml | head -1 | cut -d@ -f2)"
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::no pinned onex_change_control rev in pyproject.toml"; exit 1; }
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
       - name: Checkout onex_change_control
         uses: actions/checkout@v7
         with:
           repository: OmniNode-ai/onex_change_control
+          ref: ${{ steps.occ-pin.outputs.rev }}
           path: onex_change_control
 
       - uses: astral-sh/setup-uv@v7

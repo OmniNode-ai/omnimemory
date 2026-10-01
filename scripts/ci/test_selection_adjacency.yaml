@@ -232,6 +232,10 @@ test_families:
   tests/unit/test_ci_workflow_shape.py:
     triggers:
       - .github/workflows/
+  tests/unit/test_workflow_sibling_pins.py:
+    triggers:
+      - .github/workflows/
+      - pyproject.toml
   tests/unit/test_occ_companion_effect_edited_trigger_omn_18334.py:
     triggers:
       - .github/workflows/
