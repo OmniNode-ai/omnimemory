@@ -342,10 +342,21 @@ jobs:
       # Uses default GITHUB_TOKEN which has read access to public repos in the org.
       # Same pattern as omniclaude ci-cd.yml. If omnibase_core becomes private,
       # add: token: ${{ secrets.OMNIBASE_CORE_ACCESS_TOKEN }}
+      # OMN-20001: read the omnibase_core rev this repo has PINNED (the one the
+      # omnibase_core downstream pin-bump bot maintains in check-handshake.yml),
+      # never core's live default branch.
+      - name: Resolve pinned omnibase_core rev
+        id: core-pin
+        run: |
+          rev="$(grep -E '^[[:space:]]+ref: [0-9a-f]{40}$' .github/workflows/check-handshake.yml | awk '{print $2}')"
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::no single pinned omnibase_core rev in check-handshake.yml"; exit 1; }
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
       - name: Checkout omnibase_core
         uses: actions/checkout@v7
         with:
           repository: OmniNode-ai/omnibase_core
+          ref: ${{ steps.core-pin.outputs.rev }}
           path: omnibase_core
 
       - name: Verify handshake is current
@@ -604,10 +615,20 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v7
+      # OMN-20001: read the onex_change_control rev pinned in pyproject.toml,
+      # never OCC's live default branch.
+      - name: Resolve pinned onex_change_control rev
+        id: occ-pin
+        run: |
+          rev="$(grep -oE 'onex_change_control\.git@[0-9a-f]{40}' pyproject.toml | head -1 | cut -d@ -f2)"
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::no pinned onex_change_control rev in pyproject.toml"; exit 1; }
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
       - name: Checkout onex_change_control
         uses: actions/checkout@v7
         with:
           repository: OmniNode-ai/onex_change_control
+          ref: ${{ steps.occ-pin.outputs.rev }}
           path: onex_change_control
 
       - uses: astral-sh/setup-uv@v7
@@ -651,11 +672,35 @@ jobs:
       - name: Ratchet non-canonical lifecycle-word classes against frozen allowlist (OMN-14350)
         run: |
           uv run --no-project \
-            --with 'omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@63635097705d832e0ee9c4811093efb31349105c' \
+            --with 'omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@a3b56675fda87a1ba8cf7e19d8e60a7d0ab6c4ee' \
             python -m omnibase_core.validators.no_noncanonical_lifecycle_classes \
             --check-stale \
             --allowlist .onex_ratchets/noncanonical_class_allowlist.yaml \
             src/omnimemory
+
+  shape-gate-independence:
+    name: Shape-Gate Independence (OMN-20298)
+    # OMN-20298: no shape-gate detector may depend on the change-control preflight.
+    # Unconditional (no needs, no if); wired into required CI Summary via needs: +
+    # strict success-only verdict check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.8.3"
+      - name: Refuse shape-gate detectors that depend on the preflight (OMN-20298)
+        run: |
+          uv run --no-project \
+            --with 'omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@d17f5be8be88a8d35fc6a69e13cb8c1896c3025b' \
+            python -m omnibase_core.handlers.handler_shape_gate_independence
 
   # ============================================================================
   # Detect Secrets - the CI half of the .secrets.baseline gate (OMN-18669)
@@ -735,10 +780,79 @@ jobs:
             exit $HOOK_EXIT
           fi
 
+  # Canonical-file-shape ratchet (OMN-20304). Operator ruling 2026-10-01: no
+  # new scripts, plugins or exceptions in any repository. Refuses a new code
+  # file outside src/<pkg>/{nodes,handlers,models,protocols,contracts,enums}/,
+  # tests/ and docs/, new imperative lines in a SKILL.md, and any new baseline,
+  # allowlist, waiver or suppression entry. Existing files sit in the
+  # shrink-only .onex_ratchets/canonical_file_shape_baseline.txt. Same module
+  # and same omnibase_core commit as the canonical-file-shape pre-commit hook.
+  # Unconditional: no `if:`, no `needs:`. The positive-control step plants a
+  # bad sample on every run and fails unless the ratchet refuses it.
+  canonical-file-shape:
+    name: Canonical File Shape (OMN-20304)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CANONICAL_FILE_SHAPE_CORE: "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@a3b56675fda87a1ba8cf7e19d8e60a7d0ab6c4ee"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.8.3"
+      - name: Positive control (planted bad sample refused, clean sample accepted)
+        run: |
+          set -u
+          ratchet() {
+            uv run --no-project --with "$CANONICAL_FILE_SHAPE_CORE" \
+              python -m omnibase_core.validators.canonical_file_shape "$@"
+          }
+          mkdir -p bin tests
+          printf '#!/bin/sh\necho planted\n' > bin/zz_canary_planted
+          git add bin/zz_canary_planted
+          if ratchet; then
+            echo "POSITIVE CONTROL FAILED: planted bin/zz_canary_planted was accepted"
+            exit 1
+          fi
+          echo "positive control: planted bad sample refused"
+          git rm -q --cached bin/zz_canary_planted
+          rm bin/zz_canary_planted
+          printf 'def test_canary() -> None:\n    assert True\n' > tests/zz_canary_clean.py
+          git add tests/zz_canary_clean.py
+          ratchet
+          echo "positive control: clean sample accepted"
+          git rm -q --cached tests/zz_canary_clean.py
+          rm tests/zz_canary_clean.py
+      - name: Refuse new non-canonical files and new exceptions
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -u
+          base="${PR_BASE:-${MQ_BASE:-${PUSH_BEFORE:-}}}"
+          if [ -n "$base" ] && git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git merge-base "$base" HEAD)"
+            uv run --no-project --with "$CANONICAL_FILE_SHAPE_CORE" \
+              python -m omnibase_core.validators.canonical_file_shape --base "$base" --head HEAD
+          else
+            echo "no base revision on this event; checking the tree against the baseline only"
+            uv run --no-project --with "$CANONICAL_FILE_SHAPE_CORE" \
+              python -m omnibase_core.validators.canonical_file_shape --head HEAD
+          fi
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets, shape-gate-independence, canonical-file-shape]
     if: always()
 
     steps:
@@ -751,11 +865,23 @@ jobs:
             echo "::error::no-noncanonical-lifecycle-classes ratchet did not pass (result: ${{ needs.no-noncanonical-lifecycle-classes.result }}) - fail-closed (OMN-14350)"
             exit 1
           fi
+          # OMN-20298: strict fail-closed gate on shape-gate independence - only
+          # 'success' passes; skipped/cancelled/failure ALL block.
+          if [[ "${{ needs.shape-gate-independence.result }}" != "success" ]]; then
+            echo "::error::shape-gate-independence did not pass (result: ${{ needs.shape-gate-independence.result }}) - fail-closed (OMN-20298)"
+            exit 1
+          fi
           # OMN-18669: strict fail-closed gate on the secrets scan - only 'success'
           # passes; skipped/cancelled/failure ALL block. A secrets gate that a
           # skipped job can satisfy is the state this ticket exists to remove.
           if [[ "${{ needs.detect-secrets.result }}" != "success" ]]; then
             echo "::error::detect-secrets did not pass (result: ${{ needs.detect-secrets.result }}) - fail-closed (OMN-18669)"
+            exit 1
+          fi
+          # OMN-20304: strict fail-closed gate on the canonical-file-shape ratchet -
+          # only 'success' passes; skipped/cancelled/failure ALL block.
+          if [[ "${{ needs.canonical-file-shape.result }}" != "success" ]]; then
+            echo "::error::canonical-file-shape ratchet did not pass (result: ${{ needs.canonical-file-shape.result }}) - fail-closed (OMN-20304)"
             exit 1
           fi
           migration_freeze="${{ needs.migration-freeze.result }}"

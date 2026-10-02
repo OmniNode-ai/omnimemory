@@ -100,15 +100,17 @@ jobs:
       github.actor != 'renovate[bot]' &&
       (contains(github.event.pull_request.title, 'OMN-') ||
        contains(github.event.pull_request.head.ref, 'OMN-'))
-    # OMN-14941 (F1 repin): pinned `@dev` until the reusable promotes to
-    # omniclaude main (call-occ-autobind-reusable.yml exists only on
-    # omniclaude dev today); then re-pin to `@main` or a main SHA (OMN-14812).
-    # tests/ci/test_workflow_uses_refs_resolve.py fails closed on any
-    # cross-repo `uses:` pin that does not resolve live.
-    uses: OmniNode-ai/omniclaude/.github/workflows/call-occ-autobind-reusable.yml@dev
+    # OMN-20001: the reusable and the omnimarket publisher it sources are both
+    # pinned to immutable revs (omniclaude 2a4123cf, omnimarket v0.4.276), never
+    # a sibling's live branch, so a merge there cannot turn this repo red.
+    # Bump both together in a consumer PR after an integration test of the new
+    # revs; tests/unit/test_workflow_sibling_pins.py fails closed on any
+    # sibling `uses:` / checkout without a 40-hex rev.
+    uses: OmniNode-ai/omniclaude/.github/workflows/call-occ-autobind-reusable.yml@2a4123cf225e4001a71478459efa85b9726ddfb0
     secrets: inherit
     with:
       lane: dev
+      omnimarket-ref: e11987165b960cb86cdeab7d0ad3fe1884bb2572 # omnimarket v0.4.276
 
   occ-autobind-manual-replay:
     # OMN-14993: manual re-publish entrypoint, gated to the workflow_dispatch
@@ -160,7 +162,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: OmniNode-ai/omnimarket
-          ref: dev
+          ref: e11987165b960cb86cdeab7d0ad3fe1884bb2572 # omnimarket v0.4.276
           path: .occ-autobind-src
           persist-credentials: false
           sparse-checkout: |

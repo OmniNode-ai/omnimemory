@@ -14,7 +14,7 @@
 #
 # Applied via: gh api repos/OmniNode-ai/omnimemory/branches/main/protection -X PUT
 # Mode: strict (branch must be up-to-date before merging)
-# Total required checks: 12
+# Total required checks: 13
 
 required_checks:
   # -- Phase 1: Quick Validation (parallel, ~2-5 min) -------------------------
@@ -87,6 +87,28 @@ required_checks:
       are identical to the detect-secrets pre-commit hook by construction;
       tests/unit/test_validate_ci_precommit_alignment.py fails if the pair
       drifts apart.
+
+  - name: "Shape-Gate Independence (OMN-20298)"
+    workflow: ci.yml
+    job_id: shape-gate-independence
+    conditional: false
+    rationale: >-
+      OMN-20298. Refuses any shape-gate detector job that depends on the
+      change-control preflight. Unconditional (no needs, no if); gates merges
+      through the required CI Summary context, which needs: this job and
+      accepts only a success result.
+
+  - name: "Canonical File Shape (OMN-20304)"
+    workflow: ci.yml
+    job_id: canonical-file-shape
+    conditional: false
+    rationale: >-
+      OMN-20304. Refuses a new code file outside the canonical locations, new
+      imperative SKILL.md lines and any new baseline, allowlist or suppression
+      entry, against the shrink-only
+      .onex_ratchets/canonical_file_shape_baseline.txt. Gates merges through
+      the required CI Summary context, which needs: this job and accepts only a
+      success result.
 
   # -- Phase 2: Full Test Suite ------------------------------------------------
 

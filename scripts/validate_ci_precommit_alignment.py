@@ -83,6 +83,20 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     # worse, the reverse. That is exactly what this alignment test exists to
     # catch, so the pair is declared here rather than excluded.
     ("detect-secrets", "detect-secrets", "detect-secrets-hook"),
+    # OMN-20298: shape-gate independence guard (omnibase_core PR 1833)
+    (
+        "check-shape-gate-independence",
+        "shape-gate-independence",
+        "shape_gate_independence",
+    ),
+    # OMN-20304: canonical-file-shape ratchet. The CI counterpart is ci.yml's
+    # canonical-file-shape job, which runs the same module at the same
+    # omnibase_core commit as the hook.
+    (
+        "canonical-file-shape",
+        "canonical-file-shape",
+        "omnibase_core.validators.canonical_file_shape",
+    ),
     # Infrastructure hooks
     ("migration-freeze-check", "migration-freeze", "check_migration_freeze.sh"),
     # New hooks from OMN-2218
