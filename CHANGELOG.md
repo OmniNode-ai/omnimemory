@@ -1,3 +1,13 @@
+## v0.18.4 (2026-10-01)
+
+### Release
+- Cut omnimemory from dev at 0.18.4 by the scheduled release train.
+- 1 release-relevant commit(s) merged since v0.18.3.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.3
+- : Migrate OmniMemory handler routing contracts (#555)
+
 ## v0.18.3 (2026-09-26)
 
 ### Release
