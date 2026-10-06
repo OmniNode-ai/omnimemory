@@ -106,7 +106,7 @@ jobs:
     # Bump both together in a consumer PR after an integration test of the new
     # revs; tests/unit/test_workflow_sibling_pins.py fails closed on any
     # sibling `uses:` / checkout without a 40-hex rev.
-    uses: OmniNode-ai/omniclaude/.github/workflows/call-occ-autobind-reusable.yml@2a4123cf225e4001a71478459efa85b9726ddfb0
+    uses: OmniNode-ai/omniclaude/.github/workflows/call-occ-autobind-reusable.yml@3ea5bfc90dec0efd386214247b38c8c2cc46508d
     secrets: inherit
     with:
       lane: dev
