@@ -8,6 +8,8 @@ on:
     branches: [main, 'hotfix/**']
   pull_request:
     branches: [main, dev]
+    # OMN-18854: marking a draft ready must re-evaluate evidence admission.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -21,6 +23,37 @@ env:
   CACHE_VERSION: "0.1.0"
 
 jobs:
+  # OMN-18854: the existing eligibility validator must feed the required
+  # CI Summary. Other validations remain independent of this evidence gate.
+  occ-preflight:
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: OmniNode-ai/omnibase_core/.github/workflows/occ-preflight.yml@13ceae69c246a33c9fc8fc4b33f83fb66b89edc6
+    with:
+      core-ref: 13ceae69c246a33c9fc8fc4b33f83fb66b89edc6
+      contracts-dir: contracts
+      receipts-dir: drift/dod_receipts
+
+  # OMN-18854: evidence admission has its own verdict; shape detectors and
+  # their result aggregation do not branch directly on the evidence preflight.
+  occ-eligibility:
+    name: OCC Eligibility Admission
+    runs-on: ubuntu-latest
+    needs: occ-preflight
+    if: always()
+    steps:
+      - name: Require eligible evidence on admission events
+        run: |
+          event="${{ github.event_name }}"
+          if [[ "$event" == "pull_request" || "$event" == "merge_group" ]]; then
+            if [[ "${{ needs.occ-preflight.result }}" != "success" ]]; then
+              echo "::error::occ-preflight did not pass (result: ${{ needs.occ-preflight.result }})"
+              exit 1
+            fi
+          fi
+
   # =============================================================================
   # JOB ORDERING RATIONALE (Fail-Fast Optimization)
   # =============================================================================
@@ -224,6 +257,10 @@ jobs:
       # CI counterpart of the no-git-precommit-additional-dependencies hook.
       - name: Pre-commit dependencies come from package indexes (OMN-19666)
         run: bash tests/test_precommit_additional_dependencies_omn19666.sh
+
+      # OMN-18854: the same focused regression runs before commit and in CI.
+      - name: Verify OCC eligibility enforcement (OMN-18854)
+        run: uv run pytest tests/scripts/test_occ_eligibility_enforcement.py -q
 
       # SYNC: Pre-commit hook 'validate-gitignore-baseline' at pre-commit stage (OMN-18033)
       # This step and the hook both pin released omnibase-core==0.47.23,
@@ -852,12 +889,18 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets, shape-gate-independence, canonical-file-shape]
+    needs: [migration-freeze, lint, pyright, onex-validation, transport-import-guard, contract-validation, io-audit, check-handshake, test-select, tests-gate, compliance, contract-compliance, no-noncanonical-lifecycle-classes, detect-secrets, shape-gate-independence, canonical-file-shape, occ-eligibility]
     if: always()
 
     steps:
       - name: Check test results
         run: |
+          # OMN-18854: require the admission verdict on every event. That job
+          # judges eligibility on PR/queue events and passes non-admission events.
+          if [[ "${{ needs.occ-eligibility.result }}" != "success" ]]; then
+            echo "::error::occ-eligibility did not pass (result: ${{ needs.occ-eligibility.result }})"
+            exit 1
+          fi
           # OMN-14350: strict fail-closed gate on the non-canonical lifecycle-class
           # ratchet - only 'success' passes; skipped/cancelled/failure ALL block. It is
           # in needs: so this job WAITS for it (no race).
