@@ -76,6 +76,18 @@
 #   pre-commit run --all-files --hook-stage pre-push  # Run pre-push hooks
 
 repos:
+  # OMN-18854: exercise the required summary's eligibility refusal and control.
+  - repo: local
+    hooks:
+      - id: occ-eligibility-enforcement
+        name: OCC eligibility enforcement (OMN-18854)
+        entry: python -m pytest tests/scripts/test_occ_eligibility_enforcement.py -q
+        language: python
+        additional_dependencies: ['pytest>=9,<10', 'PyYAML>=6', 'pytest-asyncio>=1.4,<2']
+        pass_filenames: false
+        files: ^(\.github/workflows/ci\.yml|\.github/required-checks\.yaml|\.pre-commit-config\.yaml|tests/scripts/test_occ_eligibility_enforcement\.py)$
+        stages: [pre-commit]
+
   # No hardcoded ONEX topic strings — sourced from onex_change_control (OMN-5259)
   - repo: https://github.com/OmniNode-ai/onex_change_control
     rev: 8d7e85bc00e7f1b1306d1cb40949be1ab6e7e91a  # pragma: allowlist secret
@@ -524,7 +536,7 @@ repos:
       - id: validate-spdx-headers
         name: ONEX SPDX Header Requirement
         entry: python scripts/validation/validate_spdx_headers.py
-        language: system
+        language: python
         pass_filenames: true
         files: ^(src|tests|scripts|examples)/.*\.py$
         exclude: ^(archived/|archive/)

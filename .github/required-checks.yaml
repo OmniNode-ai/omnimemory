@@ -14,9 +14,23 @@
 #
 # Applied via: gh api repos/OmniNode-ai/omnimemory/branches/main/protection -X PUT
 # Mode: strict (branch must be up-to-date before merging)
-# Total required checks: 13
+# Manifest entries (including CI Summary members): 15
 
 required_checks:
+  # OMN-18854: this is an umbrella member, not a separate protection context.
+  - name: "occ-preflight / eligibility"
+    workflow: ci.yml
+    job_id: occ-preflight
+    conditional: true
+    condition: "Required on pull_request and merge_group; not applicable on push or workflow_dispatch"
+    rationale: >-
+      OMN-18854. The shared eligibility validator feeds the required CI Summary
+      through the OCC Eligibility Admission job. On pull_request and
+      merge_group, only successful preflight passes admission; CI Summary
+      requires a successful admission verdict on every event. Failed,
+      cancelled, skipped and absent results block. The caller and validator
+      source use the same immutable omnibase_core revision.
+
   # -- Phase 1: Quick Validation (parallel, ~2-5 min) -------------------------
 
   - name: "Migration Freeze Check"

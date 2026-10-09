@@ -38,6 +38,12 @@ import yaml
 # Expected hook-to-CI alignment pairs
 # Format: (pre-commit hook id, CI job name, CI step/command description)
 EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
+    # OMN-18854: hold eligibility's required CI Summary barrier to its hook.
+    (
+        "occ-eligibility-enforcement",
+        "onex-validation",
+        "tests/scripts/test_occ_eligibility_enforcement.py",
+    ),
     # Formatting and linting
     ("ruff-format", "lint", "ruff format --check"),
     ("ruff", "lint", "ruff check"),
