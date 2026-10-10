@@ -106,6 +106,10 @@ test_families:
       - scripts/
       - .pre-commit-config.yaml
       - .github/workflows/ci.yml
+  tests/ci/:
+    triggers:
+      - .github/workflows/call-repo-evidence-gate.yml
+      - contracts/
   tests/gates/:
     triggers:
       - src/omnimemory/
