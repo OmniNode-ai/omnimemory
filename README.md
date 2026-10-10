@@ -22,25 +22,25 @@
 
 **Every OmniMemory document lives in the OmniNode knowledge base, not in this repository.** This README is the landing page and the full index; there are no `docs/` pages here to read.
 
-- **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge-base)** — public documentation home.
+- **[OmniNode knowledge base](https://github.com/OmniNode-ai/knowledge_base)** — public documentation home.
 
 **Architecture**
-- [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-four-node-architecture.md) — the EFFECT / COMPUTE / REDUCER / ORCHESTRATOR archetypes applied to memory
-- [ARCH-002: Kafka Abstraction Rule](https://github.com/OmniNode-ai/knowledge-base/blob/main/architecture/omnimemory-arch-002-kafka-abstraction.md) — why nodes never speak to a broker directly
+- [ONEX Four-Node Architecture](https://github.com/OmniNode-ai/knowledge_base/blob/main/architecture/omnimemory-four-node-architecture.md) — the EFFECT / COMPUTE / REDUCER / ORCHESTRATOR archetypes applied to memory
+- [ARCH-002: Kafka Abstraction Rule](https://github.com/OmniNode-ai/knowledge_base/blob/main/architecture/omnimemory-arch-002-kafka-abstraction.md) — why nodes never speak to a broker directly
 
 **Reference**
-- [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md) — every setting, type, default and constraint
-- [Memory Data Ownership](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-memory-data-ownership.md) — which repository owns which storage service
-- [Runtime Plugin System](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-runtime-plugins.md) — how `PluginMemory` wires into the ONEX kernel
-- [Handler Reuse Matrix](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-handler-reuse-matrix.md) — which `omnibase_infra` handler each memory node reuses
+- [Environment Variables](https://github.com/OmniNode-ai/knowledge_base/blob/main/reference/omnimemory-environment-variables.md) — every setting, type, default and constraint
+- [Memory Data Ownership](https://github.com/OmniNode-ai/knowledge_base/blob/main/reference/omnimemory-memory-data-ownership.md) — which repository owns which storage service
+- [Runtime Plugin System](https://github.com/OmniNode-ai/knowledge_base/blob/main/reference/omnimemory-runtime-plugins.md) — how `PluginMemory` wires into the ONEX kernel
+- [Handler Reuse Matrix](https://github.com/OmniNode-ai/knowledge_base/blob/main/reference/omnimemory-handler-reuse-matrix.md) — which `omnibase_infra` handler each memory node reuses
 
 **Guides**
-- [PII Handling](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-pii-handling.md) — detection, sanitization and storage-path integration
-- [Performance Testing](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-performance-testing.md) — SLA targets, benchmarks and how to read them
-- [Market Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md) — what moves to `omnimarket` and what stays
+- [PII Handling](https://github.com/OmniNode-ai/knowledge_base/blob/main/guides/omnimemory-pii-handling.md) — detection, sanitization and storage-path integration
+- [Performance Testing](https://github.com/OmniNode-ai/knowledge_base/blob/main/guides/omnimemory-performance-testing.md) — SLA targets, benchmarks and how to read them
+- [Market Migration Boundary](https://github.com/OmniNode-ai/knowledge_base/blob/main/guides/omnimemory-market-migration-boundary.md) — what moves to `omnimarket` and what stays
 
 **Runbooks**
-- [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md) — bringing the storage layer up, health checks, troubleshooting
+- [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge_base/blob/main/runbooks/omnimemory-starting-memory-services.md) — bringing the storage layer up, health checks, troubleshooting
 
 Only this README, [CLAUDE.md](CLAUDE.md), [CHANGELOG.md](CHANGELOG.md), [LICENSE](LICENSE), [SECURITY.md](SECURITY.md) and the `.claude/` and `.github/` trees carry markdown in this repository. The `kb-doc-gate` required check runs in `strict` mode (see [`.kb-doc-gate.yaml`](.kb-doc-gate.yaml)) and fails any PR that reintroduces documentation here.
 
@@ -55,7 +55,7 @@ Only this README, [CLAUDE.md](CLAUDE.md), [CHANGELOG.md](CHANGELOG.md), [LICENSE
 - **Memory-layer data services** — Qdrant, Memgraph, Valkey, Kreuzberg (owned via `docker-compose.yml`)
 - **Node handlers** — contract-carrying nodes in `src/omnimemory/nodes/`, migrating to `omnimarket`
 
-Not owned here: Kafka/Redpanda and PostgreSQL ([`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra)), the ONEX kernel and contracts ([`omnibase_core`](https://github.com/OmniNode-ai/omnibase_core)), platform-boundary protocols ([`omnibase_spi`](https://github.com/OmniNode-ai/omnibase_spi)), the post-migration node runtime ([`omnimarket`](https://github.com/OmniNode-ai/omnimarket)), and dashboard read models ([`omnidash`](https://github.com/OmniNode-ai/omnidash)). See [Memory Data Ownership](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-memory-data-ownership.md) for the full boundary table, and [Market Migration Boundary](https://github.com/OmniNode-ai/knowledge-base/blob/main/guides/omnimemory-market-migration-boundary.md) for what is moving.
+Not owned here: Kafka/Redpanda and PostgreSQL ([`omnibase_infra`](https://github.com/OmniNode-ai/omnibase_infra)), the ONEX kernel and contracts ([`omnibase_core`](https://github.com/OmniNode-ai/omnibase_core)), platform-boundary protocols ([`omnibase_spi`](https://github.com/OmniNode-ai/omnibase_spi)), the post-migration node runtime ([`omnimarket`](https://github.com/OmniNode-ai/omnimarket)), and dashboard read models ([`omnidash`](https://github.com/OmniNode-ai/omnidash)). See [Memory Data Ownership](https://github.com/OmniNode-ai/knowledge_base/blob/main/reference/omnimemory-memory-data-ownership.md) for the full boundary table, and [Market Migration Boundary](https://github.com/OmniNode-ai/knowledge_base/blob/main/guides/omnimemory-market-migration-boundary.md) for what is moving.
 
 ---
 
@@ -77,7 +77,7 @@ uv sync --group dev
 uv run pytest tests/ -m unit
 ```
 
-Ports and every other setting are configurable — see [Environment Variables](https://github.com/OmniNode-ai/knowledge-base/blob/main/reference/omnimemory-environment-variables.md). The full startup runbook, with health checks and troubleshooting, is [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge-base/blob/main/runbooks/omnimemory-starting-memory-services.md).
+Ports and every other setting are configurable — see [Environment Variables](https://github.com/OmniNode-ai/knowledge_base/blob/main/reference/omnimemory-environment-variables.md). The full startup runbook, with health checks and troubleshooting, is [Starting OmniMemory Services](https://github.com/OmniNode-ai/knowledge_base/blob/main/runbooks/omnimemory-starting-memory-services.md).
 
 ## Development
 
