@@ -88,9 +88,11 @@ repos:
         files: ^(\.github/workflows/ci\.yml|\.github/required-checks\.yaml|\.pre-commit-config\.yaml|tests/scripts/test_occ_eligibility_enforcement\.py)$
         stages: [pre-commit]
 
-  # No hardcoded ONEX topic strings — sourced from onex_change_control (OMN-5259)
-  - repo: https://github.com/OmniNode-ai/onex_change_control
-    rev: 8d7e85bc00e7f1b1306d1cb40949be1ab6e7e91a  # pragma: allowlist secret
+  # No hardcoded ONEX topic strings and ticketed TODO format — sourced from omnibase_core
+  # (OMN-5259; OMN-20074, OCC retirement S8: same hook ids, no longer pulled from
+  # the change-control repository)
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: 4a4177335d11b138a29fe28e2f4c5575afa92b2b  # pragma: allowlist secret
     hooks:
       - id: no-hardcoded-topics
         exclude: ^src/omnimemory/topics\.py$
