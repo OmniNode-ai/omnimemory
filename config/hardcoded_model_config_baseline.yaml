@@ -15,9 +15,6 @@
 
 schema_version: 1
 entries:
-  - path: pyproject.toml
-    family: E-LAN
-    content_sha1: 406121965f2c4f34b87405dc1d8725f587925e16
   - path: scripts/graphify_to_qdrant.py
     family: M
     content_sha1: 4e1b554d77d4c5298708b0f7b584ae355807acb7
@@ -42,9 +39,6 @@ entries:
   - path: src/omnimemory/nodes/node_navigation_history_reducer/handlers/handler_navigation_history_reducer.py
     family: M
     content_sha1: 4f853d37a6c51fa102b42d2ea0e775233f336d84
-  - path: src/omnimemory/runtime/plugin.py
-    family: E-LAN
-    content_sha1: eb3cab7ef94de5a3ca66ff4797bfe632a89addf2
   - path: tests/integration/test_golden_chain_memgraph_ingestion.py
     family: E-LAN
     content_sha1: 84b23ad58c9198587cfd9eac7e3fa2031eb8cb5f

@@ -83,6 +83,7 @@ from omnibase_core.models.event_bus.model_consumer_group_scope import (
     ModelConsumerGroupScope,
 )
 from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
+from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
     ModelDomainPluginResult,
@@ -545,15 +546,26 @@ class PluginMemory:
                     HandlerNavigationHistoryReducer,
                 )
 
+                # No embedding endpoint is shipped (OMN-20930): the deployment
+                # supplies LLM_EMBEDDING_URL. Unset, the handler gets its own
+                # empty default and its Qdrant writes fail and are logged.
+                nav_embedding_url = expand_contract_env_refs(
+                    "${env.LLM_EMBEDDING_URL:}"
+                )
+                if not nav_embedding_url:
+                    logger.warning(
+                        "LLM_EMBEDDING_URL is not set; navigation history cannot "
+                        "embed successful paths. Supply it through the operator "
+                        "overlay (correlation_id=%s)",
+                        correlation_id,
+                    )
+
                 navigation_history_handler = HandlerNavigationHistoryReducer(
                     writer=None,
                     pg_dsn=nav_pg_dsn,
                     qdrant_host=os.environ["QDRANT_HOST"],
                     qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
-                    embedding_url=os.environ.get(
-                        "LLM_EMBEDDING_URL",
-                        "http://192.168.86.200:8100",  # onex-allow-internal-ip
-                    ),
+                    embedding_url=nav_embedding_url,
                     embedding_model=os.environ.get(
                         "OMNIMEMORY_EMBEDDING_MODEL", "default"
                     ),

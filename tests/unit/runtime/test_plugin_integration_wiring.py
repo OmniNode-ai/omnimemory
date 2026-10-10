@@ -217,6 +217,39 @@ class TestNavigationHistoryWiring:
             assert result.success
 
     @pytest.mark.asyncio
+    async def test_unset_embedding_url_ships_no_lab_default(
+        self, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """OMN-20930: no LLM_EMBEDDING_URL means no embedding endpoint, said loudly."""
+        plugin = PluginMemory()
+        config = _make_config()
+
+        monkeypatch.setenv("OMNIMEMORY_PG_DSN", "postgresql://test:5432/omnimemory")
+        monkeypatch.setenv("QDRANT_HOST", "test-qdrant")
+        monkeypatch.setenv("QDRANT_PORT", "6333")
+        monkeypatch.delenv("LLM_EMBEDDING_URL", raising=False)
+
+        with (
+            patch(
+                "omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer.HandlerNavigationHistoryReducer",
+                return_value=MagicMock(),
+            ) as mock_nav_cls,
+            _patch_dispatch_factory() as mock_factory,
+            _patch_contract_topics(),
+            _patch_introspection(),
+            caplog.at_level("WARNING"),
+        ):
+            mock_factory.return_value = MagicMock(route_count=10, handler_count=8)
+
+            result = await plugin.wire_dispatchers(config)
+
+            assert mock_nav_cls.call_args.kwargs["embedding_url"] == ""
+            assert any(
+                "LLM_EMBEDDING_URL" in record.getMessage() for record in caplog.records
+            )
+            assert result.success
+
+    @pytest.mark.asyncio
     async def test_navigation_handler_not_constructed_when_pg_dsn_empty(
         self,
     ) -> None:

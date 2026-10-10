@@ -13,7 +13,7 @@ Usage::
     python 004_create_navigation_paths_collection.py
 
     # Against a remote Qdrant:
-    QDRANT_HOST=192.168.86.200 QDRANT_PORT=6333 \\
+    QDRANT_HOST=192.0.2.10 QDRANT_PORT=6333 \\
         python 004_create_navigation_paths_collection.py
 
 Requires: qdrant-client
