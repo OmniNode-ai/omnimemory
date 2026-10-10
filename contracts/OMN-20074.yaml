@@ -37,6 +37,13 @@ requirements:
       - id: "AC6"
         statement: |-
           AC6: .pre-commit-config.yaml declares no-hardcoded-topics and no-untracked-todos once each, in an omnibase_core block pinned to a full commit sha, with each exclude and setting unchanged and no onex_change_control block -- falsifier: uv run pytest tests/ci/test_precommit_hooks_core_omn20074.py -q
+  - id: "req-codeql-from-core"
+    statement: |-
+      omnimemory's CodeQL caller uses omnibase_core's codeql-reusable.yml instead of onex_change_control's, with the job id, the inputs and the required context unchanged.
+    acceptance:
+      - id: "AC7"
+        statement: |-
+          AC7: security-scan.yml's codeql job calls OmniNode-ai/omnibase_core/.github/workflows/codeql-reusable.yml at the full sha 3fbb43eaff028a30edccb1b9b794e0a3f3d9523c and names no onex_change_control, and the job id, name and inputs are unchanged so the required context CodeQL / CodeQL Analysis (python) is unchanged -- falsifier: uv run pytest tests/ci/test_codeql_from_core_omn20074.py -q
 evidence_requirements:
   - kind: "tests"
     description: "The caller workflow has the required base-branch trigger and read-only permissions."
@@ -56,6 +63,9 @@ evidence_requirements:
   - kind: "tests"
     description: "Migrated hooks sit in an omnibase_core block at a full sha, excludes unchanged."
     command: "uv run pytest tests/ci/test_precommit_hooks_core_omn20074.py -q"
+  - kind: "tests"
+    description: "The CodeQL caller uses the omnibase_core reusable at a full sha, shape unchanged."
+    command: "uv run pytest tests/ci/test_codeql_from_core_omn20074.py -q"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -112,3 +122,11 @@ dod_evidence:
         check_value: "uv run pytest tests/ci/test_precommit_hooks_core_omn20074.py -q"
         cwd: "${OMNI_HOME}/omnimemory"
     binds_ac: ["AC6"]
+  - id: "dod-codeql-from-core-ac7"
+    description: "The CodeQL caller uses the omnibase_core reusable at a full sha, shape unchanged."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_codeql_from_core_omn20074.py -q"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC7"]
