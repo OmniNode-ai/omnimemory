@@ -875,13 +875,26 @@ jobs:
           PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -u
-          base="${PR_BASE:-${MQ_BASE:-${PUSH_BEFORE:-}}}"
+          base="${PR_BASE:-${MQ_BASE:-}}"
+          # OMN-20868: release.yml fast-forwards main to a dev sha, so a push's
+          # `before` is the previous release and the range spans every dev PR
+          # since then, each already checked here against dev, including
+          # commits that predate this ratchet. A push whose HEAD is on dev is
+          # checked against the baseline; any other push diffs its own range.
+          if [ -z "$base" ] && [ -n "${PUSH_BEFORE:-}" ]; then
+            git fetch -q --no-tags origin +refs/heads/dev:refs/remotes/origin/dev
+            if git merge-base --is-ancestor HEAD refs/remotes/origin/dev; then
+              echo "push of a commit already on dev (fast-forward of ${PUSH_BEFORE}..HEAD); each commit was checked on its dev PR"
+            else
+              base="$PUSH_BEFORE"
+            fi
+          fi
           if [ -n "$base" ] && git cat-file -e "${base}^{commit}" 2>/dev/null; then
             base="$(git merge-base "$base" HEAD)"
             uv run --no-project --with "$CANONICAL_FILE_SHAPE_CORE" \
               python -m omnibase_core.validators.canonical_file_shape --base "$base" --head HEAD
           else
-            echo "no base revision on this event; checking the tree against the baseline only"
+            echo "no diff base for this event; checking the tree against the baseline only"
             uv run --no-project --with "$CANONICAL_FILE_SHAPE_CORE" \
               python -m omnibase_core.validators.canonical_file_shape --head HEAD
           fi
