@@ -17,6 +17,15 @@
 # Manifest entries (including CI Summary members): 15
 
 required_checks:
+  - name: "pr-title / check-title"
+    workflow: pr-title-check.yml
+    job_id: pr-title
+    producer_kind: local
+    conditional: false
+    rationale: >-
+      PR title ticket-reference check: the job runs omnimarket's
+      node_pr_title_check_compute from a pinned omnimarket release (OMN-20997).
+
   # OMN-18854: this is an umbrella member, not a separate protection context.
   - name: "occ-preflight / eligibility"
     workflow: ci.yml
