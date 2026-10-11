@@ -1,0 +1,68 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-20943"
+title: "OCC retirement G (omnimemory): the imperative contract guard caller repoints to omnibase_core's reusable with its own shrink-only allowlist"
+summary: "omnimemory's imperative-contract-guard caller calls omnibase_core's reusable workflow at the full sha
+  031148215620031436cba30619bbae67c0bb38ad and passes allowlist-path imperative-contract-allowlist.yaml,
+  omnimemory's own allowlist, which carries the four entries onex_change_control used for omnimemory at
+  725d2967 unchanged. The reusable refuses an allowlist that gains a path against the merge base. The job id,
+  the workflow name and the required-check context are unchanged. The canonical-file-shape hook and job run
+  at the same core sha, which reads the allowlist-path a caller passes to the reusable, so the new allowlist
+  file is admitted as a declared shrink-only list. uv.lock moves omnibase-core to 0.47.41 so the ratchet
+  handler is importable by the test."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-guard-caller-from-core"
+    statement: |-
+      omnimemory's imperative contract guard must run from omnibase_core's reusable with omnimemory's own shrink-only allowlist, and no workflow may read onex_change_control for this guard.
+    acceptance:
+      - id: "AC1"
+        statement: |-
+          AC1: omnimemory's imperative-contract-guard caller uses omnibase_core's reusable at a full sha (688ef1735 or later on core dev) and no workflow in omnimemory references onex_change_control for this guard -- falsifier: a test in tests/ci added by the PR parses the caller workflow and fails at the merge base (uv run pytest on that file)
+      - id: "AC2"
+        statement: |-
+          AC2: omnimemory carries its own allowlist file whose entries equal, path for path, the omnimemory entries the onex_change_control guard used at 725d2967, and the reusable's ratchet refuses an allowlist that gains a path -- falsifier: the same test file compares the allowlist to the recorded 725d2967 entries and a planted extra path is refused by the core ratchet handler (uv run pytest on that file)
+      - id: "AC3"
+        statement: |-
+          AC3: The guard still refuses what it refused before on omnimemory's tree -- falsifier: on a lab host, the core handler run over omnimemory's tree with a planted imperative contract exits non-zero, and over the clean tree exits 0, with the same verdicts as the onex_change_control script at 725d2967 on both inputs, recorded on the PR body Lab: line
+evidence_requirements:
+  - kind: "tests"
+    description: "The caller uses omnibase_core's reusable at a full sha, names omnimemory's allowlist, keeps its names, and no workflow reads onex_change_control for this guard."
+    command: "uv run pytest tests/ci/test_imperative_contract_guard_caller_omn20943.py -q"
+  - kind: "tests"
+    description: "The allowlist equals the recorded 725d2967 entries and the core ratchet refuses a planted extra path."
+    command: "uv run pytest tests/ci/test_imperative_contract_guard_caller_omn20943.py -q"
+  - kind: "tests"
+    description: "The core guard exits 0 over the clean tree and non-zero over a planted raw HTTP call in the live handler."
+    command: "uv run pytest tests/ci/test_imperative_contract_guard_caller_omn20943.py -q"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn20943-ac1"
+    description: "The caller workflow uses omnibase_core's reusable at a full sha and no workflow reads onex_change_control for this guard."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_imperative_contract_guard_caller_omn20943.py -q"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC1"]
+  - id: "dod-omn20943-ac2"
+    description: "The allowlist equals the recorded 725d2967 entries path for path and the core ratchet refuses a planted extra path."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_imperative_contract_guard_caller_omn20943.py -q"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC2"]
+  - id: "dod-omn20943-ac3"
+    description: "The core guard exits 0 over the clean tree and non-zero over a planted raw HTTP call in the live handler."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_imperative_contract_guard_caller_omn20943.py -q"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC3"]
