@@ -1,3 +1,13 @@
+## v0.18.5 (2026-10-11)
+
+### Release
+- Cut omnimemory from dev at 0.18.5 by the scheduled release train.
+- 1 release-relevant commit(s) merged since v0.18.4.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.4
+- feat: remove the lab embedding default from omnimemory (#605)
+
 ## v0.18.4 (2026-10-01)
 
 ### Release
