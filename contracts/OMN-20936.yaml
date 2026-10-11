@@ -1,0 +1,55 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-20936"
+title: "omniintelligence and omnimemory endpoint defaults move to the private overlay"
+summary: "The lab embedding endpoint leaves omnimemory: runtime/plugin.py no longer defaults LLM_EMBEDDING_URL
+  to a private-network address. The navigation history reducer's embedding URL comes from LLM_EMBEDDING_URL,
+  then embedding_url in a node_navigation_history_reducer overlay found under ONEX_SKILL_OVERLAY_ROOTS,
+  and otherwise the plugin logs that no endpoint is configured and names both ways to supply one. The
+  pytest marker text and a usage example no longer name a private host. The lab value lives in a private
+  overlay at onex/overlays/node_navigation_history_reducer/overlay.yaml."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-no-lab-endpoint-shipped"
+    statement: "omnimemory ships no lab endpoint and resolves one only from env or an overlay."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: omniintelligence and omnimemory at dev carry no lab endpoint in configuration
+          or as a default value -- falsifier: pytest over the gate's deployment-config class reports zero
+          findings in both repos"
+      - id: "AC2"
+        statement: "AC2: each repointed reader resolves today's endpoint from the private overlay or env
+          and fails naming the missing setting without it -- falsifier: pytest focused tests for each
+          repointed reader with and without ONEX_SKILL_OVERLAY_ROOTS"
+evidence_requirements:
+  - kind: "tests"
+    description: "The navigation embedding URL resolves env, then overlay, else none."
+    command: "uv run pytest tests/unit/runtime/test_navigation_embedding_url_omn20936.py -q"
+  - kind: "tests"
+    description: "An unset embedding URL is logged, naming both ways to supply it."
+    command: "uv run pytest tests/unit/runtime/test_plugin_integration_wiring.py -q -k unset_embedding_url"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn20936-ac1-no-lab-endpoint-shipped"
+    description: "The plugin passes no private default for the embedding URL; unset, the handler gets
+      an empty one and the plugin logs it."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/runtime/test_plugin_integration_wiring.py -q -k unset_embedding_url"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC1"]
+  - id: "dod-omn20936-ac2-overlay-or-env-else-none"
+    description: "The embedding URL resolves from the environment variable or the overlay, with the overlay
+      root set and unset."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/runtime/test_navigation_embedding_url_omn20936.py -q"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC2"]

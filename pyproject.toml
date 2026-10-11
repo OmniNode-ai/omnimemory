@@ -412,7 +412,7 @@ markers = [
     "benchmark: marks tests as performance benchmarks",
     "slow: marks tests as slow-running (excluded from quick test runs)",
     "memgraph: marks tests as requiring Memgraph database",
-    "embedding: marks tests as requiring embedding server (http://192.168.86.201:8002)",
+    "embedding: marks tests as requiring an embedding server (LLM_EMBEDDING_URL)",
 ]
 
 [tool.uv]
