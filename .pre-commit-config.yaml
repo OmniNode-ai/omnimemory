@@ -121,8 +121,13 @@ repos:
   # CI runs the same module at the same commit (job "Canonical File Shape
   # (OMN-20304)"). The rev moved from 6363509770 to the OMN-20304 commit for
   # both hooks; the lifecycle validator's source is identical at the two commits.
+  #
+  # OMN-20943: the rev moved to the omnibase_core commit that reads the allowlist-path
+  # a workflow passes to omnibase_core's imperative contract guard (OMN-20946), so
+  # imperative-contract-allowlist.yaml, declared by .github/workflows/imperative-contract-guard.yml,
+  # is not refused by name. The lifecycle validator's source is identical at the two commits.
   - repo: https://github.com/OmniNode-ai/omnibase_core
-    rev: f50d00fc7918d0b12ccd0d3497160325e32e7ac5  # pragma: allowlist secret
+    rev: 031148215620031436cba30619bbae67c0bb38ad  # pragma: allowlist secret
     hooks:
       - id: no-noncanonical-lifecycle-classes
         args: [--allowlist, .onex_ratchets/noncanonical_class_allowlist.yaml, src/omnimemory]
