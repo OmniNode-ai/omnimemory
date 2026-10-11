@@ -67,7 +67,10 @@ import logging
 import os
 import time
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+import yaml
 
 if TYPE_CHECKING:
     from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
@@ -83,6 +86,7 @@ from omnibase_core.models.event_bus.model_consumer_group_scope import (
     ModelConsumerGroupScope,
 )
 from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
+from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
     ModelDomainPluginResult,
@@ -151,6 +155,47 @@ async def _probe_tcp_reachable(host: str, port: int, timeout: float = 5.0) -> bo
         return True
     except (OSError, TimeoutError):
         return False
+
+
+_OVERLAY_ROOTS_ENV = "ONEX_SKILL_OVERLAY_ROOTS"
+_NAVIGATION_OVERLAY_NODE = "node_navigation_history_reducer"
+
+
+def _navigation_embedding_url() -> str:
+    """The navigation history reducer's embedding endpoint, or ``""`` when none is configured.
+
+    In order: ``LLM_EMBEDDING_URL``, then ``embedding_url`` in the first
+    ``node_navigation_history_reducer/overlay.yaml`` found under a root named in
+    ``ONEX_SKILL_OVERLAY_ROOTS``. No endpoint is shipped (OMN-20936). An overlay
+    that is there and unreadable or malformed raises ``ValueError`` rather than
+    being skipped, because a half-read overlay would embed against the wrong host.
+    """
+    from_env = expand_contract_env_refs("${env.LLM_EMBEDDING_URL:}")
+    if from_env:
+        return from_env
+    roots = expand_contract_env_refs(f"${{env.{_OVERLAY_ROOTS_ENV}:}}")
+    for root in roots.split(os.pathsep):
+        if not root:
+            continue
+        candidate = Path(root) / _NAVIGATION_OVERLAY_NODE / "overlay.yaml"
+        if not candidate.is_file():
+            continue
+        try:
+            raw = yaml.safe_load(candidate.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, yaml.YAMLError) as exc:
+            raise ValueError(
+                f"{candidate} is not a readable overlay ({type(exc).__name__})"
+            ) from None
+        if (
+            not isinstance(raw, dict)
+            or set(raw) != {"embedding_url"}
+            or not isinstance(raw["embedding_url"], str)
+        ):
+            raise ValueError(
+                f"{candidate} must be a mapping holding exactly embedding_url, a string"
+            )
+        return str(raw["embedding_url"])
+    return ""
 
 
 class PluginMemory:
@@ -545,15 +590,27 @@ class PluginMemory:
                     HandlerNavigationHistoryReducer,
                 )
 
+                # No embedding endpoint is shipped (OMN-20936): the deployment
+                # supplies LLM_EMBEDDING_URL or a node_navigation_history_reducer
+                # overlay. Neither, and the handler gets its own empty default
+                # and its Qdrant writes fail and are logged.
+                nav_embedding_url = _navigation_embedding_url()
+                if not nav_embedding_url:
+                    logger.warning(
+                        "No embedding endpoint is configured; navigation history "
+                        "cannot embed successful paths. Set LLM_EMBEDDING_URL or "
+                        "supply a node_navigation_history_reducer overlay with "
+                        "embedding_url under a root listed in "
+                        "ONEX_SKILL_OVERLAY_ROOTS (correlation_id=%s)",
+                        correlation_id,
+                    )
+
                 navigation_history_handler = HandlerNavigationHistoryReducer(
                     writer=None,
                     pg_dsn=nav_pg_dsn,
                     qdrant_host=os.environ["QDRANT_HOST"],
                     qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
-                    embedding_url=os.environ.get(
-                        "LLM_EMBEDDING_URL",
-                        "http://192.168.86.200:8100",  # onex-allow-internal-ip
-                    ),
+                    embedding_url=nav_embedding_url,
                     embedding_model=os.environ.get(
                         "OMNIMEMORY_EMBEDDING_MODEL", "default"
                     ),
