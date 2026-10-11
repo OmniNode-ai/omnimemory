@@ -40,7 +40,7 @@ concurrency:
 
 jobs:
   public-repo-hygiene:
-    uses: OmniNode-ai/omniclaude/.github/workflows/public-repo-hygiene-reusable.yml@3ea5bfc90dec0efd386214247b38c8c2cc46508d
+    uses: OmniNode-ai/omniclaude/.github/workflows/public-repo-hygiene-reusable.yml@0c9f9146d8dd0446fc5c10952aa57247b3a880ae
     with:
       mode: report
     secrets: inherit
