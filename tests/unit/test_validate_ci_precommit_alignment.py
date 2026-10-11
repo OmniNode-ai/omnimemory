@@ -362,6 +362,13 @@ class TestPrecommitHooksCoveredByAlignments:
             # same omnibase_core commit as the hook rev; not a ci.yml job so
             # not in EXPECTED_ALIGNMENTS.
             "check-hardcoded-model-config-compute",
+            # OMN-20940: CI counterpart is the standalone workflow
+            # .github/workflows/public-repo-hygiene.yml, context
+            # public-repo-hygiene / deployment-config, pinned to the same
+            # omniclaude commit as the hook rev (tests/ci/
+            # test_deployment_config_context_omn20940.py); not a ci.yml job so
+            # not in EXPECTED_ALIGNMENTS.
+            "deployment-config",
         }
     )
 
