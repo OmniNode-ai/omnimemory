@@ -983,6 +983,7 @@ def create_expire_memory_dispatch_handler(
                 f"is wired (correlation_id={ctx_correlation_id})"
             )
 
+        publish = publish_callback
         payload = _get_dispatch_payload(envelope)
         now = datetime.now(UTC)
 
@@ -1000,7 +1001,7 @@ def create_expire_memory_dispatch_handler(
                 ctx_correlation_id,
             )
             await _publish_lifecycle_event(
-                publish_callback,
+                publish,
                 MemoryEventTopic.LIFECYCLE_TRANSITION_FAILED,
                 ModelLifecycleTransitionFailedEvent(
                     memory_id=memory_id,

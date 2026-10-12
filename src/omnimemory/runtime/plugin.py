@@ -480,17 +480,20 @@ class PluginMemory:
             An initialized HandlerMemoryExpire, or None.
         """
         import asyncpg
+        from pydantic import ValidationError
 
         from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
             HandlerMemoryExpire,
         )
+        from omnimemory.settings import PostgresSettings
 
         correlation_id = config.correlation_id
-        dsn = os.environ.get(_EXPIRE_DB_URL_ENV, "").strip()
-        if not dsn:
+        try:
+            dsn = str(PostgresSettings.model_validate({}).omnimemory_db_url)
+        except ValidationError:
             logger.warning(
-                "%s is not set; expire-memory commands will be answered with "
-                "lifecycle-transition-failed (correlation_id=%s)",
+                "%s is not set or invalid; expire-memory commands will be "
+                "answered with lifecycle-transition-failed (correlation_id=%s)",
                 _EXPIRE_DB_URL_ENV,
                 correlation_id,
             )
