@@ -103,5 +103,11 @@ class EnumMemoryEventTopic(UtilStrValueHelper, str, Enum):
     MEMORY_RETRIEVAL_RESPONSE = "onex.evt.omnimemory.memory-retrieval-response.v1"
     """Memory retrieval response event."""
 
+    MEMORY_EXPIRED = "onex.evt.omnimemory.memory-expired.v1"
+    """Memory transitioned from ACTIVE to EXPIRED (lifecycle orchestrator)."""
+
+    LIFECYCLE_TRANSITION_FAILED = "onex.evt.omnimemory.lifecycle-transition-failed.v1"
+    """A lifecycle state transition was refused or failed (lifecycle orchestrator)."""
+
 
 __all__ = ["EnumMemoryCommandTopic", "EnumMemoryEventTopic"]

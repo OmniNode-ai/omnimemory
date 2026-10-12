@@ -395,3 +395,114 @@ class TestHandlerMemoryLifecycle:
         """component_count is 0 when no components provided."""
         lifecycle = HandlerMemoryLifecycle()
         assert lifecycle.component_count == 0
+
+
+@pytest.mark.unit
+class TestExpireHandlerWiring:
+    """PluginMemory builds the expire handler from OMNIMEMORY_DB_URL.
+
+    Without a wired HandlerMemoryExpire an expire-memory command is answered
+    with lifecycle-transition-failed; with one it expires the memory.
+    """
+
+    DSN = "postgresql://tester@db.invalid:5432/omnimemory"
+
+    @pytest.mark.asyncio
+    async def test_expire_handler_built_on_the_pool_when_db_url_set(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plugin = PluginMemory()
+        config = _make_config()
+        pool = MagicMock()
+        pool.close = AsyncMock()
+        monkeypatch.setenv("OMNIMEMORY_DB_URL", self.DSN)
+
+        with (
+            patch(
+                "asyncpg.create_pool", new_callable=AsyncMock, return_value=pool
+            ) as create_pool,
+            _patch_dispatch_factory() as mock_factory,
+            _patch_contract_topics(),
+            _patch_introspection(),
+        ):
+            mock_factory.return_value = MagicMock(route_count=10, handler_count=8)
+
+            result = await plugin.wire_dispatchers(config)
+
+            assert result.success
+            assert create_pool.await_args is not None
+            assert create_pool.await_args.kwargs["dsn"] == self.DSN
+            expire_handler = mock_factory.call_args[1]["expire_handler"]
+            assert expire_handler is not None
+            assert expire_handler.initialized
+
+    @pytest.mark.asyncio
+    async def test_no_expire_handler_when_db_url_unset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plugin = PluginMemory()
+        config = _make_config()
+        monkeypatch.delenv("OMNIMEMORY_DB_URL", raising=False)
+
+        with (
+            patch("asyncpg.create_pool", new_callable=AsyncMock) as create_pool,
+            _patch_dispatch_factory() as mock_factory,
+            _patch_contract_topics(),
+            _patch_introspection(),
+        ):
+            mock_factory.return_value = MagicMock(route_count=6, handler_count=5)
+
+            result = await plugin.wire_dispatchers(config)
+
+            assert result.success
+            create_pool.assert_not_awaited()
+            assert mock_factory.call_args[1]["expire_handler"] is None
+
+    @pytest.mark.asyncio
+    async def test_unreachable_database_leaves_no_expire_handler_and_wires(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        plugin = PluginMemory()
+        config = _make_config()
+        monkeypatch.setenv("OMNIMEMORY_DB_URL", self.DSN)
+
+        with (
+            patch(
+                "asyncpg.create_pool",
+                new_callable=AsyncMock,
+                side_effect=OSError("connection refused"),
+            ),
+            _patch_dispatch_factory() as mock_factory,
+            _patch_contract_topics(),
+            _patch_introspection(),
+        ):
+            mock_factory.return_value = MagicMock(route_count=6, handler_count=5)
+
+            result = await plugin.wire_dispatchers(config)
+
+            assert result.success
+            assert mock_factory.call_args[1]["expire_handler"] is None
+        assert "expire-memory commands will be answered" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_shutdown_closes_the_pool(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plugin = PluginMemory()
+        config = _make_config()
+        pool = MagicMock()
+        pool.close = AsyncMock()
+        monkeypatch.setenv("OMNIMEMORY_DB_URL", self.DSN)
+
+        with (
+            patch("asyncpg.create_pool", new_callable=AsyncMock, return_value=pool),
+            _patch_dispatch_factory() as mock_factory,
+            _patch_contract_topics(),
+            _patch_introspection(),
+        ):
+            mock_factory.return_value = MagicMock(route_count=10, handler_count=8)
+            await plugin.wire_dispatchers(config)
+
+            await plugin.shutdown(config)
+
+        pool.close.assert_awaited_once()

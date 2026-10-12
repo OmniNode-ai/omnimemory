@@ -5,6 +5,7 @@
 
 - Incoming events from omniintelligence (intent classification)
 - Crawl tick commands for the document ingestion pipeline (OMN-2426)
+- Lifecycle transition failure events from the memory lifecycle orchestrator
 
 Note: Document pipeline events (ModelDocumentChangedEvent,
 ModelDocumentDiscoveredEvent, ModelDocumentRemovedEvent) are in
@@ -16,8 +17,10 @@ to avoid contract duplication. See omnibase_core.models.events.
 
 from .model_crawl_tick_command import ModelCrawlTickCommand
 from .model_intent_classified_event import ModelIntentClassifiedEvent
+from .model_lifecycle_transition_failed_event import ModelLifecycleTransitionFailedEvent
 
 __all__ = [
     "ModelCrawlTickCommand",
     "ModelIntentClassifiedEvent",
+    "ModelLifecycleTransitionFailedEvent",
 ]

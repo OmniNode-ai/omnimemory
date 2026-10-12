@@ -32,6 +32,7 @@ import json
 import logging
 import os
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 from uuid import UUID, uuid4
 
@@ -48,6 +49,13 @@ from omnimemory.topics import EnumMemoryCommandTopic as MemoryCommandTopic
 from omnimemory.topics import EnumMemoryEventTopic as MemoryEventTopic
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
+    from omnimemory.enums import EnumLifecycleState
+    from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
+        ModelExpireMemoryCommand,
+        ModelMemoryExpireResult,
+    )
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
     )
@@ -59,9 +67,16 @@ DispatchReturn = str | list[str] | None
 
 
 def _get_dispatch_payload(message: object) -> object:
-    """Return payload for both envelope and raw-payload dispatch APIs."""
+    """Return payload for envelope, materialized and raw-payload dispatch APIs.
+
+    ``MessageDispatchEngine`` hands a dispatcher its materialized form
+    ``{"payload": ..., "__bindings": ..., "__debug_trace": ...}``, not the
+    envelope it was given; the command lives under ``payload``.
+    """
     if isinstance(message, ModelEventEnvelope):
         return message.payload
+    if isinstance(message, dict) and "__bindings" in message and "payload" in message:
+        return message["payload"]
     return message
 
 
@@ -101,6 +116,18 @@ class ProtocolIntentQueryHandler(Protocol):
         self,
         request: object,
     ) -> object: ...
+
+
+@runtime_checkable
+class ProtocolMemoryExpireHandler(Protocol):
+    """Protocol for the handler that performs the ACTIVE -> EXPIRED transition.
+
+    Matches ``HandlerMemoryExpire.handle()``.
+    """
+
+    async def handle(
+        self, command: ModelExpireMemoryCommand
+    ) -> ModelMemoryExpireResult: ...
 
 
 # =============================================================================
@@ -353,7 +380,7 @@ def create_intent_query_dispatch_handler(
 
 
 # =============================================================================
-# Bridge Handler: Lifecycle Orchestrator (runtime-tick, archive, expire)
+# Bridge Handler: Lifecycle Orchestrator (runtime-tick, archive)
 # =============================================================================
 
 
@@ -805,7 +832,7 @@ def _create_lifecycle_bridge_handler(
     """Create a dispatch engine handler for lifecycle commands.
 
     Replaces the no-op handler with a bridge to HandlerMemoryLifecycle.
-    Handles runtime-tick, archive-memory, and expire-memory commands.
+    Handles runtime-tick and archive-memory commands plus the shutdown command.
 
     Args:
         lifecycle: A ``HandlerMemoryLifecycle`` instance.
@@ -838,9 +865,11 @@ def _create_lifecycle_bridge_handler(
                 await lifecycle.handle_startup()
 
         # Route lifecycle commands.
-        if command in ("shutdown", "expire-memory"):
+        if command == "shutdown":
             # Shutdown is the only lifecycle teardown method available.
             # archive-memory has no dedicated handler yet (OMN-6588 follow-up).
+            # expire-memory never reaches this bridge: it has its own dispatcher
+            # (create_expire_memory_dispatch_handler).
             logger.info(
                 "Lifecycle shutdown requested (command=%s, correlation_id=%s)",
                 command,
@@ -855,6 +884,199 @@ def _create_lifecycle_bridge_handler(
                 ctx_correlation_id,
             )
 
+        return []
+
+    return _handle
+
+
+# =============================================================================
+# Dispatch Handler: Expire Memory
+# =============================================================================
+
+# Keys `onex kafka produce --envelope` flattens into a command payload. They
+# carry transport metadata, not command fields, so they are dropped before the
+# strict ModelExpireMemoryCommand validation.
+_COMMAND_ENVELOPE_KEYS = frozenset({"correlation_id", "requested_by", "timestamp"})
+
+_EXPIRE_OPERATION = "expire"
+
+
+def _readable_memory_id(payload: object) -> UUID | None:
+    """Return the payload's memory_id when it is a readable UUID, else None."""
+    if not isinstance(payload, dict):
+        return None
+    raw = payload.get("memory_id")
+    try:
+        return UUID(str(raw))
+    except ValueError:
+        return None
+
+
+async def _publish_lifecycle_event(
+    publish_callback: Callable[[str, dict[str, object]], Awaitable[None]]
+    | Callable[[str, dict[str, object]], None],
+    topic: MemoryEventTopic,
+    event: BaseModel,
+) -> None:
+    """Publish one lifecycle outcome event; a publish failure propagates."""
+    published = publish_callback(topic.value, event.model_dump(mode="json"))
+    if inspect.isawaitable(published):
+        await published
+
+
+def create_expire_memory_dispatch_handler(
+    *,
+    expire_handler: ProtocolMemoryExpireHandler | None,
+    publish_callback: Callable[[str, dict[str, object]], Awaitable[None]]
+    | Callable[[str, dict[str, object]], None]
+    | None,
+    correlation_id: UUID | None = None,
+) -> Callable[
+    [ModelEventEnvelope[object], ModelDispatchContext],
+    Awaitable[DispatchReturn],
+]:
+    """Create a dispatch engine handler for expire-memory commands.
+
+    The handler validates the payload as ``ModelExpireMemoryCommand``, runs
+    ``HandlerMemoryExpire`` and publishes exactly one outcome event:
+
+    - transition succeeded -> ``memory-expired.v1`` carrying the entity id
+    - refused or failed (entity not ACTIVE, not found, revision conflict,
+      database error, malformed command, no expire handler configured)
+      -> ``lifecycle-transition-failed.v1`` and no ``memory-expired.v1``
+
+    A command is never acknowledged without an outcome event. With no publish
+    callback wired the handler raises before touching the database, so the
+    message is nacked instead of expiring a memory nobody is told about; a
+    publish failure raises as well.
+
+    Args:
+        expire_handler: Handler that performs the ACTIVE -> EXPIRED transition,
+            or None when the database is not configured.
+        publish_callback: Callback that publishes an event to a topic. Accepts
+            sync and async callables.
+        correlation_id: Optional fixed correlation ID for tracing.
+
+    Returns:
+        Async handler function compatible with MessageDispatchEngine.
+    """
+
+    async def _handle(
+        envelope: ModelEventEnvelope[object],
+        context: ModelDispatchContext,
+    ) -> DispatchReturn:
+        """Dispatch handler: expire-memory envelope -> HandlerMemoryExpire."""
+        from omnimemory.models.events import ModelLifecycleTransitionFailedEvent
+        from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
+            ModelExpireMemoryCommand,
+        )
+        from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_tick import (
+            ModelMemoryExpiredEvent,
+        )
+
+        ctx_correlation_id = (
+            correlation_id or getattr(context, "correlation_id", None) or uuid4()
+        )
+        if publish_callback is None:
+            raise RuntimeError(
+                "expire-memory outcome cannot be published: no publish callback "
+                f"is wired (correlation_id={ctx_correlation_id})"
+            )
+
+        publish = publish_callback
+        payload = _get_dispatch_payload(envelope)
+        now = datetime.now(UTC)
+
+        async def _fail(
+            *,
+            memory_id: UUID | None,
+            reason: str,
+            conflict: bool = False,
+            previous_state: EnumLifecycleState | None = None,
+        ) -> DispatchReturn:
+            logger.warning(
+                "expire-memory refused (memory_id=%s, reason=%s, correlation_id=%s)",
+                memory_id,
+                reason,
+                ctx_correlation_id,
+            )
+            await _publish_lifecycle_event(
+                publish,
+                MemoryEventTopic.LIFECYCLE_TRANSITION_FAILED,
+                ModelLifecycleTransitionFailedEvent(
+                    memory_id=memory_id,
+                    operation=_EXPIRE_OPERATION,
+                    reason=reason,
+                    conflict=conflict,
+                    previous_state=previous_state,
+                    correlation_id=ctx_correlation_id,
+                    emitted_at=now,
+                ),
+            )
+            return []
+
+        if not isinstance(payload, dict):
+            return await _fail(
+                memory_id=None,
+                reason=(
+                    f"expire-memory payload must be a JSON object, got "
+                    f"{type(payload).__name__}"
+                ),
+            )
+
+        fields = {k: v for k, v in payload.items() if k not in _COMMAND_ENVELOPE_KEYS}
+        try:
+            # The command model is strict (Python types); a bus payload is JSON,
+            # where a UUID or timestamp is a string, so validate in lax mode.
+            command = ModelExpireMemoryCommand.model_validate(fields, strict=False)
+        except ValueError as e:
+            return await _fail(
+                memory_id=_readable_memory_id(payload),
+                reason=f"Invalid expire-memory command: {e}",
+            )
+
+        if expire_handler is None:
+            return await _fail(
+                memory_id=command.memory_id,
+                reason=(
+                    "Expire handler not configured: no database connection "
+                    "(OMNIMEMORY_DB_URL) is wired into the memory runtime."
+                ),
+            )
+
+        # Pin the timestamp so the database row and the event agree.
+        if command.expired_at is None:
+            command = command.model_copy(update={"expired_at": now})
+        result = await expire_handler.handle(command)
+
+        if not result.success:
+            return await _fail(
+                memory_id=command.memory_id,
+                reason=result.error_message or "Expiration failed",
+                conflict=result.conflict,
+                previous_state=result.previous_state,
+            )
+
+        expired_at = command.expired_at or now
+        await _publish_lifecycle_event(
+            publish_callback,
+            MemoryEventTopic.MEMORY_EXPIRED,
+            ModelMemoryExpiredEvent(
+                entity_id=command.memory_id,
+                memory_id=command.memory_id,
+                correlation_id=ctx_correlation_id,
+                causation_id=ctx_correlation_id,
+                emitted_at=expired_at,
+                expires_at=expired_at,
+                lifecycle_revision=result.new_revision or command.expected_revision + 1,
+            ),
+        )
+        logger.info(
+            "Memory expired (memory_id=%s, revision=%s, correlation_id=%s)",
+            command.memory_id,
+            result.new_revision,
+            ctx_correlation_id,
+        )
         return []
 
     return _handle
@@ -877,21 +1099,23 @@ def create_memory_dispatch_engine(
     intent_graph_adapter: object | None = None,
     navigation_history_handler: object | None = None,
     semantic_compute_handler: object | None = None,
+    expire_handler: ProtocolMemoryExpireHandler | None = None,
 ) -> MessageDispatchEngine:
     """Create and configure a MessageDispatchEngine for OmniMemory domain.
 
     Creates the engine, registers all omnimemory domain handlers and routes,
     and freezes it. The engine is ready for dispatch after this call.
 
-    Registers 4-8 handlers covering 6-10 routes:
+    Registers 5-9 handlers covering 6-10 routes:
         1. intent-classified handler (1 route: intent-classified.v1 events)
         2. intent-query handler (1 route: intent-query-requested.v1 commands)
         3. memory-retrieval handler (1 route: memory-retrieval-requested.v1)
-        4. lifecycle handler (3 routes: runtime-tick, archive, expire)
-        5. graph-memory handler (optional, 1 route -- OMN-6578)
-        6. intent-graph handler (optional, 1 route -- OMN-6579)
-        7. navigation-history handler (optional, 1 route -- OMN-6583)
-        8. semantic-compute handler (optional, 1 route -- OMN-6585)
+        4. lifecycle handler (2 routes: runtime-tick, archive)
+        5. expire-memory handler (1 route: expire-memory commands)
+        6. graph-memory handler (optional, 1 route -- OMN-6578)
+        7. intent-graph handler (optional, 1 route -- OMN-6579)
+        8. navigation-history handler (optional, 1 route -- OMN-6583)
+        9. semantic-compute handler (optional, 1 route -- OMN-6585)
 
     Args:
         intent_consumer: REQUIRED intent event consumer handler.
@@ -907,6 +1131,9 @@ def create_memory_dispatch_engine(
             instance (OMN-6583).
         semantic_compute_handler: Optional HandlerSemanticCompute instance
             (OMN-6585).
+        expire_handler: Optional HandlerMemoryExpire instance. Without one,
+            expire-memory commands are answered with a
+            lifecycle-transition-failed event instead of being dropped.
 
     Returns:
         Frozen MessageDispatchEngine ready for dispatch.
@@ -1033,15 +1260,29 @@ def create_memory_dispatch_engine(
             ),
         )
     )
-    # Route: expire-memory command
+    # Route: expire-memory command. Its own dispatcher: the lifecycle bridge
+    # above has no expire operation and used to read an expire command as a
+    # shutdown request.
+    expire_dispatch_handler = create_expire_memory_dispatch_handler(
+        expire_handler=expire_handler,
+        publish_callback=publish_callback,
+    )
+    engine.register_dispatcher(
+        dispatcher_id="memory-lifecycle-expire-handler",
+        dispatcher=expire_dispatch_handler,
+        category=EnumMessageCategory.COMMAND,
+        node_kind=EnumNodeKind.ORCHESTRATOR,
+        message_types=None,
+    )
     engine.register_route(
         ModelDispatchRoute(
             route_id="memory-lifecycle-expire-route",
             topic_pattern=DISPATCH_ALIAS_EXPIRE_MEMORY,
             message_category=EnumMessageCategory.COMMAND,
-            handler_id="memory-lifecycle-handler",
+            handler_id="memory-lifecycle-expire-handler",
             description=(
-                "Routes expire-memory commands to lifecycle orchestrator (fail-fast)."
+                "Routes expire-memory commands to HandlerMemoryExpire and "
+                "publishes memory-expired or lifecycle-transition-failed."
             ),
         )
     )
@@ -1322,7 +1563,9 @@ __all__ = [
     "DISPATCH_ALIAS_INTENT_QUERY_REQUESTED",
     "DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED",
     "DISPATCH_ALIAS_RUNTIME_TICK",
+    "ProtocolMemoryExpireHandler",
     "create_dispatch_callback",
+    "create_expire_memory_dispatch_handler",
     "create_intent_classified_dispatch_handler",
     "create_intent_query_dispatch_handler",
     "create_lifecycle_dispatch_handler",

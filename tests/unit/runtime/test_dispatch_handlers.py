@@ -182,17 +182,17 @@ class TestCreateMemoryDispatchEngine:
         )
         assert engine.is_frozen
 
-    def test_engine_has_four_handlers(
+    def test_engine_has_five_handlers(
         self,
         mock_intent_consumer: MagicMock,
         mock_intent_query_handler: MagicMock,
     ) -> None:
-        """All 4 memory domain handlers must be registered."""
+        """All 5 memory domain handlers must be registered (expire has its own)."""
         engine = create_memory_dispatch_engine(
             intent_consumer=mock_intent_consumer,
             intent_query_handler=mock_intent_query_handler,
         )
-        assert engine.dispatcher_count == 4
+        assert engine.dispatcher_count == 5
 
     def test_engine_has_six_routes(
         self,
