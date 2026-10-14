@@ -67,7 +67,7 @@ requirements:
     acceptance:
       - id: "AC11"
         statement: |-
-          AC11: no event-triggered workflow calls an OCC reusable, ci.yml runs no occ-preflight or occ-eligibility job, call-occ-autobind.yml and call-occ-companion-effect.yml and their helper script and eligibility test are gone, CI Summary, the required-checks manifest and the pre-commit hooks name no OCC context, and the repo-evidence caller passes shadow "false" and compare-with-occ "false" -- falsifier: uv run pytest tests/ci/test_no_occ_callers_omn20074.py -q
+          AC11: no event-triggered workflow calls an OCC reusable, ci.yml runs no occ-preflight or occ-eligibility job, call-occ-autobind.yml and call-occ-companion-effect.yml and their helper script and eligibility test are gone, CI Summary, the required-checks manifest and the pre-commit hooks name no OCC context, the runner-IP caller pins the reusable without a nested preflight, and the repo-evidence caller passes shadow "false" and compare-with-occ "false" -- falsifier: uv run pytest tests/ci/test_no_occ_callers_omn20074.py -q
 evidence_requirements:
   - kind: "tests"
     description: "The caller workflow has the required base-branch trigger and read-only permissions."
