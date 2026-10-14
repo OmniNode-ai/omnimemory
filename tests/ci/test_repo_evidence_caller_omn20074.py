@@ -1,17 +1,17 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
-"""OMN-20074: omnimemory's repo-evidence caller runs in shadow mode.
+"""OMN-20074: omnimemory's repo-evidence caller enforces repo-owned evidence.
 
-The S5 comparison with OCC has ended (S6 precursor, ``compare-with-occ`` is
-"false"). The caller must still block nothing: the reusable's ``shadow`` input
-makes ``repo-evidence / verify`` and ``repo-evidence / dod-verify`` conclude
-success, and no OCC caller is removed yet.
+S6 cut-over: ``shadow`` and ``compare-with-occ`` are both "false", so
+``repo-evidence / dod-verify`` carries a real verdict and admission never waits for
+OCC's. Every OCC caller and the in-CI OCC preflight are gone (see
+``test_no_occ_callers_omn20074.py``).
 
-Failure modes this catches: the caller dropped ``shadow`` or ``compare-with-occ``
-(the check-run would carry a real refusal); the pin moved to a branch name or an
-older reusable; the caller moved to ``pull_request`` (a PR could then edit what
-judges it); a job name was added (the context prefix would change); an OCC caller
-was removed before the S6 ruling; the repo contract lost a falsifier.
+Failure modes this catches: the caller turned ``shadow`` or ``compare-with-occ``
+back on (admission would wait on a verdict nobody reports); the pin moved to a
+branch name or an older reusable; the caller moved to ``pull_request`` (a PR could
+then edit what judges it); a job name was added (the context prefix would change);
+an OCC caller came back; the repo contract lost a falsifier.
 """
 
 from __future__ import annotations
@@ -88,21 +88,22 @@ def test_current_receipt_gate_verifier_version_is_at_or_above_the_floor() -> Non
     assert version >= VERIFIER_FLOOR
 
 
-def test_caller_is_in_shadow_mode_and_ends_the_occ_comparison() -> None:
+def test_caller_shadow_mode_is_off_and_the_evidence_source_is_the_caller() -> None:
     inputs = _job()["with"]
     assert inputs["evidence-source"] == "caller"
     # Quoted strings: the reusable's boolean-like inputs are string inputs.
-    assert inputs["shadow"] == "true"
-    # OMN-20074 S6: the S5 comparison ended, so dev stops waiting for an OCC
-    # verdict before the cut-over removes its producers.
-    assert inputs["compare-with-occ"] == "false"
+    assert inputs["shadow"] == "false"
     version = tuple(int(part) for part in inputs["verifier-version"].split("."))
     assert version >= VERIFIER_FLOOR
 
 
-def test_shadow_caller_removes_no_occ_caller() -> None:
+def test_caller_ends_the_occ_comparison() -> None:
+    assert _job()["with"]["compare-with-occ"] == "false"
+
+
+def test_occ_callers_are_removed() -> None:
     for name in ("call-occ-autobind.yml", "call-occ-companion-effect.yml"):
-        assert (WORKFLOWS / name).is_file(), f"{name} must stay until the S6 ruling"
+        assert not (WORKFLOWS / name).exists(), f"{name} is retired at S6"
 
 
 def test_repo_contract_names_a_falsifier_per_criterion() -> None:
