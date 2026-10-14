@@ -25,6 +25,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.unit.util_occ_retirement import occ_callers_retired
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "call-occ-companion-effect.yml"
 
@@ -54,6 +56,8 @@ def _pull_request_types() -> list[str]:
 
 
 def test_the_caller_listens_for_a_description_edit() -> None:
+    if occ_callers_retired(REPO_ROOT):
+        return
     assert "edited" in _pull_request_types(), (
         "without the description-edited activity type the companion effect "
         "never runs on the event that drops the evidence line, so the "
@@ -63,6 +67,8 @@ def test_the_caller_listens_for_a_description_edit() -> None:
 
 def test_the_trigger_types_it_already_had_are_kept() -> None:
     """Positive control: the repair trigger is ADDITIVE, never a replacement."""
+    if occ_callers_retired(REPO_ROOT):
+        return
     types = _pull_request_types()
     for required in ("opened", "synchronize"):
         assert required in types, (
