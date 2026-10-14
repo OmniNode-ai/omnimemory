@@ -13,7 +13,6 @@ overrides = [
     { name = "omnibase-infra", specifier = ">=0.38.4,<0.39.0" },
     { name = "omnibase-spi", specifier = ">=0.23.0,<0.24.0" },
     { name = "omnimarket", git = "https://github.com/OmniNode-ai/omnimarket.git?tag=v0.4.0" },
-    { name = "onex-change-control", git = "https://github.com/OmniNode-ai/onex_change_control.git?rev=bd30807469c2b570d99ffefb25fb23e6a9d7cfb1" },
 ]
 
 [[package]]
