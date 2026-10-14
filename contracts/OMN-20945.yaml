@@ -1,0 +1,51 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-20945"
+title: "omnimemory's OMN-20074 contract repeats no YAML mapping key, and a test keeps every contract that
+  way"
+summary: >-
+  contracts/OMN-20074.yaml lost the "- kind" line of its AC8 evidence_requirements item, so two items
+  shared one mapping with a repeated description and command key (a last-key-wins parser dropped the CodeQL
+  item's values). The line is restored and a test loads every contracts/*.yaml with omnibase_core's strict
+  mapping loader, so omnimemory meets the duplicate-key refusal when it bumps its omnimarket pin.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-no-duplicate-contract-key"
+    statement: "No contract in contracts/ repeats a mapping key, and the OMN-20074 evidence items are
+      one mapping each."
+    acceptance:
+      - id: "AC1"
+        statement: >-
+          AC1: every contracts/*.yaml in omnimemory loads through omnibase_core's strict mapping loader
+          without a duplicate-key error, and contracts/OMN-20074.yaml has the line 86 duplicate gone --
+          falsifier: uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q -n 0
+      - id: "AC2"
+        statement: >-
+          AC2: the strict loader refuses a planted repeated key, so a green AC1 is not a loader that accepts
+          anything -- falsifier: uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q
+          -n 0 -k refuses_a_repeated_key
+evidence_requirements:
+  - kind: "tests"
+    description: "Every contract loads under the strict loader and a planted duplicate is refused."
+    command: "uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q -n 0"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn20945-ac1-strict-load"
+    description: "Each contract in contracts/ loads without a duplicate-key error."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q -n 0"
+    binds_ac: ["AC1"]
+  - id: "dod-omn20945-ac2-planted-duplicate"
+    description: "The strict loader raises on a planted repeated description key."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q -n 0 -k refuses_a_repeated_key"
+    binds_ac: ["AC2"]
