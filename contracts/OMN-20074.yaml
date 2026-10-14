@@ -23,7 +23,7 @@ requirements:
           AC2: the caller pins the reusable by the full sha of the omnibase_core#1914 squash commit, the pin omnibase_core's own caller uses, with a verifier-version of 0.4.305 or later -- falsifier: uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k current_receipt_gate
       - id: "AC3"
         statement: |-
-          AC3: the caller sets evidence-source caller, shadow "true" and compare-with-occ "true", so the S5 shadow count records the new-path verdict beside OCC's on the same head and no repo-evidence check-run concludes anything but success -- falsifier: uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k shadow_mode
+          AC3: the caller sets evidence-source caller and shadow "true", with compare-with-occ set by AC10, so no repo-evidence check-run concludes anything but success -- falsifier: uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k shadow_mode
       - id: "AC4"
         statement: |-
           AC4: the shadow caller removes no OCC caller: call-occ-autobind.yml and call-occ-companion-effect.yml stay until the S6 ruling -- falsifier: uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k removes_no_occ_caller
@@ -54,6 +54,13 @@ requirements:
       - id: "AC9"
         statement: |-
           AC9: the contract-validation step's own run block passes this repository's branch-ticket contract, skips a branch with no ticket or no contract, and fails a planted binds_ac entry that is not a criterion label, a planted binds_ac item of check_type command_exit_0 and a planted malformed contract, each naming the file, the first two also the rule -- falsifier: uv run pytest tests/ci/test_contract_validation_core_validator_omn20074.py -q
+  - id: "req-s6-comparison-off"
+    statement: |-
+      omnimemory's dev repo-evidence caller must stop comparing with OCC before the S6 cut-over removes OCC's verdict producers, so the cut-over pull request is judged by a caller that does not wait for a verdict nobody will report.
+    acceptance:
+      - id: "AC10"
+        statement: |-
+          AC10: the caller passes compare-with-occ "false" -- falsifier: uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k ends_the_occ_comparison
 evidence_requirements:
   - kind: "tests"
     description: "The caller workflow has the required base-branch trigger and read-only permissions."
@@ -83,6 +90,9 @@ evidence_requirements:
     description: "The contract-validation step passes this repository's branch contract and refuses both
       planted binds_ac shapes and a malformed contract."
     command: "uv run pytest tests/ci/test_contract_validation_core_validator_omn20074.py -q"
+  - kind: "tests"
+    description: "The caller passes compare-with-occ false."
+    command: "uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k ends_the_occ_comparison"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -166,3 +176,11 @@ dod_evidence:
         check_value: "uv run pytest tests/ci/test_contract_validation_core_validator_omn20074.py -q"
         cwd: "${OMNI_HOME}/omnimemory"
     binds_ac: ["AC9"]
+  - id: "dod-s6-comparison-off-ac10"
+    description: "The caller passes compare-with-occ false."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_repo_evidence_caller_omn20074.py -q -k ends_the_occ_comparison"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC10"]
