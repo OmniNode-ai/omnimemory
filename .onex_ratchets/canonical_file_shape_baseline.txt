@@ -14,7 +14,6 @@ scripts/check_no_hardcoded_bolt.sh
 scripts/ci/__init__.py
 scripts/ci/collect_changed_files.py
 scripts/ci/detect_test_paths.py
-scripts/ci/occ_manual_replay_precheck.py
 scripts/ci/run_runtime_profiles_validator.py
 scripts/ci/test_selection_loader.py
 scripts/ci/test_selection_models.py
