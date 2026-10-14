@@ -83,6 +83,7 @@ evidence_requirements:
   - kind: "tests"
     description: "The CodeQL caller uses the omnibase_core reusable at a full sha, shape unchanged."
     command: "uv run pytest tests/ci/test_codeql_from_core_omn20074.py -q"
+  - kind: "tests"
     description: "The contract-validation workflow reads no onex_change_control, validates with omnibase_core
       at the locked core and keeps its names."
     command: "uv run pytest tests/ci/test_contract_validation_core_validator_omn20074.py -q -k test_workflow_"
