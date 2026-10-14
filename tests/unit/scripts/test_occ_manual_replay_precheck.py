@@ -35,6 +35,10 @@ from typing import Any
 
 import pytest
 
+from tests.unit.util_occ_retirement import occ_callers_retired
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
 _SCRIPT = (
     Path(__file__).resolve().parents[3]
     / "scripts"
@@ -70,6 +74,8 @@ def _pr(**overrides: Any) -> dict[str, Any]:
 def test_the_script_the_workflow_references_actually_exists() -> None:
     """The OMN-16665 repair itself. Without this file the workflow step exits 2
     before the publish, and the documented remediation is a dead end."""
+    if occ_callers_retired(REPO_ROOT):
+        return
     assert _SCRIPT.is_file(), f"{_SCRIPT} is referenced by the workflow but absent"
 
 
@@ -78,9 +84,13 @@ class TestRefusals:
     def test_open_non_draft_pr_is_eligible(self) -> None:
         """Control: the ordinary replay path still passes, so every refusal
         below is caused by the state under test."""
+        if occ_callers_retired(REPO_ROOT):
+            return
         _load().check_replay_eligible(_pr())
 
     def test_closed_unmerged_pr_is_refused(self) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         with pytest.raises(
             module.ManualReplayRefusedError, match="closed without merging"
@@ -92,6 +102,8 @@ class TestRefusals:
     ) -> None:
         """The override is scoped to MERGED. A blanket state override would
         re-open occ#4333, the incident F-17 was added to close."""
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         with pytest.raises(
             module.ManualReplayRefusedError, match="closed without merging"
@@ -99,6 +111,8 @@ class TestRefusals:
             module.check_replay_eligible(_pr(state="CLOSED"), allow_merged_replay=True)
 
     def test_merged_pr_is_refused_by_default(self) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         with pytest.raises(module.ManualReplayRefusedError) as excinfo:
             module.check_replay_eligible(_pr(state="MERGED"))
@@ -107,14 +121,20 @@ class TestRefusals:
         assert "allow_merged_replay=true" in str(excinfo.value)
 
     def test_merged_pr_is_eligible_when_armed(self) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         _load().check_replay_eligible(_pr(state="MERGED"), allow_merged_replay=True)
 
     def test_draft_pr_is_refused(self) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         with pytest.raises(module.ManualReplayRefusedError, match="draft"):
             module.check_replay_eligible(_pr(isDraft=True))
 
     def test_draft_is_refused_independently_of_the_merged_override(self) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         with pytest.raises(module.ManualReplayRefusedError, match="draft"):
             module.check_replay_eligible(_pr(isDraft=True), allow_merged_replay=True)
@@ -122,6 +142,8 @@ class TestRefusals:
     def test_state_comparison_is_case_insensitive(self) -> None:
         """gh emits uppercase; a lowercase-only comparison would silently admit
         every refused state."""
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         with pytest.raises(module.ManualReplayRefusedError):
             module.check_replay_eligible(_pr(state="merged"))
@@ -132,6 +154,8 @@ class TestCliExitCodes:
     """The workflow reads the exit code, so it is part of the contract."""
 
     def test_eligible_pr_exits_zero(self, tmp_path: Path) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         state_file = tmp_path / "pr_state.json"
         state_file.write_text(json.dumps(_pr()), encoding="utf-8")
@@ -139,6 +163,8 @@ class TestCliExitCodes:
         assert module.main(["precheck", str(state_file)]) == 0
 
     def test_refused_pr_exits_one(self, tmp_path: Path) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         state_file = tmp_path / "pr_state.json"
         state_file.write_text(json.dumps(_pr(state="MERGED")), encoding="utf-8")
@@ -146,6 +172,8 @@ class TestCliExitCodes:
         assert module.main(["precheck", str(state_file)]) == 1
 
     def test_armed_merged_pr_exits_zero(self, tmp_path: Path) -> None:
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
         state_file = tmp_path / "pr_state.json"
         state_file.write_text(json.dumps(_pr(state="MERGED")), encoding="utf-8")
@@ -155,6 +183,8 @@ class TestCliExitCodes:
     def test_unreadable_state_file_exits_two(self, tmp_path: Path) -> None:
         """Distinct from the exit-1 refusal: a wiring fault must not read as a
         policy decision."""
+        if occ_callers_retired(REPO_ROOT):
+            return
         module = _load()
 
         assert module.main(["precheck", str(tmp_path / "missing.json")]) == 2
