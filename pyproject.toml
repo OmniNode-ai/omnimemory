@@ -438,7 +438,6 @@ override-dependencies = [
     # transitive dependency on omninode-memory to the workspace copy, which is
     # what the OMN-13837 omnimarket-chain note actually needed.
     "omnimarket>=0.4.0,<0.5.0",
-    "onex-change-control @ git+https://github.com/OmniNode-ai/onex_change_control.git@bd30807469c2b570d99ffefb25fb23e6a9d7cfb1",
 ]
 
 [tool.uv.sources]
