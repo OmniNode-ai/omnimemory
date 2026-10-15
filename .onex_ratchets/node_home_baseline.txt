@@ -1,0 +1,18 @@
+# Node-home baseline (OMN-20702). Shrink-only.
+# Pre-existing ONEX node directories outside omnimarket, one per line.
+# Delete an entry when its node is removed. New or renamed nodes move
+# to omnimarket instead. No allowlist, suppression or per-entry exemption.
+# Created once with --write-baseline; never regenerate or add entries.
+src/omnimemory/nodes/node_agent_coordinator_orchestrator
+src/omnimemory/nodes/node_agent_learning_retrieval_effect
+src/omnimemory/nodes/node_intent_query_effect
+src/omnimemory/nodes/node_intent_storage_effect
+src/omnimemory/nodes/node_kreuzberg_parse_effect
+src/omnimemory/nodes/node_memory_lifecycle_orchestrator
+src/omnimemory/nodes/node_memory_retrieval_effect
+src/omnimemory/nodes/node_memory_storage_effect
+src/omnimemory/nodes/node_navigation_history_reducer
+src/omnimemory/nodes/node_persona_builder_compute
+src/omnimemory/nodes/node_persona_storage_effect
+src/omnimemory/nodes/node_semantic_analyzer_compute
+src/omnimemory/nodes/node_similarity_compute

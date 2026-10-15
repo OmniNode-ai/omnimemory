@@ -116,6 +116,12 @@ repos:
         args: [--allowlist, .onex_ratchets/noncanonical_class_allowlist.yaml, src/omnimemory]
         files: ^src/omnimemory/.*\.py$
       - id: canonical-file-shape
+      # Node-home ratchet (OMN-20702): a new ONEX node directory or onex.nodes
+      # entry point outside omnimarket is refused against the shrink-only
+      # .onex_ratchets/node_home_baseline.txt. BLOCKING, no allowlist, no
+      # suppression comment. CI twin: the Canonical File Shape job in
+      # .github/workflows/ci.yml, same omnibase_core commit.
+      - id: check-node-home
   # URL Authority Gate (OMN-13298, child of OMN-12803).
   # Ratchet: NEW fingerprints fail; existing violations grandfathered in the
   # shared baseline at omnibase_core/src/omnibase_core/validation/baselines/url_authority_baseline.json.
