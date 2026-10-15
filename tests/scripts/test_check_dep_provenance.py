@@ -111,15 +111,15 @@ def test_reject_tag_override(mod, tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# ALLOW: occ-only override (the current legitimate state)
+# ALLOW: a git source for a package outside the forbidden first-party set
 # ---------------------------------------------------------------------------
 
 
-def test_allow_occ_only_override(mod, tmp_path: Path) -> None:
-    """onex-change-control git pin is intentional (immutable-main model)."""
+def test_allow_unlisted_package_git_override(mod, tmp_path: Path) -> None:
+    """Only the three PyPI-released first-party deps are policed."""
     block = (
         "[tool.uv.sources]\n"
-        'onex-change-control = { git = "https://github.com/OmniNode-ai/onex_change_control.git", '
+        'some-other-dep = { git = "https://github.com/OmniNode-ai/some_other_dep.git", '
         'rev = "2dd26ade7caaa7131e532473ec9d8a207d0e77ab" }\n'
     )
     path = _write_pyproject(tmp_path, block)
