@@ -111,6 +111,25 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ("check-ai-slop", "ai-slop-check", "check_ai_slop.py"),
 ]
 
+# OMN-20702: register the node-home pair before its activation PR lands. It
+# shares the canonical-file-shape job, but runs a different module. Keep this
+# separate from the required pairs so dev can validate before activation too.
+ACTIVATION_ALIGNMENTS: list[tuple[str, str, str]] = [
+    (
+        "check-node-home",
+        "canonical-file-shape",
+        "omnibase_core.nodes.node_node_home_check_compute.runtime_node_home_check",
+    ),
+]
+
+
+def expected_alignments(precommit_content: str) -> list[tuple[str, str, str]]:
+    """Include registered activation pairs whenever their hook is enabled."""
+    hook_ids = extract_hook_ids(precommit_content)
+    return EXPECTED_ALIGNMENTS + [
+        alignment for alignment in ACTIVATION_ALIGNMENTS if alignment[0] in hook_ids
+    ]
+
 
 def load_file(path: Path) -> str | None:
     """Load a file and return its content, or None if not found."""
@@ -176,7 +195,7 @@ def main() -> int:
     print("Checking CI/pre-commit alignment...")
     print()
 
-    for hook_id, ci_job, ci_description in EXPECTED_ALIGNMENTS:
+    for hook_id, ci_job, ci_description in expected_alignments(precommit_content):
         checked += 1
 
         # Check pre-commit hook exists

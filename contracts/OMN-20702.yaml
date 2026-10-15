@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-20702"
+title: "Register the node-home hook and CI alignment before activation"
+summary: >-
+  The CI/pre-commit alignment validator recognizes the check-node-home hook and its module in the canonical-file-shape
+  job when the hook is enabled. The existing required alignments remain required before and after activation.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-omn20702-alignment-registration"
+    statement: >-
+      Register node-home validation without requiring activation on dev or excluding the hook from validation
+      after activation.
+    acceptance:
+      - id: "AC1"
+        statement: >-
+          The alignment tests accept the registered hook with its CI counterpart, refuse it when the CI
+          module is absent, and pass before activation.
+evidence_requirements:
+  - kind: "tests"
+    description: "Focused alignment validator tests pass."
+    command: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml pytest tests/unit/test_validate_ci_precommit_alignment.py
+      -q"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn20702-alignment-registration"
+    description: "The validator checks the active hook and refuses its missing CI command."
+    source: "manual"
+    binds_ac: ["AC1"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml pytest tests/unit/test_validate_ci_precommit_alignment.py
+          -q"
