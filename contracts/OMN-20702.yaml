@@ -16,7 +16,7 @@ requirements:
       Register node-home validation without requiring activation on dev or excluding the hook from validation
       after activation.
     acceptance:
-      - id: "AC-ALIGNMENT"
+      - id: "AC1"
         statement: >-
           The alignment tests accept the registered hook with its CI counterpart, refuse it when the CI
           module is absent, and pass before activation.
@@ -33,7 +33,7 @@ dod_evidence:
   - id: "dod-omn20702-alignment-registration"
     description: "The validator checks the active hook and refuses its missing CI command."
     source: "manual"
-    binds_ac: ["AC-ALIGNMENT"]
+    binds_ac: ["AC1"]
     checks:
       - check_type: "test_passes"
         check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml pytest tests/unit/test_validate_ci_precommit_alignment.py
