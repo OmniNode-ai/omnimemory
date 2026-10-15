@@ -3,10 +3,13 @@
 ---
 schema_version: "1.0.0"
 ticket_id: "OMN-20702"
-title: "Register the node-home hook and CI alignment before activation"
+title: "omnimemory refuses a new ONEX node outside omnimarket, against a shrink-only baseline of today's
+  nodes"
 summary: >-
-  The CI/pre-commit alignment validator recognizes the check-node-home hook and its module in the canonical-file-shape
-  job when the hook is enabled. The existing required alignments remain required before and after activation.
+  The node-home gate lives in omnibase_core as the check-node-home hook. This change turns it on in omnimemory:
+  a baseline of the 13 node directories that exist here today, the check-node-home pre-commit hook, and
+  CI steps in the Canonical File Shape job that plant a node directory and fail unless the check refuses
+  it, then run the check against the pull request or merge-group base and fail closed when no base resolves.
 is_seam_ticket: false
 interface_change: false
 interfaces_touched: []
@@ -20,11 +23,25 @@ requirements:
         statement: >-
           The alignment tests accept the registered hook with its CI counterpart, refuse it when the CI
           module is absent, and pass before activation.
+  - id: "req-omn20702-omnimemory-node-home"
+    statement: >-
+      omnimemory runs the node-home check in pre-commit and in CI, and a node directory absent from .onex_ratchets/node_home_baseline.txt
+      is refused by both.
+    acceptance:
+      - id: "AC4"
+        statement: >-
+          AC4 (omnimemory): the pre-commit hook and the CI step run the check, the baseline lists only
+          existing node directories, and the check accepts the tree -- falsifier: python -m pytest tests/ci/test_node_home_activation_omn20702.py
+          fails.
 evidence_requirements:
   - kind: "tests"
     description: "Focused alignment validator tests pass."
     command: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml pytest tests/unit/test_validate_ci_precommit_alignment.py
       -q"
+  - kind: "tests"
+    description: "The node-home activation tests pass."
+    command: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml --with omnibase-core==0.47.43
+      pytest tests/ci/test_node_home_activation_omn20702.py -q"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -38,3 +55,11 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml pytest tests/unit/test_validate_ci_precommit_alignment.py
           -q"
+  - id: "dod-omn20702-omnimemory-ac4"
+    description: "The node-home activation tests pass, including the check against the committed baseline."
+    source: "manual"
+    binds_ac: ["AC4"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pyyaml --with omnibase-core==0.47.43
+          pytest tests/ci/test_node_home_activation_omn20702.py -q"
