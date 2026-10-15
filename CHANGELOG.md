@@ -1,3 +1,14 @@
+## v0.18.6 (2026-10-15)
+
+### Release
+- Cut omnimemory from dev at 0.18.6 by the scheduled release train.
+- 2 release-relevant commit(s) merged since v0.18.5.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.5
+- build(deps): update fastapi requirement from <0.143.0,>=0.136.3 to >=0.136.3,<0.144.0 (#628)
+- ci: Contract Compliance Check validates omnimemory's own contracts, drop onex-change-control (#626)
+
 ## v0.18.5 (2026-10-11)
 
 ### Release
