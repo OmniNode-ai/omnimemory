@@ -84,7 +84,7 @@ def test_no_workflow_reads_a_sibling_at_a_live_ref() -> None:
     "snippet",
     [
         "jobs:\n  j:\n    uses: OmniNode-ai/omniclaude/.github/workflows/x.yml@main\n",
-        "jobs:\n  j:\n    steps:\n      - uses: OmniNode-ai/onex_change_control/.github/actions/a@dev\n",
+        "jobs:\n  j:\n    steps:\n      - uses: OmniNode-ai/omnibase_spi/.github/actions/a@dev\n",
         "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          repository: OmniNode-ai/omnibase_core\n",
         "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          repository: OmniNode-ai/omnimarket\n          ref: dev\n",
     ],
