@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-17427"
+title: "omnimemory: pr-title check calls the omnibase_core reusable"
+summary: >-
+  Replace the inline PR title jobs with a call to omnibase_core's reusable pr-title-check.yml, passing
+  only the omnimarket version, under the unchanged pr-title / check-title context.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-pr-title-core-reusable"
+    statement: >-
+      PR Title Check runs from omnibase_core's reusable workflow with only this repository's parameters
+      and keeps its required context, triggers and title decision.
+    acceptance:
+      - id: "AC1"
+        statement: >-
+          AC1: PR Title Check's one job pr-title calls omnibase_core's pr-title-check.yml at a full sha
+          with only omnimarket-version, composing pr-title / check-title on pull_request and merge_group
+          -- falsifier: python -m pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -k "workflow
+          or context" fails at the merge base.
+      - id: "AC2"
+        statement: >-
+          AC2: .github/required-checks.yaml names the pr-title / check-title row as a cross_repo producer
+          whose cross_repo_ref equals the workflow's call -- falsifier: python -m pytest tests/ci/test_pr_title_check_omnimarket_node.py
+          -q -k manifest fails at the merge base.
+evidence_requirements:
+  - kind: "tests"
+    description: "Focused workflow, context, manifest and installed-node verdict checks."
+    command: "uv run --no-project --with pytest --with pytest-asyncio --with pytest-xdist --with pyyaml
+      pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -n 0"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-workflow-core-reusable"
+    description: "Workflow calls the core reusable with only its parameters under the required context."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pytest-xdist --with
+          pyyaml pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -n 0 -k \"workflow or context\""
+    binds_ac: ["AC1"]
+  - id: "dod-manifest-core-reusable-producer"
+    description: "Required-check manifest declares the core reusable producer."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pytest-xdist --with
+          pyyaml pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -n 0 -k manifest"
+    binds_ac: ["AC2"]
