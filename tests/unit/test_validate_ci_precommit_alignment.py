@@ -39,7 +39,55 @@ load_file = _module.load_file
 extract_hook_ids = _module.extract_hook_ids
 extract_ci_job_ids = _module.extract_ci_job_ids
 check_ci_contains = _module.check_ci_contains
-EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = _module.EXPECTED_ALIGNMENTS
+EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = _module.expected_alignments(
+    (_REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.unit
+class TestNodeHomeActivationAlignment:
+    """The alignment gate accepts activation and still refuses missing CI wiring."""
+
+    def test_inactive_hook_does_not_require_ci_wiring(self) -> None:
+        alignments = _module.expected_alignments("repos: []")
+        assert alignments == _module.EXPECTED_ALIGNMENTS
+        assert all(pair[0] != "check-node-home" for pair in alignments)
+
+    def test_active_hook_requires_its_ci_module(self) -> None:
+        alignments = _module.expected_alignments("  - id: check-node-home\n")
+        assert (
+            "check-node-home",
+            "canonical-file-shape",
+            "omnibase_core.nodes.node_node_home_check_compute.runtime_node_home_check",
+        ) in alignments
+        assert len(alignments) == len(_module.EXPECTED_ALIGNMENTS) + 1
+
+    def test_validator_refuses_missing_node_home_command(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        precommit = (_REPO_ROOT / ".pre-commit-config.yaml").read_text()
+        if "check-node-home" not in extract_hook_ids(precommit):
+            precommit += "\n  - repo: local\n    hooks:\n      - id: check-node-home\n"
+        workflow = (_REPO_ROOT / ".github/workflows/ci.yml").read_text()
+        module = (
+            "omnibase_core.nodes.node_node_home_check_compute.runtime_node_home_check"
+        )
+        if module not in workflow:
+            workflow += f"\n# python -m {module}\n"
+        (tmp_path / ".pre-commit-config.yaml").write_text(precommit)
+        workflow_path = tmp_path / ".github/workflows/ci.yml"
+        workflow_path.parent.mkdir(parents=True)
+        workflow_path.write_text(workflow)
+        (tmp_path / ".github/required-checks.yaml").write_text("required_checks: []\n")
+        monkeypatch.chdir(tmp_path)
+
+        assert _module.main() == 0
+        workflow_path.write_text(workflow.replace(module, "missing-node-home-command"))
+        assert _module.main() == 1
+        assert f"CI workflow does not reference '{module}'" in capsys.readouterr().out
 
 
 # =============================================================================
@@ -622,7 +670,16 @@ class TestAlignmentCount:
         # 24 as of OMN-20304, which added the canonical-file-shape pair (23 as of
         # OMN-20298, check-shape-gate-independence; 22 as of OMN-19666, which added
         # the no-git-precommit-additional-dependencies pair; 21 as of OMN-18033).
-        expected_count = 24
+        expected_count = 24 + len(
+            [
+                pair
+                for pair in _module.ACTIVATION_ALIGNMENTS
+                if pair[0]
+                in extract_hook_ids(
+                    (_REPO_ROOT / ".pre-commit-config.yaml").read_text()
+                )
+            ]
+        )
         assert len(EXPECTED_ALIGNMENTS) == expected_count, (
             f"EXPECTED_ALIGNMENTS has {len(EXPECTED_ALIGNMENTS)} entries, "
             f"expected {expected_count}. If you added or removed entries, "

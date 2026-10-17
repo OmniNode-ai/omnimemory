@@ -19,10 +19,6 @@ Forbidden first-party deps (both hyphen and underscore spellings):
 A ``[tool.uv.sources]`` entry for any of the above with a ``git`` / ``rev`` /
 ``branch`` / ``tag`` key is a forbidden override and fails the gate.
 
-``onex-change-control`` is deliberately NOT checked — it follows an
-immutable-main pin release model (different from the three PyPI-released deps),
-so its git pin is intentional and must remain allowed.
-
 Escape hatch (Rule-10 style): a forbidden source line may carry an inline
 comment ``# raw-override-ok: <ticket>`` with a NON-EMPTY token. This exempts the
 single line. An empty token (``# raw-override-ok:`` with nothing after) does NOT
