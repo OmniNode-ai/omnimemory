@@ -119,6 +119,18 @@ required_checks:
       the required CI Summary context, which needs: this job and accepts only a
       success result.
 
+  - name: "Public Runner Placement (OMN-19998)"
+    workflow: ci.yml
+    job_id: public-runner-placement
+    conditional: false
+    rationale: >-
+      OMN-19998. Operator ruling 2026-10-16T07:07:09Z: CI runners are for
+      private repositories only. Refuses a job whose runs-on is, or can resolve
+      to, a self-hosted label, using omnibase_core's check at the release the
+      pre-commit hook pins. Unconditional (no needs, no if); gates merges
+      through the required CI Summary context, which needs: this job and
+      accepts only a success result.
+
   # -- Phase 2: Full Test Suite ------------------------------------------------
 
   - name: "Tests"

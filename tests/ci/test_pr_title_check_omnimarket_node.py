@@ -28,12 +28,8 @@ MANIFEST = ROOT / ".github/required-checks.yaml"
 CONTEXT = "pr-title / check-title"
 NODE_MODULE = "omnimarket.nodes.node_pr_title_check_compute"
 OMNIMARKET_VERSION = "0.4.310"
-RUNS_ON = """${{
-  (github.event_name == 'pull_request' &&
-   github.event.pull_request.head.repo.full_name != github.repository)
-  && fromJSON(vars.OMNI_PUBLIC_PR_RUNS_ON_JSON || '["ubuntu-latest"]')
-  || fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]')
-}}"""
+# OMN-19998: a public repository runs CI on a GitHub-hosted runner only.
+RUNS_ON = "ubuntu-latest"
 OLD_BASH = r"""
 if [[ -z "$PR_TITLE" ]]; then
   exit 1
@@ -67,7 +63,7 @@ def test_workflow_preserves_context_triggers_and_runner() -> None:
     assert "uses" not in job
     assert job["name"] == CONTEXT
     assert job["if"] == "github.event_name == 'pull_request'"
-    assert " ".join(job["runs-on"].split()) == " ".join(RUNS_ON.split())
+    assert job["runs-on"] == RUNS_ON
     assert job["timeout-minutes"] == 10
     assert job["permissions"] == {"contents": "read"}
     assert workflow[True] == {
