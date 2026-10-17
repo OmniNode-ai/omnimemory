@@ -1,23 +1,12 @@
 ## v0.18.6 (2026-10-15)
 
-### Release
-- Cut omnimemory from dev at 0.18.6 by the scheduled release train.
-- 2 release-relevant commit(s) merged since v0.18.5.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.5
+v0.18.6 is cut from dev by the scheduled release train; 2 release-relevant commits since v0.18.5; the train opens only when the declared lab-evidence premise holds for the exact candidate commit.
 - build(deps): update fastapi requirement from <0.143.0,>=0.136.3 to >=0.136.3,<0.144.0 (#628)
 - ci: Contract Compliance Check validates omnimemory's own contracts, drop onex-change-control (#626)
 
 ## v0.18.5 (2026-10-11)
 
-### Release
-- Cut omnimemory from dev at 0.18.5 by the scheduled release train.
-- 1 release-relevant commit(s) merged since v0.18.4.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.4
-- feat: remove the lab embedding default from omnimemory (#605)
+v0.18.5 is cut from dev by the same train, 1 release-relevant commit since v0.18.4, feat: remove the lab embedding default from omnimemory (#605), under the same lab-evidence premise.
 
 ## v0.18.4 (2026-10-01)
 
