@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-18595"
+title: "Release omnimemory 0.18.6"
+summary: "Publish consistent 0.18.6 release metadata and compact the newest changelog entries without
+  moving the historical credential example tracked by the secrets scanner."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-release-metadata"
+    statement: "The release metadata agrees and the release notes pass the existing secrets scan without
+      a baseline rewrite."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: pyproject.toml, the omninode-memory uv.lock entry and the newest changelog header
+          all declare 0.18.6; falsified by the release metadata assertion."
+      - id: "AC2"
+        statement: "AC2: detect-secrets 1.5.0 finds no new secret in CHANGELOG.md and requires no baseline
+          rewrite; falsified by the focused scan assertion."
+evidence_requirements:
+  - kind: "tests"
+    description: "Focused release metadata assertions and the existing scanner's new-finding and baseline-update
+      decisions."
+    command: |-
+      uv run --no-project --python 3.12 --with "detect-secrets==1.5.0" python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline --no-verify CHANGELOG.md
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn18595-release-metadata"
+    description: "Package metadata, the root lock entry and the latest changelog header agree on the release
+      version."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: |-
+          uv run --no-project --python 3.12 python -c 'import pathlib, tomllib; p=tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]; lock=tomllib.loads(pathlib.Path("uv.lock").read_text()); package=next(item for item in lock["package"] if item["name"] == p["name"]); assert p["version"] == package["version"] == "0.18.6"; assert pathlib.Path("CHANGELOG.md").read_text().startswith("## v0.18.6 (2026-10-15)\n")'
+      - check_type: "test_passes"
+        check_value: |-
+          uv run --no-project --python 3.12 python tests/test_release_metadata_omn18595.py
+    binds_ac: ["AC1"]
+  - id: "dod-omn18595-changelog-secrets"
+    description: "The scanner accepts the changelog with no new finding and no change to its recorded
+      baseline results."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: |-
+          uv run --no-project --python 3.12 --with detect-secrets==1.5.0 python -c 'import pathlib; assert pathlib.Path("CHANGELOG.md").read_text().startswith("## v0.18.6 (2026-10-15)\n"), "changelog is not the 0.18.6 release notes"; from detect_secrets.core.secrets_collection import SecretsCollection; from detect_secrets.pre_commit_hook import parse_args, should_update_baseline; args=parse_args(["--baseline", ".secrets.baseline", "--no-verify", "CHANGELOG.md"]); scanned=SecretsCollection(); scanned.scan_file("CHANGELOG.md"); assert not (scanned - args.baseline), "new secret finding"; assert not should_update_baseline(args.baseline, scanned, ["CHANGELOG.md"], args.baseline_version), "baseline rewrite required"'
+    binds_ac: ["AC2"]
