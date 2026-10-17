@@ -106,6 +106,10 @@ test_families:
       - scripts/
       - .pre-commit-config.yaml
       - .github/workflows/ci.yml
+  tests/test_release_metadata_omn18595.py:
+    triggers:
+      - CHANGELOG.md
+      - uv.lock
   tests/ci/:
     triggers:
       - .github/workflows/call-repo-evidence-gate.yml
