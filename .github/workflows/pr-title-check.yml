@@ -20,13 +20,7 @@ jobs:
     # OMN-20997: run the released title decision node under the existing context.
     # No checkout: the decision reads only the event's title and author.
     name: pr-title / check-title
-    runs-on: >-
-      ${{
-        (github.event_name == 'pull_request' &&
-         github.event.pull_request.head.repo.full_name != github.repository)
-        && fromJSON(vars.OMNI_PUBLIC_PR_RUNS_ON_JSON || '["ubuntu-latest"]')
-        || fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]')
-      }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
@@ -52,10 +46,7 @@ jobs:
   pr-title-merge-group:
     if: github.event_name == 'merge_group'
     name: pr-title / check-title
-    runs-on: >-
-      ${{
-        fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]')
-      }}
+    runs-on: ubuntu-latest
     steps:
       - name: Accept merge-group title check
         run: |

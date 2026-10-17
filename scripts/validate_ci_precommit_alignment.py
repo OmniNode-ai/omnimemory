@@ -97,6 +97,14 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
         "canonical-file-shape",
         "omnibase_core.validators.canonical_file_shape",
     ),
+    # OMN-19998: public-repository runner placement. The CI counterpart is
+    # ci.yml's public-runner-placement job, which runs the same handler module
+    # at the same omnibase_core release as the hook.
+    (
+        "check-public-runner-placement",
+        "public-runner-placement",
+        "omnibase_core.handlers.handler_public_runner_placement_cli",
+    ),
     # Infrastructure hooks
     ("migration-freeze-check", "migration-freeze", "check_migration_freeze.sh"),
     # New hooks from OMN-2218

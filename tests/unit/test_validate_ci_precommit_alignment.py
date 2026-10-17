@@ -667,10 +667,11 @@ class TestAlignmentCount:
         """
         # 24 after OMN-20074 (OCC retirement S6) removed the eligibility
         # enforcement regression pair that OMN-18854 had added (25).
+        # 25 as of OMN-19998, which added the check-public-runner-placement pair.
         # 24 as of OMN-20304, which added the canonical-file-shape pair (23 as of
         # OMN-20298, check-shape-gate-independence; 22 as of OMN-19666, which added
         # the no-git-precommit-additional-dependencies pair; 21 as of OMN-18033).
-        expected_count = 24 + len(
+        expected_count = 25 + len(
             [
                 pair
                 for pair in _module.ACTIVATION_ALIGNMENTS

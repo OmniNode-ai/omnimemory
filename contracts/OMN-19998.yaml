@@ -1,0 +1,41 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-19998"
+title: "omnimemory CI runs on GitHub-hosted runners; the public runner placement check gates CI Summary"
+summary: >-
+  Operator ruling 2026-10-16T07:07:09Z: CI runners are for private repositories only. omnimemory is public,
+  so every routing fallback in its workflows that named the self-hosted omnibase-ci fleet falls back to
+  ubuntu-latest, and omnibase_core's check-public-runner-placement runs as a CI Summary member job and
+  as a pre-commit hook at one core release.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-omn19998-public-runner-placement"
+    statement: "No omnimemory workflow routing fallback names the self-hosted fleet, and core's placement
+      check runs in CI Summary and in pre-commit at one core release."
+    acceptance:
+      - id: "AC1"
+        statement: >-
+          AC1: no workflow line in omnimemory falls back to the self-hosted fleet, the Public Runner Placement
+          job is unconditional, hosted, carries a positive control and the same core release as the pre-commit
+          hook, and CI Summary requires its success -- falsifier: uv run pytest tests/ci/test_public_runner_placement_omn19998.py
+          -q fails at the merge base, where 11 fallback lines name the fleet and neither the job nor the
+          hook exists
+evidence_requirements:
+  - kind: "tests"
+    description: "The placement tests read every workflow file for the fleet fallback, the ci.yml job,
+      the pre-commit config and the CI Summary wiring."
+    command: "uv run pytest tests/ci/test_public_runner_placement_omn19998.py -q -n 0"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn19998-ac1-public-runner-placement"
+    description: "The tests read the workflows, the CI job, the pre-commit hook and the CI Summary wiring."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_public_runner_placement_omn19998.py -q -n 0"
+    binds_ac: ["AC1"]
