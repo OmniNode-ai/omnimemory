@@ -46,7 +46,7 @@ MIT SPDX headers required in `src/`, `tests/`, `scripts/`, `examples/` (spec: `o
 
 ## Documentation
 
-Every OmniMemory document lives in the OmniNode knowledge base, not in this repository. The only markdown that remains here is this file, the root `README.md`, `CHANGELOG.md`, `LICENSE`, `SECURITY.md`, and the `.claude/` and `.github/` trees — enforced by the required `kb-doc-gate` check running in `strict` mode (`.kb-doc-gate.yaml`). A pointer stub is not a removal: the README's Documentation section carries the signposting role for the whole repo and is the full page index.
+Human documentation lives in the OmniNode knowledge base. Keep the root `README.md` as a short pointer. Repository-local markdown is limited to these agent instructions, the CI-verified `.claude/architecture-handshake.md`, GitHub issue/PR templates, and `CHANGELOG.md`, which the release metadata test and evidence contract read. The required `kb-doc-gate` check runs in `strict` mode (`.kb-doc-gate.yaml`).
 
 - Public: <https://github.com/OmniNode-ai/knowledge_base>
 

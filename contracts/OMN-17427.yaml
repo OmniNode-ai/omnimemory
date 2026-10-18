@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-17427"
+title: "Remove unread repository documentation"
+summary: >-
+  Delete unread human documentation, replace the README with a short public knowledge-base pointer, and
+  retain agent instructions, templates, legal text and machine-read files.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-documentation-removal"
+    statement: "Human documentation belongs in the public knowledge base."
+    acceptance:
+      - id: "AC1"
+        statement: "Unread prose files are removed and the root README is three to five lines linking
+          to the public knowledge base."
+      - id: "AC2"
+        statement: "Legal text, agent instructions, templates and machine-read files remain, with no local
+          markdown links to removed files."
+      - id: "AC3"
+        statement: "The existing focused release metadata tests still pass."
+evidence_requirements:
+  - kind: "tests"
+    description: "Documentation inventory, local links and existing release metadata checks."
+    command: "uv run --no-project --python 3.12 python tests/test_documentation_inventory_omn17427.py"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-documentation-inventory"
+    description: "The removed files are absent and the README points to the public knowledge base."
+    source: "manual"
+    binds_ac: ["AC1"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --python 3.12 python tests/test_documentation_inventory_omn17427.py
+          TestRemovedProse"
+  - id: "dod-preserved-readers-and-links"
+    description: "Every retained prose exception exists, markdown links avoid the removed files and the
+      public hygiene allowlist no longer names SECURITY.md."
+    source: "manual"
+    binds_ac: ["AC2"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --python 3.12 python tests/test_documentation_inventory_omn17427.py
+          TestRetainedReaders"
+  - id: "dod-release-metadata"
+    description: "With the prose removed, the existing three release metadata checks pass with the retained
+      changelog."
+    source: "manual"
+    binds_ac: ["AC3"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --python 3.12 python tests/test_documentation_inventory_omn17427.py
+          TestReleaseMetadataAfterRemoval"
