@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-17427"
+title: "Remove unread repository documentation"
+summary: >-
+  Delete unread human documentation, replace the README with a short public knowledge-base pointer, and
+  retain agent instructions, templates, legal text and machine-read files.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-documentation-removal"
+    statement: "Human documentation belongs in the public knowledge base."
+    acceptance:
+      - id: "AC1"
+        statement: "Unread prose files are removed and the root README is three to five lines linking
+          to the public knowledge base."
+      - id: "AC2"
+        statement: "Legal text, agent instructions, templates and machine-read files remain, with no local
+          markdown links to removed files."
+      - id: "AC3"
+        statement: "The existing focused release metadata tests still pass."
+evidence_requirements:
+  - kind: "tests"
+    description: "Documentation inventory, local links and existing release metadata checks."
+    command: "uv run --no-project --python 3.12 python tests/test_release_metadata_omn18595.py"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-documentation-inventory"
+    description: "The removed files are absent and the README points to the public knowledge base."
+    source: "manual"
+    binds_ac: ["AC1"]
+    checks:
+      - check_type: "test_passes"
+        check_value: >-
+          uv run --no-project --python 3.12 python -c 'from pathlib import Path; removed=(".github/CODE_OF_CONDUCT.md",
+          ".github/CONTRIBUTING.md", "SECURITY.md"); assert all(not Path(p).exists() for p in removed);
+          readme=Path("README.md").read_text(); assert 3 <= len(readme.splitlines()) <= 5; assert "https://github.com/OmniNode-ai/knowledge_base"
+          in readme; print("PASS: unread prose removed; README has a public knowledge-base pointer")'
+  - id: "dod-preserved-readers-and-links"
+    description: "Every retained prose exception exists and markdown links avoid the removed files."
+    source: "manual"
+    binds_ac: ["AC2"]
+    checks:
+      - check_type: "test_passes"
+        check_value: >-
+          uv run --no-project --python 3.12 python -c 'from pathlib import Path; import re, subprocess;
+          retained=("README.md", "CLAUDE.md", "LICENSE", ".claude/architecture-handshake.md", ".github/ISSUE_TEMPLATE/bug_report.md",
+          ".github/ISSUE_TEMPLATE/feature_request.md", ".github/PULL_REQUEST_TEMPLATE.md", "CHANGELOG.md",
+          ".onex_ratchets/canonical_file_shape_baseline.txt", ".onex_ratchets/node_home_baseline.txt");
+          assert all(Path(p).is_file() for p in retained); removed={"CODE_OF_CONDUCT.md", "CONTRIBUTING.md",
+          "SECURITY.md"}; paths=subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0");
+          docs=[Path(p) for p in paths if Path(p).is_file() and Path(p).suffix.lower() in {".md", ".mdx",
+          ".rst", ".adoc", ".txt"}]; links=[target for p in docs for target in re.findall(r"\]\(([^)]+)\)",
+          p.read_text())]; assert not [link for link in links if "://" not in link and Path(link.split("#")[0]).name
+          in removed]; print("PASS: retained reader inputs exist; no markdown links to removed files")'
+  - id: "dod-release-metadata"
+    description: "The existing three release metadata checks pass with the retained changelog."
+    source: "manual"
+    binds_ac: ["AC3"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --python 3.12 python tests/test_release_metadata_omn18595.py"
