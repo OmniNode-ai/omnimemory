@@ -21,7 +21,7 @@ required_checks:
     workflow: pr-title-check.yml
     job_id: pr-title
     producer_kind: cross_repo
-    cross_repo_ref: "OmniNode-ai/omnibase_core/.github/workflows/pr-title-check.yml@1b6bc0cb3da1f804961e87f646cc85bf3d391149"
+    cross_repo_ref: "OmniNode-ai/omnibase_core/.github/workflows/pr-title-check.yml@6d562b13401684270453f1dedd22f8737110f2f2"
     conditional: false
     rationale: >-
       PR title ticket-reference check: omnibase_core's reusable runs omnimarket's
@@ -120,6 +120,18 @@ required_checks:
       .onex_ratchets/canonical_file_shape_baseline.txt. Gates merges through
       the required CI Summary context, which needs: this job and accepts only a
       success result.
+
+  - name: "Public Runner Placement (OMN-19998)"
+    workflow: ci.yml
+    job_id: public-runner-placement
+    conditional: false
+    rationale: >-
+      OMN-19998. Operator ruling 2026-10-16T07:07:09Z: CI runners are for
+      private repositories only. Refuses a job whose runs-on is, or can resolve
+      to, a self-hosted label, using omnibase_core's check at the release the
+      pre-commit hook pins. Unconditional (no needs, no if); gates merges
+      through the required CI Summary context, which needs: this job and
+      accepts only a success result.
 
   # -- Phase 2: Full Test Suite ------------------------------------------------
 

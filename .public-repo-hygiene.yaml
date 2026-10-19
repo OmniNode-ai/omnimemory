@@ -40,7 +40,6 @@ allowed_top_level:
   - "CLAUDE.md"
   - "LICENSE"
   - "README.md"
-  - "SECURITY.md"
   - "architecture-handshakes"
   - "config"
   - "contract.yaml"

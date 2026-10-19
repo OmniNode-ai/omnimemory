@@ -106,6 +106,21 @@ test_families:
       - scripts/
       - .pre-commit-config.yaml
       - .github/workflows/ci.yml
+  tests/test_release_metadata_omn18595.py:
+    triggers:
+      - CHANGELOG.md
+      - uv.lock
+  tests/test_documentation_inventory_omn17427.py:
+    triggers:
+      - README.md
+      - CLAUDE.md
+      - CHANGELOG.md
+      - .claude/
+      - .github/
+      - .kb-doc-gate.yaml
+      - .public-repo-hygiene.yaml
+      - .onex_ratchets/
+      - tests/test_release_metadata_omn18595.py
   tests/ci/:
     triggers:
       - .github/workflows/call-repo-evidence-gate.yml

@@ -6,10 +6,8 @@
 # the allowed set exists on the branch, which is what keeps a scrubbed repo
 # scrubbed. Validator + allowed set: omniclaude/scripts/kb_doc_gate.py.
 #
-# No repo-specific `allowed:` entries: everything that survives here
-# (README.md, CLAUDE.md, .claude/**, CHANGELOG.md, LICENSE, SECURITY.md,
-# .github/**) is already in the validator's DEFAULT_ALLOWED. Do not add an
-# `allowed:` glob to keep a new doc — move the doc to the knowledge base.
-#
-# A `mode:` here always wins over the caller workflow's `--mode` argument.
+# No repo-specific `allowed:` entries: the README, agent instructions,
+# CI-verified architecture handshake, issue/PR templates and machine-read
+# changelog all match the validator's DEFAULT_ALLOWED. Human documentation
+# belongs in the knowledge base; do not add an `allowed:` glob for a new doc.
 mode: strict
