@@ -5,6 +5,11 @@
 The bash oracle below is the decision portion of the old reusable pinned at
 725d2967b031d7065efd41d0751f903638202cc1. The node runs from a PyPI release in
 an isolated venv, as the workflow does; no sibling clone or checkout is needed.
+
+OMN-17427: the job body now lives in omnibase_core's reusable
+``pr-title-check.yml``, which every repository of the same type calls. This
+repository's caller passes only the omnimarket version; the caller job id
+``pr-title`` and the reusable's job ``check-title`` compose the same context.
 """
 
 from __future__ import annotations
@@ -28,8 +33,15 @@ MANIFEST = ROOT / ".github/required-checks.yaml"
 CONTEXT = "pr-title / check-title"
 NODE_MODULE = "omnimarket.nodes.node_pr_title_check_compute"
 OMNIMARKET_VERSION = "0.4.310"
-# OMN-19998: a public repository runs CI on a GitHub-hosted runner only.
-RUNS_ON = "ubuntu-latest"
+CORE_REUSABLE = re.compile(
+    r"OmniNode-ai/omnibase_core/\.github/workflows/pr-title-check\.yml@[0-9a-f]{40}"
+)
+RUNS_ON = """${{
+  (github.event_name == 'pull_request' &&
+   github.event.pull_request.head.repo.full_name != github.repository)
+  && fromJSON(vars.OMNI_PUBLIC_PR_RUNS_ON_JSON || '["ubuntu-latest"]')
+  || fromJSON(vars.OMNI_TRUSTED_CI_RUNS_ON_JSON || '["self-hosted","omnibase-ci"]')
+}}"""
 OLD_BASH = r"""
 if [[ -z "$PR_TITLE" ]]; then
   exit 1
@@ -56,52 +68,38 @@ def _workflow() -> dict[Any, Any]:
     return loaded
 
 
-def test_workflow_preserves_context_triggers_and_runner() -> None:
+def test_workflow_calls_the_core_reusable_with_only_its_parameters() -> None:
     workflow = _workflow()
+    assert list(workflow["jobs"]) == ["pr-title"]
     job = workflow["jobs"]["pr-title"]
     assert "onex_change_control" not in WORKFLOW.read_text(encoding="utf-8")
-    assert "uses" not in job
-    assert job["name"] == CONTEXT
-    assert job["if"] == "github.event_name == 'pull_request'"
-    assert job["runs-on"] == RUNS_ON
-    assert job["timeout-minutes"] == 10
+    assert CORE_REUSABLE.fullmatch(job["uses"])
+    assert job["with"] == {"omnimarket-version": OMNIMARKET_VERSION}
     assert job["permissions"] == {"contents": "read"}
+    assert not {"steps", "runs-on", "if", "needs", "name"} & job.keys()
     assert workflow[True] == {
         "pull_request": {"types": ["opened", "edited", "synchronize", "reopened"]},
         "merge_group": {"types": ["checks_requested"]},
     }
-    assert workflow["jobs"]["pr-title-merge-group"]["name"] == CONTEXT
 
 
-def test_workflow_runs_an_isolated_pinned_release_node() -> None:
-    steps = _workflow()["jobs"]["pr-title"]["steps"]
-    assert len(steps) == 2
-    assert re.fullmatch(r"astral-sh/setup-uv@[0-9a-f]{40}", steps[0]["uses"])
-    assert not any("actions/checkout" in step.get("uses", "") for step in steps)
-    env = steps[1]["env"]
-    assert env["OMNIMARKET_VERSION"] == OMNIMARKET_VERSION
-    assert env["PR_TITLE"] == "${{ github.event.pull_request.title }}"
-    assert env["PR_AUTHOR"] == "${{ github.event.pull_request.user.login }}"
-    script = steps[1]["run"]
-    assert '"omnimarket==${OMNIMARKET_VERSION}"' in script
-    assert "--no-deps" in script
-    assert '"pydantic>=2.11"' in script
-    assert "uv venv --quiet --python 3.12" in script
-    assert f"-I -m {NODE_MODULE}" in script
-    assert "json.dumps" in script
-    assert "${{ github.event.pull_request.title }}" not in script
+def test_call_composes_the_unchanged_required_context() -> None:
+    # A reusable call's context is "<caller job name or id> / <callee job name or id>";
+    # the core reusable's one job is check-title.
+    (caller_id,) = _workflow()["jobs"]
+    assert f"{caller_id} / check-title" == CONTEXT
 
 
-def test_manifest_names_the_local_producer() -> None:
+def test_manifest_names_the_core_reusable_producer() -> None:
     rows = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))["required_checks"]
     matching = [row for row in rows if row["name"] == CONTEXT]
     assert len(matching) == 1
     row = matching[0]
-    assert row["producer_kind"] == "local"
+    assert row["producer_kind"] == "cross_repo"
     assert row["workflow"] == "pr-title-check.yml"
     assert row["job_id"] == "pr-title"
     assert row["conditional"] is False
-    assert "cross_repo_ref" not in row
+    assert row["cross_repo_ref"] == _workflow()["jobs"]["pr-title"]["uses"]
     assert "onex_change_control" not in row["rationale"]
 
 

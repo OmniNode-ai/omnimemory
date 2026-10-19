@@ -20,11 +20,13 @@ required_checks:
   - name: "pr-title / check-title"
     workflow: pr-title-check.yml
     job_id: pr-title
-    producer_kind: local
+    producer_kind: cross_repo
+    cross_repo_ref: "OmniNode-ai/omnibase_core/.github/workflows/pr-title-check.yml@6d562b13401684270453f1dedd22f8737110f2f2"
     conditional: false
     rationale: >-
-      PR title ticket-reference check: the job runs omnimarket's
-      node_pr_title_check_compute from a pinned omnimarket release (OMN-20997).
+      PR title ticket-reference check: omnibase_core's reusable runs omnimarket's
+      node_pr_title_check_compute from a pinned omnimarket release (OMN-20997);
+      the job pr-title calls it with only the omnimarket version (OMN-17427).
 
   # -- Phase 1: Quick Validation (parallel, ~2-5 min) -------------------------
 
