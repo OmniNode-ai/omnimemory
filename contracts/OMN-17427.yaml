@@ -39,6 +39,13 @@ requirements:
           AC5: .github/required-checks.yaml names the pr-title / check-title row as a cross_repo producer
           whose cross_repo_ref equals the workflow's call -- falsifier: python -m pytest tests/ci/test_pr_title_check_omnimarket_node.py
           -q -k manifest fails at the merge base.
+  - id: "req-contract-migration"
+    statement: "The scheduled closer can resolve the migrated ticket contracts in this repository."
+    acceptance:
+      - id: "AC6"
+        statement: >-
+          contracts/OMN-17390.yaml and contracts/OMN-20868.yaml contain exactly the source bytes from
+          change-control commit 49cfc14c21a2c50f9964c1aeed4b66001ce279a3, readable without a sibling checkout.
 evidence_requirements:
   - kind: "tests"
     description: "Documentation inventory, local links and existing release metadata checks."
@@ -94,3 +101,11 @@ dod_evidence:
         check_value: "uv run --no-project --with pytest --with pytest-asyncio --with pytest-xdist --with
           pyyaml pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -n 0 -k manifest"
     binds_ac: ["AC5"]
+  - id: "dod-migrated-contract-bytes"
+    description: "Resolve both migrated contracts locally and compare their Git blob identities with the
+      source bytes; the merge base lacks both contracts."
+    source: "manual"
+    binds_ac: ["AC6"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "python3 tests/ci/test_migrated_contracts_omn17427.py"
