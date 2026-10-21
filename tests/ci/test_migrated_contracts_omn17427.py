@@ -9,7 +9,7 @@ import hashlib
 import unittest
 from pathlib import Path
 
-_CONTRACTS = Path(__file__).resolve().parents[1] / "contracts"
+_CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
 # Git blob identities at change-control commit
 # 49cfc14c21a2c50f9964c1aeed4b66001ce279a3; no sibling checkout is needed to run.
 _OMN_17390_BLOB_ID = "ab72a43d7e4e6b521142debe3ef25848ce7c2296"

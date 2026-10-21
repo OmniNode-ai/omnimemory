@@ -108,4 +108,4 @@ dod_evidence:
     binds_ac: ["AC6"]
     checks:
       - check_type: "test_passes"
-        check_value: "python3 tests/test_migrated_contracts_omn17427.py"
+        check_value: "python3 tests/ci/test_migrated_contracts_omn17427.py"
