@@ -63,7 +63,9 @@ dod_evidence:
     description: "AC3, this repository's part of the scan: every contracts/*.yaml in omnimemory loads
       through load_yaml_mapping_no_duplicates with no duplicate mapping key. The scan of all nine product
       repositories is item dod-omn20945-ac3-duplicates-scanned in omnimarket's contracts/OMN-20945.yaml;
-      this item does not run it."
+      this item does not run it. The gate's control uses the Binds-Merged-Fix trailer to revert 04461be99e75943e4a053b2755ee3d2af6e57a38
+      (omnimemory#622) at the merge base before overlaying this PR's contract, restoring the duplicate
+      description key in contracts/OMN-20074.yaml."
     source: "manual"
     checks:
       - check_type: "test_passes"
