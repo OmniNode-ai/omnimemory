@@ -26,6 +26,16 @@ requirements:
           AC2: the strict loader refuses a planted repeated key, so a green AC1 is not a loader that accepts
           anything -- falsifier: uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q
           -n 0 -k refuses_a_repeated_key
+  - id: "req-scan-all-product-contracts"
+    statement: "Every product repository's dev contracts are scanned with the strict loader and each duplicate
+      is listed before a repo bumps its omnimarket pin."
+    acceptance:
+      - id: "AC3"
+        statement: 'AC3: Every contracts/\*.yaml on origin/dev of the nine product repos is scanned with
+          the strict loader and each duplicate found is listed by repo, file, line and key in the PR body,
+          so no repo meets the new refusal unannounced when it bumps its omnimarket pin -- falsifier:
+          the scan, rerun from the canonical clones on a lab host and recorded on the PR body Lab: line,
+          names a duplicate the list omits'
 evidence_requirements:
   - kind: "tests"
     description: "Every contract loads under the strict loader and a planted duplicate is refused."
@@ -49,3 +59,16 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q -n 0 -k refuses_a_repeated_key"
     binds_ac: ["AC2"]
+  - id: "dod-omn20945-ac3-strict-load-scope"
+    description: "AC3, this repository's part of the scan: every contracts/*.yaml in omnimemory loads
+      through load_yaml_mapping_no_duplicates with no duplicate mapping key. The scan of all nine product
+      repositories is item dod-omn20945-ac3-duplicates-scanned in omnimarket's contracts/OMN-20945.yaml;
+      this item does not run it. The gate's control uses the Binds-Merged-Fix trailer to revert 04461be99e75943e4a053b2755ee3d2af6e57a38
+      (omnimemory#622) at the merge base before overlaying this PR's contract, restoring the duplicate
+      description key in contracts/OMN-20074.yaml."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_contracts_no_duplicate_keys_omn20945.py -q -n 0"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC3"]
