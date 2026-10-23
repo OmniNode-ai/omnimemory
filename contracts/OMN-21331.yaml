@@ -46,6 +46,8 @@ dod_evidence:
         check_value: grep -q "merge_group:" .github/workflows/ci.yml && grep -q "pull_request" .github/workflows/ci.yml
           && grep -q "zz_canary_planted" .github/workflows/ci.yml
         cwd: ${OMNI_HOME}/omnimemory
+      - check_type: test_passes
+        check_value: uv run pytest tests/ci/test_canonical_file_shape_core_tag_omn21331.py -q -n 0
     binds_ac:
       - AC2
   - id: dod-omn21331-ac4
@@ -56,5 +58,7 @@ dod_evidence:
         check_value: "! git grep -qE 'CANONICAL_FILE_SHAPE_CORE: .*[0-9a-f]{40}' -- .github/workflows
           && git grep -q 'CANONICAL_FILE_SHAPE_CORE: .*omnibase_core@dev-' -- .github/workflows"
         cwd: ${OMNI_HOME}/omnimemory
+      - check_type: test_passes
+        check_value: uv run pytest tests/ci/test_canonical_file_shape_core_tag_omn21331.py -q -n 0
     binds_ac:
       - AC4
