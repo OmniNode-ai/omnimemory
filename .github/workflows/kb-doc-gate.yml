@@ -41,6 +41,6 @@ concurrency:
 
 jobs:
   kb-doc-gate:
-    uses: OmniNode-ai/omniclaude/.github/workflows/kb-doc-gate-reusable.yml@6bb38d42448dd955d517091a5d967aa14d534668
+    uses: OmniNode-ai/omniclaude/.github/workflows/kb-doc-gate-reusable.yml@b6ca3729f2a9b70ae6518a8c46d08f3c1ebb8c60
     with:
       mode: strict
