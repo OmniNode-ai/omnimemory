@@ -54,6 +54,13 @@ requirements:
           locked dependency resolution succeeds without rewriting it."
       - id: "AC8"
         statement: "The existing focused Qdrant handler tests pass with the locked dependencies."
+  - id: "req-fastapi-lock-pr676"
+    statement: "The FastAPI requirement update in PR 676 remains installable with the committed lockfile."
+    acceptance:
+      - id: "AC7"
+        statement: >-
+          uv.lock records the FastAPI requirement from pyproject.toml, so uv lock --check accepts the
+          widened upper bound without rewriting dependency metadata.
 evidence_requirements:
   - kind: "tests"
     description: "Documentation inventory, local links and existing release metadata checks."
@@ -132,3 +139,11 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "env PYTHONDONTWRITEBYTECODE=1 uv run --locked pytest tests/unit/nodes/test_handler_qdrant.py
           -q"
+  - id: "dod-fastapi-lock-pr676"
+    description: "The dependency lock accepts the widened FastAPI requirement without an update."
+    source: "manual"
+    binds_ac: ["AC7"]
+    checks:
+      - check_type: "command"
+        check_value: "uv lock --check"
+        cwd: "${OMNI_HOME}/omnimemory"
