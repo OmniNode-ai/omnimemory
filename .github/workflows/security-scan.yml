@@ -24,7 +24,7 @@ concurrency:
 jobs:
   codeql:
     name: CodeQL
-    uses: OmniNode-ai/omnibase_core/.github/workflows/codeql-reusable.yml@8b5404ce9666e10e445e4b97a71da00fdc0d4fe9
+    uses: OmniNode-ai/omnibase_core/.github/workflows/codeql-reusable.yml@3fbb43eaff028a30edccb1b9b794e0a3f3d9523c
     with:
       language: python
       query_suite: security-and-quality
