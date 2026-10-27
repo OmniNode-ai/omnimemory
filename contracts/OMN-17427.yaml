@@ -46,6 +46,14 @@ requirements:
         statement: >-
           contracts/OMN-17390.yaml and contracts/OMN-20868.yaml contain exactly the source bytes from
           change-control commit 49cfc14c21a2c50f9964c1aeed4b66001ce279a3, readable without a sibling checkout.
+  - id: "req-pr677-qdrant-lock"
+    statement: "PR 677's widened Qdrant requirement remains installable from the committed lockfile."
+    acceptance:
+      - id: "AC7"
+        statement: "The lockfile matches both Qdrant requirement entries allowing >=1.18.0,<1.21.0, and
+          locked dependency resolution succeeds without rewriting it."
+      - id: "AC8"
+        statement: "The existing focused Qdrant handler tests pass with the locked dependencies."
 evidence_requirements:
   - kind: "tests"
     description: "Documentation inventory, local links and existing release metadata checks."
@@ -109,3 +117,18 @@ dod_evidence:
     checks:
       - check_type: "test_passes"
         check_value: "python3 tests/ci/test_migrated_contracts_omn17427.py"
+  - id: "dod-pr677-qdrant-lock"
+    description: "Locked resolution accepts the manifest and lockfile after the Qdrant ceiling change."
+    source: "manual"
+    binds_ac: ["AC7"]
+    checks:
+      - check_type: "command"
+        check_value: "uv lock --check"
+  - id: "dod-pr677-qdrant-handler"
+    description: "The existing Qdrant handler unit tests pass with the committed dependency resolution."
+    source: "manual"
+    binds_ac: ["AC8"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "env PYTHONDONTWRITEBYTECODE=1 uv run --locked pytest tests/unit/nodes/test_handler_qdrant.py
+          -q"
