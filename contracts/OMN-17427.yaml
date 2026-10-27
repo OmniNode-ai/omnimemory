@@ -46,6 +46,13 @@ requirements:
         statement: >-
           contracts/OMN-17390.yaml and contracts/OMN-20868.yaml contain exactly the source bytes from
           change-control commit 49cfc14c21a2c50f9964c1aeed4b66001ce279a3, readable without a sibling checkout.
+  - id: "req-fastapi-lock-pr676"
+    statement: "The FastAPI requirement update in PR 676 remains installable with the committed lockfile."
+    acceptance:
+      - id: "AC7"
+        statement: >-
+          uv.lock records the FastAPI requirement from pyproject.toml, so uv lock --check accepts the
+          widened upper bound without rewriting dependency metadata.
 evidence_requirements:
   - kind: "tests"
     description: "Documentation inventory, local links and existing release metadata checks."
@@ -109,3 +116,11 @@ dod_evidence:
     checks:
       - check_type: "test_passes"
         check_value: "python3 tests/ci/test_migrated_contracts_omn17427.py"
+  - id: "dod-fastapi-lock-pr676"
+    description: "The dependency lock accepts the widened FastAPI requirement without an update."
+    source: "manual"
+    binds_ac: ["AC7"]
+    checks:
+      - check_type: "command"
+        check_value: "uv lock --check"
+        cwd: "${OMNI_HOME}/omnimemory"
