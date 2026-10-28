@@ -1,3 +1,14 @@
+## v0.18.7 (2026-10-28)
+
+### Release
+- Cut omnimemory from dev at 0.18.7 by the scheduled release train.
+- 2 release-relevant commit(s) merged since v0.18.6.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.6
+- build(deps): update fastapi requirement from <0.144.0,>=0.136.3 to >=0.136.3,<0.163.0 (#676)
+- build(deps): update qdrant-client requirement from <1.20.0,>=1.18.0 to >=1.18.0,<1.21.0 (#677)
+
 ## v0.18.6 (2026-10-15)
 
 v0.18.6 is cut from dev by the scheduled release train; 2 release-relevant commits since v0.18.5; the train opens only when the declared lab-evidence premise holds for the exact candidate commit.
@@ -10,22 +21,11 @@ v0.18.5 is cut from dev by the same train, 1 release-relevant commit since v0.18
 
 ## v0.18.4 (2026-10-01)
 
-### Release
-- Cut omnimemory from dev at 0.18.4 by the scheduled release train.
-- 1 release-relevant commit(s) merged since v0.18.3.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.3
-- : Migrate OmniMemory handler routing contracts (#555)
+Cut from dev by scheduled release train; 1 release-relevant commit since v0.18.3; opens only when declared lab-evidence premise holds for exact candidate commit. Included: Migrate OmniMemory handler routing contracts (#555).
 
 ## v0.18.3 (2026-09-26)
 
-### Release
-- Cut omnimemory from dev at 0.18.3 by the scheduled release train.
-- 1 release-relevant commit(s) merged since v0.18.2.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.2
+Cut from dev by same scheduled release train; 1 release-relevant commit since v0.18.2 under same lab-evidence premise.
 - feat: judge PyPI pin resolvability before merge, with the release step's own script (#537)
 
 ## v0.18.2 (2026-09-18)
