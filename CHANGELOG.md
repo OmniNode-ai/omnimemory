@@ -21,22 +21,11 @@ v0.18.5 is cut from dev by the same train, 1 release-relevant commit since v0.18
 
 ## v0.18.4 (2026-10-01)
 
-### Release
-- Cut omnimemory from dev at 0.18.4 by the scheduled release train.
-- 1 release-relevant commit(s) merged since v0.18.3.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.3
-- : Migrate OmniMemory handler routing contracts (#555)
+Cut from dev by scheduled release train; 1 release-relevant commit since v0.18.3; opens only when declared lab-evidence premise holds for exact candidate commit. Included: Migrate OmniMemory handler routing contracts (#555).
 
 ## v0.18.3 (2026-09-26)
 
-### Release
-- Cut omnimemory from dev at 0.18.3 by the scheduled release train.
-- 1 release-relevant commit(s) merged since v0.18.2.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.2
+Cut from dev by same scheduled release train; 1 release-relevant commit since v0.18.2 under same lab-evidence premise.
 - feat: judge PyPI pin resolvability before merge, with the release step's own script (#537)
 
 ## v0.18.2 (2026-09-18)
