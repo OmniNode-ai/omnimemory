@@ -58,7 +58,7 @@ class TestNodeHomeActivationAlignment:
         assert (
             "check-node-home",
             "canonical-file-shape",
-            "omnibase_core.nodes.node_node_home_check_compute.runtime_node_home_check",
+            "omnibase_core.nodes.node_canonical_file_shape_check_compute.runtime_canonical_file_shape_check --rules node-home",
         ) in alignments
         assert len(alignments) == len(_module.EXPECTED_ALIGNMENTS) + 1
 
@@ -72,9 +72,7 @@ class TestNodeHomeActivationAlignment:
         if "check-node-home" not in extract_hook_ids(precommit):
             precommit += "\n  - repo: local\n    hooks:\n      - id: check-node-home\n"
         workflow = (_REPO_ROOT / ".github/workflows/ci.yml").read_text()
-        module = (
-            "omnibase_core.nodes.node_node_home_check_compute.runtime_node_home_check"
-        )
+        module = "omnibase_core.nodes.node_canonical_file_shape_check_compute.runtime_canonical_file_shape_check --rules node-home"
         if module not in workflow:
             workflow += f"\n# python -m {module}\n"
         (tmp_path / ".pre-commit-config.yaml").write_text(precommit)

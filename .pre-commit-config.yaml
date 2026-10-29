@@ -119,19 +119,26 @@ repos:
   # CI runs the same module at the same commit (job "Canonical File Shape
   # (OMN-20304)"). OMN-20943 pins canonical-file-shape to the commit that reads
   # the imperative guard caller's allowlist-path as a shrink-only declaration.
+  # OMN-21525: the canonical-file-shape hook (and the node-home rule group,
+  # check-node-home) run the node_canonical_file_shape_check_compute entry; the hook ids
+  # are unchanged. rev is the omnibase_core dev-merge tag that carries omnibase_core#2124.
   - repo: https://github.com/OmniNode-ai/omnibase_core
-    rev: 031148215620031436cba30619bbae67c0bb38ad  # pragma: allowlist secret
+    rev: dev-20261029151319-6e0a5eee541a
     hooks:
-      - id: no-noncanonical-lifecycle-classes
-        args: [--allowlist, .onex_ratchets/noncanonical_class_allowlist.yaml, src/omnimemory]
-        files: ^src/omnimemory/.*\.py$
       - id: canonical-file-shape
+        args: [--rules, file-shape]
       # Node-home ratchet (OMN-20702): a new ONEX node directory or onex.nodes
       # entry point outside omnimarket is refused against the shrink-only
       # .onex_ratchets/node_home_baseline.txt. BLOCKING, no allowlist, no
       # suppression comment. CI twin: the Canonical File Shape job in
       # .github/workflows/ci.yml, same omnibase_core commit.
       - id: check-node-home
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: 031148215620031436cba30619bbae67c0bb38ad  # pragma: allowlist secret
+    hooks:
+      - id: no-noncanonical-lifecycle-classes
+        args: [--allowlist, .onex_ratchets/noncanonical_class_allowlist.yaml, src/omnimemory]
+        files: ^src/omnimemory/.*\.py$
   # URL Authority Gate (OMN-13298, child of OMN-12803).
   # Ratchet: NEW fingerprints fail; existing violations grandfathered in the
   # shared baseline at omnibase_core/src/omnibase_core/validation/baselines/url_authority_baseline.json.

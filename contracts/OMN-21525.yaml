@@ -1,0 +1,85 @@
+---
+schema_version: "1.0.0"
+ticket_id: OMN-21525
+title: omnimemory switches to the canonical-file-shape node entry with a ticketed first-install burn-down
+  baseline
+summary: omnimemory runs the canonical-file-shape hook and its Canonical File Shape CI job through the
+  node_canonical_file_shape_check_compute entry of omnibase_core, pinned to a dev-merge tag. The twelve
+  paths the whole-tree rules refuse and the existing baseline does not list are held in a first-installed
+  burn-down baseline that names this ticket. The existing baseline is untouched. The burn-down baseline
+  only shrinks and reaches zero entries by 2026-11-12.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: req-omn21525-omnimemory-canonical-file-shape-switch
+    statement: The canonical-file-shape hook and CI job run the node entry at the omnibase_core dev-merge
+      tag, pass on the whole tree with the burn-down baseline, refuse a new unbound handler and refuse
+      growth of the burn-down baseline.
+    acceptance:
+      - id: AC1
+        statement: "AC1: the hook is wired at the omnibase_core tag and passes on the whole tree with
+          a baseline of exactly the measured findings, this ticket named in its header -- falsifier: the
+          hook run over the whole tree exits 0 and the burn-down baseline holds 12 entries under a header
+          naming OMN-21525"
+      - id: AC2
+        statement: "AC2: a canary commit adding one new unbound handler is refused with handler_outside_node
+          and a canary adding one baseline line for an existing refused file is refused with baseline-growth
+          -- falsifier: the repository's canary test passes on both cases"
+      - id: AC3
+        statement: "AC3: on 2026-11-12 the baseline holds zero entries -- falsifier: the burn-down baseline
+          holds zero entries on 2026-11-12"
+evidence_requirements:
+  - kind: ci
+    description: The hook runs the node entry at the dev-merge tag over the whole tree and exits 0.
+    command: uv run --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@dev-20261029151319-6e0a5eee541a"
+      python -m omnibase_core.nodes.node_canonical_file_shape_check_compute.runtime_canonical_file_shape_check
+      --rules file-shape --head HEAD
+  - kind: ci
+    description: The canary test refuses a new unbound handler and refuses growth of the burn-down baseline.
+    command: uv run pytest tests/ci/test_canonical_file_shape_ratchet_omn21525.py -q -n 0
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: dod-omn21525-ac1
+    description: The whole tree passes the node entry at the dev-merge tag, the burn-down baseline holds
+      the 12 measured findings under a header naming OMN-21525, and the existing baseline keeps its 69
+      entries.
+    source: manual
+    checks:
+      - check_type: command
+        check_value: uv run --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@dev-20261029151319-6e0a5eee541a"
+          python -m omnibase_core.nodes.node_canonical_file_shape_check_compute.runtime_canonical_file_shape_check
+          --rules file-shape --head HEAD
+      - check_type: command
+        check_value: >-
+          head -1 .onex_ratchets/canonical_file_shape_burndown_baseline.txt | grep -q 'Burn-down ticket.
+          OMN-21525' && test "$(grep -c -v '^#' .onex_ratchets/canonical_file_shape_burndown_baseline.txt)"
+          = 12 && test "$(grep -c -v '^#' .onex_ratchets/canonical_file_shape_baseline.txt)" = 69
+      - check_type: test_passes
+        check_value: uv run pytest tests/ci/test_canonical_file_shape_core_tag_omn21331.py tests/ci/test_node_home_activation_omn20702.py
+          -q -n 0
+    binds_ac:
+      - AC1
+  - id: dod-omn21525-ac2
+    description: The canary test commits one new unbound handler and one burn-down line moved from the
+      existing baseline into a throwaway copy of the tree and shows handler_outside_node and baseline-growth.
+    source: manual
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/ci/test_canonical_file_shape_ratchet_omn21525.py -q -n 0
+    binds_ac:
+      - AC2
+  - id: dod-omn21525-ac3
+    description: The burn-down baseline at the install holds 12 entries and is shrink-only; AC3 is met
+      when this check prints 0 on 2026-11-12. At the install the count is 12, so the check below holds
+      only the install-time bound.
+    source: manual
+    checks:
+      - check_type: command
+        check_value: test "$(grep -c -v '^#' .onex_ratchets/canonical_file_shape_burndown_baseline.txt)"
+          -le 12
+    binds_ac:
+      - AC3

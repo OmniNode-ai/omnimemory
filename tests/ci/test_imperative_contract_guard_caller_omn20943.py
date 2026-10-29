@@ -85,7 +85,16 @@ def test_caller_uses_core_and_keeps_the_job_and_context() -> None:
             ), path
 
 
-def test_canonical_shape_hook_uses_the_exemption_commit() -> None:
+def _ci_core_ref() -> str:
+    workflow = _mapping(WORKFLOWS / "ci.yml")
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    pin = jobs["canonical-file-shape"]["env"]["CANONICAL_FILE_SHAPE_CORE"]
+    assert isinstance(pin, str)
+    return pin.rsplit("@", 1)[1]
+
+
+def test_canonical_shape_hook_uses_the_ci_dev_merge_tag() -> None:
     repos = _mapping(ROOT / ".pre-commit-config.yaml")["repos"]
     assert isinstance(repos, list)
     (hook_repo,) = [
@@ -94,7 +103,8 @@ def test_canonical_shape_hook_uses_the_exemption_commit() -> None:
         if any(hook["id"] == "canonical-file-shape" for hook in repo["hooks"])
     ]
     assert hook_repo["repo"] == "https://github.com/OmniNode-ai/omnibase_core"
-    assert hook_repo["rev"] == _caller_sha()
+    assert hook_repo["rev"] == _ci_core_ref()
+    assert re.fullmatch(r"dev-\d{14}-[0-9a-f]{12}", hook_repo["rev"])
 
 
 def test_own_allowlist_matches_the_recorded_paths() -> None:
