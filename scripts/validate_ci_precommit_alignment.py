@@ -95,7 +95,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     (
         "canonical-file-shape",
         "canonical-file-shape",
-        "omnibase_core.validators.canonical_file_shape",
+        "omnibase_core.nodes.node_canonical_file_shape_check_compute.runtime_canonical_file_shape_check",
     ),
     # OMN-19998: public-repository runner placement. The CI counterpart is
     # ci.yml's public-runner-placement job, which runs the same handler module
@@ -126,7 +126,7 @@ ACTIVATION_ALIGNMENTS: list[tuple[str, str, str]] = [
     (
         "check-node-home",
         "canonical-file-shape",
-        "omnibase_core.nodes.node_node_home_check_compute.runtime_node_home_check",
+        "omnibase_core.nodes.node_canonical_file_shape_check_compute.runtime_canonical_file_shape_check --rules node-home",
     ),
 ]
 
