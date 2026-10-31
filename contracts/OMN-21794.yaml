@@ -1,0 +1,62 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21794"
+title: "omnimemory contracts_and_di literal_url, literal_path and literal_model_name burn-down, slice
+  rf1515-c5"
+summary: "The semantic compute policy no longer names an embedding or LLM model in code. The allowed and
+  default models are the semantic analyzer node contract's model_routing section, read through ModelSemanticModelRouting;
+  the policy fields default to those values and an explicit value still wins."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-semantic-model-routing"
+    statement: "The semantic compute policy holds no model identifier literal; the allowed and default
+      embedding and LLM models are declared in the semantic analyzer node contract and injected."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the contracts_and_di count for literal_url, literal_path and literal_model_name
+          over the slice paths drops to zero and the repo total drops by the slice size, with no baseline
+          entry or suppression added -- falsifier: onex run of runtime_validator_run with the contracts_and_di
+          reference over omnimemory src before and after, counts compared per rule"
+      - id: "AC2"
+        statement: "AC2: every url, path and model name comes from the owning node contract or overlay
+          and is injected, none hard-coded in the touched code -- falsifier: uv run pytest tests/unit
+          -q over the touched modules plus the checker re-run on the slice paths"
+      - id: "AC3"
+        statement: "AC3: the slice lands as one PR titled with this ticket id and carries lab proof of
+          the tests and the checker re-run -- falsifier: uv run pytest tests/unit -q on the lab through
+          lab-run at the PR head, receipt path in the PR body"
+evidence_requirements:
+  - kind: "tests"
+    description: "The policy defaults equal the node contract's model_routing section, an explicit value
+      overrides, and a node contract without the section is refused."
+    command: "uv run pytest tests/unit/test_semantic_model_routing.py tests/test_semantic_compute_policy_config.py
+      -q --no-cov"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21794-ac1-checker-count"
+    description: "AC1: the contracts_and_di checker finds no literal_model_name in the policy config file."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/test_semantic_model_routing.py -q --no-cov"
+    binds_ac: ["AC1"]
+  - id: "dod-omn21794-ac2-injected"
+    description: "AC2: the policy model defaults come from the node contract."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/test_semantic_model_routing.py tests/test_semantic_compute_policy_config.py
+          -q --no-cov"
+    binds_ac: ["AC2"]
+  - id: "dod-omn21794-ac3-lab-proof"
+    description: "AC3: the unit suite passes at the PR head on a lab host."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit -q --no-cov"
+    binds_ac: ["AC3"]

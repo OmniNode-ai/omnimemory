@@ -410,3 +410,16 @@ def services_available() -> bool:
         True if PostgreSQL and Valkey are available.
     """
     return check_services_available()
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Supply the semantic analyzer contract's model_routing overlay values (OMN-21794)."""
+    os.environ.setdefault(
+        "OMNIMEMORY_SEMANTIC_ALLOWED_EMBEDDING_MODELS",
+        "text-embedding-3-small,gte-qwen2",
+    )
+    os.environ.setdefault("OMNIMEMORY_SEMANTIC_DEFAULT_EMBEDDING_MODEL", "gte-qwen2")
+    os.environ.setdefault(
+        "OMNIMEMORY_SEMANTIC_ALLOWED_LLM_MODELS", "qwen2.5-72b,qwen2.5-14b"
+    )
+    os.environ.setdefault("OMNIMEMORY_SEMANTIC_DEFAULT_LLM_MODEL", "qwen2.5-14b")

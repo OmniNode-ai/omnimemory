@@ -15,6 +15,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...enums.enum_entity_extraction_mode import EnumEntityExtractionMode
+from .model_semantic_model_routing import ModelSemanticModelRouting
 
 
 class ModelSemanticComputePolicyConfig(BaseModel):
@@ -201,23 +202,43 @@ class ModelSemanticComputePolicyConfig(BaseModel):
     # =========================================================================
 
     allowed_embedding_models: list[str] = Field(
-        default_factory=lambda: ["text-embedding-3-small", "gte-qwen2"],
-        description="List of allowed embedding model identifiers",
+        default_factory=lambda: list(
+            ModelSemanticModelRouting.from_node_contract().allowed_embedding_models
+        ),
+        description=(
+            "List of allowed embedding model identifiers, read from the "
+            "semantic analyzer node contract's model_routing section"
+        ),
     )
 
     default_embedding_model: str = Field(
-        default="gte-qwen2",
-        description="Default embedding model to use",
+        default_factory=lambda: (
+            ModelSemanticModelRouting.from_node_contract().default_embedding_model
+        ),
+        description=(
+            "Default embedding model to use, read from the semantic analyzer "
+            "node contract's model_routing section"
+        ),
     )
 
     allowed_llm_models: list[str] = Field(
-        default_factory=lambda: ["qwen2.5-72b", "qwen2.5-14b"],
-        description="List of allowed LLM model identifiers",
+        default_factory=lambda: list(
+            ModelSemanticModelRouting.from_node_contract().allowed_llm_models
+        ),
+        description=(
+            "List of allowed LLM model identifiers, read from the semantic "
+            "analyzer node contract's model_routing section"
+        ),
     )
 
     default_llm_model: str = Field(
-        default="qwen2.5-14b",
-        description="Default LLM model for semantic analysis",
+        default_factory=lambda: (
+            ModelSemanticModelRouting.from_node_contract().default_llm_model
+        ),
+        description=(
+            "Default LLM model for semantic analysis, read from the semantic "
+            "analyzer node contract's model_routing section"
+        ),
     )
 
     # =========================================================================

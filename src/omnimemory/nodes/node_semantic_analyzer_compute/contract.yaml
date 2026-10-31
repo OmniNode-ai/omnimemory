@@ -36,6 +36,17 @@ algorithm:
   normalization_method: "none"
   precision_digits: 6
 
+# === MODEL ROUTING ===
+# The only place a model identifier is bound. Every value is an overlay reference
+# expanded at load (ModelSemanticModelRouting.from_node_contract); the lane's
+# service env supplies the identifiers, a list comma separated. An unset
+# reference fails closed. Code and repository name no model.
+model_routing:
+  allowed_embedding_models: "${env.OMNIMEMORY_SEMANTIC_ALLOWED_EMBEDDING_MODELS}"
+  default_embedding_model: "${env.OMNIMEMORY_SEMANTIC_DEFAULT_EMBEDDING_MODEL}"
+  allowed_llm_models: "${env.OMNIMEMORY_SEMANTIC_ALLOWED_LLM_MODELS}"
+  default_llm_model: "${env.OMNIMEMORY_SEMANTIC_DEFAULT_LLM_MODEL}"
+
 # === DEPENDENCIES ===
 # Provider protocols for I/O abstraction
 dependencies:
