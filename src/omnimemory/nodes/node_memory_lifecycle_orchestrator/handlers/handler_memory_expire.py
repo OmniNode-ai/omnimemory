@@ -109,15 +109,16 @@ from omnimemory.adapters.adapter_concurrency import (
     CircuitBreakerOpenError,
     CircuitBreakerState,
 )
+from omnimemory.models.config.model_lifecycle_timeout_settings import (
+    ModelLifecycleTimeoutSettings,
+)
 
 logger = logging.getLogger(__name__)
 
-# Query timeout for database operations (seconds)
-_QUERY_TIMEOUT_SECONDS: float = 30.0
-
-# Circuit breaker configuration for database operations
+# Circuit breaker configuration for database operations. The query timeout and the
+# recovery timeout are ModelLifecycleTimeoutSettings values from the node contract
+# descriptor (OMN-21623).
 _CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
-_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: float = 60.0
 _CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
 
 __all__ = [
@@ -403,19 +404,30 @@ class HandlerMemoryExpire:
     # handle_with_retry() to keep retrying on already-expired memories.
     _VALID_FROM_STATES = frozenset({EnumLifecycleState.ACTIVE})
 
-    def __init__(self, container: ModelONEXContainer) -> None:
+    def __init__(
+        self,
+        container: ModelONEXContainer,
+        settings: ModelLifecycleTimeoutSettings | None = None,
+    ) -> None:
         """Initialize the expiration handler with container.
 
         Args:
             container: ONEX dependency injection container for service resolution.
                 The handler uses the container for accessing shared infrastructure
                 services and configuration.
+            settings: Database query and circuit-breaker recovery timeouts. ``None``
+                resolves ``descriptor`` from the node contract (OMN-21623).
 
         Note:
             The handler is not fully operational until initialize() is called.
             Use the initialized property to check initialization status.
         """
         self._container = container
+        self._settings = (
+            settings
+            if settings is not None
+            else ModelLifecycleTimeoutSettings.from_node_contract()
+        )
         self._db_pool: Pool | None = None
         self._max_retries: int = 3
         self._circuit_breaker: CircuitBreaker | None = None
@@ -452,7 +464,7 @@ class HandlerMemoryExpire:
         self._max_retries = max_retries
         self._circuit_breaker = circuit_breaker or CircuitBreaker(
             failure_threshold=_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-            recovery_timeout=_CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+            recovery_timeout=self._settings.db_circuit_breaker_recovery_seconds,
             success_threshold=_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
         )
         self._initialized = True
@@ -638,7 +650,7 @@ class HandlerMemoryExpire:
                         command.expected_revision,  # $5: expected revision
                         EnumLifecycleState.ACTIVE.value,  # $6: required current state
                     ),
-                    timeout=_QUERY_TIMEOUT_SECONDS,
+                    timeout=self._settings.db_query_timeout_seconds,
                 )
 
                 if row is None:
@@ -958,7 +970,7 @@ class HandlerMemoryExpire:
             async with self._db_pool.acquire() as conn:
                 row = await asyncio.wait_for(
                     conn.fetchrow(self._READ_STATE_SQL, memory_id),
-                    timeout=_QUERY_TIMEOUT_SECONDS,
+                    timeout=self._settings.db_query_timeout_seconds,
                 )
 
                 if row is None:

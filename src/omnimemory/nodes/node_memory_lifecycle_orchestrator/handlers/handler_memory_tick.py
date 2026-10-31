@@ -59,6 +59,9 @@ from omnimemory.adapters.adapter_concurrency import (
     CircuitBreakerOpenError,
 )
 from omnimemory.enums import EnumLifecycleState
+from omnimemory.models.config.model_lifecycle_timeout_settings import (
+    ModelLifecycleTimeoutSettings,
+)
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
@@ -66,9 +69,6 @@ if TYPE_CHECKING:
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
 logger = logging.getLogger(__name__)
-
-# Timeout for projection reader calls (seconds)
-_PROJECTION_READER_TIMEOUT_SECONDS: float = 10.0
 
 
 # =============================================================================
@@ -469,12 +469,18 @@ class HandlerMemoryTick:
         >>> # Output events: ModelMemoryExpiredEvent, ModelMemoryArchiveInitiated
     """
 
-    def __init__(self, container: ModelONEXContainer) -> None:
+    def __init__(
+        self,
+        container: ModelONEXContainer,
+        settings: ModelLifecycleTimeoutSettings | None = None,
+    ) -> None:
         """Initialize HandlerMemoryTick with ONEX container for dependency injection.
 
         Args:
             container: ONEX container providing dependency injection for
                 services, configuration, and runtime context.
+            settings: Projection-reader and circuit-breaker recovery timeouts.
+                ``None`` resolves ``descriptor`` from the node contract (OMN-21623).
 
         Note:
             The container is stored for interface compliance with the standard ONEX
@@ -483,6 +489,11 @@ class HandlerMemoryTick:
             configure the handler with its dependencies before use.
         """
         self._container = container
+        self._settings = (
+            settings
+            if settings is not None
+            else ModelLifecycleTimeoutSettings.from_node_contract()
+        )
         self._projection_reader: ProtocolMemoryLifecycleProjectionReader | None = None
         self._batch_size: int = 100
         self._circuit_breaker: CircuitBreaker | None = None
@@ -513,7 +524,7 @@ class HandlerMemoryTick:
         # cascading failures when the projection reader is unavailable
         self._circuit_breaker = circuit_breaker or CircuitBreaker(
             failure_threshold=5,
-            recovery_timeout=30.0,
+            recovery_timeout=self._settings.tick_circuit_breaker_recovery_seconds,
             success_threshold=2,
         )
         self._initialized = True
@@ -766,7 +777,7 @@ class HandlerMemoryTick:
                     correlation_id=correlation_id,
                     limit=self._batch_size,
                 ),
-                timeout=_PROJECTION_READER_TIMEOUT_SECONDS,
+                timeout=self._settings.projection_reader_timeout_seconds,
             )
             self._circuit_breaker.record_success()
         except TimeoutError:
@@ -775,7 +786,7 @@ class HandlerMemoryTick:
                 "Projection reader timeout during expiration check",
                 extra={
                     "correlation_id": str(correlation_id),
-                    "timeout_seconds": _PROJECTION_READER_TIMEOUT_SECONDS,
+                    "timeout_seconds": self._settings.projection_reader_timeout_seconds,
                 },
             )
             return []
@@ -895,7 +906,7 @@ class HandlerMemoryTick:
                     correlation_id=correlation_id,
                     limit=self._batch_size,
                 ),
-                timeout=_PROJECTION_READER_TIMEOUT_SECONDS,
+                timeout=self._settings.projection_reader_timeout_seconds,
             )
             self._circuit_breaker.record_success()
         except TimeoutError:
@@ -904,7 +915,7 @@ class HandlerMemoryTick:
                 "Projection reader timeout during archive check",
                 extra={
                     "correlation_id": str(correlation_id),
-                    "timeout_seconds": _PROJECTION_READER_TIMEOUT_SECONDS,
+                    "timeout_seconds": self._settings.projection_reader_timeout_seconds,
                 },
             )
             return []

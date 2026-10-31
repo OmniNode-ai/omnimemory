@@ -94,6 +94,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from omnimemory.adapters.adapter_concurrency import CircuitBreaker
 from omnimemory.enums import EnumLifecycleState
+from omnimemory.models.config.model_lifecycle_timeout_settings import (
+    ModelLifecycleTimeoutSettings,
+)
 
 if TYPE_CHECKING:
     from asyncpg import Pool
@@ -546,24 +549,29 @@ class HandlerMemoryArchive:
     _MIN_COMPRESSION_LEVEL: int = 1
     _MAX_COMPRESSION_LEVEL: int = 9
 
-    # Query timeout for database operations (seconds).
+    # Query timeout for database operations (seconds) is
+    # ``ModelLifecycleTimeoutSettings.db_query_timeout_seconds``, resolved from the
+    # node contract descriptor (OMN-21623).
     #
     # This timeout applies to individual database queries (SELECT, UPDATE),
     # not connection acquisition. It prevents indefinite blocking when the
     # database is under heavy load or experiencing issues.
-    _QUERY_TIMEOUT_SECONDS: float = 30.0
 
     # Circuit breaker configuration defaults.
     #
     # These defaults balance responsiveness with stability:
     # - failure_threshold=5: Opens after 5 consecutive failures
-    # - recovery_timeout=60: Waits 60s before attempting recovery
     # - success_threshold=2: Requires 2 successes to fully close
+    # The recovery timeout is
+    # ``ModelLifecycleTimeoutSettings.db_circuit_breaker_recovery_seconds``.
     _CB_FAILURE_THRESHOLD: int = 5
-    _CB_RECOVERY_TIMEOUT: float = 60.0
     _CB_SUCCESS_THRESHOLD: int = 2
 
-    def __init__(self, container: ModelONEXContainer) -> None:
+    def __init__(
+        self,
+        container: ModelONEXContainer,
+        settings: ModelLifecycleTimeoutSettings | None = None,
+    ) -> None:
         """Initialize the archive handler with a dependency container.
 
         Args:
@@ -571,6 +579,8 @@ class HandlerMemoryArchive:
                 The container follows the ONEX DI pattern where handlers receive
                 all dependencies through the container rather than as constructor
                 parameters.
+            settings: Database query and circuit-breaker recovery timeouts. ``None``
+                resolves ``descriptor`` from the node contract (OMN-21623).
 
         Note:
             After construction, call initialize() to set up runtime dependencies
@@ -579,6 +589,11 @@ class HandlerMemoryArchive:
             initialization.
         """
         self._container = container
+        self._settings = (
+            settings
+            if settings is not None
+            else ModelLifecycleTimeoutSettings.from_node_contract()
+        )
         self._db_pool: Pool | None = None
         self._archive_base_path: Path | None = None
         self._orphan_tracker: ProtocolOrphanedArchiveTracker | None = None
@@ -673,7 +688,7 @@ class HandlerMemoryArchive:
         # Initialize circuit breaker for DB operations
         self._db_circuit_breaker = CircuitBreaker(
             failure_threshold=self._CB_FAILURE_THRESHOLD,
-            recovery_timeout=self._CB_RECOVERY_TIMEOUT,
+            recovery_timeout=self._settings.db_circuit_breaker_recovery_seconds,
             success_threshold=self._CB_SUCCESS_THRESHOLD,
         )
 
@@ -770,10 +785,10 @@ class HandlerMemoryArchive:
             ],
             archive_format="JSONL with gzip compression (.jsonl.gz)",
             compression_level=self._compression_level,
-            query_timeout_seconds=self._QUERY_TIMEOUT_SECONDS,
+            query_timeout_seconds=self._settings.db_query_timeout_seconds,
             circuit_breaker_config=ModelCircuitBreakerConfigInfo(
                 failure_threshold=self._CB_FAILURE_THRESHOLD,
-                recovery_timeout=self._CB_RECOVERY_TIMEOUT,
+                recovery_timeout=self._settings.db_circuit_breaker_recovery_seconds,
                 success_threshold=self._CB_SUCCESS_THRESHOLD,
             ),
         )
@@ -1436,7 +1451,7 @@ class HandlerMemoryArchive:
                     """,
                     memory_id,
                 ),
-                timeout=self._QUERY_TIMEOUT_SECONDS,
+                timeout=self._settings.db_query_timeout_seconds,
             )
 
             if row is None:
@@ -1525,7 +1540,7 @@ class HandlerMemoryArchive:
                     expected_revision,
                     EnumLifecycleState.EXPIRED.value,
                 ),
-                timeout=self._QUERY_TIMEOUT_SECONDS,
+                timeout=self._settings.db_query_timeout_seconds,
             )
 
             # Check if update affected any rows
