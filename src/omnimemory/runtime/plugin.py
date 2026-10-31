@@ -683,9 +683,6 @@ class PluginMemory:
                     qdrant_host=os.environ["QDRANT_HOST"],
                     qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
                     embedding_url=nav_embedding_url,
-                    embedding_model=os.environ.get(
-                        "OMNIMEMORY_EMBEDDING_MODEL", "default"
-                    ),
                 )
                 logger.info(
                     "Navigation history handler constructed (correlation_id=%s)",

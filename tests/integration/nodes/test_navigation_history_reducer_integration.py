@@ -27,6 +27,9 @@ import pytest
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qdrant_models
 
+from omnimemory.models.config.model_navigation_client_settings import (
+    ModelNavigationClientSettings,
+)
 from omnimemory.nodes.node_navigation_history_reducer.handlers import (
     HandlerNavigationHistoryReducer,
 )
@@ -63,6 +66,13 @@ pytestmark = [
     ),
 ]
 
+_SETTINGS = ModelNavigationClientSettings(
+    embedding_model="test-embedding-model",
+    pg_command_timeout_seconds=30.0,
+    qdrant_timeout_seconds=30,
+    embedding_http_timeout_seconds=30.0,
+)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -76,6 +86,7 @@ async def writer() -> AsyncGenerator[HandlerNavigationHistoryWriter, None]:
         qdrant_host=_QDRANT_HOST,
         qdrant_port=_QDRANT_PORT,
         embedding_url=_EMBEDDING_URL,
+        settings=_SETTINGS,
     )
     try:
         yield instance
@@ -308,6 +319,7 @@ async def test_handler_fire_and_forget_does_not_propagate_errors() -> None:
         pg_dsn="postgresql://invalid:invalid@127.0.0.1:9999/invalid",
         qdrant_host="127.0.0.1",
         qdrant_port=9998,
+        settings=_SETTINGS,
     )
     await handler.initialize()
 

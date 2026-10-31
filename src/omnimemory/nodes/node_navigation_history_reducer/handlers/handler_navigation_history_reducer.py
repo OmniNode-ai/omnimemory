@@ -40,6 +40,10 @@ from qdrant_client.http import models as qdrant_models
 if TYPE_CHECKING:
     import asyncpg
 
+
+from omnimemory.models.config.model_navigation_client_settings import (
+    ModelNavigationClientSettings,
+)
 from omnimemory.nodes.node_navigation_history_reducer.models.model_navigation_history_request import (  # noqa: TC001
     ModelNavigationHistoryRequest,
 )
@@ -77,7 +81,6 @@ _DEFAULT_EMBEDDING_URL = (
         "LLM_EMBEDDING_URL", ""
     )
 )
-_DEFAULT_EMBEDDING_MODEL = "Qwen3-Embedding-8B"
 _QDRANT_COLLECTION = "navigation_paths"
 
 # Qdrant vector dimension for Qwen3-Embedding-8B (4096-dim output)
@@ -96,8 +99,7 @@ class HandlerNavigationHistoryWriter:
         _qdrant_host: Qdrant server hostname.
         _qdrant_port: Qdrant server port.
         _embedding_url: URL for the embedding model endpoint.
-        _embedding_model: Model name to request from the embedding endpoint.
-        _pg_pool: Shared asyncpg connection pool (created on first use).
+        _settings: Embedding model and client timeouts (injected).
         _qdrant_client: Shared Qdrant async client (created on first use).
     """
 
@@ -107,7 +109,8 @@ class HandlerNavigationHistoryWriter:
         qdrant_host: str | None = _DEFAULT_QDRANT_HOST,
         qdrant_port: int | None = _DEFAULT_QDRANT_PORT,
         embedding_url: str = _DEFAULT_EMBEDDING_URL,
-        embedding_model: str = _DEFAULT_EMBEDDING_MODEL,
+        *,
+        settings: ModelNavigationClientSettings,
     ) -> None:
         """Initialize the writer with connection parameters.
 
@@ -120,13 +123,14 @@ class HandlerNavigationHistoryWriter:
             qdrant_port: Port of the Qdrant server. ``None`` (the default) resolves
                 the port from the contract descriptor (``descriptor.qdrant_port``).
             embedding_url: Full URL for the embedding API endpoint.
-            embedding_model: Model identifier to pass to the embedding endpoint.
+            settings: Embedding model and client timeouts, resolved from the node
+                contract's ``descriptor`` by the binding site (OMN-21623).
         """
         self._pg_dsn = pg_dsn
         self._qdrant_host = qdrant_host
         self._qdrant_port = qdrant_port
         self._embedding_url = embedding_url
-        self._embedding_model = embedding_model
+        self._settings = settings
 
         self._pg_pool: asyncpg.Pool | None = None
         self._qdrant_client: AsyncQdrantClient | None = None
@@ -247,7 +251,7 @@ class HandlerNavigationHistoryWriter:
                 dsn=self._pg_dsn,
                 min_size=1,
                 max_size=5,
-                command_timeout=30,
+                command_timeout=self._settings.pg_command_timeout_seconds,
             )
         assert self._pg_pool is not None
         return self._pg_pool
@@ -281,7 +285,7 @@ class HandlerNavigationHistoryWriter:
             self._qdrant_client = AsyncQdrantClient(
                 host=host,
                 port=port,
-                timeout=30,
+                timeout=self._settings.qdrant_timeout_seconds,
             )
         return self._qdrant_client
 
@@ -455,11 +459,13 @@ class HandlerNavigationHistoryWriter:
         """
         import httpx as _httpx  # omnimemory-http-exempt: Phase 2 handler; local import to satisfy static scan; Phase 3 will inject via adapter (OMN-2584)  # transport-import-ok node-purity-ok: Phase-2 handler httpx; Phase-3 DI debt OMN-2584
 
-        async with _httpx.AsyncClient(timeout=30.0) as client:
+        async with _httpx.AsyncClient(
+            timeout=self._settings.embedding_http_timeout_seconds
+        ) as client:
             response = await client.post(
                 self._embedding_url,
                 json={
-                    "model": self._embedding_model,
+                    "model": self._settings.embedding_model,
                     "input": text,
                 },
                 headers={"Content-Type": "application/json"},
@@ -532,7 +538,7 @@ class HandlerNavigationHistoryReducer:
         qdrant_host: str | None = _DEFAULT_QDRANT_HOST,
         qdrant_port: int | None = _DEFAULT_QDRANT_PORT,
         embedding_url: str = _DEFAULT_EMBEDDING_URL,
-        embedding_model: str = _DEFAULT_EMBEDDING_MODEL,
+        settings: ModelNavigationClientSettings | None = None,
     ) -> None:
         """Initialize the handler.
 
@@ -545,7 +551,9 @@ class HandlerNavigationHistoryReducer:
             qdrant_port: Qdrant port (used only if ``writer`` is None).
                 ``None`` resolves from the contract descriptor.
             embedding_url: Embedding endpoint URL (used only if ``writer`` is None).
-            embedding_model: Embedding model name (used only if ``writer`` is None).
+            settings: Embedding model and client timeouts (used only if ``writer``
+                is None). ``None`` resolves ``descriptor`` from the node contract
+                (OMN-21623), the way ``qdrant_host`` does.
         """
         if writer is not None:
             self._writer = writer
@@ -555,7 +563,11 @@ class HandlerNavigationHistoryReducer:
                 qdrant_host=qdrant_host,
                 qdrant_port=qdrant_port,
                 embedding_url=embedding_url,
-                embedding_model=embedding_model,
+                settings=(
+                    settings
+                    if settings is not None
+                    else ModelNavigationClientSettings.from_node_contract()
+                ),
             )
         self._initialized = False
 
