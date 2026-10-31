@@ -44,6 +44,9 @@ from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
 from omnibase_infra.models.dispatch.model_dispatch_context import ModelDispatchContext
 from omnibase_infra.runtime.message_dispatch_engine import MessageDispatchEngine
 
+from omnimemory.models.config.model_node_event_bus_topics import (
+    ModelNodeEventBusTopics,
+)
 from omnimemory.runtime.contract_topics import canonical_topic_to_dispatch_alias
 from omnimemory.topics import EnumMemoryCommandTopic as MemoryCommandTopic
 from omnimemory.topics import EnumMemoryEventTopic as MemoryEventTopic
@@ -140,55 +143,53 @@ class ProtocolMemoryExpireHandler(Protocol):
 #
 # Usage: when calling dispatch(), pass the alias instead of the raw topic.
 
+# Each alias below converts the topic that a node contract declares in its event_bus
+# section (or, for the topics no contract declares yet, the EnumMemory*Topic member)
+# into the form the dispatch engine matches on.
+
+
+def _node_topics(node: str) -> ModelNodeEventBusTopics:
+    return ModelNodeEventBusTopics.from_node_contract(f"omnimemory.nodes.{node}")
+
+
+_LIFECYCLE = _node_topics("node_memory_lifecycle_orchestrator")
+
 DISPATCH_ALIAS_INTENT_CLASSIFIED = canonical_topic_to_dispatch_alias(
     MemoryEventTopic.INTENT_CLASSIFIED
 )
-"""Dispatch-compatible alias for intent-classified canonical topic."""
-
 DISPATCH_ALIAS_INTENT_QUERY_REQUESTED = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.INTENT_QUERY_REQUESTED
+    _node_topics("node_intent_query_effect").subscribed("intent-query-requested")
 )
-"""Dispatch-compatible alias for intent-query-requested canonical topic."""
-
 DISPATCH_ALIAS_RUNTIME_TICK = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.RUNTIME_TICK
+    _LIFECYCLE.subscribed("runtime-tick")
 )
-"""Dispatch-compatible alias for runtime-tick command topic."""
-
 DISPATCH_ALIAS_ARCHIVE_MEMORY = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.ARCHIVE_MEMORY
+    _LIFECYCLE.subscribed("archive-memory")
 )
-"""Dispatch-compatible alias for archive-memory command topic."""
-
 DISPATCH_ALIAS_EXPIRE_MEMORY = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.EXPIRE_MEMORY
+    _LIFECYCLE.subscribed("expire-memory")
 )
-"""Dispatch-compatible alias for expire-memory command topic."""
-
 DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.MEMORY_RETRIEVAL_REQUESTED
+    _node_topics("node_memory_retrieval_effect").subscribed(
+        "memory-retrieval-requested"
+    )
 )
-"""Dispatch-compatible alias for memory-retrieval-requested command topic."""
-
+# Graph memory (OMN-6578) and intent graph (OMN-6579) are served by adapters with no
+# node contract to declare their command topics.
 DISPATCH_ALIAS_GRAPH_MEMORY = canonical_topic_to_dispatch_alias(
     MemoryCommandTopic.GRAPH_MEMORY_QUERY
 )
-"""Dispatch-compatible alias for graph memory query/mutation operations (OMN-6578)."""
-
 DISPATCH_ALIAS_INTENT_GRAPH = canonical_topic_to_dispatch_alias(
     MemoryCommandTopic.INTENT_GRAPH_QUERY
 )
-"""Dispatch-compatible alias for intent graph query/mutation operations (OMN-6579)."""
-
 DISPATCH_ALIAS_NAVIGATION_HISTORY = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.NAVIGATION_HISTORY_SESSION
+    _node_topics("node_navigation_history_reducer").dispatched(
+        "navigation-history-session"
+    )
 )
-"""Dispatch-compatible alias for navigation history session events (OMN-6583)."""
-
 DISPATCH_ALIAS_SEMANTIC_COMPUTE = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.SEMANTIC_ANALYSIS
+    _node_topics("node_semantic_analyzer_compute").dispatched("semantic-analysis")
 )
-"""Dispatch-compatible alias for semantic analysis requests (OMN-6585)."""
 
 
 # =============================================================================
@@ -915,11 +916,11 @@ def _readable_memory_id(payload: object) -> UUID | None:
 async def _publish_lifecycle_event(
     publish_callback: Callable[[str, dict[str, object]], Awaitable[None]]
     | Callable[[str, dict[str, object]], None],
-    topic: MemoryEventTopic,
+    topic: str,
     event: BaseModel,
 ) -> None:
     """Publish one lifecycle outcome event; a publish failure propagates."""
-    published = publish_callback(topic.value, event.model_dump(mode="json"))
+    published = publish_callback(topic, event.model_dump(mode="json"))
     if inspect.isawaitable(published):
         await published
 
@@ -1002,7 +1003,7 @@ def create_expire_memory_dispatch_handler(
             )
             await _publish_lifecycle_event(
                 publish,
-                MemoryEventTopic.LIFECYCLE_TRANSITION_FAILED,
+                _LIFECYCLE.published("lifecycle-transition-failed"),
                 ModelLifecycleTransitionFailedEvent(
                     memory_id=memory_id,
                     operation=_EXPIRE_OPERATION,
@@ -1060,7 +1061,7 @@ def create_expire_memory_dispatch_handler(
         expired_at = command.expired_at or now
         await _publish_lifecycle_event(
             publish_callback,
-            MemoryEventTopic.MEMORY_EXPIRED,
+            _LIFECYCLE.published("memory-expired"),
             ModelMemoryExpiredEvent(
                 entity_id=command.memory_id,
                 memory_id=command.memory_id,

@@ -70,7 +70,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
                     "default_confidence_threshold": 0.5,
                 },
                 {
-                    "connection_uri": "bolt://memgraph:7687",
+                    "connection_uri": "bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}",
                     "timeout_seconds": 60.0,
                     "circuit_breaker_threshold": 3,
                     "max_intents_per_session": 50,
@@ -84,7 +84,7 @@ class ModelHandlerIntentConfig(BaseModel):  # omnimemory-model-exempt: handler c
         min_length=1,
         description=(
             "Graph database connection URI. "
-            "Example: 'bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}' or 'bolt://memgraph:7687'."
+            "Example: 'bolt://{OMNIMEMORY_MEMGRAPH_HOST}:{OMNIMEMORY_MEMGRAPH_PORT}'."
         ),
     )
     auth_username: str | None = Field(

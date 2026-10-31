@@ -45,12 +45,9 @@ _CREDENTIAL_PATTERNS: list[Pattern[str]] = [
     re.compile(r"\basic\s+([^\s]+)", re.IGNORECASE),
 ]
 
-# Connection string patterns - detect database/service URLs
+# Connection string patterns - detect any scheme carrying credentials in its authority
 _CONNECTION_STRING_PATTERNS: list[Pattern[str]] = [
-    re.compile(r"postgresql://[^@]+@[^/]+/[^\s]+", re.IGNORECASE),
-    re.compile(r"mysql://[^@]+@[^/]+/[^\s]+", re.IGNORECASE),
-    re.compile(r"mongodb://[^@]+@[^/]+/[^\s]+", re.IGNORECASE),
-    re.compile(r"redis://[^@]+@[^/]+/[^\s]*", re.IGNORECASE),
+    re.compile(r"\b[a-z][a-z0-9+.-]*://[^@\s]+@[^/\s]+/[^\s]*", re.IGNORECASE),
 ]
 
 # IP address patterns - detect IPv4 and IPv6 addresses

@@ -1,12 +1,14 @@
 ---
 schema_version: "1.0.0"
 ticket_id: "OMN-21623"
-title: "omnimemory burn-down slices: navigation, lifecycle and intent storage settings resolve from node
-  contract descriptors and overlays"
+title: "omnimemory burn-down slices: navigation, lifecycle, intent storage and topic values resolve from
+  node contracts and overlays"
 summary: "The navigation-history reducer's embedding model and client timeouts are injected as ModelNavigationClientSettings.
   The lifecycle orchestrator's archive, expire and tick handlers receive ModelLifecycleTimeoutSettings.
   Intent storage circuit breaker thresholds and recovery time resolve as ModelIntentStorageSettings. Settings
-  models expand node contract descriptor values with the ${env.VAR:default} overlay convention."
+  models expand node contract descriptor values with the ${env.VAR:default} overlay convention. Dispatch
+  and kreuzberg topics resolve from node contract event_bus sections through ModelNodeEventBusTopics;
+  the error sanitizer matches any credentialed connection string without naming a scheme."
 is_seam_ticket: false
 interface_change: true
 interfaces_touched:
@@ -52,6 +54,25 @@ requirements:
           configured value, and the error category backoff factors load from error_categories_contract.yaml
           with the env overlay replacing each -- falsifier: uv run pytest tests/unit/adapters/test_injected_timeouts.py
           -q -p no:randomly --no-cov fails at the merge base, where those parameters carry literal defaults"
+  - id: "req-topics-from-contract"
+    statement: "Dispatch aliases, lifecycle outcome topics and the kreuzberg publish topics are read from
+      the node contracts' event_bus sections; code names no topic the contracts declare."
+    acceptance:
+      - id: "AC5"
+        statement: "AC5: ModelNodeEventBusTopics resolves a topic from a node contract's event_bus by
+          event name and refuses an undeclared name, and the navigation and semantic nodes declare their
+          command topics as descriptor dispatch_topics without joining the plugin subscription set --
+          falsifier: uv run pytest tests/unit/runtime/test_model_node_event_bus_topics.py -q --no-cov
+          fails at the merge base, where ModelNodeEventBusTopics does not exist"
+  - id: "req-sanitizer-connection-strings"
+    statement: "The error sanitizer redacts a credentialed connection string of any scheme without naming
+      a scheme or an endpoint in code."
+    acceptance:
+      - id: "AC6"
+        statement: "AC6: bolt, postgresql, mysql, mongodb and redis connection strings carrying credentials
+          are redacted by one scheme-agnostic pattern and a credential-free URL is left alone -- falsifier:
+          uv run pytest tests/unit/adapters/test_adapter_error_sanitizer_connection_strings.py -q --no-cov
+          fails at the merge base for the bolt connection string"
 evidence_requirements:
   - kind: "tests"
     description: "Contract defaults and overlays reach the intent storage adapter; invalid settings fail
@@ -72,6 +93,15 @@ evidence_requirements:
     description: "The resilience parameters have no default, the injected values reach the lock, the probe
       and the handler shutdown, and the error category backoff overlay wins or fails to load."
     command: "uv run pytest tests/unit/adapters/test_injected_timeouts.py -q -p no:randomly --no-cov"
+  - kind: "tests"
+    description: "Topics resolve from node contracts, dispatch-only nodes stay out of the subscription
+      set, and an undeclared event name is refused."
+    command: "uv run pytest tests/unit/runtime/test_model_node_event_bus_topics.py -q --no-cov"
+  - kind: "tests"
+    description: "Credentialed connection strings of any scheme are redacted and a credential-free URL
+      is kept."
+    command: "uv run pytest tests/unit/adapters/test_adapter_error_sanitizer_connection_strings.py -q
+      --no-cov"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -111,3 +141,18 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "uv run pytest tests/unit/adapters/test_injected_timeouts.py -q -p no:randomly --no-cov"
     binds_ac: ["AC4"]
+  - id: "dod-omn21623-topics-from-contract"
+    description: "AC5: topics resolve from node contract event_bus sections through ModelNodeEventBusTopics."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/runtime/test_model_node_event_bus_topics.py -q --no-cov"
+    binds_ac: ["AC5"]
+  - id: "dod-omn21623-sanitizer-connection-strings"
+    description: "AC6: the error sanitizer redacts credentialed connection strings of any scheme."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/adapters/test_adapter_error_sanitizer_connection_strings.py
+          -q --no-cov"
+    binds_ac: ["AC6"]

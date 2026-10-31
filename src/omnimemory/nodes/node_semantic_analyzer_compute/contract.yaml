@@ -96,6 +96,14 @@ handler_routing:
         module: "omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute"
   default_handler: null
 
+# === DESCRIPTOR ===
+# Command topics the dispatch engine routes to this node's handler. The runtime
+# resolves them from here (runtime/dispatch_handlers.py); the plugin does not
+# subscribe to them.
+descriptor:
+  dispatch_topics:
+    - "onex.cmd.omnimemory.semantic-analysis.v1"
+
 # === TAGS ===
 tags:
   - memory
