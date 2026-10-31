@@ -11,6 +11,7 @@ that integrate with ModelBaseResult for consistent error handling across the sys
 
 from __future__ import annotations
 
+import importlib.resources
 from enum import Enum
 from typing import TYPE_CHECKING, cast
 
@@ -24,7 +25,9 @@ FieldValueType = (
 )
 
 # Import ModelOnexError from omnibase_core
+import yaml
 from omnibase_core.models.errors.model_onex_error import ModelOnexError
+from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation import ModelMetadata
@@ -144,54 +147,36 @@ class ModelErrorCategoryInfo(BaseModel):
     prefix: str = Field(description="Error code prefix")
     description: str = Field(description="Category description")
     recoverable: bool = Field(description="Whether errors are generally recoverable")
-    default_retry_count: int = Field(3, description="Default retry count")
-    default_backoff_factor: float = Field(2.0, description="Default backoff multiplier")
+    default_retry_count: int = Field(..., description="Default retry count")
+    default_backoff_factor: float = Field(..., description="Default backoff multiplier")
 
 
-ERROR_CATEGORIES: dict[str, ModelErrorCategoryInfo] = {
-    "VALIDATION": ModelErrorCategoryInfo(
-        prefix="ONEX_OMNIMEMORY_VAL",
-        description="Input validation errors",
-        recoverable=False,
-        default_retry_count=0,
-        default_backoff_factor=1.0,
-    ),
-    "STORAGE": ModelErrorCategoryInfo(
-        prefix="ONEX_OMNIMEMORY_STO",
-        description="Storage system errors",
-        recoverable=True,
-        default_retry_count=3,
-        default_backoff_factor=2.0,
-    ),
-    "RETRIEVAL": ModelErrorCategoryInfo(
-        prefix="ONEX_OMNIMEMORY_RET",
-        description="Memory retrieval errors",
-        recoverable=True,
-        default_retry_count=2,
-        default_backoff_factor=1.5,
-    ),
-    "PROCESSING": ModelErrorCategoryInfo(
-        prefix="ONEX_OMNIMEMORY_PRO",
-        description="Intelligence processing errors",
-        recoverable=True,
-        default_retry_count=2,
-        default_backoff_factor=2.0,
-    ),
-    "COORDINATION": ModelErrorCategoryInfo(
-        prefix="ONEX_OMNIMEMORY_COR",
-        description="Coordination and workflow errors",
-        recoverable=True,
-        default_retry_count=3,
-        default_backoff_factor=1.5,
-    ),
-    "SYSTEM": ModelErrorCategoryInfo(
-        prefix="ONEX_OMNIMEMORY_SYS",
-        description="System-level errors",
-        recoverable=False,
-        default_retry_count=1,
-        default_backoff_factor=1.0,
-    ),
-}
+def _load_error_categories() -> dict[str, ModelErrorCategoryInfo]:
+    """Build the category table from ``error_categories_contract.yaml``.
+
+    Each entry's backoff factor is a ``${env.VAR:default}`` overlay value
+    expanded by ``expand_contract_env_refs``; a value that is not a number
+    raises ``ValidationError``.
+    """
+    document = yaml.safe_load(
+        importlib.resources.files("omnimemory.protocols")
+        .joinpath("error_categories_contract.yaml")
+        .read_text(encoding="utf-8")
+    )
+    return {
+        name: ModelErrorCategoryInfo.model_validate(
+            {
+                **entry,
+                "default_backoff_factor": expand_contract_env_refs(
+                    str(entry["default_backoff_factor"])
+                ),
+            }
+        )
+        for name, entry in document["categories"].items()
+    }
+
+
+ERROR_CATEGORIES: dict[str, ModelErrorCategoryInfo] = _load_error_categories()
 
 
 def get_error_category(

@@ -41,6 +41,17 @@ requirements:
           with environment overlays, invalid overlays fail at binding, explicit DI bypasses loading, and
           the unused timeout default is removed -- falsifier: uv run pytest tests/nodes/node_intent_storage_effect/test_circuit_breaker_settings.py
           -q --no-cov"
+  - id: "req-resilience-injection"
+    statement: "The concurrency, health, retry and intent-handler resilience code holds no timeout, backoff
+      or polling literal; each is injected by the caller, and the error category backoff factors are contract
+      overlay values."
+    acceptance:
+      - id: "AC4"
+        statement: "AC4: circuit breaker, connection pool, retry, priority lock, health manager, PostgreSQL
+          health probe and intent handler shutdown timeouts are required parameters or the handler's own
+          configured value, and the error category backoff factors load from error_categories_contract.yaml
+          with the env overlay replacing each -- falsifier: uv run pytest tests/unit/adapters/test_injected_timeouts.py
+          -q -p no:randomly --no-cov fails at the merge base, where those parameters carry literal defaults"
 evidence_requirements:
   - kind: "tests"
     description: "Contract defaults and overlays reach the intent storage adapter; invalid settings fail
@@ -57,6 +68,10 @@ evidence_requirements:
       model has no defaults, and each handler uses the injected values."
     command: "uv run pytest tests/unit/nodes/test_memory_lifecycle_orchestrator/test_lifecycle_timeout_settings.py
       -q -p no:randomly --no-cov"
+  - kind: "tests"
+    description: "The resilience parameters have no default, the injected values reach the lock, the probe
+      and the handler shutdown, and the error category backoff overlay wins or fails to load."
+    command: "uv run pytest tests/unit/adapters/test_injected_timeouts.py -q -p no:randomly --no-cov"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -88,3 +103,11 @@ dod_evidence:
         check_value: "uv run pytest tests/nodes/node_intent_storage_effect/test_circuit_breaker_settings.py
           -q --no-cov"
     binds_ac: ["AC3"]
+  - id: "dod-omn21623-resilience-injection"
+    description: "AC4: resilience timeouts, backoffs and polling intervals are injected, and the error
+      category backoff factors resolve from a contract overlay."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/adapters/test_injected_timeouts.py -q -p no:randomly --no-cov"
+    binds_ac: ["AC4"]

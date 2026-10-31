@@ -192,8 +192,8 @@ async def retry_with_backoff(
 def retry_decorator(
     config: ModelRetryConfig | None = None,
     max_attempts: int = 3,
-    base_delay_ms: int = 1000,
-    max_delay_ms: int = 30000,
+    base_delay_ms: int | None = None,
+    max_delay_ms: int | None = None,
     exponential_multiplier: float = 2.0,
     jitter: bool = True,
     retryable_exceptions: list[str] | None = None,
@@ -204,8 +204,8 @@ def retry_decorator(
     Args:
         config: Retry configuration (if provided, other params ignored)
         max_attempts: Maximum retry attempts
-        base_delay_ms: Base delay between attempts in milliseconds
-        max_delay_ms: Maximum delay between attempts in milliseconds
+        base_delay_ms: Base delay in ms (omitted: the ModelRetryConfig value)
+        max_delay_ms: Maximum delay in ms (omitted: the ModelRetryConfig value)
         exponential_multiplier: Exponential backoff multiplier
         jitter: Whether to add random jitter
         retryable_exceptions: List of retryable exception names
@@ -225,10 +225,10 @@ def retry_decorator(
             "max_delay_ms": max_delay_ms,
             "exponential_multiplier": exponential_multiplier,
             "jitter": jitter,
+            "retryable_exceptions": retryable_exceptions,
         }
-        # Only override retryable_exceptions if explicitly provided
-        if retryable_exceptions is not None:
-            config_kwargs["retryable_exceptions"] = retryable_exceptions
+        # Only override the ModelRetryConfig defaults for explicitly provided values
+        config_kwargs = {k: v for k, v in config_kwargs.items() if v is not None}
         effective_config = ModelRetryConfig(**config_kwargs)
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:

@@ -708,7 +708,7 @@ health_manager = HealthCheckManager()
 
 # Convenience functions for registering common health checks
 async def create_postgresql_health_check(
-    connection_string: str,
+    connection_string: str, connect_timeout: float
 ) -> Callable[[], Awaitable[HealthCheckResult]]:
     """Create a PostgreSQL health check function."""
 
@@ -720,7 +720,7 @@ async def create_postgresql_health_check(
         )
 
         try:
-            conn = await asyncpg.connect(connection_string, timeout=5)
+            conn = await asyncpg.connect(connection_string, timeout=connect_timeout)
             await conn.execute("SELECT 1")
             await conn.close()
 
@@ -907,7 +907,7 @@ class HealthManager:
 
     def __init__(
         self,
-        default_timeout: float = 5.0,
+        default_timeout: float,
         rate_limit_window: float = 60.0,
         max_checks_per_window: int = 100,
     ):

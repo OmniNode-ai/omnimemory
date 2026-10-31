@@ -855,7 +855,7 @@ class TestConcurrencyPerformance:
 
         Target: <2ms overhead per acquire/release cycle.
         """
-        lock = PriorityLock(name="benchmark_lock")
+        lock = PriorityLock(name="benchmark_lock", poll_interval_seconds=0.001)
 
         # Warm up
         for _ in range(10):
