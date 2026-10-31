@@ -427,8 +427,8 @@ def test_learning_retrieval_declares_no_phantom_handler() -> None:
     retrieval this EFFECT node declares, and a bare function fails the boot ctor
     predicate anyway.
     """
-    from omnimemory.nodes.node_agent_learning_retrieval_effect.handlers import (
-        handler_agent_learning_retrieval as learning_module,
+    from omnimemory.nodes.node_agent_learning_retrieval_effect.adapters import (
+        adapter_learning_scoring as learning_module,
     )
 
     routing = _routing("node_agent_learning_retrieval_effect")

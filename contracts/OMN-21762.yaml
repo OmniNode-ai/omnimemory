@@ -1,0 +1,55 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21762"
+title: "omnimemory handler-shape burn-down, slice rf1400-s2: handlers take one typed request and the runtime
+  owns the envelope"
+summary: "The runtime tick handler takes a ModelRuntimeTick instead of an event envelope. The mock retrieval
+  handlers hold their snapshots, embeddings and edges in an injected StoreMockRetrieval, the semantic
+  compute handler holds its embeddings in a CacheEmbedding, and the lifecycle handler exposes the exempt
+  initialize and shutdown hooks. The agent learning helpers move to a scoring module and the expire-handler
+  protocol moves to protocols/."
+is_seam_ticket: false
+interface_change: true
+interfaces_touched:
+  - public_api
+requirements:
+  - id: "req-handler-shape-slice"
+    statement: "The ValidatorHandlerShape count over the nine files of this slice is zero and no baseline
+      entry or suppression is added."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: ValidatorHandlerShape reports no finding for the slice files, and still reports
+          a mutating public method on a probe handler -- falsifier: uv run pytest tests/unit/runtime/test_handler_shape_burn_down.py
+          -q --no-cov fails at the merge base, where the slice files carry 14 findings"
+  - id: "req-typed-request"
+    statement: "The touched handlers take one typed request with no envelope inside the handler."
+    acceptance:
+      - id: "AC2"
+        statement: "AC2: HandlerMemoryTick.handle takes a ModelRuntimeTick and the lifecycle, retrieval
+          and semantic tests pass over the touched modules -- falsifier: uv run pytest tests/unit/nodes/test_memory_lifecycle_orchestrator
+          tests/nodes/node_memory_retrieval_effect tests/unit/runtime -q --no-cov"
+evidence_requirements:
+  - kind: "tests"
+    description: "The slice files have no handler-shape finding and the validator still flags a mutating
+      probe."
+    command: "uv run pytest tests/unit/runtime/test_handler_shape_burn_down.py -q --no-cov"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21762-handler-shape-slice"
+    description: "AC1: the slice files carry no ValidatorHandlerShape finding."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/runtime/test_handler_shape_burn_down.py -q --no-cov"
+    binds_ac: ["AC1"]
+  - id: "dod-omn21762-typed-request"
+    description: "AC2: the tick handler takes a typed request and the touched modules' tests pass."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/nodes/test_memory_lifecycle_orchestrator tests/nodes/node_memory_retrieval_effect
+          tests/unit/runtime -q --no-cov"
+    binds_ac: ["AC2"]

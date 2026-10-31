@@ -24,11 +24,10 @@ Usage:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from omnibase_core.container import ModelONEXContainer
-from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
 from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
 from omnimemory.nodes.node_memory_lifecycle_orchestrator.adapters import (
@@ -92,19 +91,6 @@ def runtime_tick(
 
 
 @pytest.fixture
-def tick_envelope(
-    runtime_tick: ModelRuntimeTick,
-    correlation_id: UUID,
-) -> ModelEventEnvelope[ModelRuntimeTick]:
-    """Provide a tick event envelope for testing."""
-    return ModelEventEnvelope(
-        payload=runtime_tick,
-        correlation_id=correlation_id,
-        envelope_id=uuid4(),
-    )
-
-
-@pytest.fixture
 def adapter(container: ModelONEXContainer) -> AdapterRuntimeTickMemory:
     """Provide an uninitialized adapter for testing."""
     return AdapterRuntimeTickMemory(container)
@@ -163,11 +149,11 @@ class TestNotInitializedGuard:
     async def test_process_tick_raises_if_not_initialized(
         self,
         adapter: AdapterRuntimeTickMemory,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """process_tick() raises RuntimeError if not initialized."""
         with pytest.raises(RuntimeError, match="not initialized"):
-            await adapter.process_tick(tick_envelope)
+            await adapter.process_tick(runtime_tick)
 
 
 # ---------------------------------------------------------------------------
@@ -183,11 +169,11 @@ class TestTickDelegation:
     async def test_process_tick_returns_empty_events_without_reader(
         self,
         adapter: AdapterRuntimeTickMemory,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """process_tick() returns empty events when no projection reader."""
         await adapter.initialize(projection_reader=None)
-        output = await adapter.process_tick(tick_envelope)
+        output = await adapter.process_tick(runtime_tick)
         # Without a projection reader, no lifecycle events are emitted
         assert output.events == ()
 
@@ -195,11 +181,11 @@ class TestTickDelegation:
     async def test_process_tick_records_metrics(
         self,
         adapter: AdapterRuntimeTickMemory,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """process_tick() returns output with metrics keys."""
         await adapter.initialize(projection_reader=None)
-        output = await adapter.process_tick(tick_envelope)
+        output = await adapter.process_tick(runtime_tick)
         assert "expired_count" in output.metrics
         assert "archive_initiated_count" in output.metrics
         assert output.metrics["expired_count"] == 0.0

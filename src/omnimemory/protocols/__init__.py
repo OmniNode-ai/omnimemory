@@ -62,6 +62,7 @@ from .protocol_embedding import ProtocolEmbeddingClient, ProtocolRateLimiter
 from .protocol_embedding_provider import ProtocolEmbeddingProvider, ProtocolLLMProvider
 from .protocol_handler_intent import ProtocolHandlerIntent
 from .protocol_intent_graph_adapter import ProtocolIntentGraphAdapter
+from .protocol_memory_expire_handler import ProtocolMemoryExpireHandler
 from .protocol_secrets_provider import ProtocolSecretsProvider
 
 __all__ = [
@@ -127,4 +128,5 @@ __all__ = [
     "ProtocolHandlerIntent",
     # Adapter protocols (for contract-driven dependency injection)
     "ProtocolIntentGraphAdapter",
+    "ProtocolMemoryExpireHandler",
 ]

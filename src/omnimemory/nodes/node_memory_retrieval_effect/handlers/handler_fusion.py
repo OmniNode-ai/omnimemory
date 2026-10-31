@@ -61,7 +61,7 @@ MIN_VECTOR_COSINE = 0.5
 """Cosine similarity below which the semantic leg is treated as not matching.
 
 Cosine is bounded in ``[0, 1]`` and 0.5 is the midpoint. The existing layered
-search in ``handler_agent_learning_retrieval`` already treats 0.70 as a broad
+search in ``adapter_learning_scoring`` already treats 0.70 as a broad
 context match and 0.85 as a high-precision one, so 0.5 sits deliberately below
 both: this floor is meant to exclude noise, not to make a relevance judgement
 that belongs to the ranking.

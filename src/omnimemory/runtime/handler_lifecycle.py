@@ -37,7 +37,7 @@ class HandlerMemoryLifecycle:
         self._semantic = semantic_handler
         self._started = False
 
-    async def handle_startup(self) -> dict[str, str]:
+    async def initialize(self) -> dict[str, str]:
         """Initialize all memory subsystem components.
 
         Returns:
@@ -60,7 +60,7 @@ class HandlerMemoryLifecycle:
         )
         return statuses
 
-    async def handle_shutdown(self) -> None:
+    async def shutdown(self) -> None:
         """Graceful shutdown of memory subsystem components."""
         self._started = False
         logger.info("Memory lifecycle stopped")

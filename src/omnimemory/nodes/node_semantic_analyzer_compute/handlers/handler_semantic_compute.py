@@ -74,7 +74,6 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID, uuid4
 
-from cachetools import LRUCache
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from omnimemory.adapters.adapter_handler_constants import (
@@ -95,6 +94,9 @@ from omnimemory.models.intelligence import (
     ModelSemanticAnalysisResult,
     ModelSemanticEntity,
     ModelSemanticEntityList,
+)
+from omnimemory.nodes.node_semantic_analyzer_compute.adapters.adapter_embedding_cache import (
+    EmbeddingLruCache,
 )
 
 if TYPE_CHECKING:
@@ -531,7 +533,7 @@ class HandlerSemanticCompute:
         self._embedding_provider: ProtocolEmbeddingProvider | None = None
         self._llm_provider: ProtocolLLMProvider | None = None
         self._policy: HandlerSemanticComputePolicy | None = None
-        self._embedding_cache: LRUCache[str, list[float]] | None = None
+        self._embedding_cache: EmbeddingLruCache | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
@@ -613,7 +615,7 @@ class HandlerSemanticCompute:
             # If caching is disabled (max_cache_size=0), use minimum size but caching
             # will be bypassed by enable_caching=False or the cache will just evict quickly
             effective_cache_size = max(self._config.max_cache_size, _MIN_CACHE_SIZE)
-            self._embedding_cache = LRUCache(maxsize=effective_cache_size)
+            self._embedding_cache = EmbeddingLruCache(max_size=effective_cache_size)
 
             self._initialized = True
             logger.debug(
@@ -687,8 +689,8 @@ class HandlerSemanticCompute:
                 llm_provider_error = str(e)
 
         if self._embedding_cache is not None:
-            cache_size = len(self._embedding_cache)
-            cache_max_size = int(self._embedding_cache.maxsize)
+            cache_size = self._embedding_cache.size
+            cache_max_size = self._embedding_cache.max_size
 
         return ModelSemanticComputeHealth(
             initialized=self._initialized,
@@ -756,7 +758,7 @@ class HandlerSemanticCompute:
             # Handler is no longer usable until initialize() is called
         """
         if self._embedding_cache is not None:
-            self._embedding_cache.clear()
+            self._embedding_cache.reset()
         self._initialized = False
         logger.debug("HandlerSemanticCompute shutdown complete")
 
@@ -947,8 +949,8 @@ class HandlerSemanticCompute:
 
         # Check cache
         cache_key = self._compute_cache_key(content, model)
-        if self._config.enable_caching and cache_key in self._embedding_cache:
-            return list(self._embedding_cache[cache_key])
+        if self._config.enable_caching and self._embedding_cache.contains(cache_key):
+            return self._embedding_cache.get(cache_key)
 
         # Generate embedding via provider with retry logic for transient failures
         timeout = self._config.policy_config.timeout_seconds
@@ -970,7 +972,7 @@ class HandlerSemanticCompute:
 
         # Cache if appropriate (LRUCache handles eviction automatically)
         if self._config.enable_caching and self._policy.should_cache_embedding(content):
-            self._embedding_cache[cache_key] = embedding
+            self._embedding_cache.put(cache_key, embedding)
 
         return embedding
 
