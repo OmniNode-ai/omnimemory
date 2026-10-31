@@ -59,6 +59,7 @@ from omnimemory.errors.embedding_errors import (
     EmbeddingTimeoutError,
 )
 from omnimemory.handlers.adapters.adapter_rate_limiter import ProviderRateLimiter
+from omnimemory.handlers.container.registry_http_rest import bind_http_rest_handler
 from omnimemory.models.config import (
     EnumEmbeddingProviderType,
     ModelEmbeddingHttpClientConfig,
@@ -194,7 +195,7 @@ class EmbeddingHttpClient:
 
             # Create a minimal ONEX container for the handler
             container = ModelONEXContainer()
-            self._handler = HandlerHttpRest(container)
+            self._handler = bind_http_rest_handler(container)
             # Assert for type narrowing: pyright doesn't narrow instance attributes
             # after assignment due to potential concurrent modification
             assert self._handler is not None

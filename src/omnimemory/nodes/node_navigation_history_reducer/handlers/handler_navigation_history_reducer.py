@@ -44,6 +44,9 @@ if TYPE_CHECKING:
 from omnimemory.models.config.model_navigation_client_settings import (
     ModelNavigationClientSettings,
 )
+from omnimemory.nodes.node_navigation_history_reducer.container.registry_navigation_history import (
+    bind_navigation_history_writer,
+)
 from omnimemory.nodes.node_navigation_history_reducer.models.model_navigation_history_request import (  # noqa: TC001
     ModelNavigationHistoryRequest,
 )
@@ -558,7 +561,7 @@ class HandlerNavigationHistoryReducer:
         if writer is not None:
             self._writer = writer
         else:
-            self._writer = HandlerNavigationHistoryWriter(
+            self._writer = bind_navigation_history_writer(
                 pg_dsn=pg_dsn,
                 qdrant_host=qdrant_host,
                 qdrant_port=qdrant_port,

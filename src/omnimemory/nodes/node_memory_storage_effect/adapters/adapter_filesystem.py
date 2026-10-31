@@ -44,11 +44,11 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from omnibase_infra.errors.error_infra import InfraConnectionError
-from omnibase_infra.handlers.handler_filesystem import HandlerFileSystem
 from pydantic import ValidationError
 
 from omnimemory.models.adapters import ModelFileSystemAdapterConfig
 
+from ..container.registry_filesystem import HandlerFileSystem, bind_filesystem_handler
 from ..models import (
     ModelMemoryStorageRequest,
     ModelMemoryStorageResponse,
@@ -218,7 +218,7 @@ class HandlerFileSystemAdapter:
             config: The adapter configuration specifying paths and limits.
         """
         self._config = config
-        self._handler = HandlerFileSystem()
+        self._handler = bind_filesystem_handler()
         self._snapshots_path = config.base_path / config.snapshots_dir
         self._initialized = False
         self._init_lock = asyncio.Lock()

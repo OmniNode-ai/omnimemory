@@ -96,6 +96,9 @@ from omnimemory.models.intelligence import (
     ModelSemanticEntity,
     ModelSemanticEntityList,
 )
+from omnimemory.nodes.node_semantic_analyzer_compute.container.registry_semantic_compute import (
+    bind_semantic_compute_policy,
+)
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
@@ -603,7 +606,7 @@ class HandlerSemanticCompute:
                 )
 
             # Set up policy and cache
-            self._policy = HandlerSemanticComputePolicy(self._config.policy_config)
+            self._policy = bind_semantic_compute_policy(self._config.policy_config)
 
             # Guard against max_cache_size=0: cachetools LRUCache requires maxsize > 0
             # If caching is disabled (max_cache_size=0), use minimum size but caching

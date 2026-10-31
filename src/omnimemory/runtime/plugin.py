@@ -482,8 +482,8 @@ class PluginMemory:
         import asyncpg
         from pydantic import ValidationError
 
-        from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
-            HandlerMemoryExpire,
+        from omnimemory.nodes.node_memory_lifecycle_orchestrator.container.registry_memory_lifecycle import (
+            bind_memory_expire,
         )
         from omnimemory.settings import PostgresSettings
 
@@ -514,7 +514,7 @@ class PluginMemory:
         if pool is None:
             return None
 
-        handler = HandlerMemoryExpire(config.container)
+        handler = bind_memory_expire(config.container)
         await handler.initialize(db_pool=pool)
         self._expire_db_pool = pool
         return handler
@@ -658,8 +658,8 @@ class PluginMemory:
             navigation_history_handler = None
             nav_pg_dsn = os.environ.get("OMNIMEMORY_PG_DSN", "")
             if nav_pg_dsn:
-                from omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer import (
-                    HandlerNavigationHistoryReducer,
+                from omnimemory.nodes.node_navigation_history_reducer.container.registry_navigation_history import (
+                    bind_configured_navigation_history_reducer,
                 )
 
                 # No embedding endpoint is shipped (OMN-20936): the deployment
@@ -677,8 +677,7 @@ class PluginMemory:
                         correlation_id,
                     )
 
-                navigation_history_handler = HandlerNavigationHistoryReducer(
-                    writer=None,
+                navigation_history_handler = bind_configured_navigation_history_reducer(
                     pg_dsn=nav_pg_dsn,
                     qdrant_host=os.environ["QDRANT_HOST"],
                     qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
@@ -693,13 +692,11 @@ class PluginMemory:
             # Uses container for dependency injection.
             semantic_compute_handler = None
             if config.container is not None:
-                from omnimemory.nodes.node_semantic_analyzer_compute.handlers.handler_semantic_compute import (
-                    HandlerSemanticCompute,
+                from omnimemory.nodes.node_semantic_analyzer_compute.container.registry_semantic_compute import (
+                    bind_semantic_compute,
                 )
 
-                semantic_compute_handler = HandlerSemanticCompute(
-                    container=config.container,
-                )
+                semantic_compute_handler = bind_semantic_compute(config.container)
                 logger.info(
                     "Semantic compute handler constructed (correlation_id=%s)",
                     correlation_id,

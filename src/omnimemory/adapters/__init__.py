@@ -73,7 +73,7 @@ from .adapter_metrics_counter import (
     validate_correlation_id,
 )
 from .adapter_observability_wrapper import (
-    HandlerMetrics,
+    CapturedMetrics,
     HandlerObservabilityWrapper,
 )
 from .adapter_pii_detector import (
@@ -149,7 +149,7 @@ __all__ = [
     "Gauge",
     "MetricsRegistry",
     "metrics_registry",
-    "HandlerMetrics",
+    "CapturedMetrics",
     "HandlerObservabilityWrapper",
     # Concurrency
     "LockPriority",

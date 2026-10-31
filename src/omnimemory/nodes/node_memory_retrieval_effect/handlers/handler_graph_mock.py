@@ -48,7 +48,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from omnibase_core.models.omnimemory import (
@@ -59,6 +58,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from ..models import (
+    ModelGraphRelationship,
     ModelHandlerGraphMockConfig,
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
@@ -70,25 +70,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "HandlerGraphMock",
     "ModelHandlerGraphMockConfig",
-    "HandlerGraphRelationship",
 ]
-
-
-@dataclass
-class HandlerGraphRelationship:
-    """Represents a relationship between two snapshots.
-
-    Attributes:
-        source_id: The source snapshot ID.
-        target_id: The target snapshot ID.
-        relationship_type: The type of relationship (e.g., "related_to", "caused_by").
-        weight: Optional weight/strength of the relationship (0.0-1.0).
-    """
-
-    source_id: str
-    target_id: str
-    relationship_type: str
-    weight: float = 1.0
 
 
 class HandlerGraphMock:
@@ -130,7 +112,7 @@ class HandlerGraphMock:
         """
         self._config = config
         self._snapshots: dict[str, ModelMemorySnapshot] = {}
-        self._relationships: list[HandlerGraphRelationship] = []
+        self._relationships: list[ModelGraphRelationship] = []
         self._adjacency: dict[
             str, list[tuple[str, str, float]]
         ] = {}  # id -> [(target, type, weight)]
@@ -214,7 +196,7 @@ class HandlerGraphMock:
             relationship_type: The type of relationship.
             weight: Optional weight (0.0-1.0). Defaults to 1.0.
         """
-        relationship = HandlerGraphRelationship(
+        relationship = ModelGraphRelationship(
             source_id=source_id,
             target_id=target_id,
             relationship_type=relationship_type,

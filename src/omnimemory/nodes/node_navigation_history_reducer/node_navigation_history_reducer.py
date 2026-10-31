@@ -15,8 +15,8 @@ entry point following ONEX node conventions.
 from __future__ import annotations
 
 from omnimemory.nodes.base import BaseReducerNode, ContainerType
-from omnimemory.nodes.node_navigation_history_reducer.handlers import (
-    HandlerNavigationHistoryReducer,
+from omnimemory.nodes.node_navigation_history_reducer.container.registry_navigation_history import (
+    bind_navigation_history_reducer,
 )
 
 
@@ -60,4 +60,4 @@ class NodeNavigationHistoryReducer(BaseReducerNode):
                 the platform matures.
         """
         super().__init__(container)
-        self.handler = HandlerNavigationHistoryReducer()
+        self.handler = bind_navigation_history_reducer()

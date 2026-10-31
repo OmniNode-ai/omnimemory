@@ -27,7 +27,7 @@ from omnimemory.adapters.adapter_metrics_counter import (
     validate_metric_labels,
 )
 from omnimemory.adapters.adapter_observability_wrapper import (
-    HandlerMetrics,
+    CapturedMetrics,
     HandlerObservabilityWrapper,
     _get_safe_content_metadata,
 )
@@ -463,12 +463,12 @@ class TestSafeContentMetadata:
         assert result1["content_hash"] != result2["content_hash"]
 
 
-class TestHandlerMetricsDataclass:
-    """Tests for HandlerMetrics dataclass."""
+class TestCapturedMetricsDataclass:
+    """Tests for CapturedMetrics dataclass."""
 
     def test_handler_metrics_creation(self) -> None:
-        """Test HandlerMetrics can be created with required fields."""
-        metrics = HandlerMetrics(
+        """Test CapturedMetrics can be created with required fields."""
+        metrics = CapturedMetrics(
             correlation_id="test-id",
             operation="store",
             handler="filesystem",
@@ -485,8 +485,8 @@ class TestHandlerMetricsDataclass:
         assert metrics.error_message is None
 
     def test_handler_metrics_with_error(self) -> None:
-        """Test HandlerMetrics with error information."""
-        metrics = HandlerMetrics(
+        """Test CapturedMetrics with error information."""
+        metrics = CapturedMetrics(
             correlation_id="test-id",
             operation="store",
             handler="filesystem",

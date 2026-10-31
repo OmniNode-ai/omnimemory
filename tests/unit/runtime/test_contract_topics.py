@@ -476,7 +476,7 @@ class TestNoHardcodedTopics:
 
     def test_registry_has_no_get_topic_suffixes(self) -> None:
         """RegistryIntentQueryEffect must not have get_topic_suffixes method."""
-        from omnimemory.nodes.node_intent_query_effect.registry import (
+        from omnimemory.nodes.node_intent_query_effect.container import (
             RegistryIntentQueryEffect,
         )
 
@@ -494,7 +494,7 @@ class TestNoHardcodedTopics:
         """
         import inspect
 
-        from omnimemory.nodes.node_intent_query_effect.registry import (
+        from omnimemory.nodes.node_intent_query_effect.container import (
             RegistryIntentQueryEffect,
         )
 

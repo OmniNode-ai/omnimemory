@@ -42,7 +42,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..base import BaseComputeNode, ContainerType
-from .handlers import HandlerSemanticCompute, ModelHandlerSemanticComputeConfig
+from .container.registry_semantic_compute import bind_semantic_compute
 from .models import (
     ModelSemanticAnalyzerComputeRequest,
     ModelSemanticAnalyzerComputeResponse,
@@ -50,6 +50,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from ...protocols import ProtocolEmbeddingProvider, ProtocolLLMProvider
+    from .handlers import HandlerSemanticCompute, ModelHandlerSemanticComputeConfig
 
 __all__ = [
     "NodeSemanticAnalyzerCompute",
@@ -119,7 +120,7 @@ class NodeSemanticAnalyzerCompute(BaseComputeNode):
             config: Optional handler configuration.
         """
         super().__init__(container)
-        self._handler = HandlerSemanticCompute(container=container)
+        self._handler = bind_semantic_compute(container)
         self._pending_config = config
         self._pending_embedding_provider = embedding_provider
         self._pending_llm_provider = llm_provider
