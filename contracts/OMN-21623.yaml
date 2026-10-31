@@ -1,11 +1,12 @@
 ---
 schema_version: "1.0.0"
 ticket_id: "OMN-21623"
-title: "omnimemory burn-down slices: navigation reducer client settings and lifecycle orchestrator timeouts
-  move from handler literals into node contract descriptors and are injected"
+title: "omnimemory burn-down slices: navigation, lifecycle and intent storage settings resolve from node
+  contract descriptors and overlays"
 summary: "The navigation-history reducer's embedding model and client timeouts are injected as ModelNavigationClientSettings.
   The lifecycle orchestrator's archive, expire and tick handlers receive ModelLifecycleTimeoutSettings.
-  Both settings models expand node contract descriptor values with the ${env.VAR:default} overlay convention."
+  Intent storage circuit breaker thresholds and recovery time resolve as ModelIntentStorageSettings. Settings
+  models expand node contract descriptor values with the ${env.VAR:default} overlay convention."
 is_seam_ticket: false
 interface_change: true
 interfaces_touched:
@@ -31,7 +32,21 @@ requirements:
           values in the node contract.yaml with the env overlay replacing each -- falsifier: uv run pytest
           tests/unit/nodes/test_memory_lifecycle_orchestrator/test_lifecycle_timeout_settings.py -q -p
           no:randomly --no-cov fails at the merge base, where ModelLifecycleTimeoutSettings does not exist"
+  - id: "req-intent-storage-breaker"
+    statement: "The intent storage adapter resolves its circuit breaker policy from the node contract
+      descriptor or accepts an injected circuit breaker configuration; it holds no literal policy defaults."
+    acceptance:
+      - id: "AC3"
+        statement: "AC3: intent storage breaker thresholds and recovery time resolve from the contract
+          with environment overlays, invalid overlays fail at binding, explicit DI bypasses loading, and
+          the unused timeout default is removed -- falsifier: uv run pytest tests/nodes/node_intent_storage_effect/test_circuit_breaker_settings.py
+          -q --no-cov"
 evidence_requirements:
+  - kind: "tests"
+    description: "Contract defaults and overlays reach the intent storage adapter; invalid settings fail
+      at binding and explicitly injected configurations bypass contract loading."
+    command: "uv run pytest tests/nodes/node_intent_storage_effect/test_circuit_breaker_settings.py -q
+      --no-cov"
   - kind: "tests"
     description: "The descriptor values resolve, the overlay wins, a bad value fails to load, the settings
       model has no defaults, and the writer hands the values to its clients."
@@ -65,3 +80,11 @@ dod_evidence:
         check_value: "uv run pytest tests/unit/nodes/test_memory_lifecycle_orchestrator/test_lifecycle_timeout_settings.py
           -q -p no:randomly --no-cov"
     binds_ac: ["AC2"]
+  - id: "dod-omn21623-intent-storage-breaker"
+    description: "AC3: intent storage circuit breaker settings resolve from the contract descriptor."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/nodes/node_intent_storage_effect/test_circuit_breaker_settings.py
+          -q --no-cov"
+    binds_ac: ["AC3"]

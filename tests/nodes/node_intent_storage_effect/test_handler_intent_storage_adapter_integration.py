@@ -67,9 +67,6 @@ try:
         ModelIntentStorageRequest,
         ModelIntentStorageResponse,
     )
-    from omnimemory.nodes.node_intent_storage_effect.adapters.adapter_intent_storage import (
-        _DEFAULT_CIRCUIT_BREAKER_CONFIG,
-    )
 
     _DEPENDENCIES_AVAILABLE = True
     _SKIP_REASON = ""
@@ -819,7 +816,7 @@ class TestErrorHandling:
         )
 
         # Trigger enough failures to open circuit breaker using the actual threshold
-        failure_threshold = _DEFAULT_CIRCUIT_BREAKER_CONFIG.failure_threshold
+        failure_threshold = handler_with_mock._circuit_breaker.failure_threshold
         for _ in range(failure_threshold):
             response = await handler_with_mock.execute(request)
             # Verify failures are being recorded (not circuit breaker errors yet)

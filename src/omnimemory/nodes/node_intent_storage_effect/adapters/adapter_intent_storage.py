@@ -46,6 +46,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import structlog
@@ -57,8 +58,8 @@ from omnimemory.adapters.adapter_concurrency import (
 from omnimemory.adapters.adapter_pii_detector import PIIDetector
 from omnimemory.handlers.adapters import AdapterIntentGraph
 from omnimemory.handlers.adapters.models import ModelAdapterIntentGraphConfig
-from omnimemory.models.utils.model_circuit_breaker_config import (
-    ModelCircuitBreakerConfig,
+from omnimemory.models.config.model_intent_storage_settings import (
+    ModelIntentStorageSettings,
 )
 from omnimemory.nodes.node_intent_storage_effect.models import (
     ModelIntentRecordResponse,
@@ -66,18 +67,13 @@ from omnimemory.nodes.node_intent_storage_effect.models import (
     ModelIntentStorageResponse,
 )
 
+if TYPE_CHECKING:
+    from omnimemory.models.utils import ModelCircuitBreakerConfig
+
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger(__name__)
 
 __all__ = ["HandlerIntentStorageAdapter"]
-
-# Default circuit breaker configuration for external adapter calls
-_DEFAULT_CIRCUIT_BREAKER_CONFIG = ModelCircuitBreakerConfig(
-    failure_threshold=5,
-    recovery_timeout=60,
-    success_threshold=3,
-    timeout=30.0,
-)
 
 
 class HandlerIntentStorageAdapter:
@@ -106,15 +102,17 @@ class HandlerIntentStorageAdapter:
             config: Optional configuration for the intent graph adapter.
                 If not provided, uses default configuration.
             circuit_breaker_config: Optional circuit breaker configuration.
-                If not provided, uses default configuration with 5 failure
-                threshold, 60s recovery timeout, and 3 success threshold.
+                If not provided, resolves the node contract descriptor and its
+                environment overlay at this binding boundary.
         """
         self._config = config or ModelAdapterIntentGraphConfig()
         self._adapter: AdapterIntentGraph | None = None
         self._initialized = False
 
         # Initialize circuit breaker for external adapter calls
-        cb_config = circuit_breaker_config or _DEFAULT_CIRCUIT_BREAKER_CONFIG
+        cb_config = circuit_breaker_config or (
+            ModelIntentStorageSettings.from_node_contract()
+        )
         self._circuit_breaker = CircuitBreaker(
             failure_threshold=cb_config.failure_threshold,
             recovery_timeout=float(cb_config.recovery_timeout),
