@@ -720,14 +720,16 @@ async def create_postgresql_health_check(
         )
 
         try:
-            conn = await asyncpg.connect(connection_string, timeout=connect_timeout)
+            # asyncpg accepts fractional seconds, but its unannotated timeout=60
+            # default makes Pyright infer int. Preserve the caller's precision.
+            pg = cast("Callable[..., Awaitable[asyncpg.Connection]]", asyncpg.connect)
+            conn = await pg(connection_string, timeout=connect_timeout)
             await conn.execute("SELECT 1")
             await conn.close()
 
+            # Latency will be set by the manager.
             return HealthCheckResult(
-                config=config,
-                status=HealthStatus.HEALTHY,
-                latency_ms=0.0,  # Will be set by the manager
+                config=config, status=HealthStatus.HEALTHY, latency_ms=0.0
             )
         except Exception as e:
             return HealthCheckResult(
