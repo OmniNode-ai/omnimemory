@@ -11,7 +11,7 @@ summary: "Core's contracts_and_di check reports 86 findings in omnimemory src. T
 is_seam_ticket: false
 interface_change: true
 interfaces_touched:
-  - "HandlerNavigationHistoryWriter and HandlerNavigationHistoryReducer take injected ModelNavigationClientSettings"
+  - public_api
 requirements:
   - id: "req-nav-reducer-settings"
     statement: "The navigation-history reducer's handler holds no embedding model name and no client timeout
