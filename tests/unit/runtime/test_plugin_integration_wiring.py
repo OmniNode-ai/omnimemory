@@ -207,7 +207,6 @@ class TestNavigationHistoryWiring:
                 qdrant_host="test-qdrant",
                 qdrant_port=6333,
                 embedding_url="http://test-embedding:8100",
-                embedding_model="test-model",
             )
 
             # Factory called with navigation handler

@@ -18,6 +18,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from omnimemory.models.config.model_navigation_client_settings import (
+    ModelNavigationClientSettings,
+)
 from omnimemory.nodes.node_navigation_history_reducer.handlers.handler_navigation_history_reducer import (
     HandlerNavigationHistoryReducer,
     HandlerNavigationHistoryWriter,
@@ -38,6 +41,13 @@ from omnimemory.nodes.node_navigation_history_reducer.models.model_navigation_se
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+_SETTINGS = ModelNavigationClientSettings(
+    embedding_model="test-embedding-model",
+    pg_command_timeout_seconds=30.0,
+    qdrant_timeout_seconds=30,
+    embedding_http_timeout_seconds=30.0,
+)
 
 
 def _make_step(index: int = 0) -> ModelPlanStep:
@@ -169,7 +179,7 @@ class TestHandlerNavigationHistoryReducer:
 
     @pytest.mark.asyncio
     async def test_execute_requires_initialize(self) -> None:
-        handler = HandlerNavigationHistoryReducer()
+        handler = HandlerNavigationHistoryReducer(settings=_SETTINGS)
         session = _make_success_session()
         request = ModelNavigationHistoryRequest(session=session)
 
@@ -179,7 +189,7 @@ class TestHandlerNavigationHistoryReducer:
 
     @pytest.mark.asyncio
     async def test_initialize_idempotent(self) -> None:
-        handler = HandlerNavigationHistoryReducer()
+        handler = HandlerNavigationHistoryReducer(settings=_SETTINGS)
         await handler.initialize()
         await handler.initialize()  # Should not raise
         assert handler.is_initialized is True
@@ -258,7 +268,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_record_success_writes_postgres_and_qdrant(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         session = _make_success_session()
 
         mock_conn = AsyncMock()
@@ -283,7 +293,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_record_failure_writes_postgres_only(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         session = _make_failure_session()
 
         mock_conn = AsyncMock()
@@ -304,7 +314,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_record_idempotent_on_duplicate_session_id(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         session = _make_success_session()
 
         mock_conn = AsyncMock()
@@ -325,7 +335,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_postgres_failure_does_not_write_qdrant(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         session = _make_success_session()
 
         # Pool.acquire() raises when entering context
@@ -349,7 +359,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_qdrant_failure_returns_partial_success(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         session = _make_success_session()
 
         mock_conn = AsyncMock()
@@ -375,7 +385,7 @@ class TestHandlerNavigationHistoryWriterUnit:
         self,
     ) -> None:
         """Critical invariant: failed paths MUST NOT appear in Qdrant."""
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         session = _make_failure_session()
 
         mock_conn = AsyncMock()
@@ -394,7 +404,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_embed_text_parses_response(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
         fake_vector = [0.1, 0.2, 0.3]
         fake_response_json = {"data": [{"embedding": fake_vector}]}
 
@@ -415,7 +425,7 @@ class TestHandlerNavigationHistoryWriterUnit:
 
     @pytest.mark.asyncio
     async def test_embed_text_raises_on_bad_response(self) -> None:
-        writer = HandlerNavigationHistoryWriter()
+        writer = HandlerNavigationHistoryWriter(settings=_SETTINGS)
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()

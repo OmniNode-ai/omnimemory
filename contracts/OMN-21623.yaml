@@ -1,0 +1,45 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21623"
+title: "omnimemory burn-down slice: the navigation-history reducer's embedding model and client timeouts
+  move from handler literals into the node contract descriptor and are injected"
+summary: "Core's contracts_and_di check reports 86 findings in omnimemory src. This slice moves the embedding
+  model name and the three client timeouts (Postgres pool, Qdrant client, embedding HTTP call) of node_navigation_history_reducer
+  into the contract's descriptor as ${env.VAR:default} overlay values. The plugin binding site expands
+  them into ModelNavigationClientSettings and injects them into the handler, which holds no literal. 82
+  findings remain; they are listed in the PR body."
+is_seam_ticket: false
+interface_change: true
+interfaces_touched:
+  - "HandlerNavigationHistoryWriter and HandlerNavigationHistoryReducer take injected ModelNavigationClientSettings"
+requirements:
+  - id: "req-nav-reducer-settings"
+    statement: "The navigation-history reducer's handler holds no embedding model name and no client timeout
+      literal; each is a contract descriptor value an overlay can replace, injected as ModelNavigationClientSettings."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the navigation reducer is injected its embedding model and its Postgres, Qdrant
+          and embedding-HTTP timeouts as ModelNavigationClientSettings, resolved by the binding site from
+          descriptor values in its contract.yaml with the env overlay replacing each -- falsifier: uv
+          run pytest tests/nodes/node_navigation_history_reducer/test_client_settings.py -q -p no:randomly
+          --no-cov fails at the merge base, where ModelNavigationClientSettings does not exist"
+evidence_requirements:
+  - kind: "tests"
+    description: "The descriptor values resolve, the overlay wins, a bad value fails to load, the settings
+      model has no defaults, and the writer hands the values to its clients."
+    command: "uv run pytest tests/nodes/node_navigation_history_reducer/test_client_settings.py -q -p
+      no:randomly --no-cov"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21623-nav-reducer-settings"
+    description: "AC1: the navigation reducer's embedding model and client timeouts are injected from
+      its contract descriptor."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/nodes/node_navigation_history_reducer/test_client_settings.py
+          -q -p no:randomly --no-cov"
+    binds_ac: ["AC1"]
