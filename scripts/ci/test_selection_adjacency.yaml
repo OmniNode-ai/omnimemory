@@ -295,6 +295,10 @@ test_families:
     triggers:
       - src/omnimemory/models/config/
       - src/omnimemory/enums/
+  tests/unit/test_semantic_model_routing.py:
+    triggers:
+      - src/omnimemory/models/config/
+      - src/omnimemory/nodes/node_semantic_analyzer_compute/
   tests/unit/test_sql_placeholders.py:
     triggers:
       - src/omnimemory/handlers/
