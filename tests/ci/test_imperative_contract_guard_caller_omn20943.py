@@ -31,7 +31,6 @@ RECORDED_PATHS = [
     "src/omnimemory/handlers/adapters/adapter_valkey.py",
     "src/omnimemory/nodes/node_memory_retrieval_effect/adapters/adapter_embedding_client.py",
     "src/omnimemory/runtime/plugin.py",
-    "src/omnimemory/topics.py",
 ]
 LIVE_HANDLER = "src/omnimemory/nodes/node_memory_retrieval_effect/handlers/handler_memory_retrieval.py"
 

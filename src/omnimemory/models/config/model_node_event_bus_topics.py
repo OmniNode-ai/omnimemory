@@ -30,7 +30,7 @@ class ModelNodeEventBusTopics(BaseModel):
     dispatch_topics: tuple[str, ...] = Field(
         ...,
         description=(
-            "Command topics the contract declares under descriptor.dispatch_topics: "
+            "Topics the contract declares under descriptor.dispatch_topics: "
             "routed to the node's handler by the dispatch engine, never subscribed"
         ),
     )

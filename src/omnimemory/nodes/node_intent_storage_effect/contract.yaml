@@ -231,3 +231,8 @@ descriptor:
   failure_threshold: "${env.OMNIMEMORY_INTENT_STORAGE_FAILURE_THRESHOLD:5}"
   recovery_timeout: "${env.OMNIMEMORY_INTENT_STORAGE_RECOVERY_SECONDS:60}"
   success_threshold: "${env.OMNIMEMORY_INTENT_STORAGE_SUCCESS_THRESHOLD:3}"
+  # Event the dispatch engine routes to this node's intent bridge handler. The
+  # runtime resolves it from here (runtime/dispatch_handlers.py); omnimemory does
+  # not subscribe to it: omnimarket owns the Kafka consumer (OMN-13701).
+  dispatch_topics:
+    - "onex.evt.omniintelligence.intent-classified.v1"
