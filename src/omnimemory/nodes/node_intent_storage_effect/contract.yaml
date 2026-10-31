@@ -225,3 +225,9 @@ tags:
   - memgraph
   - graph
   - analytics
+
+# Circuit breaker policy resolved at the handler binding boundary.
+descriptor:
+  failure_threshold: "${env.OMNIMEMORY_INTENT_STORAGE_FAILURE_THRESHOLD:5}"
+  recovery_timeout: "${env.OMNIMEMORY_INTENT_STORAGE_RECOVERY_SECONDS:60}"
+  success_threshold: "${env.OMNIMEMORY_INTENT_STORAGE_SUCCESS_THRESHOLD:3}"
