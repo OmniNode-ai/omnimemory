@@ -230,6 +230,14 @@ event_bus:
         soft-deleted from the storage backend."
 
 # === TAGS ===
+# OMN-21738: the storage config's timeout bounds are overlay values, not literals in the
+# model. ``${env.VAR:default}`` is expanded by ModelMemoryStorageConfig.from_node_contract;
+# an operator overlay or the per-lane service env replaces the inline default per lane.
+descriptor:
+  node_archetype: effect
+  min_timeout_ms: "${env.OMNIMEMORY_STORAGE_MIN_TIMEOUT_MS:100}"
+  max_timeout_ms: "${env.OMNIMEMORY_STORAGE_MAX_TIMEOUT_MS:300000}"
+
 tags:
   - memory
   - storage

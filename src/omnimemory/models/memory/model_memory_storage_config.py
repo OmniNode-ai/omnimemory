@@ -7,14 +7,23 @@ Memory storage configuration model following ONEX standards.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+import importlib.resources
+
+import yaml
+from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 
 from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC001
 
 # Validation limits for storage configuration
 MAX_CONNECTIONS_LIMIT = 1000
-MIN_TIMEOUT_MS = 100
-MAX_TIMEOUT_MS = 300000  # 5 minutes
 MAX_BATCH_SIZE = 10000
 
 
@@ -77,6 +86,16 @@ class ModelMemoryStorageConfig(BaseModel):
         default=30000,
         description="Idle connection timeout in milliseconds",
     )
+    min_timeout_ms: int = Field(
+        ...,
+        gt=0,
+        description="Lowest connection or idle timeout the storage system accepts, in milliseconds",
+    )
+    max_timeout_ms: int = Field(
+        ...,
+        gt=0,
+        description="Highest connection or idle timeout the storage system accepts, in milliseconds",
+    )
 
     # Performance settings
     batch_size: int = Field(
@@ -116,17 +135,46 @@ class ModelMemoryStorageConfig(BaseModel):
             raise ValueError(f"max_connections cannot exceed {MAX_CONNECTIONS_LIMIT}")
         return v
 
-    @field_validator("connection_timeout_ms", "idle_timeout_ms")
+    @model_validator(mode="after")
+    def validate_timeout_values(self) -> ModelMemoryStorageConfig:
+        """Validate the timeouts sit inside the injected bounds."""
+        if self.min_timeout_ms > self.max_timeout_ms:
+            raise ValueError("min_timeout_ms cannot exceed max_timeout_ms")
+        for name in ("connection_timeout_ms", "idle_timeout_ms"):
+            value = getattr(self, name)
+            if value < self.min_timeout_ms:
+                raise ValueError(
+                    f"Timeout values must be at least {self.min_timeout_ms}ms"
+                )
+            if value > self.max_timeout_ms:
+                raise ValueError(
+                    f"Timeout values cannot exceed {self.max_timeout_ms:,}ms"
+                )
+        return self
+
     @classmethod
-    def validate_timeout_values(cls, v: int) -> int:
-        """Validate timeout values are positive and reasonable."""
-        if v < MIN_TIMEOUT_MS:
-            raise ValueError(f"Timeout values must be at least {MIN_TIMEOUT_MS}ms")
-        if v > MAX_TIMEOUT_MS:
-            raise ValueError(
-                f"Timeout values cannot exceed {MAX_TIMEOUT_MS:,}ms (5 minutes)"
-            )
-        return v
+    def from_node_contract(cls, **values: object) -> ModelMemoryStorageConfig:
+        """Build the config with the timeout bounds from the storage node's contract.
+
+        ``min_timeout_ms`` and ``max_timeout_ms`` are the node contract's ``descriptor``
+        entries (``${env.VAR:default}`` overlay values), expanded by
+        ``expand_contract_env_refs``; a missing entry or a value that is not a
+        positive integer raises ``ValidationError``.
+        """
+        package = "omnimemory.nodes.node_memory_storage_effect"
+        contract = yaml.safe_load(
+            importlib.resources.files(package)
+            .joinpath("contract.yaml")
+            .read_text(encoding="utf-8")
+        )
+        descriptor = contract.get("descriptor") if isinstance(contract, dict) else None
+        if not isinstance(descriptor, dict):
+            raise ValueError(f"{package} contract has no descriptor mapping")
+        bounds = {
+            name: expand_contract_env_refs(str(descriptor.get(name, "")))
+            for name in ("min_timeout_ms", "max_timeout_ms")
+        }
+        return cls.model_validate({**bounds, **values})
 
     @field_validator("batch_size")
     @classmethod

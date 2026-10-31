@@ -342,7 +342,7 @@ class HandlerKreuzbergParse:
                 indexed_count=0,
                 failed_count=1,
                 skipped_too_large_count=0,
-                timeout_count=1,
+                timeout_count=int(failed_event.error_code == "timeout"),
             )
         except KreuzbergExtractionError as exc:
             _log.warning(

@@ -1,0 +1,67 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21738"
+title: "omnimemory contracts_and_di literal_timeout burn-down, slice rf1300-c4: storage config timeout
+  bounds resolve from the storage node contract"
+summary: "ModelMemoryStorageConfig takes its timeout bounds as required min_timeout_ms and max_timeout_ms
+  fields, resolved by from_node_contract from the descriptor of the node_memory_storage_effect contract
+  with the ${env.VAR:default} overlay convention. The kreuzberg timeout result counts the timeout events
+  it emitted instead of naming a literal."
+is_seam_ticket: false
+interface_change: true
+interfaces_touched:
+  - public_api
+requirements:
+  - id: "req-literal-timeout-slice"
+    statement: "The storage config model and the kreuzberg parse handler hold no timeout literal; the
+      bounds are contract descriptor values an overlay can replace, injected as model fields."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the contracts_and_di literal_timeout count over the slice paths drops to zero
+          and the repo total drops by the slice size, with no baseline entry or suppression added -- falsifier:
+          runtime_validator_run with ValidatorContractsAndDi over omnimemory src before and after, counts
+          compared per rule"
+      - id: "AC2"
+        statement: "AC2: the storage config timeout bounds are taken through injected fields bound from
+          the node contract descriptor or its env overlay and none remains hard-coded in the touched code
+          -- falsifier: uv run pytest tests/unit/models/test_memory_storage_config_timeout_bounds.py -q
+          -p no:randomly --no-cov"
+      - id: "AC3"
+        statement: "AC3: the slice lands as one PR titled with this ticket id and carries lab proof of
+          the tests and the checker re-run -- falsifier: the PR body Lab line names the host, sha and
+          exit code"
+evidence_requirements:
+  - kind: "tests"
+    description: "The bounds resolve from the descriptor, the overlay wins, a bad value fails at binding,
+      the bounds have no default, and a timeout below the injected minimum is refused."
+    command: "uv run pytest tests/unit/models/test_memory_storage_config_timeout_bounds.py -q -p no:randomly
+      --no-cov"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21738-literal-timeout-slice"
+    description: "AC1 and AC2: the storage config bounds are injected from the node contract descriptor
+      and the slice paths hold no literal_timeout finding."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/models/test_memory_storage_config_timeout_bounds.py -q
+          -p no:randomly --no-cov"
+    binds_ac: ["AC1", "AC2"]
+  - id: "dod-omn21738-kreuzberg-parse-tests"
+    description: "AC2: the kreuzberg parse handler tests pass with the timeout result counting its emitted
+      events."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/nodes/test_kreuzberg_parse_effect -q -p no:randomly --no-cov"
+    binds_ac: ["AC2"]
+  - id: "dod-omn21738-pr-lab-proof"
+    description: "AC3: the PR body carries the lab proof of the tests and the checker re-run."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/models -q -p no:randomly --no-cov"
+    binds_ac: ["AC3"]
