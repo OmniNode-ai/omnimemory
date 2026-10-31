@@ -95,7 +95,7 @@ def test_matches_the_documented_curve() -> None:
     so a change to the constant fails here instead of silently agreeing with
     itself.
 
-    Note the four-week figure. ``handler_agent_learning_retrieval.py:21`` and
+    Note the four-week figure. ``adapter_learning_scoring.py:21`` and
     the architecture plan's §2.3 both describe this decay as "~60% at 4 weeks"
     / "a 4-week-old learning scores 0.6x". That is wrong by about six points —
     ``exp(-0.015 * 28) = 0.657``, and 0.600 is not reached until day 34. Writing
@@ -146,7 +146,7 @@ def test_future_timestamps_do_not_amplify() -> None:
 def test_uses_the_same_constant_as_the_agent_learning_path() -> None:
     """Two decay implementations that disagree would rank the same document
     differently depending on which path served it."""
-    from omnimemory.nodes.node_agent_learning_retrieval_effect.handlers.handler_agent_learning_retrieval import (
+    from omnimemory.nodes.node_agent_learning_retrieval_effect.adapters.adapter_learning_scoring import (
         compute_freshness_score,
     )
 

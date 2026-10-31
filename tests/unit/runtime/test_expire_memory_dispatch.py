@@ -363,7 +363,7 @@ class TestLifecycleBridgeDoesNotTreatExpireAsShutdown:
         from omnimemory.runtime.handler_lifecycle import HandlerMemoryLifecycle
 
         lifecycle = HandlerMemoryLifecycle()
-        await lifecycle.handle_startup()
+        await lifecycle.initialize()
         bridge = _create_lifecycle_bridge_handler(lifecycle=lifecycle)
         correlation_id = uuid4()
         envelope: ModelEventEnvelope[object] = ModelEventEnvelope(

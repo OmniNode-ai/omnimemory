@@ -109,7 +109,9 @@ validation_rules:
 #
 #   * `grep -rn HandlerAgentLearningRetrieval src/` matches only this contract.
 #     The module the entry named,
-#     handlers/handler_agent_learning_retrieval.py, contains four module-level
+#     handlers/handler_agent_learning_retrieval.py (moved to
+#     adapters/adapter_learning_scoring.py under OMN-21762, because it holds
+#     helpers and is no handler), contains four module-level
 #     pure functions (compute_freshness_score, build_error_query_text,
 #     build_context_query_text, rank_and_merge) and no class at all — so
 #     getattr() raised AttributeError at boot and the route resolved to nothing.

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from omnimemory.nodes.node_agent_learning_retrieval_effect.handlers.handler_agent_learning_retrieval import (
+from omnimemory.nodes.node_agent_learning_retrieval_effect.adapters.adapter_learning_scoring import (
     build_context_query_text,
     build_error_query_text,
     compute_freshness_score,

@@ -49,14 +49,14 @@ DECAY_LAMBDA_PER_DAY = 0.015
 """Decay constant, per day, for ``A(t) = A_0 * exp(-lambda * dt)``.
 
 Unchanged from the value already live in
-``node_agent_learning_retrieval_effect.handlers.handler_agent_learning_retrieval``
+``node_agent_learning_retrieval_effect.adapters.adapter_learning_scoring``
 so the two paths cannot drift apart. Taken as-is rather than retuned — there is
 no evidence in this repository that would justify moving it, and moving it
 without evidence is worse than keeping a documented constant.
 
 The actual curve: **0.900 at one week, 0.657 at four weeks, 0.600 at ~34
 days**. This was mis-stated as "~60% at 4 weeks" in
-``handler_agent_learning_retrieval.py`` — off by about six points, since 0.600
+``adapter_learning_scoring.py`` — off by about six points, since 0.600
 is a 34-day figure. Corrected there, and its tests now pin exact values rather
 than the wide bands that let the error survive (``0.60 < score < 0.72``
 contains both the true value and the wrong one, so it could never fail).

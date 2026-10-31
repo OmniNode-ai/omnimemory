@@ -55,12 +55,11 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from omnimemory.enums import EnumLifecycleState
-    from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
-        ModelExpireMemoryCommand,
-        ModelMemoryExpireResult,
-    )
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelHandlerMemoryRetrievalConfig,
+    )
+    from omnimemory.protocols.protocol_memory_expire_handler import (
+        ProtocolMemoryExpireHandler,
     )
     from omnimemory.runtime.handler_lifecycle import HandlerMemoryLifecycle
 
@@ -119,18 +118,6 @@ class ProtocolIntentQueryHandler(Protocol):
         self,
         request: object,
     ) -> object: ...
-
-
-@runtime_checkable
-class ProtocolMemoryExpireHandler(Protocol):
-    """Protocol for the handler that performs the ACTIVE -> EXPIRED transition.
-
-    Matches ``HandlerMemoryExpire.handle()``.
-    """
-
-    async def handle(
-        self, command: ModelExpireMemoryCommand
-    ) -> ModelMemoryExpireResult: ...
 
 
 # =============================================================================
@@ -863,7 +850,7 @@ def _create_lifecycle_bridge_handler(
         # Ensure the lifecycle handler is started before processing commands.
         if not lifecycle.is_started():
             with contextlib.suppress(Exception):
-                await lifecycle.handle_startup()
+                await lifecycle.initialize()
 
         # Route lifecycle commands.
         if command == "shutdown":
@@ -877,7 +864,7 @@ def _create_lifecycle_bridge_handler(
                 ctx_correlation_id,
             )
             with contextlib.suppress(Exception):
-                await lifecycle.handle_shutdown()
+                await lifecycle.shutdown()
         elif command == "archive-memory":
             logger.warning(
                 "archive-memory command not yet implemented "
@@ -1564,7 +1551,6 @@ __all__ = [
     "DISPATCH_ALIAS_INTENT_QUERY_REQUESTED",
     "DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED",
     "DISPATCH_ALIAS_RUNTIME_TICK",
-    "ProtocolMemoryExpireHandler",
     "create_dispatch_callback",
     "create_expire_memory_dispatch_handler",
     "create_intent_classified_dispatch_handler",

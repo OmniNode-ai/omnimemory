@@ -5,7 +5,6 @@
 # location or rewritten as contract + node + handler. A new line is refused
 # and the file is never deleted, even when empty.
 src/omnimemory/handlers/handler_intent.py
-src/omnimemory/nodes/node_agent_learning_retrieval_effect/handlers/handler_agent_learning_retrieval.py
 src/omnimemory/nodes/node_intent_storage_effect/adapters/adapter_intent_storage.py
 src/omnimemory/nodes/node_kreuzberg_parse_effect/handler_kreuzberg_parse.py
 src/omnimemory/nodes/node_memory_retrieval_effect/handlers/handler_db_mock.py

@@ -22,15 +22,14 @@ Example::
     from omnimemory.nodes.node_memory_lifecycle_orchestrator.adapters import (
         AdapterRuntimeTickMemory,
     )
-    from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
     container = ModelONEXContainer()
     adapter = AdapterRuntimeTickMemory(container)
     await adapter.initialize(projection_reader=reader, batch_size=50)
 
-    # Process a runtime tick envelope
-    output = await adapter.process_tick(envelope)
+    # Process a runtime tick
+    output = await adapter.process_tick(tick)
     print(f"Expired: {output.metrics['expired_count']}")
 
 Related Tickets:
@@ -58,7 +57,6 @@ from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
     from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
-    from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
     from omnimemory.adapters.adapter_concurrency import CircuitBreaker
@@ -207,7 +205,7 @@ class AdapterRuntimeTickMemory:
 
     async def process_tick(
         self,
-        envelope: ModelEventEnvelope[ModelRuntimeTick],
+        tick: ModelRuntimeTick,
     ) -> ModelHandlerOutput[None]:
         """Process a runtime tick and emit lifecycle transition events.
 
@@ -215,7 +213,7 @@ class AdapterRuntimeTickMemory:
         and archive candidates within the current tick window.
 
         Args:
-            envelope: Event envelope containing the runtime tick payload.
+            tick: The runtime tick.
 
         Returns:
             ModelHandlerOutput containing lifecycle transition events
@@ -229,7 +227,7 @@ class AdapterRuntimeTickMemory:
                 "AdapterRuntimeTickMemory not initialized. "
                 "Call initialize() before process_tick()."
             )
-        return await self._handler.handle(envelope)
+        return await self._handler.handle(tick)
 
     async def health_check(self) -> ModelRuntimeTickAdapterHealth:
         """Return health status of the adapter and its handler.

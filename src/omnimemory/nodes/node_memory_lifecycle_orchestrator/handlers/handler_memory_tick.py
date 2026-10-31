@@ -48,7 +48,7 @@ import logging
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
 from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
@@ -65,7 +65,6 @@ from omnimemory.models.config.model_lifecycle_timeout_settings import (
 
 if TYPE_CHECKING:
     from omnibase_core.container import ModelONEXContainer
-    from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
     from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
 logger = logging.getLogger(__name__)
@@ -465,7 +464,7 @@ class HandlerMemoryTick:
         ...     scheduler_id="runtime-001",
         ...     tick_interval_ms=1000,
         ... )
-        >>> output = await handler.handle(envelope)
+        >>> output = await handler.handle(tick)
         >>> # Output events: ModelMemoryExpiredEvent, ModelMemoryArchiveInitiated
     """
 
@@ -636,7 +635,7 @@ class HandlerMemoryTick:
 
     async def handle(
         self,
-        envelope: ModelEventEnvelope[ModelRuntimeTick],
+        request: ModelRuntimeTick,
     ) -> ModelHandlerOutput[None]:
         """Process runtime tick and emit lifecycle transition events.
 
@@ -647,7 +646,7 @@ class HandlerMemoryTick:
         Uses projection emission markers to prevent duplicate events.
 
         Args:
-            envelope: The event envelope containing the runtime tick event.
+            request: The runtime tick event.
 
         Returns:
             ModelHandlerOutput containing lifecycle events (ModelMemoryExpiredEvent,
@@ -660,12 +659,11 @@ class HandlerMemoryTick:
         """
         start_time = time.perf_counter()
 
-        # Extract from envelope
-        tick = envelope.payload
+        tick = request
         # Use tick.now (injected time) for consistent evaluation across distributed
-        # deployments and deterministic testing - NOT envelope_timestamp
+        # deployments and deterministic testing
         now = tick.now
-        correlation_id = envelope.correlation_id or uuid4()
+        correlation_id = tick.correlation_id
 
         events: list[BaseModel] = []
 
@@ -711,7 +709,7 @@ class HandlerMemoryTick:
 
         # Return handler output (ORCHESTRATOR: events only, no result)
         return ModelHandlerOutput.for_orchestrator(
-            input_envelope_id=envelope.envelope_id,
+            input_envelope_id=tick.tick_id,
             correlation_id=correlation_id,
             handler_id=self.handler_id,
             events=tuple(events),

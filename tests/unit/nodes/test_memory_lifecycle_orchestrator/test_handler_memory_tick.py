@@ -32,7 +32,6 @@ import pytest
 from omnibase_core.container import ModelONEXContainer
 from omnibase_core.enums import EnumMessageCategory, EnumNodeKind
 from omnibase_core.models.dispatch.model_handler_output import ModelHandlerOutput
-from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
 from omnibase_infra.runtime.models.model_runtime_tick import ModelRuntimeTick
 
 from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_tick import (
@@ -89,7 +88,9 @@ def correlation_id() -> UUID:
 
 
 @pytest.fixture
-def runtime_tick(fixed_now: datetime, tick_id: UUID) -> ModelRuntimeTick:
+def runtime_tick(
+    fixed_now: datetime, tick_id: UUID, correlation_id: UUID
+) -> ModelRuntimeTick:
     """Create a runtime tick event for testing.
 
     Args:
@@ -104,35 +105,9 @@ def runtime_tick(fixed_now: datetime, tick_id: UUID) -> ModelRuntimeTick:
         tick_id=tick_id,
         sequence_number=1,
         scheduled_at=fixed_now,
-        correlation_id=uuid4(),
+        correlation_id=correlation_id,
         scheduler_id="test-scheduler-001",
         tick_interval_ms=1000,
-    )
-
-
-@pytest.fixture
-def tick_envelope(
-    runtime_tick: ModelRuntimeTick,
-    fixed_now: datetime,
-    correlation_id: UUID,
-) -> ModelEventEnvelope[ModelRuntimeTick]:
-    """Create an event envelope containing a runtime tick.
-
-    Args:
-        runtime_tick: The tick event payload.
-        fixed_now: Fixed timestamp.
-        correlation_id: Correlation ID for tracing.
-
-    Returns:
-        Event envelope wrapping the runtime tick.
-    """
-    return ModelEventEnvelope(
-        envelope_id=uuid4(),
-        envelope_timestamp=fixed_now,
-        correlation_id=correlation_id,
-        payload=runtime_tick,
-        source_tool="test-runtime",
-        event_type="RuntimeTick",
     )
 
 
@@ -434,7 +409,7 @@ class TestNoCandidates:
     async def test_tick_with_no_projection_reader(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """Test tick returns empty result when no projection reader.
 
@@ -445,7 +420,7 @@ class TestNoCandidates:
         handler = HandlerMemoryTick(container)
         await handler.initialize()
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert isinstance(output, ModelHandlerOutput)
         assert output.events == ()
@@ -456,7 +431,7 @@ class TestNoCandidates:
     async def test_tick_with_empty_projection(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """Test tick returns empty result when projection has no candidates.
 
@@ -471,7 +446,7 @@ class TestNoCandidates:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert output.events == ()
         assert output.metrics["expired_count"] == 0.0
@@ -481,7 +456,7 @@ class TestNoCandidates:
     async def test_projection_reader_called_correctly(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
         correlation_id: UUID,
     ) -> None:
@@ -495,7 +470,7 @@ class TestNoCandidates:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader, batch_size=50)
 
-        await handler.handle(tick_envelope)
+        await handler.handle(runtime_tick)
 
         # Verify expired candidates call
         assert len(reader.get_expired_candidates_calls) == 1
@@ -525,7 +500,7 @@ class TestExpirationDetection:
     async def test_finds_expired_memory(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler finds and emits event for expired memory.
@@ -543,7 +518,7 @@ class TestExpirationDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 1
         event = output.events[0]
@@ -557,7 +532,7 @@ class TestExpirationDetection:
     async def test_finds_multiple_expired_memories(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler finds and emits events for multiple expired memories.
@@ -577,7 +552,7 @@ class TestExpirationDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 3
         assert all(isinstance(e, ModelMemoryExpiredEvent) for e in output.events)
@@ -587,7 +562,7 @@ class TestExpirationDetection:
     async def test_skips_memory_not_needing_expiration(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler skips memories that don't need expiration event.
@@ -606,7 +581,7 @@ class TestExpirationDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         # Event should be filtered out by needs_expiration_event() check
         assert len(output.events) == 0
@@ -615,7 +590,7 @@ class TestExpirationDetection:
     async def test_expiration_event_contains_correct_causation_id(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         tick_id: UUID,
         fixed_now: datetime,
     ) -> None:
@@ -633,7 +608,7 @@ class TestExpirationDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 1
         event = output.events[0]
@@ -653,7 +628,7 @@ class TestArchiveDetection:
     async def test_finds_archive_candidate(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler finds and emits event for archive candidate.
@@ -671,7 +646,7 @@ class TestArchiveDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 1
         event = output.events[0]
@@ -685,7 +660,7 @@ class TestArchiveDetection:
     async def test_finds_multiple_archive_candidates(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler finds and emits events for multiple archive candidates.
@@ -705,7 +680,7 @@ class TestArchiveDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 3
         assert all(isinstance(e, ModelMemoryArchiveInitiated) for e in output.events)
@@ -715,7 +690,7 @@ class TestArchiveDetection:
     async def test_skips_already_initiated_archive(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler skips memories that already have archive initiated.
@@ -733,7 +708,7 @@ class TestArchiveDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         # Event should be filtered out by needs_archive_event() check
         assert len(output.events) == 0
@@ -742,7 +717,7 @@ class TestArchiveDetection:
     async def test_skips_already_archived_memory(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler skips memories that are already archived.
@@ -760,7 +735,7 @@ class TestArchiveDetection:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 0
 
@@ -777,7 +752,7 @@ class TestCombinedScenarios:
     async def test_finds_both_expired_and_archive_candidates(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler processes both expirations and archives in one tick.
@@ -801,7 +776,7 @@ class TestCombinedScenarios:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert len(output.events) == 2
         assert output.metrics["expired_count"] == 1.0
@@ -825,7 +800,7 @@ class TestBatchLimiting:
     async def test_respects_batch_size_for_expirations(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         fixed_now: datetime,
     ) -> None:
         """Test handler respects batch_size when processing expirations.
@@ -846,7 +821,7 @@ class TestBatchLimiting:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader, batch_size=5)
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         # Should only emit batch_size (5) events
         assert len(output.events) == 5
@@ -856,7 +831,7 @@ class TestBatchLimiting:
     async def test_batch_size_passed_to_reader(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """Test batch_size is passed to projection reader.
 
@@ -868,7 +843,7 @@ class TestBatchLimiting:
         handler = HandlerMemoryTick(container)
         await handler.initialize(projection_reader=reader, batch_size=25)
 
-        await handler.handle(tick_envelope)
+        await handler.handle(runtime_tick)
 
         # Both reader calls should have limit=25
         assert reader.get_expired_candidates_calls[0]["limit"] == 25
@@ -887,7 +862,7 @@ class TestHandlerOutput:
     async def test_output_structure(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
         correlation_id: UUID,
     ) -> None:
         """Test handler returns correctly structured output.
@@ -899,19 +874,19 @@ class TestHandlerOutput:
         handler = HandlerMemoryTick(container)
         await handler.initialize()
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert isinstance(output, ModelHandlerOutput)
         assert output.handler_id == "handler-memory-tick"
         assert output.correlation_id == correlation_id
-        assert output.input_envelope_id == tick_envelope.envelope_id
+        assert output.input_envelope_id == runtime_tick.tick_id
         assert output.processing_time_ms >= 0.0
 
     @pytest.mark.asyncio
     async def test_output_metrics_present(
         self,
         container: ModelONEXContainer,
-        tick_envelope: ModelEventEnvelope[ModelRuntimeTick],
+        runtime_tick: ModelRuntimeTick,
     ) -> None:
         """Test handler output includes required metrics.
 
@@ -922,7 +897,7 @@ class TestHandlerOutput:
         handler = HandlerMemoryTick(container)
         await handler.initialize()
 
-        output = await handler.handle(tick_envelope)
+        output = await handler.handle(runtime_tick)
 
         assert "expired_count" in output.metrics
         assert "archive_initiated_count" in output.metrics

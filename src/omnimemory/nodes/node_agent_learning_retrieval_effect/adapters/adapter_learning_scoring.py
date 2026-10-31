@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 # Copyright (c) 2025 OmniNode Team
-"""Handler for agent learning retrieval.
+"""Scoring helpers for agent learning retrieval (OMN-21762: helpers, not a handler).
 
 Performs layered similarity search against two Qdrant collections:
 1. agent_learnings_error — high-precision error signature matching (cosine > 0.85)

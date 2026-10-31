@@ -61,6 +61,7 @@ from omnibase_core.models.omnimemory import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+from ..adapters.adapter_mock_store import MockRetrievalStore
 from ..models import (
     ModelHandlerDbMockConfig,
     ModelMemoryRetrievalRequest,
@@ -108,14 +109,20 @@ class HandlerDbMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: ModelHandlerDbMockConfig) -> None:
+    def __init__(
+        self,
+        config: ModelHandlerDbMockConfig,
+        store: MockRetrievalStore | None = None,
+    ) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
             config: The handler configuration.
+            store: Collaborator holding the seeded snapshots. A fresh store
+                is created when none is injected.
         """
         self._config = config
-        self._snapshots: dict[str, ModelMemorySnapshot] = {}
+        self._store = store if store is not None else MockRetrievalStore()
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
@@ -132,7 +139,7 @@ class HandlerDbMock:
     @property
     def snapshot_count(self) -> int:
         """Get the number of stored snapshots."""
-        return len(self._snapshots)
+        return len(self._store.snapshots)
 
     async def initialize(self) -> None:
         """Initialize the mock handler.
@@ -158,25 +165,12 @@ class HandlerDbMock:
         Note:
             Snapshots with invalid or empty IDs are skipped with a warning.
         """
-        valid_count = 0
-        for snapshot in snapshots:
-            # Validate snapshot ID is non-empty
-            if not snapshot.snapshot_id or not str(snapshot.snapshot_id).strip():
-                logger.warning(
-                    "Skipping snapshot with invalid/empty ID: %r",
-                    snapshot.snapshot_id,
-                )
-                continue
+        stored = self._store.seed_snapshots(snapshots)
+        logger.debug("Seeded %d snapshots into mock DB store", len(stored))
 
-            snapshot_id = str(snapshot.snapshot_id)
-            self._snapshots[snapshot_id] = snapshot
-            valid_count += 1
-
-        logger.debug("Seeded %d snapshots into mock DB store", valid_count)
-
-    def clear(self) -> None:
-        """Clear all snapshots from the mock store."""
-        self._snapshots.clear()
+    def reset(self) -> None:
+        """Drop all snapshots from the mock store."""
+        self._store.reset()
 
     async def execute(
         self, request: ModelMemoryRetrievalRequest
@@ -226,7 +220,7 @@ class HandlerDbMock:
 
         # Score all snapshots by text match
         scored_results: list[tuple[str, float]] = []
-        for snapshot_id, snapshot in self._snapshots.items():
+        for snapshot_id, snapshot in self._store.snapshots.items():
             score = self._compute_text_score(snapshot, search_terms)
             if score > 0:
                 # Apply metadata and tag filters if specified
@@ -255,7 +249,7 @@ class HandlerDbMock:
 
         results = [
             ModelSearchResult(
-                snapshot=self._snapshots[snapshot_id],
+                snapshot=self._store.snapshots[snapshot_id],
                 score=score,
             )
             for snapshot_id, score in scored_results
@@ -386,6 +380,6 @@ class HandlerDbMock:
     async def shutdown(self) -> None:
         """Shutdown the handler and release resources."""
         if self._initialized:
-            self._snapshots.clear()
+            self._store.reset()
             self._initialized = False
             logger.debug("Mock DB handler shutdown complete")

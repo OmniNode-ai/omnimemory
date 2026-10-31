@@ -708,7 +708,7 @@ class TestHandlerLifecycle:
         assert len(response.results) > 0
 
         # Clear
-        handler.clear()
+        handler.reset()
 
         # Verify data is gone
         response = await handler.execute(

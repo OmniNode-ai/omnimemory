@@ -245,8 +245,8 @@ class HandlerMemoryRetrieval:
             source_id, target_id, relationship_type, weight
         )
 
-    def clear(self) -> None:
-        """Clear all data from all handlers.
+    def reset(self) -> None:
+        """Drop all data from all handlers.
 
         Raises:
             RuntimeError: If the handler is not initialized.
@@ -255,11 +255,11 @@ class HandlerMemoryRetrieval:
             raise RuntimeError("Handler not initialized. Call initialize() first.")
 
         if self._qdrant_handler:
-            self._qdrant_handler.clear()
+            self._qdrant_handler.reset()
         if self._db_handler:
-            self._db_handler.clear()
+            self._db_handler.reset()
         if self._graph_handler:
-            self._graph_handler.clear()
+            self._graph_handler.reset()
 
     async def handle(
         self, request: ModelMemoryRetrievalRequest

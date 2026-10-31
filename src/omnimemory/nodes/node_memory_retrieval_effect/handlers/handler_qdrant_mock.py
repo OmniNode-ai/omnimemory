@@ -76,6 +76,7 @@ from ..adapters.adapter_embedding_client import (
     EmbeddingClientError,
     EmbeddingConnectionError,
 )
+from ..adapters.adapter_mock_store import MockRetrievalStore
 from ..models import (
     ModelEmbeddingClientConfig,
     ModelHandlerQdrantMockConfig,
@@ -123,15 +124,20 @@ class HandlerQdrantMock:
             response = await handler.execute(request)
     """
 
-    def __init__(self, config: ModelHandlerQdrantMockConfig) -> None:
+    def __init__(
+        self,
+        config: ModelHandlerQdrantMockConfig,
+        store: MockRetrievalStore | None = None,
+    ) -> None:
         """Initialize the mock handler with configuration.
 
         Args:
             config: The handler configuration.
+            store: Collaborator holding the seeded data. A fresh store is
+                created when none is injected.
         """
         self._config = config
-        self._snapshots: dict[str, ModelMemorySnapshot] = {}
-        self._embeddings: dict[str, list[float]] = {}
+        self._store = store if store is not None else MockRetrievalStore()
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._embedding_client: EmbeddingClient | None = None
@@ -149,7 +155,7 @@ class HandlerQdrantMock:
     @property
     def snapshot_count(self) -> int:
         """Get the number of stored snapshots."""
-        return len(self._snapshots)
+        return len(self._store.snapshots)
 
     async def initialize(self) -> None:
         """Initialize the mock handler.
@@ -224,33 +230,21 @@ class HandlerQdrantMock:
         Note:
             Snapshots with invalid or empty IDs are skipped with a warning.
         """
-        valid_count = 0
-        for snapshot in snapshots:
-            # Validate snapshot ID is non-empty
-            if not snapshot.snapshot_id or not str(snapshot.snapshot_id).strip():
-                logger.warning(
-                    "Skipping snapshot with invalid/empty ID: %r",
-                    snapshot.snapshot_id,
-                )
-                continue
-
-            snapshot_id = str(snapshot.snapshot_id)
-            self._snapshots[snapshot_id] = snapshot
-
+        stored = self._store.seed_snapshots(snapshots)
+        for snapshot_id in stored:
             # Use provided embedding or generate mock
             if embeddings and snapshot_id in embeddings:
-                self._embeddings[snapshot_id] = embeddings[snapshot_id]
+                self._store.put_embedding(snapshot_id, embeddings[snapshot_id])
             else:
-                self._embeddings[snapshot_id] = self._generate_mock_embedding(snapshot)
+                self._store.put_embedding(
+                    snapshot_id,
+                    self._generate_mock_embedding(self._store.snapshots[snapshot_id]),
+                )
+        logger.debug("Seeded %d snapshots into mock store", len(stored))
 
-            valid_count += 1
-
-        logger.debug("Seeded %d snapshots into mock store", valid_count)
-
-    def clear(self) -> None:
-        """Clear all snapshots from the mock store."""
-        self._snapshots.clear()
-        self._embeddings.clear()
+    def reset(self) -> None:
+        """Drop all snapshots and embeddings from the mock store."""
+        self._store.reset()
 
     async def execute(
         self, request: ModelMemoryRetrievalRequest
@@ -298,7 +292,7 @@ class HandlerQdrantMock:
 
         # Score all snapshots
         scored_results: list[tuple[str, float]] = []
-        for snapshot_id, embedding in self._embeddings.items():
+        for snapshot_id, embedding in self._store.embeddings.items():
             similarity = self._cosine_similarity(query_embedding, embedding)
             if similarity >= request.similarity_threshold:
                 scored_results.append((snapshot_id, similarity))
@@ -318,7 +312,7 @@ class HandlerQdrantMock:
 
         results = [
             ModelSearchResult(
-                snapshot=self._snapshots[snapshot_id],
+                snapshot=self._store.snapshots[snapshot_id],
                 score=score,
                 distance=1.0 - score,  # Convert similarity to distance
             )
@@ -458,7 +452,6 @@ class HandlerQdrantMock:
                 self._embedding_client = None
                 logger.debug("Embedding client closed")
 
-            self._snapshots.clear()
-            self._embeddings.clear()
+            self._store.reset()
             self._initialized = False
             logger.debug("Mock Qdrant handler shutdown complete")
