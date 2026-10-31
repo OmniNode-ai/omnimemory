@@ -1,0 +1,42 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21794"
+title: "omnimemory contracts_and_di literal_url, literal_path and literal_model_name burn-down, slice
+  rf1515-c5"
+summary: "The semantic analyzer node's embedding and LLM model names (allowed lists and defaults) are
+  declared in its contract.yaml descriptor with the ${env.VAR:default} overlay, and ModelSemanticComputePolicyConfig
+  resolves them from there instead of naming models in code."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-semantic-policy-models"
+    statement: "ModelSemanticComputePolicyConfig names no model; the allowed embedding and LLM models
+      and their defaults are descriptor values in the semantic analyzer node contract that an overlay
+      can replace."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the contracts_and_di count for literal_url, literal_path and literal_model_name
+          over omnimemory src drops from 4 (all literal_model_name, all in model_semantic_compute_policy_config.py)
+          to 0 with no baseline entry or suppression -- falsifier: runtime_validator_run with ValidatorContractsAndDi
+          over src before and after, counts compared per rule"
+      - id: "AC2"
+        statement: "AC2: the four model values resolve from the node contract descriptor with the env
+          overlay replacing each, and an overlay default outside its allowed list fails -- falsifier:
+          uv run pytest tests/unit/nodes/test_semantic_policy_model_settings.py -q --no-cov"
+evidence_requirements:
+  - kind: "tests"
+    description: "Descriptor values resolve, the overlay wins, and an inconsistent overlay fails."
+    command: "uv run pytest tests/unit/nodes/test_semantic_policy_model_settings.py -q --no-cov"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21794-semantic-policy-models"
+    description: "AC1 and AC2: semantic compute model names come from the node contract descriptor."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/nodes/test_semantic_policy_model_settings.py -q --no-cov"
+    binds_ac: ["AC1", "AC2"]
