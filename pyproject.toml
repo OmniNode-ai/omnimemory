@@ -378,7 +378,6 @@ module = [
     "omnimemory.models.contracts.model_contract_orchestrator_extended",
     "omnimemory.models.contracts.model_contract_reducer_extended",
     "omnimemory.protocols.error_models",
-    "omnimemory.topics",
 ]
 disallow_subclassing_any = false
 

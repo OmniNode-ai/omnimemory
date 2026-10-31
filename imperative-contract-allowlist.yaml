@@ -15,8 +15,3 @@ allowlisted_handlers:
       - hardcoded_private_ip
     ticket: OMN-12673
     note: Existing live freestanding runtime plugin debt; dependency sweep must not broaden it.
-  - path: src/omnimemory/topics.py
-    violations:
-      - hardcoded_topic
-    ticket: OMN-12673
-    note: Existing live topic registry literals; dependency sweep must not broaden them.

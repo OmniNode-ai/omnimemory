@@ -23,12 +23,12 @@ CORE_REPO = "https://github.com/OmniNode-ai/omnibase_core"
 CHANGE_CONTROL_REPO = "https://github.com/OmniNode-ai/onex_change_control"
 # Each hook's exclude from the change-control block, byte for byte (None: no exclude).
 EXPECTED_EXCLUDE: dict[str, str | None] = {
-    "no-hardcoded-topics": "^src/omnimemory/topics\\.py$",
+    "no-hardcoded-topics": None,
     "no-untracked-todos": None,
 }
 # The keys each hook carried, so a widened or added setting is refused.
 EXPECTED_KEYS: dict[str, list[str]] = {
-    "no-hardcoded-topics": ["exclude", "id", "stages"],
+    "no-hardcoded-topics": ["id", "stages"],
     "no-untracked-todos": ["id", "stages"],
 }
 # The stages each hook carried (None: no stages key).

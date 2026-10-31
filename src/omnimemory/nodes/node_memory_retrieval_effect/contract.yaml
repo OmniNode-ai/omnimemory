@@ -135,6 +135,11 @@ descriptor:
   idempotent: false
   qdrant_host: "${env.QDRANT_HOST}"
   qdrant_port: "${env.QDRANT_PORT:6333}"
+  # Graph memory query/mutation command (OMN-6578) the dispatch engine routes to
+  # AdapterGraphMemory. The runtime resolves it from here
+  # (runtime/dispatch_handlers.py); the plugin does not subscribe to it.
+  dispatch_topics:
+    - "onex.cmd.omnimemory.graph-memory-query.v1"
 
 # === PERFORMANCE ===
 performance:

@@ -48,8 +48,6 @@ from omnimemory.models.config.model_node_event_bus_topics import (
     ModelNodeEventBusTopics,
 )
 from omnimemory.runtime.contract_topics import canonical_topic_to_dispatch_alias
-from omnimemory.topics import EnumMemoryCommandTopic as MemoryCommandTopic
-from omnimemory.topics import EnumMemoryEventTopic as MemoryEventTopic
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -131,8 +129,7 @@ class ProtocolIntentQueryHandler(Protocol):
 # Usage: when calling dispatch(), pass the alias instead of the raw topic.
 
 # Each alias below converts the topic that a node contract declares in its event_bus
-# section (or, for the topics no contract declares yet, the EnumMemory*Topic member)
-# into the form the dispatch engine matches on.
+# section or its descriptor.dispatch_topics into the form the dispatch engine matches on.
 
 
 def _node_topics(node: str) -> ModelNodeEventBusTopics:
@@ -142,7 +139,7 @@ def _node_topics(node: str) -> ModelNodeEventBusTopics:
 _LIFECYCLE = _node_topics("node_memory_lifecycle_orchestrator")
 
 DISPATCH_ALIAS_INTENT_CLASSIFIED = canonical_topic_to_dispatch_alias(
-    MemoryEventTopic.INTENT_CLASSIFIED
+    _node_topics("node_intent_storage_effect").dispatched("intent-classified")
 )
 DISPATCH_ALIAS_INTENT_QUERY_REQUESTED = canonical_topic_to_dispatch_alias(
     _node_topics("node_intent_query_effect").subscribed("intent-query-requested")
@@ -161,13 +158,13 @@ DISPATCH_ALIAS_MEMORY_RETRIEVAL_REQUESTED = canonical_topic_to_dispatch_alias(
         "memory-retrieval-requested"
     )
 )
-# Graph memory (OMN-6578) and intent graph (OMN-6579) are served by adapters with no
-# node contract to declare their command topics.
+# Graph memory (OMN-6578) and intent graph (OMN-6579) commands are served by
+# adapters; the retrieval and intent query node contracts declare their topics.
 DISPATCH_ALIAS_GRAPH_MEMORY = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.GRAPH_MEMORY_QUERY
+    _node_topics("node_memory_retrieval_effect").dispatched("graph-memory-query")
 )
 DISPATCH_ALIAS_INTENT_GRAPH = canonical_topic_to_dispatch_alias(
-    MemoryCommandTopic.INTENT_GRAPH_QUERY
+    _node_topics("node_intent_query_effect").dispatched("intent-graph-query")
 )
 DISPATCH_ALIAS_NAVIGATION_HISTORY = canonical_topic_to_dispatch_alias(
     _node_topics("node_navigation_history_reducer").dispatched(

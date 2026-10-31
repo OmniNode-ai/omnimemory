@@ -70,5 +70,4 @@ src/omnimemory/tools/__init__.py
 src/omnimemory/tools/contract_linter.py
 src/omnimemory/tools/validators/__init__.py
 src/omnimemory/tools/validators/validator_contract.py
-src/omnimemory/topics.py
 validate_architecture_improvements.py

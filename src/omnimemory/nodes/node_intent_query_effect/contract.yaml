@@ -207,6 +207,13 @@ event_bus:
         details based on the query type."
 
 # === TAGS ===
+descriptor:
+  # Intent graph query/mutation command (OMN-6579) the dispatch engine routes to
+  # AdapterIntentGraph. The runtime resolves it from here
+  # (runtime/dispatch_handlers.py); the plugin does not subscribe to it.
+  dispatch_topics:
+    - "onex.cmd.omnimemory.intent-graph-query.v1"
+
 tags:
   - intent
   - query

@@ -46,6 +46,21 @@ class TestModelNodeEventBusTopics:
                 "semantic-analysis",
                 "onex.cmd.omnimemory.semantic-analysis.v1",
             ),
+            (
+                "omnimemory.nodes.node_memory_retrieval_effect",
+                "graph-memory-query",
+                "onex.cmd.omnimemory.graph-memory-query.v1",
+            ),
+            (
+                "omnimemory.nodes.node_intent_query_effect",
+                "intent-graph-query",
+                "onex.cmd.omnimemory.intent-graph-query.v1",
+            ),
+            (
+                "omnimemory.nodes.node_intent_storage_effect",
+                "intent-classified",
+                "onex.evt.omniintelligence.intent-classified.v1",
+            ),
         ],
     )
     def test_dispatch_only_nodes_declare_their_command_topic(
@@ -60,6 +75,24 @@ class TestModelNodeEventBusTopics:
 
         assert "onex.cmd.omnimemory.navigation-history-session.v1" not in subscribed
         assert "onex.cmd.omnimemory.semantic-analysis.v1" not in subscribed
+        assert "onex.cmd.omnimemory.graph-memory-query.v1" not in subscribed
+        assert "onex.cmd.omnimemory.intent-graph-query.v1" not in subscribed
+        assert "onex.evt.omniintelligence.intent-classified.v1" not in subscribed
+
+    def test_adapter_and_bridge_dispatch_aliases_come_from_node_contracts(
+        self,
+    ) -> None:
+        from omnimemory.runtime import dispatch_handlers
+
+        assert dispatch_handlers.DISPATCH_ALIAS_GRAPH_MEMORY == (
+            "onex.commands.omnimemory.graph-memory-query.v1"
+        )
+        assert dispatch_handlers.DISPATCH_ALIAS_INTENT_GRAPH == (
+            "onex.commands.omnimemory.intent-graph-query.v1"
+        )
+        assert dispatch_handlers.DISPATCH_ALIAS_INTENT_CLASSIFIED == (
+            "onex.events.omniintelligence.intent-classified.v1"
+        )
 
     def test_undeclared_event_name_is_refused(self) -> None:
         topics = ModelNodeEventBusTopics.from_node_contract(LIFECYCLE)

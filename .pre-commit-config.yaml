@@ -83,7 +83,6 @@ repos:
     rev: 4a4177335d11b138a29fe28e2f4c5575afa92b2b  # pragma: allowlist secret
     hooks:
       - id: no-hardcoded-topics
-        exclude: ^src/omnimemory/topics\.py$
         stages: [pre-commit]
       - id: no-untracked-todos
         stages: [pre-commit]
