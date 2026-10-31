@@ -10,6 +10,8 @@ run the core check over the package and build each binder's product.
 
 from __future__ import annotations
 
+import ast
+from graphlib import TopologicalSorter
 from pathlib import Path
 
 import pytest
@@ -74,6 +76,37 @@ def test_no_handler_is_constructed_outside_a_binding_site() -> None:
         if issue.code == "handler_hand_construction"
     ]
     assert offenders == []
+
+
+@pytest.mark.unit
+def test_semantic_handler_and_binding_imports_are_acyclic() -> None:
+    """Module-scope imports, including type-only imports, must be acyclic."""
+
+    def module_imports(statements: list[ast.stmt]) -> set[str]:
+        imports = set()
+        for statement in statements:
+            if isinstance(statement, ast.ImportFrom) and statement.module is not None:
+                imports.add(statement.module)
+            elif isinstance(statement, ast.If):
+                imports.update(module_imports(statement.body))
+                imports.update(module_imports(statement.orelse))
+        return imports
+
+    node = _SRC / "nodes/node_semantic_analyzer_compute"
+    modules = {
+        ".".join(path.relative_to(_SRC.parent).with_suffix("").parts): path
+        for directory, pattern in (
+            ("container", "registry_*.py"),
+            ("handlers", "handler_*.py"),
+        )
+        for path in (node / directory).glob(pattern)
+    }
+    dependencies = {
+        name: module_imports(ast.parse(path.read_text()).body) & modules.keys()
+        for name, path in modules.items()
+    }
+
+    assert set(TopologicalSorter(dependencies).static_order()) == set(modules)
 
 
 @pytest.mark.unit
