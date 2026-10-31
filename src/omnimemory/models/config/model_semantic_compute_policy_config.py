@@ -56,6 +56,15 @@ def _descriptor_model(name: str) -> Callable[[], str]:
     return resolve
 
 
+def _descriptor_seconds(name: str) -> Callable[[], float]:
+    """Factory for a positive seconds value declared in the node contract descriptor."""
+
+    def resolve() -> float:
+        return float(_descriptor_value(name))
+
+    return resolve
+
+
 class ModelSemanticComputePolicyConfig(BaseModel):
     """Configuration for semantic compute policy decisions.
 
@@ -117,6 +126,12 @@ class ModelSemanticComputePolicyConfig(BaseModel):
         ge=1.0,
         le=300.0,
         description="Hard timeout for semantic operations in seconds",
+    )
+
+    health_check_timeout_seconds: float = Field(
+        default_factory=_descriptor_seconds("health_check_timeout_seconds"),
+        gt=0.0,
+        description="Timeout of one provider health check in seconds, from the node contract descriptor",
     )
 
     max_retries: int = Field(

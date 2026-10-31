@@ -10,11 +10,12 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from ...enums.enum_memory_storage_type import EnumMemoryStorageType  # noqa: TC001
+from ..config.model_memory_runtime_timeout_settings import (
+    ModelMemoryRuntimeTimeoutSettings,
+)
 
 # Validation limits for storage configuration
 MAX_CONNECTIONS_LIMIT = 1000
-MIN_TIMEOUT_MS = 100
-MAX_TIMEOUT_MS = 300000  # 5 minutes
 MAX_BATCH_SIZE = 10000
 
 
@@ -119,12 +120,15 @@ class ModelMemoryStorageConfig(BaseModel):
     @field_validator("connection_timeout_ms", "idle_timeout_ms")
     @classmethod
     def validate_timeout_values(cls, v: int) -> int:
-        """Validate timeout values are positive and reasonable."""
-        if v < MIN_TIMEOUT_MS:
-            raise ValueError(f"Timeout values must be at least {MIN_TIMEOUT_MS}ms")
-        if v > MAX_TIMEOUT_MS:
+        """Validate timeout values against the bounds the storage node contract declares."""
+        bounds = ModelMemoryRuntimeTimeoutSettings.from_node_contract()
+        if v < bounds.min_timeout_ms:
             raise ValueError(
-                f"Timeout values cannot exceed {MAX_TIMEOUT_MS:,}ms (5 minutes)"
+                f"Timeout values must be at least {bounds.min_timeout_ms}ms"
+            )
+        if v > bounds.max_timeout_ms:
+            raise ValueError(
+                f"Timeout values cannot exceed {bounds.max_timeout_ms:,}ms"
             )
         return v
 

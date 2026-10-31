@@ -18,6 +18,7 @@ Related:
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import NAMESPACE_DNS, uuid5
 
 import pytest
@@ -35,6 +36,12 @@ from omnimemory.runtime.introspection import (
 )
 
 from .conftest import StubEventBus
+
+
+async def _publish(**kwargs: Any) -> IntrospectionResult:
+    """Publish with the heartbeat interval a deployment would inject from the node contract."""
+    return await publish_memory_introspection(heartbeat_interval_seconds=30.0, **kwargs)
+
 
 # =============================================================================
 # Helpers
@@ -225,7 +232,7 @@ class TestPublishMemoryIntrospection:
     @pytest.mark.asyncio
     async def test_with_none_bus_returns_empty_result(self) -> None:
         """With event_bus=None, should return an empty IntrospectionResult."""
-        result = await publish_memory_introspection(event_bus=None)
+        result = await _publish(event_bus=None)
         assert isinstance(result, IntrospectionResult)
         assert result.registered_nodes == []
         assert result.proxies == []
@@ -237,16 +244,16 @@ class TestPublishMemoryIntrospection:
 
         A subsequent call with a real bus must still succeed.
         """
-        await publish_memory_introspection(event_bus=None)
+        await _publish(event_bus=None)
         # If guard were set, this would raise RuntimeError
-        await publish_memory_introspection(event_bus=None)
+        await _publish(event_bus=None)
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_with_none_bus_multiple_calls_no_error(self) -> None:
         """Calling with event_bus=None multiple times should never raise."""
         for _ in range(5):
-            result = await publish_memory_introspection(event_bus=None)
+            result = await _publish(event_bus=None)
             assert result.registered_nodes == []
 
     @pytest.mark.unit
@@ -254,7 +261,7 @@ class TestPublishMemoryIntrospection:
     async def test_with_mock_bus_returns_registered_nodes(self) -> None:
         """With a mock event bus, should return IntrospectionResult with nodes."""
         bus = MockEventBus()
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -268,7 +275,7 @@ class TestPublishMemoryIntrospection:
     async def test_with_mock_bus_publishes_events(self) -> None:
         """With a mock event bus, introspection events should be published."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -280,12 +287,12 @@ class TestPublishMemoryIntrospection:
     async def test_second_call_raises_runtime_error(self) -> None:
         """Calling twice with a real event bus should raise RuntimeError."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
         with pytest.raises(RuntimeError, match="already been called"):
-            await publish_memory_introspection(
+            await _publish(
                 event_bus=bus,  # type: ignore[arg-type]
                 enable_heartbeat=False,
             )
@@ -295,13 +302,13 @@ class TestPublishMemoryIntrospection:
     async def test_after_reset_can_call_again(self) -> None:
         """After reset_introspection_guard, publish should succeed again."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
         await reset_introspection_guard()
         # Should not raise
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -311,9 +318,9 @@ class TestPublishMemoryIntrospection:
     @pytest.mark.asyncio
     async def test_none_bus_then_real_bus_succeeds(self) -> None:
         """Calling with None bus first, then real bus, should succeed."""
-        await publish_memory_introspection(event_bus=None)
+        await _publish(event_bus=None)
         bus = MockEventBus()
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -324,7 +331,7 @@ class TestPublishMemoryIntrospection:
     async def test_heartbeat_disabled_returns_no_proxies(self) -> None:
         """With enable_heartbeat=False, proxies list should be empty."""
         bus = MockEventBus()
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -369,7 +376,7 @@ class TestPublishMemoryShutdown:
     async def test_resets_guard_after_shutdown(self) -> None:
         """After shutdown, the guard should be reset."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -378,7 +385,7 @@ class TestPublishMemoryShutdown:
             event_bus=bus,  # type: ignore[arg-type]
         )
         # Guard should be reset; calling again should succeed
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -389,7 +396,7 @@ class TestPublishMemoryShutdown:
     async def test_with_none_bus_stops_tasks_and_resets_guard(self) -> None:
         """With event_bus=None, shutdown stops tasks and resets guard."""
         bus = MockEventBus()
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -399,7 +406,7 @@ class TestPublishMemoryShutdown:
             proxies=result.proxies,
         )
         # Guard should be reset even with None bus
-        result2 = await publish_memory_introspection(
+        result2 = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -410,7 +417,7 @@ class TestPublishMemoryShutdown:
     async def test_with_real_bus_publishes_shutdown_events(self) -> None:
         """With a real bus, shutdown should publish SHUTDOWN events."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -426,7 +433,7 @@ class TestPublishMemoryShutdown:
     async def test_shutdown_with_no_proxies(self) -> None:
         """Shutdown with proxies=None should not raise."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -469,13 +476,13 @@ class TestResetIntrospectionGuard:
     async def test_allows_republish_after_reset(self) -> None:
         """After reset, publish_memory_introspection can be called again."""
         bus = MockEventBus()
-        await publish_memory_introspection(
+        await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
         await reset_introspection_guard()
         # Should not raise
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -536,7 +543,7 @@ class TestIntrospectionLifecycle:
         bus = MockEventBus()
 
         # Phase 1: Publish introspection
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -555,7 +562,7 @@ class TestIntrospectionLifecycle:
         assert len(bus.published) > published_before_shutdown
 
         # Phase 3: Re-publish succeeds (guard was reset by shutdown)
-        result2 = await publish_memory_introspection(
+        result2 = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )
@@ -574,11 +581,11 @@ class TestIntrospectionLifecycle:
         bus = MockEventBus()
 
         results = await asyncio.gather(
-            publish_memory_introspection(
+            _publish(
                 event_bus=bus,  # type: ignore[arg-type]
                 enable_heartbeat=False,
             ),
-            publish_memory_introspection(
+            _publish(
                 event_bus=bus,  # type: ignore[arg-type]
                 enable_heartbeat=False,
             ),
@@ -623,14 +630,14 @@ class TestIntrospectionLifecycle:
             _FailingIterable(),
         ):
             with pytest.raises(RuntimeError, match="simulated iteration failure"):
-                await publish_memory_introspection(
+                await _publish(
                     event_bus=bus,  # type: ignore[arg-type]
                     enable_heartbeat=False,
                 )
 
         # Guard should have been reset by the except block.
         # A retry with the real MEMORY_NODES should succeed.
-        result = await publish_memory_introspection(
+        result = await _publish(
             event_bus=bus,  # type: ignore[arg-type]
             enable_heartbeat=False,
         )

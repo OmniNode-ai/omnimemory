@@ -229,6 +229,13 @@ event_bus:
       description: "Memory deletion confirmation event. Emitted when a memory snapshot is successfully
         soft-deleted from the storage backend."
 
+# === DESCRIPTOR ===
+descriptor:
+  memgraph_probe_timeout_seconds: "${env.OMNIMEMORY_MEMGRAPH_PROBE_TIMEOUT_SECONDS:5.0}"
+  heartbeat_interval_seconds: "${env.OMNIMEMORY_HEARTBEAT_INTERVAL_SECONDS:30.0}"
+  min_timeout_ms: "${env.OMNIMEMORY_STORAGE_MIN_TIMEOUT_MS:100}"
+  max_timeout_ms: "${env.OMNIMEMORY_STORAGE_MAX_TIMEOUT_MS:300000}"
+
 # === TAGS ===
 tags:
   - memory
