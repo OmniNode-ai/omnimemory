@@ -15,8 +15,8 @@ Handlers:
     - HandlerGraphMock: Simulates graph traversal
 
 Ranking:
-    - fuse_rrf / select_relevant: Rank fusion for the search_hybrid operation.
-      Not handlers — pure ranking functions the routing handler composes.
+    - HandlerRankFusion: Relevance gating and rank fusion for search_hybrid.
+    - HandlerActivationDecay: Activation decay applied after rank fusion.
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
@@ -32,12 +32,12 @@ from ..models import (
     ModelHandlerQdrantMockConfig,
 )
 from .handler_db_mock import HandlerDbMock
+from .handler_decay import HandlerActivationDecay
 from .handler_fusion import (
     MIN_LEXICAL_TS_RANK,
     MIN_VECTOR_COSINE,
     RRF_K_DEFAULT,
-    fuse_rrf,
-    select_relevant,
+    HandlerRankFusion,
 )
 from .handler_graph_mock import (
     HandlerGraphMock,
@@ -54,8 +54,8 @@ __all__ = [
     "MIN_LEXICAL_TS_RANK",
     "MIN_VECTOR_COSINE",
     "RRF_K_DEFAULT",
-    "fuse_rrf",
-    "select_relevant",
+    "HandlerRankFusion",
+    "HandlerActivationDecay",
     # Qdrant - semantic search
     "HandlerQdrantMock",
     "ModelHandlerQdrantMockConfig",

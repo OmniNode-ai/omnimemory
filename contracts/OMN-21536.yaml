@@ -1,0 +1,51 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21536"
+title: "omnimemory: handler-shape debt burn-down, slice 1: the retrieval decay and fusion modules become
+  handler classes"
+summary: "The handler-shape validator of omnibase_core reports 15 findings in omnimemory src at the dev
+  tip 2c62a6b79 (module_function_handler 3, envelope_in_core 1, mutating_public_method 11, noncanonical_handle
+  0). This change clears two module_function_handler findings, the activation decay and the rank fusion
+  modules of the memory retrieval effect node. Each module now holds a stateless handler class whose handle
+  takes one typed request model and returns one typed response model, the retrieval handler composes them
+  through injected collaborators, and the numbers, ordering and tie-break are unchanged. The other 13
+  findings are listed by kind and directory in the lane's ledger TERMINAL row for the next slices."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-omn21536-om1-retrieval-decay-fusion-handler-classes"
+    statement: |-
+      The activation decay and rank fusion modules of the memory retrieval effect node hold handler classes with a typed handle, and the retrieval results are unchanged.
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the handler-shape validator of omnibase_core reports no issue on handler_decay.py
+          and handler_fusion.py -- falsifier: uv run pytest tests/unit/nodes/test_retrieval_handlers_shape_omn21536.py
+          exits non-zero"
+      - id: "AC2"
+        statement: "AC2: the decay, fusion and hybrid retrieval tests pass against the handlers -- falsifier:
+          the pytest command of the evidence below exits non-zero"
+evidence_requirements:
+  - kind: "tests"
+    description: "The shape ratchet test and the decay, fusion and retrieval tests, run on a lab host
+      at the pushed head."
+    command: "uv run pytest tests/unit/nodes -q --no-cov -p no:randomly"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21536-om1-ac1-no-module-function-handler"
+    description: "AC1 runs the handler-shape validator on the two cleared modules and finds no issue."
+    source: "manual"
+    binds_ac: ["AC1"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/nodes/test_retrieval_handlers_shape_omn21536.py -q --no-cov"
+  - id: "dod-omn21536-om1-ac2-retrieval-tests"
+    description: "AC2 runs the decay, fusion and hybrid retrieval tests."
+    source: "manual"
+    binds_ac: ["AC2"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/nodes -q --no-cov -p no:randomly"
