@@ -181,14 +181,12 @@ class ProtocolHandlerIntent(Protocol):
         """
         ...
 
-    async def shutdown(self, timeout_seconds: float = 30.0) -> None:
+    async def shutdown(self) -> None:
         """Shutdown handler and close connections.
 
         Gracefully shuts down the handler by closing the underlying
         adapter and releasing resources. Safe to call multiple times.
 
-        Args:
-            timeout_seconds: Maximum time to wait for shutdown. Defaults to 30.0.
         """
         ...
 

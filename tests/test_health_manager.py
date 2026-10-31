@@ -28,13 +28,13 @@ class TestHealthManager:
 
     def test_health_manager_creation(self) -> None:
         """Test health manager can be created with valid parameters."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
         assert hm is not None
         assert isinstance(hm.circuit_breakers, dict)
 
     def test_register_health_check(self) -> None:
         """Test registering health checks."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         async def mock_health_check() -> dict[str, str]:
             return {"status": "healthy", "details": "All systems operational"}
@@ -45,7 +45,7 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_check_resource_health_success(self) -> None:
         """Test resource health check with successful result."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         async def healthy_check() -> dict[str, str | float]:
             return {"status": "healthy", "response_time": 0.05}
@@ -61,7 +61,7 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_check_resource_health_failure(self) -> None:
         """Test resource health check with failure."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         async def failing_check() -> None:
             raise ConnectionError("Database connection failed")
@@ -99,7 +99,7 @@ class TestHealthManager:
         When any resource is UNHEALTHY, the overall status should be UNHEALTHY.
         DEGRADED is only for partial degradation (RATE_LIMITED, DEGRADED status).
         """
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         async def healthy_check() -> dict[str, str]:
             return {"status": "healthy"}
@@ -126,14 +126,14 @@ class TestHealthManager:
 
     def test_get_circuit_breaker_stats(self) -> None:
         """Test getting circuit breaker statistics."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         # Add some circuit breakers
-        cb1 = CircuitBreaker(failure_threshold=3)
+        cb1 = CircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
         cb1.success_count = 10
         cb1.failure_count = 1
 
-        cb2 = CircuitBreaker(failure_threshold=5)
+        cb2 = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
         cb2.success_count = 5
         cb2.failure_count = 2
         cb2.state = CircuitBreakerState.OPEN
@@ -162,7 +162,9 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_rate_limited_health_check(self) -> None:
         """Test rate-limited health check functionality."""
-        hm = HealthManager(rate_limit_window=1.0, max_checks_per_window=2)
+        hm = HealthManager(
+            default_timeout=5.0, rate_limit_window=1.0, max_checks_per_window=2
+        )
 
         call_count = 0
 
@@ -190,7 +192,7 @@ class TestHealthManager:
 
     def test_get_rate_limited_health_response(self) -> None:
         """Test getting rate-limited health check response."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         response = hm.get_rate_limited_health_response()
 
@@ -203,10 +205,10 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_health_check_with_circuit_breaker(self) -> None:
         """Test health check integrated with circuit breaker."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         # Register circuit breaker for resource
-        cb = CircuitBreaker(failure_threshold=2)
+        cb = CircuitBreaker(failure_threshold=2, recovery_timeout=60.0)
         hm.circuit_breakers["flaky_service"] = cb
 
         failure_count = 0
@@ -236,7 +238,7 @@ class TestHealthManager:
 
     def test_sanitize_error_details(self) -> None:
         """Test error sanitization in health checks."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         # Test with sensitive information
         error = Exception("Connection failed: password=secret123, token=abc456")
@@ -250,7 +252,7 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_health_check_correlation_tracking(self) -> None:
         """Test health checks include correlation tracking."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         async def tracked_check() -> dict[str, str]:
             return {"status": "healthy", "service": "test"}
@@ -268,7 +270,7 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_bulk_health_check(self) -> None:
         """Test checking multiple resources in parallel."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         async def service1_check() -> dict[str, str]:
             return {"status": "healthy", "service": "service1"}
@@ -298,14 +300,14 @@ class TestHealthManager:
     @pytest.mark.asyncio
     async def test_health_manager_cleanup(self) -> None:
         """Test health manager resource cleanup."""
-        hm = HealthManager()
+        hm = HealthManager(default_timeout=5.0)
 
         # Add some resources
         async def test_check() -> dict[str, str]:
             return {"status": "healthy"}
 
         hm.register_health_check("cleanup_test", test_check)
-        cb = CircuitBreaker(failure_threshold=3)
+        cb = CircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
         hm.circuit_breakers["cleanup_test"] = cb
 
         assert "cleanup_test" in hm.health_checks

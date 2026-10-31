@@ -244,6 +244,7 @@ class HandlerIntent:
         self._container = container
         self._adapter: AdapterIntentGraph | None = None
         self._adapter_config: ModelAdapterIntentGraphConfig | None = None
+        self._timeout_seconds: float  # set by initialize(), read by shutdown()
         self._initialized: bool = False
         self._init_lock = asyncio.Lock()
         self._connection_uri: str = ""
@@ -381,6 +382,7 @@ class HandlerIntent:
                     },
                 )
 
+                self._timeout_seconds = timeout_seconds
                 self._adapter_config = ModelAdapterIntentGraphConfig(
                     timeout_seconds=timeout_seconds,
                     max_intents_per_session=max_intents_per_session,
@@ -439,14 +441,12 @@ class HandlerIntent:
                     self._adapter = None
                 raise RuntimeError(f"Initialization failed: {e}") from e
 
-    async def shutdown(self, timeout_seconds: float = 30.0) -> None:
+    async def shutdown(self) -> None:
         """Shutdown handler and close adapter.
 
         Gracefully shuts down the handler by closing the underlying
         adapter and releasing resources. Safe to call multiple times.
 
-        Args:
-            timeout_seconds: Maximum time to wait for shutdown. Defaults to 30.0.
         """
         shutdown_correlation_id = uuid4()
 
@@ -467,7 +467,7 @@ class HandlerIntent:
                 extra={
                     "handler": HANDLER_ID_INTENT,
                     "correlation_id": str(shutdown_correlation_id),
-                    "timeout_seconds": timeout_seconds,
+                    "timeout_seconds": self._timeout_seconds,
                 },
             )
 
@@ -475,12 +475,12 @@ class HandlerIntent:
                 try:
                     await asyncio.wait_for(
                         self._adapter.shutdown(),
-                        timeout=timeout_seconds,
+                        timeout=self._timeout_seconds,
                     )
                 except TimeoutError:
                     logger.warning(
                         "Adapter shutdown timed out after %ss",
-                        timeout_seconds,
+                        self._timeout_seconds,
                         extra={
                             "handler": HANDLER_ID_INTENT,
                             "correlation_id": str(shutdown_correlation_id),

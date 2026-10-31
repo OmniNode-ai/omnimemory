@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
+# SPDX-License-Identifier: MIT
+---
+# Error category policy for OmniMemory error codes (OMN-21623).
+# Loaded by protocols/error_models.py. Each backoff_factor is an
+# ${env.VAR:default} overlay value: the environment replaces the default.
+categories:
+  VALIDATION:
+    prefix: ONEX_OMNIMEMORY_VAL
+    description: Input validation errors
+    recoverable: false
+    default_retry_count: 0
+    default_backoff_factor: "${env.OMNIMEMORY_ERROR_BACKOFF_VALIDATION:1.0}"
+  STORAGE:
+    prefix: ONEX_OMNIMEMORY_STO
+    description: Storage system errors
+    recoverable: true
+    default_retry_count: 3
+    default_backoff_factor: "${env.OMNIMEMORY_ERROR_BACKOFF_STORAGE:2.0}"
+  RETRIEVAL:
+    prefix: ONEX_OMNIMEMORY_RET
+    description: Memory retrieval errors
+    recoverable: true
+    default_retry_count: 2
+    default_backoff_factor: "${env.OMNIMEMORY_ERROR_BACKOFF_RETRIEVAL:1.5}"
+  PROCESSING:
+    prefix: ONEX_OMNIMEMORY_PRO
+    description: Intelligence processing errors
+    recoverable: true
+    default_retry_count: 2
+    default_backoff_factor: "${env.OMNIMEMORY_ERROR_BACKOFF_PROCESSING:2.0}"
+  COORDINATION:
+    prefix: ONEX_OMNIMEMORY_COR
+    description: Coordination and workflow errors
+    recoverable: true
+    default_retry_count: 3
+    default_backoff_factor: "${env.OMNIMEMORY_ERROR_BACKOFF_COORDINATION:1.5}"
+  SYSTEM:
+    prefix: ONEX_OMNIMEMORY_SYS
+    description: System-level errors
+    recoverable: false
+    default_retry_count: 1
+    default_backoff_factor: "${env.OMNIMEMORY_ERROR_BACKOFF_SYSTEM:1.0}"

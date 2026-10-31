@@ -152,8 +152,9 @@ class PriorityLock:
     guarantees and timeout support.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, poll_interval_seconds: float):
         self.name = name
+        self._poll_interval_seconds = poll_interval_seconds
         self._lock = asyncio.Lock()
         self._queue: list[LockRequest] = []
         self._current_holder: LockRequest | None = None
@@ -277,7 +278,7 @@ class PriorityLock:
                     )
 
             # Wait a bit before checking again
-            await asyncio.sleep(0.001)  # 1ms
+            await asyncio.sleep(self._poll_interval_seconds)
 
     async def _cleanup_request(
         self, request: LockRequest, acquired_at: datetime | None
@@ -824,11 +825,11 @@ def _cleanup_shared_executor() -> None:
 atexit.register(_cleanup_shared_executor)
 
 
-async def get_priority_lock(name: str) -> PriorityLock:
+async def get_priority_lock(name: str, poll_interval_seconds: float) -> PriorityLock:
     """Get or create a priority lock by name."""
     async with _manager_lock:
         if name not in _locks:
-            _locks[name] = PriorityLock(name)
+            _locks[name] = PriorityLock(name, poll_interval_seconds)
         return _locks[name]
 
 
@@ -871,11 +872,12 @@ async def get_connection_pool(name: str) -> AsyncConnectionPool | None:
 @asynccontextmanager
 async def with_priority_lock(
     name: str,
+    poll_interval_seconds: float,
     priority: LockPriority = LockPriority.NORMAL,
     timeout: float | None = None,
 ) -> AsyncGenerator[None, None]:
     """Context manager for priority lock acquisition."""
-    lock = await get_priority_lock(name)
+    lock = await get_priority_lock(name, poll_interval_seconds)
     async with lock.acquire(priority=priority, timeout=timeout):
         yield
 
@@ -928,8 +930,8 @@ class CircuitBreaker:
 
     def __init__(
         self,
-        failure_threshold: int = 5,
-        recovery_timeout: float = 60.0,
+        failure_threshold: int,
+        recovery_timeout: float,
         success_threshold: int = 1,
     ):
         """
@@ -1146,7 +1148,7 @@ class ConnectionPool:
     cases where full configuration and callbacks are not needed.
     """
 
-    def __init__(self, max_size: int = 10, timeout: float = 30.0):
+    def __init__(self, max_size: int, timeout: float):
         """
         Initialize connection pool.
 
@@ -1328,9 +1330,9 @@ class ConnectionPool:
 
 
 def with_retry(
-    max_attempts: int = 3,
-    delay: float = 1.0,
-    backoff_multiplier: float = 2.0,
+    max_attempts: int,
+    delay: float,
+    backoff_multiplier: float,
     exceptions: tuple[type[BaseException], ...] = (Exception,),
 ) -> Callable[[F], F]:
     """
@@ -1432,39 +1434,20 @@ def with_timeout(timeout: float) -> Callable[[F], F]:
     return decorator
 
 
-def with_circuit_breaker(
-    circuit_breaker_or_threshold: CircuitBreaker | int = 5,
-    recovery_timeout: float = 60.0,
-    success_threshold: int = 1,
-) -> Callable[[F], F]:
+def with_circuit_breaker(circuit_breaker: CircuitBreaker) -> Callable[[F], F]:
     """
     Decorator for adding circuit breaker pattern to async functions.
 
-    Can be used in two ways:
-    1. With a CircuitBreaker instance: @with_circuit_breaker(my_breaker)
-    2. With parameters: @with_circuit_breaker(failure_threshold=5)
+    The caller builds the CircuitBreaker, with its thresholds and recovery
+    timeout, and injects it: @with_circuit_breaker(my_breaker)
 
     Args:
-        circuit_breaker_or_threshold: Either a CircuitBreaker instance or
-            the failure threshold (int) for creating a new CircuitBreaker
-        recovery_timeout: Seconds to wait before trying half-open (only used
-            when creating a new CircuitBreaker)
-        success_threshold: Successful calls needed to close circuit (only used
-            when creating a new CircuitBreaker)
+        circuit_breaker: The CircuitBreaker that guards the decorated function
 
     Returns:
         Decorated function with circuit breaker protection
     """
-    # Check if a CircuitBreaker instance was passed directly
-    if isinstance(circuit_breaker_or_threshold, CircuitBreaker):
-        breaker = circuit_breaker_or_threshold
-    else:
-        # Create a new CircuitBreaker with the provided parameters
-        breaker = CircuitBreaker(
-            failure_threshold=circuit_breaker_or_threshold,
-            recovery_timeout=recovery_timeout,
-            success_threshold=success_threshold,
-        )
+    breaker = circuit_breaker
 
     def decorator(func: F) -> F:
         @functools.wraps(func)

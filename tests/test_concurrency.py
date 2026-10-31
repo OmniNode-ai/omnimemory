@@ -98,7 +98,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_circuit_breaker_success_flow(self) -> None:
         """Test circuit breaker allows successful operations."""
-        cb = CircuitBreaker(failure_threshold=2)
+        cb = CircuitBreaker(failure_threshold=2, recovery_timeout=60.0)
 
         @with_circuit_breaker(cb)
         async def successful_operation() -> str:
@@ -196,7 +196,7 @@ class TestRetryDecorator:
     async def test_with_retry_success(self) -> None:
         """Test retry decorator allows successful operations."""
 
-        @with_retry(max_attempts=3, delay=0.1)
+        @with_retry(max_attempts=3, delay=0.1, backoff_multiplier=2.0)
         async def successful_operation() -> str:
             return "success"
 
@@ -208,7 +208,7 @@ class TestRetryDecorator:
         """Test retry decorator retries until success."""
         call_count = 0
 
-        @with_retry(max_attempts=3, delay=0.01)
+        @with_retry(max_attempts=3, delay=0.01, backoff_multiplier=2.0)
         async def eventually_successful() -> str:
             nonlocal call_count
             call_count += 1
@@ -225,7 +225,7 @@ class TestRetryDecorator:
         """Test retry decorator respects max attempts."""
         call_count = 0
 
-        @with_retry(max_attempts=2, delay=0.01)
+        @with_retry(max_attempts=2, delay=0.01, backoff_multiplier=2.0)
         async def always_failing() -> None:
             nonlocal call_count
             call_count += 1
@@ -323,7 +323,7 @@ class TestConcurrencyIntegration:
         attempt_count = 0
 
         @with_timeout(0.5)
-        @with_retry(max_attempts=5, delay=0.05)
+        @with_retry(max_attempts=5, delay=0.05, backoff_multiplier=2.0)
         @with_circuit_breaker(cb)
         async def complex_operation() -> str:
             nonlocal attempt_count
