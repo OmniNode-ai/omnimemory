@@ -24,18 +24,6 @@ entries:
   - path: src/omnimemory/models/config/model_qdrant_config.py
     family: M
     content_sha1: 31622a2314d35680b6d862f9ceda3d2d1768a4ec
-  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
-    family: M
-    content_sha1: 24adf01e2fab31bdf08fe6dd9fb5f549924dd1a2
-  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
-    family: M
-    content_sha1: 456ea2b1b71482a8b999e08591330baec2b6ad2d
-  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
-    family: M
-    content_sha1: afc41a0c4c87c6c7135d0bf961425683595b0b28
-  - path: src/omnimemory/models/config/model_semantic_compute_policy_config.py
-    family: M
-    content_sha1: e499a46a9f3a931845904bc058b3d95281bf4b40
   - path: tests/integration/test_golden_chain_memgraph_ingestion.py
     family: E-LAN
     content_sha1: 84b23ad58c9198587cfd9eac7e3fa2031eb8cb5f

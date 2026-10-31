@@ -30,8 +30,8 @@ class TestModelSemanticComputePolicyConfigDefaults:
         assert config.chunk_overlap == 200
         assert config.retry_base_delay_ms == 100
         assert config.retry_max_delay_ms == 5000
-        assert config.default_embedding_model == "gte-qwen2"
-        assert config.default_llm_model == "qwen2.5-14b"
+        assert config.default_embedding_model == "fixture-embed"
+        assert config.default_llm_model == "fixture-llm"
 
     def test_default_embedding_model_in_allowed_list(self) -> None:
         """Test that default embedding model is in the allowed list."""

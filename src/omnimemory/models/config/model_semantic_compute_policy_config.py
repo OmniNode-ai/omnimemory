@@ -10,11 +10,50 @@ and entity extraction operations. Used by SemanticComputePolicy for decision log
 
 from __future__ import annotations
 
+import importlib.resources
+from collections.abc import Callable
 from typing import Self
 
+import yaml
+from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...enums.enum_entity_extraction_mode import EnumEntityExtractionMode
+
+_NODE_PACKAGE = "omnimemory.nodes.node_semantic_analyzer_compute"
+
+
+def _descriptor_value(name: str) -> str:
+    """Resolve one descriptor value, with its environment overlay, from the node contract."""
+    contract = yaml.safe_load(
+        importlib.resources.files(_NODE_PACKAGE)
+        .joinpath("contract.yaml")
+        .read_text(encoding="utf-8")
+    )
+    descriptor = contract.get("descriptor") if isinstance(contract, dict) else None
+    if not isinstance(descriptor, dict) or name not in descriptor:
+        raise ValueError(f"{_NODE_PACKAGE} contract descriptor has no '{name}'")
+    return expand_contract_env_refs(str(descriptor[name]))
+
+
+def _descriptor_models(name: str) -> Callable[[], list[str]]:
+    """Factory for a model-name list declared in the node contract descriptor."""
+
+    def resolve() -> list[str]:
+        return [
+            item.strip() for item in _descriptor_value(name).split(",") if item.strip()
+        ]
+
+    return resolve
+
+
+def _descriptor_model(name: str) -> Callable[[], str]:
+    """Factory for a single model name declared in the node contract descriptor."""
+
+    def resolve() -> str:
+        return _descriptor_value(name).strip()
+
+    return resolve
 
 
 class ModelSemanticComputePolicyConfig(BaseModel):
@@ -201,22 +240,22 @@ class ModelSemanticComputePolicyConfig(BaseModel):
     # =========================================================================
 
     allowed_embedding_models: list[str] = Field(
-        default_factory=lambda: ["text-embedding-3-small", "gte-qwen2"],
+        default_factory=_descriptor_models("allowed_embedding_models"),
         description="List of allowed embedding model identifiers",
     )
 
     default_embedding_model: str = Field(
-        default="gte-qwen2",
+        default_factory=_descriptor_model("default_embedding_model"),
         description="Default embedding model to use",
     )
 
     allowed_llm_models: list[str] = Field(
-        default_factory=lambda: ["qwen2.5-72b", "qwen2.5-14b"],
+        default_factory=_descriptor_models("allowed_llm_models"),
         description="List of allowed LLM model identifiers",
     )
 
     default_llm_model: str = Field(
-        default="qwen2.5-14b",
+        default_factory=_descriptor_model("default_llm_model"),
         description="Default LLM model for semantic analysis",
     )
 

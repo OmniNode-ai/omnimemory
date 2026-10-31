@@ -410,3 +410,16 @@ def services_available() -> bool:
         True if PostgreSQL and Valkey are available.
     """
     return check_services_available()
+
+
+@pytest.fixture(autouse=True)
+def semantic_policy_model_overlay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Supply the semantic analyzer contract's model overlay values (OMN-21794).
+
+    The node contract descriptor carries no model id; a deployment overlay sets
+    these variables, and a test declares its own fixture ids.
+    """
+    monkeypatch.setenv("OMNIMEMORY_ALLOWED_EMBEDDING_MODELS", "fixture-embed")
+    monkeypatch.setenv("OMNIMEMORY_DEFAULT_EMBEDDING_MODEL", "fixture-embed")
+    monkeypatch.setenv("OMNIMEMORY_ALLOWED_LLM_MODELS", "fixture-llm-large,fixture-llm")
+    monkeypatch.setenv("OMNIMEMORY_DEFAULT_LLM_MODEL", "fixture-llm")
