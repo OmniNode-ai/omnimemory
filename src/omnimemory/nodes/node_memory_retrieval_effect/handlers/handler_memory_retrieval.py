@@ -51,10 +51,22 @@ from typing import TYPE_CHECKING, assert_never
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from .handler_db_mock import HandlerDbMock
+    from .handler_decay import HandlerActivationDecay
+    from .handler_graph_mock import HandlerGraphMock
+    from .handler_qdrant_mock import HandlerQdrantMock
+
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,
 )
 
+from ..container.registry_memory_retrieval import (
+    bind_activation_decay,
+    bind_db_mock,
+    bind_graph_mock,
+    bind_qdrant_mock,
+    bind_rank_fusion,
+)
 from ..models import (
     ModelActivationDecayRequest,
     ModelHandlerMemoryRetrievalConfig,
@@ -64,15 +76,11 @@ from ..models import (
     ModelRankedLeg,
     ModelRankFusionRequest,
 )
-from .handler_db_mock import HandlerDbMock
-from .handler_decay import HandlerActivationDecay
 from .handler_fusion import (
     MIN_LEXICAL_TS_RANK,
     MIN_VECTOR_COSINE,
     HandlerRankFusion,
 )
-from .handler_graph_mock import HandlerGraphMock
-from .handler_qdrant_mock import HandlerQdrantMock
 
 logger = logging.getLogger(__name__)
 
@@ -129,8 +137,8 @@ class HandlerMemoryRetrieval:
             fusion: Stateless rank fusion collaborator, constructed when None.
             decay: Stateless activation decay collaborator, constructed when None.
         """
-        self._fusion = HandlerRankFusion() if fusion is None else fusion
-        self._decay = HandlerActivationDecay() if decay is None else decay
+        self._fusion = bind_rank_fusion() if fusion is None else fusion
+        self._decay = bind_activation_decay() if decay is None else decay
         self._config = config or ModelHandlerMemoryRetrievalConfig()
         self._qdrant_handler: HandlerQdrantMock | None = None
         self._db_handler: HandlerDbMock | None = None
@@ -162,11 +170,9 @@ class HandlerMemoryRetrieval:
 
             if self._config.use_stub_handlers:
                 # Initialize stub (mock) handlers
-                self._qdrant_handler = HandlerQdrantMock(
-                    self._config.qdrant_mock_config
-                )
-                self._db_handler = HandlerDbMock(self._config.db_config)
-                self._graph_handler = HandlerGraphMock(self._config.graph_config)
+                self._qdrant_handler = bind_qdrant_mock(self._config.qdrant_mock_config)
+                self._db_handler = bind_db_mock(self._config.db_config)
+                self._graph_handler = bind_graph_mock(self._config.graph_config)
 
                 await asyncio.gather(
                     self._qdrant_handler.initialize(),

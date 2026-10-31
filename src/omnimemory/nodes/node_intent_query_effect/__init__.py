@@ -49,6 +49,9 @@ Example::
     Refactored to container-driven pattern for OMN-1577.
 """
 
+from omnimemory.nodes.node_intent_query_effect.container import (
+    RegistryIntentQueryEffect,
+)
 from omnimemory.nodes.node_intent_query_effect.handlers import HandlerIntentQuery
 from omnimemory.nodes.node_intent_query_effect.mappers import (
     map_intent_records,
@@ -57,7 +60,6 @@ from omnimemory.nodes.node_intent_query_effect.mappers import (
 from omnimemory.nodes.node_intent_query_effect.models import (
     ModelHandlerIntentQueryConfig,
 )
-from omnimemory.nodes.node_intent_query_effect.registry import RegistryIntentQueryEffect
 
 __all__ = [
     "HandlerIntentQuery",

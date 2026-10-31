@@ -56,8 +56,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omnimemory.nodes.node_memory_lifecycle_orchestrator.container.registry_memory_lifecycle import (
+    bind_memory_expire,
+)
 from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
-    HandlerMemoryExpire,
     ModelExpireMemoryCommand,
     ModelMemoryExpireHealth,
     ModelMemoryExpireMetadata,
@@ -169,7 +171,7 @@ class AdapterPostgresDeactivateMemory:
         Note:
             Call initialize() with a db_pool before using deactivate().
         """
-        self._handler = HandlerMemoryExpire(container)
+        self._handler = bind_memory_expire(container)
         self._initialized: bool = False
 
     async def initialize(

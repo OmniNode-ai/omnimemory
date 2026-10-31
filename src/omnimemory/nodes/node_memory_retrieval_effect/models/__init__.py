@@ -14,6 +14,7 @@ for the memory_retrieval_effect node.
 from .model_activation_decay_request import ModelActivationDecayRequest
 from .model_activation_decay_response import ModelActivationDecayResponse
 from .model_embedding_client_config import ModelEmbeddingClientConfig
+from .model_graph_relationship import ModelGraphRelationship
 from .model_handler_db_mock_config import ModelHandlerDbMockConfig
 from .model_handler_graph_mock_config import ModelHandlerGraphMockConfig
 from .model_handler_memory_retrieval_config import ModelHandlerMemoryRetrievalConfig
@@ -43,6 +44,7 @@ __all__ = [
     # Configuration models
     "ModelEmbeddingClientConfig",
     "ModelHandlerDbMockConfig",
+    "ModelGraphRelationship",
     "ModelHandlerGraphMockConfig",
     "ModelHandlerMemoryRetrievalConfig",
     "ModelHandlerQdrantConfig",

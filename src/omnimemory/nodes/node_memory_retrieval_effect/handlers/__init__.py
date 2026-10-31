@@ -41,7 +41,6 @@ from .handler_fusion import (
 )
 from .handler_graph_mock import (
     HandlerGraphMock,
-    HandlerGraphRelationship,
 )
 from .handler_memory_retrieval import HandlerMemoryRetrieval
 from .handler_qdrant_mock import HandlerQdrantMock
@@ -65,5 +64,4 @@ __all__ = [
     # Graph - traversal
     "HandlerGraphMock",
     "ModelHandlerGraphMockConfig",
-    "HandlerGraphRelationship",
 ]

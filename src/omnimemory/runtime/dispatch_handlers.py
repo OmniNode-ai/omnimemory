@@ -1222,9 +1222,9 @@ def create_memory_dispatch_engine(
     # --- Handler 4: lifecycle orchestrator (OMN-6588) ---
     # Uses real HandlerMemoryLifecycle when components are available,
     # falls back to no-op when none are provided.
-    from omnimemory.runtime.handler_lifecycle import HandlerMemoryLifecycle
+    from omnimemory.handlers.container.registry_lifecycle import bind_memory_lifecycle
 
-    _lifecycle = HandlerMemoryLifecycle(
+    _lifecycle = bind_memory_lifecycle(
         graph_memory_adapter=graph_memory_adapter,
         intent_graph_adapter=intent_graph_adapter,
         navigation_handler=navigation_history_handler,

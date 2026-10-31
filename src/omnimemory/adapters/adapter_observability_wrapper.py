@@ -6,7 +6,7 @@
 Extracted from observability.py (OMN-11580).
 
 Implements the "one wrapper, one log line, no payload" pattern for P1C observability:
-- HandlerMetrics dataclass for captured metrics
+- CapturedMetrics dataclass for captured metrics
 - HandlerObservabilityWrapper context manager for handler instrumentation
 """
 
@@ -33,7 +33,7 @@ from .adapter_metrics_counter import (
 
 
 @dataclass
-class HandlerMetrics:
+class CapturedMetrics:
     """Metrics captured during handler execution.
 
     This dataclass holds all metrics collected during a single handler operation,
@@ -208,7 +208,7 @@ class HandlerObservabilityWrapper:
             )
 
             self._emit_log_event(
-                HandlerMetrics(
+                CapturedMetrics(
                     correlation_id=correlation_id,
                     operation=operation,
                     handler=self.handler_name,
@@ -258,7 +258,7 @@ class HandlerObservabilityWrapper:
         else:
             self.registry.handler_health_status.set(0.0, handler=self.handler_name)
 
-    def _emit_log_event(self, metrics: HandlerMetrics) -> None:
+    def _emit_log_event(self, metrics: CapturedMetrics) -> None:
         """Emit a single structured log event for the operation."""
         timestamp = (
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"

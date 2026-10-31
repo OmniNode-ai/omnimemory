@@ -57,7 +57,7 @@ class RegistryIntentQueryEffect:
 
     Example:
         >>> from omnibase_core.container import ModelONEXContainer
-        >>> from omnimemory.nodes.node_intent_query_effect.registry import (
+        >>> from omnimemory.nodes.node_intent_query_effect.container import (
         ...     RegistryIntentQueryEffect,
         ... )
         >>>

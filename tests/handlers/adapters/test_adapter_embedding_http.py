@@ -143,7 +143,7 @@ class TestProtocolConformance:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
         ):
             client = EmbeddingHttpClient(config)
 
@@ -310,7 +310,7 @@ class TestEmbeddingHttpClientLifecycle:
     ) -> None:
         """Test client initialization."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(local_config)
@@ -328,7 +328,7 @@ class TestEmbeddingHttpClientLifecycle:
     ) -> None:
         """Test initialize is idempotent."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(local_config)
@@ -345,7 +345,7 @@ class TestEmbeddingHttpClientLifecycle:
     ) -> None:
         """Test client shutdown."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(local_config)
@@ -363,7 +363,7 @@ class TestEmbeddingHttpClientLifecycle:
     ) -> None:
         """Test async context manager."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -391,7 +391,7 @@ class TestEmbeddingHttpClientEmbedding:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -417,7 +417,7 @@ class TestEmbeddingHttpClientEmbedding:
         mock_handler.execute.return_value = mock_openai_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(openai_config) as client:
@@ -449,7 +449,7 @@ class TestEmbeddingHttpClientEmbedding:
         cid = uuid4()
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -466,7 +466,7 @@ class TestEmbeddingHttpClientEmbedding:
     ) -> None:
         """Test empty text raises EmbeddingClientError."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -496,7 +496,7 @@ class TestEmbeddingHttpClientBatch:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -514,7 +514,7 @@ class TestEmbeddingHttpClientBatch:
     ) -> None:
         """Test batch with empty list returns empty list."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -529,7 +529,7 @@ class TestEmbeddingHttpClientBatch:
     ) -> None:
         """Test batch with max_concurrency=0 raises ValueError."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -547,7 +547,7 @@ class TestEmbeddingHttpClientBatch:
     ) -> None:
         """Test batch with negative max_concurrency raises ValueError."""
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -588,7 +588,7 @@ class TestEmbeddingHttpClientErrors:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -618,7 +618,7 @@ class TestEmbeddingHttpClientErrors:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -643,7 +643,7 @@ class TestEmbeddingHttpClientErrors:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -668,7 +668,7 @@ class TestEmbeddingHttpClientErrors:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -713,7 +713,7 @@ class TestDimensionValidation:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -749,7 +749,7 @@ class TestDimensionValidation:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -783,7 +783,7 @@ class TestDimensionValidation:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -819,7 +819,7 @@ class TestEmbeddingHttpClientRateLimiting:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(config)
@@ -835,7 +835,7 @@ class TestEmbeddingHttpClientRateLimiting:
         """Test rate limiter is not created when disabled."""
         # local_config has rate_limit_rpm=0 by default
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(local_config)
@@ -856,7 +856,7 @@ class TestEmbeddingHttpClientRateLimiting:
         custom_limiter = ProviderRateLimiter(limiter_config)
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(local_config, rate_limiter=custom_limiter)
@@ -894,7 +894,7 @@ class TestEmbeddingHttpClientRateLimiting:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             client = EmbeddingHttpClient(config)
@@ -920,7 +920,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -949,7 +949,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -980,7 +980,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_rate_limiter.acquire = AsyncMock()
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             # Inject the mock rate limiter via constructor
@@ -1014,7 +1014,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(local_config) as client:
@@ -1045,7 +1045,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1086,7 +1086,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1127,7 +1127,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1157,7 +1157,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1205,7 +1205,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = mock_handler_result
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1255,7 +1255,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1287,7 +1287,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1327,7 +1327,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1362,7 +1362,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:
@@ -1401,7 +1401,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         with patch(
-            "omnimemory.handlers.adapters.adapter_embedding_http.HandlerHttpRest",
+            "omnimemory.handlers.container.registry_http_rest.HandlerHttpRest",
             return_value=mock_handler,
         ):
             async with EmbeddingHttpClient(config) as client:

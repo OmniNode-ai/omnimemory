@@ -15,7 +15,7 @@ Topic Discovery:
 
 Example::
 
-    from omnimemory.nodes.node_intent_query_effect.registry import (
+    from omnimemory.nodes.node_intent_query_effect.container import (
         RegistryIntentQueryEffect,
     )
 
@@ -32,7 +32,7 @@ Example::
     Removed get_topic_suffixes() -- topics are now contract-driven (OMN-2213).
 """
 
-from omnimemory.nodes.node_intent_query_effect.registry.registry_intent_query_effect import (
+from omnimemory.nodes.node_intent_query_effect.container.registry_intent_query_effect import (
     RegistryIntentQueryEffect,
 )
 

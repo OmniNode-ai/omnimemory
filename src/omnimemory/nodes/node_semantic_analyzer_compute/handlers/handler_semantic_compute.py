@@ -560,6 +560,10 @@ class HandlerSemanticCompute:
             RuntimeError: If embedding_provider is not provided and not
                 registered in container (embedding provider is required).
         """
+        from omnimemory.nodes.node_semantic_analyzer_compute.container.registry_semantic_compute import (
+            bind_semantic_compute_policy,
+        )
+
         # Fast path: already initialized (avoid lock acquisition)
         if self._initialized:
             return
@@ -603,7 +607,7 @@ class HandlerSemanticCompute:
                 )
 
             # Set up policy and cache
-            self._policy = HandlerSemanticComputePolicy(self._config.policy_config)
+            self._policy = bind_semantic_compute_policy(self._config.policy_config)
 
             # Guard against max_cache_size=0: cachetools LRUCache requires maxsize > 0
             # If caching is disabled (max_cache_size=0), use minimum size but caching
