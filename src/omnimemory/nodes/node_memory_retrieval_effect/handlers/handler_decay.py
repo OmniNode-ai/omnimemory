@@ -18,7 +18,7 @@ Two things about the shape of this, both settled rather than invented here:
   which is frozen, lives in ``omnibase_core``, and carries ``created_at`` only.
   Rather than plumb a field into a frozen core model speculatively, this
   degrades: where ``last_accessed_at`` exists the max applies, where it does not
-  the function falls back to ``created_at`` alone.
+  the handler falls back to ``created_at`` alone.
 
   Note the fallback is needed per *instance*, not merely per model —
   ``ModelMemoryItem.last_accessed_at`` and ``ModelMemoryData.last_accessed_at``
@@ -36,17 +36,13 @@ delta is measured, no cross-repo change to the core model is justified.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from datetime import datetime
+from ..models import ModelActivationDecayRequest, ModelActivationDecayResponse
 
 __all__ = [
     "DECAY_LAMBDA_PER_DAY",
     "STALE_ACTIVATION_THRESHOLD",
-    "activation_decay",
-    "freshest_timestamp",
-    "is_stale",
+    "HandlerActivationDecay",
 ]
 
 DECAY_LAMBDA_PER_DAY = 0.015
@@ -80,60 +76,25 @@ stale.
 """
 
 
-def freshest_timestamp(
-    created_at: datetime,
-    last_accessed_at: datetime | None = None,
-) -> datetime:
-    """Return the most recent timestamp available for a record.
+class HandlerActivationDecay:
+    """Compute activation decay without retaining state or reading the clock."""
 
-    Args:
-        created_at: When the record was created. Always present.
-        last_accessed_at: When it was last read, if the model carries the field
-            and the record has a value for it.
+    def handle(
+        self, request: ModelActivationDecayRequest
+    ) -> ModelActivationDecayResponse:
+        """Decay against the freshest timestamp, clamping future ages to zero.
 
-    Returns:
-        ``max(created_at, last_accessed_at)`` when both are available,
-        ``created_at`` otherwise.
-
-    A ``last_accessed_at`` *older* than ``created_at`` is possible in principle
-    — clock skew, or a backfill that stamped access times independently — so
-    this takes the max rather than preferring ``last_accessed_at`` whenever it
-    is non-null. Preferring it would let a bad backfill silently age every
-    record.
-    """
-    if last_accessed_at is None:
-        return created_at
-    return max(created_at, last_accessed_at)
-
-
-def activation_decay(
-    created_at: datetime,
-    last_accessed_at: datetime | None = None,
-    *,
-    now: datetime,
-) -> float:
-    """Exponential activation decay against the freshest available timestamp.
-
-    Args:
-        created_at: When the record was created.
-        last_accessed_at: Last read time, or None where unavailable.
-        now: The reference time. Required and injected rather than read from
-            the clock, so the value is reproducible in a test and identical
-            across every result in one response.
-
-    Returns:
-        A multiplier in ``(0.0, 1.0]``. Exactly 1.0 for a record touched now,
-        approaching 0 as it ages. Never negative and never above 1.0.
-
-    A record whose freshest timestamp is in the future scores 1.0 rather than
-    above it: future timestamps come from clock skew, and letting them amplify
-    a score would make skew a ranking advantage.
-    """
-    reference = freshest_timestamp(created_at, last_accessed_at)
-    days_old = max(0.0, (now - reference).total_seconds() / 86400)
-    return math.exp(-DECAY_LAMBDA_PER_DAY * days_old)
-
-
-def is_stale(activation_score: float) -> bool:
-    """Whether an activation score has decayed past the stale threshold."""
-    return activation_score < STALE_ACTIVATION_THRESHOLD
+        An access time older than creation can arise from backfills or clock
+        skew, so use the maximum rather than preferring any non-null access.
+        Future timestamps score 1.0 so skew cannot amplify a ranking score.
+        """
+        reference = request.created_at
+        if request.last_accessed_at is not None:
+            reference = max(reference, request.last_accessed_at)
+        days_old = max(0.0, (request.now - reference).total_seconds() / 86400)
+        activation = math.exp(-DECAY_LAMBDA_PER_DAY * days_old)
+        return ModelActivationDecayResponse(
+            freshest_timestamp=reference,
+            activation=activation,
+            is_stale=activation < STALE_ACTIVATION_THRESHOLD,
+        )

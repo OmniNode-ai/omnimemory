@@ -11,6 +11,8 @@ for the memory_retrieval_effect node.
     Initial implementation for OMN-1387.
 """
 
+from .model_activation_decay_request import ModelActivationDecayRequest
+from .model_activation_decay_response import ModelActivationDecayResponse
 from .model_embedding_client_config import ModelEmbeddingClientConfig
 from .model_handler_db_mock_config import ModelHandlerDbMockConfig
 from .model_handler_graph_mock_config import ModelHandlerGraphMockConfig
@@ -22,9 +24,19 @@ from .model_memory_retrieval_response import (
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
 )
+from .model_rank_fusion_request import ModelRankFusionRequest
+from .model_rank_fusion_response import ModelRankFusionResponse
+from .model_ranked_entry import ModelRankedEntry
+from .model_ranked_leg import ModelRankedLeg
 
 __all__ = [
     # Request/Response models
+    "ModelActivationDecayRequest",
+    "ModelActivationDecayResponse",
+    "ModelRankedEntry",
+    "ModelRankedLeg",
+    "ModelRankFusionRequest",
+    "ModelRankFusionResponse",
     "ModelMemoryRetrievalRequest",
     "ModelMemoryRetrievalResponse",
     "ModelSearchResult",

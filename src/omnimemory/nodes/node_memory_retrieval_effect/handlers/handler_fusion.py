@@ -9,7 +9,8 @@ legs into a single ordering, behind the existing retrieval protocol.
 
 Two concerns are kept separate on purpose:
 
-* :func:`fuse_rrf` is **pure rank fusion**. It consumes ranks and nothing else.
+* Rank accumulation in :meth:`HandlerRankFusion.handle` is **pure rank
+  fusion**. It consumes ranks and nothing else.
   The two legs produce numerically incomparable quantities — cosine similarity
   in ``[0, 1]`` versus an unbounded Postgres ``ts_rank`` whose magnitude depends
   on document length and term-frequency normalisation — so any score-combining
@@ -17,7 +18,8 @@ Two concerns are kept separate on purpose:
   fitted parameter with no principled value. Reciprocal Rank Fusion sidesteps it
   entirely by discarding magnitudes.
 
-* :func:`select_relevant` decides **whether a leg has anything to contribute**,
+* Relevance gating in :meth:`HandlerRankFusion.handle` decides **whether a leg
+  has anything to contribute**,
   using each leg's own scores against its own floor. This never compares one
   leg's scores to another's, so it does not reintroduce the scale problem RRF
   exists to avoid.
@@ -36,18 +38,13 @@ with no signal from displacing a leg that has some.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+from ..models import ModelRankFusionRequest, ModelRankFusionResponse
 
 __all__ = [
     "MIN_LEXICAL_TS_RANK",
     "MIN_VECTOR_COSINE",
     "RRF_K_DEFAULT",
-    "fuse_rrf",
-    "fuse_rrf_scores",
-    "select_relevant",
+    "HandlerRankFusion",
 ]
 
 RRF_K_DEFAULT = 60
@@ -80,78 +77,40 @@ contain one of these words".
 """
 
 
-def select_relevant(
-    entries: Iterable[tuple[str, float]],
-    min_score: float,
-) -> list[str]:
-    """Drop a leg's non-matching results, preserving rank order.
+class HandlerRankFusion:
+    """Gate each leg on its own scores, then fuse ranks without retaining state."""
 
-    Args:
-        entries: ``(document_id, score)`` pairs from a single leg, best first.
-        min_score: This leg's relevance floor. Compared only against scores from
-            the same leg — never across legs.
+    def handle(self, request: ModelRankFusionRequest) -> ModelRankFusionResponse:
+        """Return relevant ids, reciprocal rank scores, and deterministic order.
 
-    Returns:
-        The surviving document ids, still in the leg's original rank order.
-    """
-    return [doc_id for doc_id, score in entries if score >= min_score]
+        Each surviving document accumulates ``1 / (k + rank)`` per occurrence,
+        counting ranks from 1 after filtering. Agreement across legs therefore
+        adds contributions without comparing their incomparable raw scores.
+        Scores are meaningful only relative to others within this query.
+        Ties are broken by document id ascending, never by insertion order.
 
+        Raises:
+            ValueError: If ``k`` is negative.
+        """
+        k = RRF_K_DEFAULT if request.k is None else request.k
+        if k < 0:
+            raise ValueError(f"RRF k must be non-negative, got {k}")
 
-def fuse_rrf_scores(
-    *legs: Sequence[str],
-    k: int = RRF_K_DEFAULT,
-) -> dict[str, float]:
-    """Accumulate Reciprocal Rank Fusion scores per document.
-
-    Each document accumulates ``1 / (k + rank)`` from every leg that returned
-    it, with ``rank`` counted from 1. A document returned by both legs therefore
-    accumulates both terms, and that accumulation is the entire mechanism by
-    which agreement between legs is rewarded.
-
-    Args:
-        *legs: One ranked list of document ids per leg, best first.
-        k: Smoothing constant. See :data:`RRF_K_DEFAULT`.
-
-    Returns:
-        Fused score per document id. Values are small by construction (with
-        ``k = 60`` a rank-1 hit contributes ~0.0164) and are meaningful only
-        relative to each other within one query — never across queries, and
-        never as an absolute relevance.
-
-    Raises:
-        ValueError: If ``k`` is negative, which would make the reciprocal
-            undefined or negative for low ranks.
-    """
-    if k < 0:
-        raise ValueError(f"RRF k must be non-negative, got {k}")
-
-    scores: dict[str, float] = {}
-    for leg in legs:
-        for rank, doc_id in enumerate(leg, start=1):
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
-    return scores
-
-
-def fuse_rrf(
-    *legs: Sequence[str],
-    k: int = RRF_K_DEFAULT,
-) -> list[str]:
-    """Fuse ranked document id lists by Reciprocal Rank Fusion.
-
-    Ties are broken by document id, ascending. RRF produces exact ties whenever
-    two documents occupy the same rank in their respective legs, which on any
-    real input happens constantly, so the tie-break has to be defined rather
-    than left to insertion order.
-
-    Args:
-        *legs: One ranked list of document ids per leg, best first.
-        k: Smoothing constant. See :data:`RRF_K_DEFAULT`.
-
-    Returns:
-        Every document id from every leg, deduplicated, in fused order.
-
-    Raises:
-        ValueError: If ``k`` is negative.
-    """
-    scores = fuse_rrf_scores(*legs, k=k)
-    return sorted(scores, key=lambda doc_id: (-scores[doc_id], doc_id))
+        relevant_legs = tuple(
+            tuple(
+                entry.document_id
+                for entry in leg.entries
+                if entry.score >= leg.min_score
+            )
+            for leg in request.legs
+        )
+        scores: dict[str, float] = {}
+        for leg in relevant_legs:
+            for rank, doc_id in enumerate(leg, start=1):
+                scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
+        ranking = tuple(sorted(scores, key=lambda doc_id: (-scores[doc_id], doc_id)))
+        return ModelRankFusionResponse(
+            relevant_legs=relevant_legs,
+            scores=scores,
+            ranking=ranking,
+        )

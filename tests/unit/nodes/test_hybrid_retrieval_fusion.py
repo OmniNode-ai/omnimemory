@@ -41,6 +41,18 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 import pytest
 
+from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
+    MIN_LEXICAL_TS_RANK,
+    MIN_VECTOR_COSINE,
+    HandlerRankFusion,
+)
+from omnimemory.nodes.node_memory_retrieval_effect.models import (
+    ModelRankedEntry,
+    ModelRankedLeg,
+    ModelRankFusionRequest,
+    ModelRankFusionResponse,
+)
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -256,6 +268,44 @@ def scored(leg: Sequence[LegEntry]) -> list[tuple[str, float]]:
     return [(e["doc_id"], float(e["score"])) for e in leg]
 
 
+def _fuse(*legs: Sequence[str], k: int | None = None) -> ModelRankFusionResponse:
+    return HandlerRankFusion().handle(
+        ModelRankFusionRequest(
+            legs=tuple(
+                ModelRankedLeg(
+                    entries=tuple(
+                        ModelRankedEntry(document_id=doc_id, score=1.0)
+                        for doc_id in leg
+                    ),
+                    min_score=0.0,
+                )
+                for leg in legs
+            ),
+            k=k,
+        )
+    )
+
+
+def _relevant(entries: Sequence[tuple[str, float]], min_score: float) -> list[str]:
+    return list(
+        HandlerRankFusion()
+        .handle(
+            ModelRankFusionRequest(
+                legs=(
+                    ModelRankedLeg(
+                        entries=tuple(
+                            ModelRankedEntry(document_id=doc_id, score=score)
+                            for doc_id, score in entries
+                        ),
+                        min_score=min_score,
+                    ),
+                )
+            )
+        )
+        .relevant_legs[0]
+    )
+
+
 def _scores_by_family(*, gated: bool) -> dict[str, tuple[float, float]]:
     """Mean vector-only and fused NDCG@10 per family.
 
@@ -266,13 +316,6 @@ def _scores_by_family(*, gated: bool) -> dict[str, tuple[float, float]]:
             Both are measured so the effect of gating is a number rather than
             an assertion.
     """
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        MIN_LEXICAL_TS_RANK,
-        MIN_VECTOR_COSINE,
-        fuse_rrf,
-        select_relevant,
-    )
-
     totals: dict[str, list[tuple[float, float]]] = {}
 
     for q in load_corpus():
@@ -281,14 +324,14 @@ def _scores_by_family(*, gated: bool) -> dict[str, tuple[float, float]]:
         lexical_scored = scored(q["lexical"])
 
         if gated:
-            vector_leg = select_relevant(vector_scored, MIN_VECTOR_COSINE)
-            lexical_leg = select_relevant(lexical_scored, MIN_LEXICAL_TS_RANK)
+            vector_leg = _relevant(vector_scored, MIN_VECTOR_COSINE)
+            lexical_leg = _relevant(lexical_scored, MIN_LEXICAL_TS_RANK)
         else:
             vector_leg = [doc for doc, _ in vector_scored]
             lexical_leg = [doc for doc, _ in lexical_scored]
 
         baseline = ndcg_at_k([doc for doc, _ in vector_scored], labels, NDCG_K)
-        fused = ndcg_at_k(fuse_rrf(vector_leg, lexical_leg), labels, NDCG_K)
+        fused = ndcg_at_k(_fuse(vector_leg, lexical_leg).ranking, labels, NDCG_K)
 
         if q["family"] == "recency":
             # Scored by the decay tests instead: these queries are built so
@@ -363,77 +406,56 @@ def test_fusion_is_deterministic() -> None:
     respective legs, so tie-breaking has to be defined rather than left to dict
     ordering.
     """
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        fuse_rrf,
-    )
-
     q = load_corpus()[0]
     vector = ranked_ids(q["vector"])
     lexical = ranked_ids(q["lexical"])
-    first = fuse_rrf(vector, lexical)
+    first = _fuse(vector, lexical).ranking
     for _ in range(5):
-        assert fuse_rrf(vector, lexical) == first
+        assert _fuse(vector, lexical).ranking == first
 
 
 @pytest.mark.unit
 def test_fusion_preserves_every_input_document() -> None:
     """Fusion reorders and deduplicates; it must not drop candidates.
 
-    Dropping is :func:`select_relevant`'s job and happens before fusion, so
-    ``fuse_rrf`` itself is total over its inputs.
+    Relevance gating happens before rank fusion. With every entry above its
+    floor, the handler preserves all input documents.
     """
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        fuse_rrf,
-    )
-
     for q in load_corpus():
         vector = ranked_ids(q["vector"])
         lexical = ranked_ids(q["lexical"])
-        fused = fuse_rrf(vector, lexical)
+        fused = _fuse(vector, lexical).ranking
         assert set(fused) == set(vector) | set(lexical), q["query_id"]
         assert len(fused) == len(set(fused)), f"{q['query_id']}: duplicate in output"
 
 
 @pytest.mark.unit
 def test_select_relevant_preserves_rank_order_and_drops_below_floor() -> None:
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        select_relevant,
-    )
-
     entries = [("a", 0.9), ("b", 0.1), ("c", 0.6), ("d", 0.05)]
-    assert select_relevant(entries, 0.5) == ["a", "c"]
-    assert select_relevant(entries, 0.0) == ["a", "b", "c", "d"]
-    assert select_relevant(entries, 1.0) == []
+    assert _relevant(entries, 0.5) == ["a", "c"]
+    assert _relevant(entries, 0.0) == ["a", "b", "c", "d"]
+    assert _relevant(entries, 1.0) == []
 
 
 @pytest.mark.unit
 def test_fuse_rrf_rejects_negative_k() -> None:
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        fuse_rrf,
-    )
-
     with pytest.raises(ValueError, match="non-negative"):
-        fuse_rrf(["a"], k=-1)
+        _fuse(["a"], k=-1)
 
 
 @pytest.mark.unit
 def test_fuse_rrf_scores_and_fuse_rrf_cannot_diverge() -> None:
-    """fuse_rrf derives its order from fuse_rrf_scores; the handler uses both.
+    """The handler derives its ranking from the same scores it returns.
 
     If the two ever disagreed, the handler would attach a score from one and an
     ordering from the other -- exactly the defect the normalisation exists to
     prevent.
     """
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        fuse_rrf,
-        fuse_rrf_scores,
-    )
-
     for q in load_corpus():
         vector = ranked_ids(q["vector"])
         lexical = ranked_ids(q["lexical"])
-        order = fuse_rrf(vector, lexical)
-        scores = fuse_rrf_scores(vector, lexical)
+        order = _fuse(vector, lexical).ranking
+        scores = _fuse(vector, lexical).scores
 
         assert set(order) == set(scores), q["query_id"]
         values = [scores[doc_id] for doc_id in order]
@@ -447,10 +469,54 @@ def test_fuse_rrf_scores_rewards_agreement_between_legs() -> None:
     This is the whole mechanism of rank fusion; if it stops holding, RRF has
     been broken rather than merely retuned.
     """
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
-        fuse_rrf_scores,
-    )
-
-    scores = fuse_rrf_scores(["both", "vector_only"], ["both", "lexical_only"])
+    scores = _fuse(["both", "vector_only"], ["both", "lexical_only"]).scores
     assert scores["both"] > scores["vector_only"]
     assert scores["both"] > scores["lexical_only"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("k", [None, 0, 7])
+def test_handler_gates_before_assigning_ranks_and_uses_each_legs_floor(
+    k: int | None,
+) -> None:
+    response = HandlerRankFusion().handle(
+        ModelRankFusionRequest(
+            legs=(
+                ModelRankedLeg(
+                    entries=(
+                        ModelRankedEntry(document_id="noise", score=0.1),
+                        ModelRankedEntry(document_id="b", score=0.5),
+                        ModelRankedEntry(document_id="a", score=0.5),
+                    ),
+                    min_score=0.5,
+                ),
+                ModelRankedLeg(
+                    entries=(ModelRankedEntry(document_id="a", score=500.0),),
+                    min_score=500.0,
+                ),
+            ),
+            k=k,
+        )
+    )
+    denominator = 60 if k is None else k
+    assert response.relevant_legs == (("b", "a"), ("a",))
+    assert response.scores == {
+        "b": 1.0 / (denominator + 1),
+        "a": 1.0 / (denominator + 2) + 1.0 / (denominator + 1),
+    }
+    assert response.ranking == ("a", "b")
+
+
+@pytest.mark.unit
+def test_handler_breaks_exact_ties_by_document_id() -> None:
+    assert _fuse(["z"], ["a"]).ranking == ("a", "z")
+    assert _fuse(["a"], ["z"]).ranking == ("a", "z")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("legs", [(), ([],), ([], [])])
+def test_handler_handles_empty_legs(legs: tuple[list[str], ...]) -> None:
+    response = _fuse(*legs)
+    assert response.relevant_legs == tuple(() for _ in legs)
+    assert response.scores == {}
+    assert response.ranking == ()

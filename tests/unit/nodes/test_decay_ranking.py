@@ -35,14 +35,18 @@ from typing import TYPE_CHECKING
 import pytest
 
 from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_decay import (
-    activation_decay,
+    HandlerActivationDecay,
 )
 from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_fusion import (
     MIN_LEXICAL_TS_RANK,
     MIN_VECTOR_COSINE,
-    fuse_rrf,
-    fuse_rrf_scores,
-    select_relevant,
+    HandlerRankFusion,
+)
+from omnimemory.nodes.node_memory_retrieval_effect.models import (
+    ModelActivationDecayRequest,
+    ModelRankedEntry,
+    ModelRankedLeg,
+    ModelRankFusionRequest,
 )
 
 from .test_hybrid_retrieval_fusion import (
@@ -63,6 +67,23 @@ RECENCY_MIN_GAIN = 0.15
 # The three original families discriminate on relevance, not recency, and all
 # their documents share one timestamp. Decay must leave them alone.
 UNRELATED_FAMILY_TOLERANCE = 0.01
+
+
+def _activation(
+    created_at: datetime,
+    last_accessed_at: datetime | None = None,
+    *,
+    now: datetime,
+) -> float:
+    return (
+        HandlerActivationDecay()
+        .handle(
+            ModelActivationDecayRequest(
+                created_at=created_at, last_accessed_at=last_accessed_at, now=now
+            )
+        )
+        .activation
+    )
 
 
 def corpus_documents() -> Mapping[str, dict[str, str | None]]:
@@ -102,14 +123,27 @@ def _rank(
     """
     vector = scored(query["vector"])  # type: ignore[arg-type]
     lexical = scored(query["lexical"])  # type: ignore[arg-type]
-    legs = (
-        select_relevant(vector, MIN_VECTOR_COSINE),
-        select_relevant(lexical, MIN_LEXICAL_TS_RANK),
+    fusion = HandlerRankFusion().handle(
+        ModelRankFusionRequest(
+            legs=tuple(
+                ModelRankedLeg(
+                    entries=tuple(
+                        ModelRankedEntry(document_id=doc_id, score=score)
+                        for doc_id, score in entries
+                    ),
+                    min_score=min_score,
+                )
+                for entries, min_score in (
+                    (vector, MIN_VECTOR_COSINE),
+                    (lexical, MIN_LEXICAL_TS_RANK),
+                )
+            )
+        )
     )
     if not decay:
-        return fuse_rrf(*legs)
+        return list(fusion.ranking)
 
-    fused = fuse_rrf_scores(*legs)
+    fused = fusion.scores
     modulated: dict[str, float] = {}
     for doc_id, score in fused.items():
         meta = documents[doc_id]
@@ -120,7 +154,7 @@ def _rank(
             if use_access_time and accessed_raw is not None
             else None
         )
-        modulated[doc_id] = score * activation_decay(created, accessed, now=now)
+        modulated[doc_id] = score * _activation(created, accessed, now=now)
     return sorted(modulated, key=lambda d: (-modulated[d], d))
 
 
@@ -273,8 +307,8 @@ def test_decay_can_promote_a_fresh_irrelevant_document() -> None:
     now = reference_now()
     from datetime import timedelta
 
-    old_and_correct = activation_decay(now - timedelta(days=400), None, now=now)
-    fresh_and_wrong = activation_decay(now - timedelta(days=14), None, now=now)
+    old_and_correct = _activation(now - timedelta(days=400), None, now=now)
+    fresh_and_wrong = _activation(now - timedelta(days=14), None, now=now)
 
     # The fused scores RRF would produce for adjacent ranks are within ~2% of
     # each other, so a decay ratio this large overwhelms any ranking signal.
