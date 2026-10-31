@@ -8,7 +8,9 @@ uses the rev this repo has pinned, never the sibling's live branch, so a merge
 in one repo cannot turn another repo red. This scans every workflow for:
 
 * ``uses: OmniNode-ai/<sibling>/...@<ref>`` (reusable workflows, composite
-  actions) whose ref is not a 40-hex commit sha, and
+  actions) whose ref is not a 40-hex commit sha or a dev-merge tag
+  (``dev-<UTC YYYYMMDDHHMMSS>-<sha12>``, a fixed ref of the sibling's dev
+  branch, per the rulings of 2026-10-16T09:35:49Z and 2026-10-29T01:50:26Z), and
 * ``actions/checkout`` steps with ``repository: OmniNode-ai/<sibling>`` whose
   ``ref`` is missing (default branch tip), a branch name, or anything other
   than a 40-hex sha or the output of a ``*-pin`` resolve step that reads the
@@ -28,6 +30,7 @@ pytestmark = pytest.mark.unit
 _WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 _SELF = "omnimemory"
 _SHA = re.compile(r"[0-9a-f]{40}")
+_DEV_MERGE_TAG = re.compile(r"dev-\d{14}-[0-9a-f]{12}")
 _PIN_OUTPUT = re.compile(r"\$\{\{ steps\.[a-z-]+-pin\.outputs\.rev \}\}")
 _USES = re.compile(r"OmniNode-ai/([\w.-]+)/\S+@(\S+)")
 
@@ -49,7 +52,14 @@ def _violations(workflow: dict[str, object], name: str) -> list[str]:
             if not isinstance(uses, str):
                 continue
             match = _USES.match(uses)
-            if match and match.group(1) != _SELF and not _SHA.fullmatch(match.group(2)):
+            if (
+                match
+                and match.group(1) != _SELF
+                and not (
+                    _SHA.fullmatch(match.group(2))
+                    or _DEV_MERGE_TAG.fullmatch(match.group(2))
+                )
+            ):
                 found.append(f"{name}:{job_name}: uses {uses}")
             with_ = entry.get("with")
             if (
@@ -92,3 +102,12 @@ def test_no_workflow_reads_a_sibling_at_a_live_ref() -> None:
 def test_guard_flags_live_sibling_reads(snippet: str) -> None:
     """Positive control: the scan reports each mutable-ref shape it exists to catch."""
     assert _violations(yaml.safe_load(snippet), "synthetic.yml") != []
+
+
+def test_guard_admits_a_dev_merge_tag() -> None:
+    """A dev-merge tag is a fixed ref; the scan must not report it."""
+    snippet = (
+        "jobs:\n  j:\n    uses: OmniNode-ai/omnibase_core/.github/workflows/x.yml"
+        "@dev-20261030152335-66d35d2283c3\n"
+    )
+    assert _violations(yaml.safe_load(snippet), "synthetic.yml") == []
