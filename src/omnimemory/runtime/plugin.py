@@ -98,6 +98,7 @@ from omnibase_infra.runtime.protocol_domain_plugin import (
     ProtocolDomainPlugin,
 )
 
+from omnimemory.models.config import ModelMemoryRuntimeTimeoutSettings
 from omnimemory.runtime.contract_topics import (
     canonical_topic_to_dispatch_alias,
     collect_subscribe_topics_from_contracts,
@@ -134,22 +135,8 @@ env token and therefore matched none of the granted MSK IAM group patterns.
 """
 
 
-async def _probe_tcp_reachable(host: str, port: int, timeout: float = 5.0) -> bool:
-    """Return True if a TCP connection to host:port succeeds within timeout.
-
-    Uses stdlib asyncio only — no Memgraph SDK, no bolt protocol handshake.
-    A successful TCP connect is sufficient to confirm the service is up and
-    accepting connections on the expected port.
-
-    Args:
-        host: Hostname or IP address to probe.
-        port: TCP port number to connect to.
-        timeout: Maximum seconds to wait for connection (default: 5.0).
-
-    Returns:
-        True if connection succeeded and was cleanly closed; False on any
-        OSError (connection refused, host unreachable) or asyncio.TimeoutError.
-    """
+async def _probe_tcp_reachable(host: str, port: int, timeout: float) -> bool:
+    """Return True if a TCP connect to host:port succeeds within ``timeout`` seconds."""
     try:
         _, writer = await asyncio.wait_for(
             asyncio.open_connection(host, port),
@@ -309,7 +296,11 @@ class PluginMemory:
         host = os.environ["OMNIMEMORY_MEMGRAPH_HOST"]
         port = int(os.getenv("OMNIMEMORY_MEMGRAPH_PORT", "7687"))
 
-        reachable = await _probe_tcp_reachable(host, port)
+        reachable = await _probe_tcp_reachable(
+            host,
+            port,
+            ModelMemoryRuntimeTimeoutSettings.from_node_contract().memgraph_probe_timeout_seconds,
+        )
         if not reachable:
             return ModelHandshakeResult.failed(
                 plugin_id=self.plugin_id,
@@ -564,6 +555,8 @@ class PluginMemory:
         correlation_id = config.correlation_id
 
         try:
+            runtime_timeouts = ModelMemoryRuntimeTimeoutSettings.from_node_contract()
+
             # Create stub protocol implementations for dispatch engine
             # The dispatch handlers bridge to the actual handler logic
             intent_consumer = _StubIntentEventConsumer()
@@ -609,7 +602,11 @@ class PluginMemory:
 
                 # Probe TCP before attempting full bolt handshake to provide
                 # a clearer error message if Memgraph is unreachable.
-                reachable = await _probe_tcp_reachable(memgraph_host, memgraph_port)
+                reachable = await _probe_tcp_reachable(
+                    memgraph_host,
+                    memgraph_port,
+                    runtime_timeouts.memgraph_probe_timeout_seconds,
+                )
                 if reachable:
                     await graph_memory_adapter.initialize(
                         connection_uri=connection_uri, auth=None
@@ -731,6 +728,7 @@ class PluginMemory:
             introspection_result = await publish_memory_introspection(
                 event_bus=config.event_bus,
                 correlation_id=correlation_id,
+                heartbeat_interval_seconds=runtime_timeouts.heartbeat_interval_seconds,
             )
             self._introspection_nodes = introspection_result.registered_nodes
             self._introspection_proxies = introspection_result.proxies

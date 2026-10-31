@@ -107,6 +107,7 @@ descriptor:
   default_embedding_model: "${env.OMNIMEMORY_DEFAULT_EMBEDDING_MODEL}"
   allowed_llm_models: "${env.OMNIMEMORY_ALLOWED_LLM_MODELS}"
   default_llm_model: "${env.OMNIMEMORY_DEFAULT_LLM_MODEL}"
+  health_check_timeout_seconds: "${env.OMNIMEMORY_SEMANTIC_HEALTH_CHECK_TIMEOUT_SECONDS:5.0}"
 
 # === TAGS ===
 tags:

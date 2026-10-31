@@ -1,0 +1,43 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-21738"
+title: "omnimemory contracts_and_di literal_timeout burn-down, slice rf1625-c9: timeouts come from the
+  node contract or overlay through DI"
+summary: "The six remaining literal_timeout findings in omnimemory src (storage config bounds, graph probe
+  timeout, introspection heartbeat interval, semantic health check timeout, kreuzberg timeout count) are
+  removed: the values are descriptor entries in the storage effect and semantic analyzer node contracts
+  with the ${env.VAR:default} overlay, resolved at the binding site and injected."
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: "req-timeouts-from-contract"
+    statement: "No timeout, interval or bound is hard-coded in the touched modules; each is a node contract
+      descriptor value an overlay can replace and the callers take it as a required parameter."
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the contracts_and_di count for literal_timeout over omnimemory src drops from
+          6 to 0 and the repo total from 12 to 6, with no baseline entry or suppression -- falsifier:
+          runtime_validator_run with ValidatorContractsAndDi over src before and after, counts compared
+          per rule"
+      - id: "AC2"
+        statement: "AC2: every moved timeout is taken through an injected parameter bound from the node
+          contract or overlay -- falsifier: uv run pytest tests/unit/runtime/test_memory_runtime_timeout_settings.py
+          -q --no-cov plus the checker re-run on src"
+evidence_requirements:
+  - kind: "tests"
+    description: "Descriptor values resolve, the overlay wins, a non-positive value fails, and the callers
+      require the timeout."
+    command: "uv run pytest tests/unit/runtime/test_memory_runtime_timeout_settings.py -q --no-cov"
+emergency_bypass:
+  enabled: false
+  justification: ""
+  follow_up_ticket_id: ""
+dod_evidence:
+  - id: "dod-omn21738-timeouts-from-contract"
+    description: "AC1 and AC2: runtime timeouts, intervals and bounds come from node contract descriptors."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/unit/runtime/test_memory_runtime_timeout_settings.py -q --no-cov"
+    binds_ac: ["AC1", "AC2"]

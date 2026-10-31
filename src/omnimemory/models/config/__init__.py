@@ -38,6 +38,9 @@ from omnimemory.models.config.model_handler_semantic_compute_config import (
 from omnimemory.models.config.model_linear_scope_mapping import (
     ModelLinearScopeMapping,
 )
+from omnimemory.models.config.model_memory_runtime_timeout_settings import (
+    ModelMemoryRuntimeTimeoutSettings,
+)
 from omnimemory.models.config.model_memory_service_config import (
     ModelMemoryServiceConfig,
 )
@@ -73,6 +76,7 @@ __all__ = [
     "ModelFilesystemConfig",
     "ModelHandlerSemanticComputeConfig",
     "ModelLinearScopeMapping",
+    "ModelMemoryRuntimeTimeoutSettings",
     "ModelMemoryServiceConfig",
     "ModelPathScopeMapping",
     "ModelPostgresConfig",

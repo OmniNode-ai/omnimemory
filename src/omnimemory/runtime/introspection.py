@@ -265,7 +265,7 @@ async def publish_memory_introspection(
     *,
     correlation_id: UUID | None = None,
     enable_heartbeat: bool = True,
-    heartbeat_interval_seconds: float = 30.0,
+    heartbeat_interval_seconds: float,
 ) -> IntrospectionResult:
     """Publish introspection events for all memory nodes.
 
@@ -292,7 +292,7 @@ async def publish_memory_introspection(
             introspection events. If None, introspection is skipped.
         correlation_id: Optional correlation ID for tracing.
         enable_heartbeat: Whether to start heartbeat tasks for effect nodes.
-        heartbeat_interval_seconds: Interval between heartbeats in seconds.
+        heartbeat_interval_seconds: Seconds between heartbeats (storage effect node contract).
 
     Returns:
         IntrospectionResult with registered node names and proxy references

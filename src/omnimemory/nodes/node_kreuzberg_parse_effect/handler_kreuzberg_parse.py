@@ -95,6 +95,16 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 
+def _failed_result(*, timed_out: bool) -> ModelKreuzbergParseResult:
+    """Result of one document whose extract call failed; ``timed_out`` marks a timeout failure."""
+    return ModelKreuzbergParseResult(
+        indexed_count=0,
+        failed_count=1,
+        skipped_too_large_count=0,
+        timeout_count=int(timed_out),
+    )
+
+
 def _validate_source_path(source_url: str, document_root: Path) -> Path:
     """Validate that source_url resolves to a path within document_root.
 
@@ -338,12 +348,7 @@ class HandlerKreuzbergParse:
                 parser_version=config.parser_version,
             )
             await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
-            return ModelKreuzbergParseResult(
-                indexed_count=0,
-                failed_count=1,
-                skipped_too_large_count=0,
-                timeout_count=1,
-            )
+            return _failed_result(timed_out=True)
         except KreuzbergExtractionError as exc:
             _log.warning(
                 "kreuzberg HTTP error",
@@ -359,12 +364,7 @@ class HandlerKreuzbergParse:
                 parser_version=config.parser_version,
             )
             await publish_callback(failed_topic, failed_event.model_dump(mode="json"))
-            return ModelKreuzbergParseResult(
-                indexed_count=0,
-                failed_count=1,
-                skipped_too_large_count=0,
-                timeout_count=0,
-            )
+            return _failed_result(timed_out=False)
 
         extracted_text = result.extracted_text
 

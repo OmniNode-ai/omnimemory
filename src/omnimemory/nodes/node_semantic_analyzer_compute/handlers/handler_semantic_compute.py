@@ -114,9 +114,6 @@ __all__ = [
 # TypeVar for generic retry helper
 _T = TypeVar("_T")
 
-# Health check timeout - shorter than operation timeout since health checks should be quick
-_HEALTH_CHECK_TIMEOUT_SECONDS: float = 5.0
-
 # Minimum cache size for LRUCache (cachetools requires maxsize > 0)
 _MIN_CACHE_SIZE: int = 1
 
@@ -654,18 +651,24 @@ class HandlerSemanticCompute:
         cache_size: int | None = None
         cache_max_size: int | None = None
 
+        health_check_timeout = (
+            self._policy.config.health_check_timeout_seconds
+            if self._policy is not None
+            else None
+        )
+
         if self._initialized and self._embedding_provider is not None:
             try:
                 # Use explicit timeout to prevent health check from hanging
                 embedding_provider_healthy = await asyncio.wait_for(
                     self._embedding_provider.health_check(),
-                    timeout=_HEALTH_CHECK_TIMEOUT_SECONDS,
+                    timeout=health_check_timeout,
                 )
                 embedding_provider_name = self._embedding_provider.provider_name
             except TimeoutError:
                 embedding_provider_healthy = False
                 embedding_provider_error = (
-                    f"Health check timed out after {_HEALTH_CHECK_TIMEOUT_SECONDS}s"
+                    f"Health check timed out after {health_check_timeout}s"
                 )
             except Exception as e:
                 embedding_provider_healthy = False
@@ -676,13 +679,13 @@ class HandlerSemanticCompute:
                 # Use explicit timeout to prevent health check from hanging
                 llm_provider_healthy = await asyncio.wait_for(
                     self._llm_provider.health_check(),
-                    timeout=_HEALTH_CHECK_TIMEOUT_SECONDS,
+                    timeout=health_check_timeout,
                 )
                 llm_provider_name = self._llm_provider.provider_name
             except TimeoutError:
                 llm_provider_healthy = False
                 llm_provider_error = (
-                    f"Health check timed out after {_HEALTH_CHECK_TIMEOUT_SECONDS}s"
+                    f"Health check timed out after {health_check_timeout}s"
                 )
             except Exception as e:
                 llm_provider_healthy = False
