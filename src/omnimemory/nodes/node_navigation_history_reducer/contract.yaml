@@ -94,6 +94,11 @@ descriptor:
   pg_command_timeout_seconds: "${env.NAVIGATION_PG_COMMAND_TIMEOUT_SECONDS:30}"
   qdrant_timeout_seconds: "${env.NAVIGATION_QDRANT_TIMEOUT_SECONDS:30}"
   embedding_http_timeout_seconds: "${env.NAVIGATION_EMBEDDING_HTTP_TIMEOUT_SECONDS:30}"
+  # Command topics the dispatch engine routes to this node's handler. The runtime
+  # resolves them from here (runtime/dispatch_handlers.py); the plugin does not
+  # subscribe to them.
+  dispatch_topics:
+    - "onex.cmd.omnimemory.navigation-history-session.v1"
 
 tags:
   - memory

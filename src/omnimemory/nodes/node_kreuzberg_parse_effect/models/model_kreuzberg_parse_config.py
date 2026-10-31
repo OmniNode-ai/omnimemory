@@ -8,7 +8,16 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from omnimemory.topics import EnumMemoryEventTopic
+from omnimemory.models.config.model_node_event_bus_topics import (
+    ModelNodeEventBusTopics,
+)
+
+
+def _contract_publish_topic(event_name: str) -> str:
+    """Resolve a publish topic from the kreuzberg node contract at construction time."""
+    return ModelNodeEventBusTopics.from_node_contract(
+        "omnimemory.nodes.node_kreuzberg_parse_effect"
+    ).published(event_name)
 
 
 class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
@@ -71,10 +80,10 @@ class ModelKreuzbergParseConfig(  # omnimemory-model-exempt: handler config
         ),
     )
     publish_topic_indexed: str = Field(
-        default=EnumMemoryEventTopic.DOCUMENT_INDEXED,
+        default_factory=lambda: _contract_publish_topic("document-indexed"),
         description="Topic to publish ModelDocumentIndexedKreuzbergEvent messages to",
     )
     publish_topic_parse_failed: str = Field(
-        default=EnumMemoryEventTopic.DOCUMENT_PARSE_FAILED,
+        default_factory=lambda: _contract_publish_topic("document-parse-failed"),
         description="Topic to publish ModelDocumentParseFailedEvent messages to",
     )

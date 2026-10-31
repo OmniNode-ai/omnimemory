@@ -35,6 +35,9 @@ import pytest
 from omnibase_core.container import ModelONEXContainer
 
 from omnimemory.enums import EnumLifecycleState
+from omnimemory.models.config.model_node_event_bus_topics import (
+    ModelNodeEventBusTopics,
+)
 from omnimemory.nodes.node_memory_lifecycle_orchestrator.handlers.handler_memory_expire import (
     HandlerMemoryExpire,
 )
@@ -43,7 +46,6 @@ from omnimemory.runtime.dispatch_handlers import (
     create_dispatch_callback,
     create_memory_dispatch_engine,
 )
-from omnimemory.topics import EnumMemoryEventTopic
 
 if TYPE_CHECKING:
     from asyncpg import Pool
@@ -144,10 +146,13 @@ async def _deliver(
 class TestExpireMemoryOutcomeTopics:
     """The outcome topics are the contract's, not strings invented in a handler."""
 
-    def test_enum_carries_the_contract_topics(self) -> None:
-        assert EnumMemoryEventTopic.MEMORY_EXPIRED.value == MEMORY_EXPIRED_TOPIC
+    def test_contract_declares_the_outcome_topics(self) -> None:
+        lifecycle = ModelNodeEventBusTopics.from_node_contract(
+            "omnimemory.nodes.node_memory_lifecycle_orchestrator"
+        )
+        assert lifecycle.published("memory-expired") == MEMORY_EXPIRED_TOPIC
         assert (
-            EnumMemoryEventTopic.LIFECYCLE_TRANSITION_FAILED.value
+            lifecycle.published("lifecycle-transition-failed")
             == TRANSITION_FAILED_TOPIC
         )
 
