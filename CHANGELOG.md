@@ -1,3 +1,23 @@
+## v0.18.8 (2026-11-01)
+
+### Release
+- Cut omnimemory from dev at 0.18.8 by the scheduled release train.
+- 11 release-relevant commit(s) merged since v0.18.7.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.7
+- feat: resolve graph and intent dispatch topics from node contracts (#698)
+- refactor: resolve runtime timeouts and bounds from node contract descriptors (#697)
+- refactor: resolve model settings via contract.yaml (#696)
+- refactor: clear ValidatorHandlerShape findings in omnimemory (#695)
+- refactor: build handlers at container binding sites (#693)
+- refactor: resolve topics via node contracts and sanitize credentialed strings (#694)
+- refactor: inject resilience timeouts and error backoffs instead of literal defaults (#692)
+- refactor: resolve intent storage breaker settings from contract (#691)
+- refactor: inject lifecycle timeouts from the node contract (#688)
+- feat: move navigation reducer client settings to contract descriptors (#687)
+- fix: the retrieval decay and fusion modules become handler classes with a typed handle (slice 1) (#686)
+
 ## v0.18.7 (2026-10-28)
 
 ### Release
