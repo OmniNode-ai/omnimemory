@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
-"""OMN-20032: pin the receipt-gate reusable that refuses a verifier below the floor."""
+"""OMN-20032: pin the receipt-gate reusable that refuses a verifier below the floor.
+
+OMN-21858: the floor is now an ancestry fact checked by the reusable on the caller's
+``verifier-tag``; the caller passes no ``verifier-version``.
+"""
 
 from __future__ import annotations
 
@@ -21,13 +25,12 @@ CALLER = REPO_ROOT / ".github" / "workflows" / "call-repo-evidence-gate.yml"
 # dev-merge tag embeds its UTC creation time, so a tag at or after this one carries it.
 FLOOR_REUSABLE_TAG = "dev-20261018024445-b6ee996befa1"
 
-# 0.4.303 is the first omnimarket release carrying omnimarket#3511, the refusal of
-# a contract that leaves an acceptance criterion unbound.
-VERIFIER_FLOOR = (0, 4, 303)
-
-
-def _version(text: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in text.split("."))
+# The first omnimarket dev-merge tag whose commit descends from the floor commit
+# e565ba5ba00c (omnimarket#3511, the refusal of a contract that leaves an acceptance
+# criterion unbound). The tag embeds its UTC creation time, so a tag at or after this
+# one carries the floor.
+FLOOR_VERIFIER_TAG = "dev-20261016123308-0a385ce46cdf"
+DEV_MERGE_TAG = r"dev-\d{14}-[0-9a-f]{12}"
 
 
 def _job() -> dict[str, Any]:
@@ -47,17 +50,25 @@ def test_caller_pins_the_reusable_that_carries_the_verifier_floor() -> None:
     )
 
 
-def test_caller_verifier_version_is_at_or_above_the_floor() -> None:
-    assert _version(_job()["with"]["verifier-version"]) >= VERIFIER_FLOOR, (
-        "verifier-version must be at or above the reusable's VERIFIER_FLOOR 0.4.303"
+def test_caller_verifier_tag_is_at_or_above_the_floor() -> None:
+    inputs = _job()["with"]
+    assert "verifier-version" not in inputs
+    assert re.fullmatch(DEV_MERGE_TAG, inputs["verifier-tag"])
+    assert inputs["verifier-tag"] >= FLOOR_VERIFIER_TAG, (
+        "verifier-tag must be an omnimarket dev-merge tag at or after the floor commit"
     )
 
 
 @pytest.mark.parametrize(
-    ("version", "expected"),
-    [("0.4.280", False), ("0.4.302", False), ("0.4.303", True), ("0.4.305", True)],
+    ("tag", "expected"),
+    [
+        ("dev-20261001000000-000000000000", False),
+        ("dev-20261016123307-ffffffffffff", False),
+        (FLOOR_VERIFIER_TAG, True),
+        ("dev-20261101000200-949993edf3b7", True),
+    ],
 )
 def test_floor_comparison_has_a_refusing_and_an_admitting_case(
-    version: str, expected: bool
+    tag: str, expected: bool
 ) -> None:
-    assert (_version(version) >= VERIFIER_FLOOR) is expected
+    assert (tag >= FLOOR_VERIFIER_TAG) is expected
