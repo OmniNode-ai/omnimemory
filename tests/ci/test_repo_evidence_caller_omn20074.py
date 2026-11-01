@@ -23,7 +23,11 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.ci.receipt_gate_pin import RECEIPT_GATE_PIN_TAG, RECEIPT_GATE_REUSABLE
+from tests.ci.receipt_gate_pin import (
+    RECEIPT_GATE_PIN_TAG,
+    RECEIPT_GATE_REUSABLE,
+    VERIFIER_TAG,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -32,11 +36,10 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 CALLER = WORKFLOWS / "call-repo-evidence-gate.yml"
 CONTRACT = REPO_ROOT / "contracts" / "OMN-20074.yaml"
 
-# 0.4.305 is the first omnimarket release carrying omnimarket#3563, the verifier half
-# of the contract-home marker, and it ships the node_dod_verify occ-difference
-# classifier (omnimarket#3277, 0.4.294). The pin is an omnibase_core dev-merge tag held
-# in tests/ci/receipt_gate_pin.py (OMN-20134).
-VERIFIER_FLOOR = (0, 4, 305)
+# The reusable pin and the verifier tag are dev-merge tags held in
+# tests/ci/receipt_gate_pin.py (OMN-20134, OMN-21858). The verifier installs from an
+# omnimarket dev-merge tag, never from a released version (OMN-21676).
+DEV_MERGE_TAG = r"dev-\d{14}-[0-9a-f]{12}"
 
 
 def _load(path: Path) -> dict[Any, Any]:
@@ -84,9 +87,11 @@ def test_caller_pins_the_current_receipt_gate_by_dev_merge_tag() -> None:
     assert uses == f"{RECEIPT_GATE_REUSABLE}@{RECEIPT_GATE_PIN_TAG}"
 
 
-def test_current_receipt_gate_verifier_version_is_at_or_above_the_floor() -> None:
-    version = tuple(int(part) for part in _job()["with"]["verifier-version"].split("."))
-    assert version >= VERIFIER_FLOOR
+def test_current_receipt_gate_verifier_tag_is_a_dev_merge_tag() -> None:
+    inputs = _job()["with"]
+    assert re.fullmatch(DEV_MERGE_TAG, inputs["verifier-tag"])
+    assert inputs["verifier-tag"] == VERIFIER_TAG
+    assert "verifier-version" not in inputs
 
 
 def test_caller_shadow_mode_is_off_and_the_evidence_source_is_the_caller() -> None:
@@ -94,8 +99,8 @@ def test_caller_shadow_mode_is_off_and_the_evidence_source_is_the_caller() -> No
     assert inputs["evidence-source"] == "caller"
     # Quoted strings: the reusable's boolean-like inputs are string inputs.
     assert inputs["shadow"] == "false"
-    version = tuple(int(part) for part in inputs["verifier-version"].split("."))
-    assert version >= VERIFIER_FLOOR
+    assert re.fullmatch(DEV_MERGE_TAG, inputs["verifier-tag"])
+    assert "verifier-version" not in inputs
 
 
 def test_caller_ends_the_occ_comparison() -> None:

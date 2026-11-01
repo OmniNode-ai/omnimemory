@@ -5,8 +5,10 @@
 ``RECEIPT_GATE_PIN_TAG`` is the only test-side copy of the pin. omnimarket's
 node_receipt_gate_pin_advance_compute rewrites it in the same commit as the
 caller's ``uses:`` line, so a pin advance never leaves a test asserting the
-previous pin.
+previous pin. ``VERIFIER_TAG`` is the omnimarket dev-merge tag the caller passes as
+``verifier-tag`` (OMN-21858).
 """
 
 RECEIPT_GATE_REUSABLE = "OmniNode-ai/omnibase_core/.github/workflows/receipt-gate.yml"
-RECEIPT_GATE_PIN_TAG = "dev-20261030152335-66d35d2283c3"
+RECEIPT_GATE_PIN_TAG = "dev-20261101005012-ac2f26e3e5bf"
+VERIFIER_TAG = "dev-20261101000200-949993edf3b7"
