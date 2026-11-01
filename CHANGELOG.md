@@ -1,33 +1,20 @@
 ## v0.18.8 (2026-11-01)
 
-### Release
-- Cut omnimemory from dev at 0.18.8 by the scheduled release train.
-- 11 release-relevant commit(s) merged since v0.18.7.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.7
-- feat: resolve graph and intent dispatch topics from node contracts (#698)
-- refactor: resolve runtime timeouts and bounds from node contract descriptors (#697)
+v0.18.8 (2026-11-01) is a scheduled release train cut from dev, containing 11 release-relevant commits since v0.18.7, and opens only when the declared lab-evidence premise holds for the exact candidate.
+- feat: resolve graph and intent dispatch topics from node contracts (#698); refactor: resolve topics via node contracts and sanitize credentialed strings (#694)
+- refactor: resolve runtime timeouts and bounds from node contract descriptors (#697); refactor: inject lifecycle timeouts from the node contract (#688)
 - refactor: resolve model settings via contract.yaml (#696)
 - refactor: clear ValidatorHandlerShape findings in omnimemory (#695)
 - refactor: build handlers at container binding sites (#693)
-- refactor: resolve topics via node contracts and sanitize credentialed strings (#694)
 - refactor: inject resilience timeouts and error backoffs instead of literal defaults (#692)
 - refactor: resolve intent storage breaker settings from contract (#691)
-- refactor: inject lifecycle timeouts from the node contract (#688)
 - feat: move navigation reducer client settings to contract descriptors (#687)
 - fix: the retrieval decay and fusion modules become handler classes with a typed handle (slice 1) (#686)
 
 ## v0.18.7 (2026-10-28)
 
-### Release
-- Cut omnimemory from dev at 0.18.7 by the scheduled release train.
-- 2 release-relevant commit(s) merged since v0.18.6.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.6
-- build(deps): update fastapi requirement from <0.144.0,>=0.136.3 to >=0.136.3,<0.163.0 (#676)
-- build(deps): update qdrant-client requirement from <1.20.0,>=1.18.0 to >=1.18.0,<1.21.0 (#677)
+v0.18.7 (2026-10-28) is a scheduled release train with the exact-candidate lab-evidence premise, containing 2 release-relevant commits since v0.18.6.
+- Included: update fastapi requirement from <0.144.0,>=0.136.3 to >=0.136.3,<0.163.0 (#676); update qdrant-client requirement from <1.20.0,>=1.18.0 to >=1.18.0,<1.21.0 (#677).
 
 ## v0.18.6 (2026-10-15)
 
@@ -50,15 +37,8 @@ Cut from dev by same scheduled release train; 1 release-relevant commit since v0
 
 ## v0.18.2 (2026-09-18)
 
-### Release
-- Cut omnimemory from dev at 0.18.2 by the scheduled release train.
-- 3 release-relevant commit(s) merged since v0.18.1.
-- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
-
-### Included Since v0.18.1
-- chore(deps, OMN-13902): refresh omninode sibling locks [bot] (#504)
-- docs(OMN-16602): scrub omnimemory docs to zero residual and require kb-doc-gate strict (#473)
-- build(deps-dev): update neo4j requirement from <6.0.0,>=5.0.0 to >=5.0.0,<7.0.0 (#471)
+v0.18.2 (2026-09-18) is a scheduled release train with the exact-candidate lab-evidence premise, containing 3 release-relevant commits since v0.18.1.
+- Included: refresh omninode sibling locks (#504); scrub omnimemory docs to zero residual and require kb-doc-gate strict (#473); update neo4j requirement from <6.0.0,>=5.0.0 to >=5.0.0,<7.0.0 (#471).
 
 ## v0.18.1 (2026-08-31)
 
