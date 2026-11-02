@@ -15,7 +15,6 @@ Test Coverage:
 - validate_naming.py: ONEX naming conventions (ModelXxx, EnumXxx, etc.)
 - validate_enum_casing.py: UPPER_SNAKE_CASE enforcement
 - validate_single_class_per_file.py: Single class per file rule
-- validate_no_backward_compatibility.py: Anti-pattern detection
 """
 
 from __future__ import annotations
@@ -36,9 +35,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "validation"))
 from validate_enum_casing import validate_file as validate_enum_casing
 from validate_http_imports import validate_file as validate_http_imports
 from validate_naming import validate_file as validate_naming
-from validate_no_backward_compatibility import (
-    validate_file as validate_no_backward_compat,
-)
 from validate_pydantic_patterns import validate_file as validate_pydantic_patterns
 from validate_secrets import is_test_file
 from validate_secrets import validate_file as validate_secrets
@@ -1233,230 +1229,6 @@ class ProfileService:
 
 
 # =============================================================================
-# TEST: validate_no_backward_compatibility.py
-# =============================================================================
-
-
-class TestValidateNoBackwardCompatibility:
-    """Tests for validate_no_backward_compatibility.py - anti-pattern detection."""
-
-    def test_detects_backward_compat_comment(self) -> None:
-        """Test detection of '# backward compat' comments."""
-        code = """
-def old_function():
-    # backward compat
-    return new_function()
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Backward compatibility comment" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_detects_backwards_compatibility_comment(self) -> None:
-        """Test detection of '# backwards compatibility' comment variant."""
-        code = """
-# backwards compatibility with old API
-old_name = new_name
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Backward compatibility comment" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_detects_deprecated_decorator(self) -> None:
-        """Test detection of @deprecated decorator."""
-        code = """
-@deprecated
-def old_function():
-    pass
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Deprecated decorator" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_detects_deprecated_comment(self) -> None:
-        """Test detection of '# deprecated' comment."""
-        code = """
-# deprecated
-def old_function():
-    pass
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Deprecated comment" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_detects_legacy_comment(self) -> None:
-        """Test detection of '# legacy' comment.
-
-        Note: The regex uses a negative lookahead (?!\\s*[_a-z]) to avoid
-        matching when followed by underscore or lowercase (e.g., # legacy_helper).
-        Use "# legacy" or "# legacy:" to trigger detection.
-        """
-        code = """
-# legacy
-def old_handler():
-    pass
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Legacy comment" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_detects_alias_assignment(self) -> None:
-        """Test detection of alias assignments."""
-        code = """
-old_function = new_function  # alias
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Alias assignment" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_detects_todo_remove_deprecated(  # TODO_FORMAT_EXEMPT: test fixture
-        self,
-    ) -> None:
-        """Test detection of TODO to remove deprecated code."""
-        code = """
-# TODO: remove deprecated function in next version
-def old_function():
-    pass
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "TODO to remove deprecated" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_clean_file_passes(self) -> None:
-        """Test that clean files pass without violations."""
-        code = '''
-def modern_function():
-    """A modern function with no backward compatibility cruft."""
-    return do_something()
-
-
-class ModernClass:
-    """A clean, modern implementation."""
-
-    def process(self):
-        return self._internal_process()
-'''
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 0
-        finally:
-            cleanup_temp_file(path)
-
-    def test_skip_omnibase_core_import(self) -> None:
-        """Test that imports from omnibase_core are skipped."""
-        code = """
-from omnibase_core import deprecated_module  # This is fine
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 0
-        finally:
-            cleanup_temp_file(path)
-
-    def test_does_not_match_deprecated_in_variable_name(self) -> None:
-        """Test that 'deprecated' in variable names doesn't trigger.
-
-        The pattern uses word boundaries to avoid matching variable names
-        like 'deprecated_feature' or 'is_deprecated'.
-        """
-        code = '''
-def check_deprecated_features():
-    """Check for deprecated features."""
-    deprecated_count = 0
-    return deprecated_count
-'''
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 0
-        finally:
-            cleanup_temp_file(path)
-
-    def test_does_not_match_legacy_in_variable_name(self) -> None:
-        """Test that 'legacy' in variable names doesn't trigger."""
-        code = '''
-def handle_legacy_data():
-    """Handle legacy data format."""
-    legacy_count = process_legacy_records()
-    return legacy_count
-'''
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 0
-        finally:
-            cleanup_temp_file(path)
-
-    def test_case_insensitive_detection(self) -> None:
-        """Test that detection is case insensitive.
-
-        Note: The regex uses negative lookahead to avoid matching when followed
-        by lowercase letters. Using @Deprecated decorator and backwards compat
-        comment tests case insensitivity reliably.
-        """
-        code = """
-@Deprecated
-def old_function():
-    pass
-
-# backwards compatibility
-old_name = new_name
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 2
-        finally:
-            cleanup_temp_file(path)
-
-    def test_one_violation_per_line(self) -> None:
-        """Test that only one violation is reported per line."""
-        # Line that matches multiple patterns
-        code = """
-@deprecated  # legacy backward compat
-def old_function():
-    pass
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            # Even though multiple patterns match, only one violation per line
-            line_2_violations = [v for v in violations if v.line == 2]
-            assert len(line_2_violations) == 1
-        finally:
-            cleanup_temp_file(path)
-
-
-# =============================================================================
 # TEST: validate_http_imports.py
 # =============================================================================
 
@@ -2077,57 +1849,6 @@ class Status2(StrEnum):
             cleanup_temp_file(path)
 
 
-class TestValidateNoBackwardCompatAdditional:
-    """Additional tests for validate_no_backward_compatibility.py edge cases."""
-
-    def test_handles_missing_file(self) -> None:
-        """Test that missing files are handled gracefully."""
-        path = Path("/nonexistent/file.py")
-        violations = validate_no_backward_compat(path)
-        assert violations == []
-
-    def test_delete_deprecated_todo(  # TODO_FORMAT_EXEMPT: test fixture
-        self,
-    ) -> None:
-        """Test detection of TODO: delete deprecated."""
-        code = """
-# TODO: delete deprecated code
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "TODO" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_deprecated_decorator_with_parens(self) -> None:
-        """Test @deprecated() with parentheses."""
-        code = """
-@deprecated("Use new_function instead")
-def old_function():
-    pass
-"""
-        path = write_temp_file(code)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert len(violations) == 1
-            assert "Deprecated decorator" in violations[0].message
-        finally:
-            cleanup_temp_file(path)
-
-    def test_handles_unicode_error(self) -> None:
-        """Test that files with encoding issues are handled gracefully."""
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".py", delete=False) as f:
-            f.write(b"\xff\xfe")  # Invalid UTF-8 bytes
-            path = Path(f.name)
-        try:
-            violations = validate_no_backward_compat(path)
-            assert violations == []
-        finally:
-            path.unlink(missing_ok=True)
-
-
 class TestValidateSingleClassMainAdditional:
     """Additional main() tests for validate_single_class_per_file.py."""
 
@@ -2541,56 +2262,6 @@ class TestValidateSingleClassMain:
         assert "Usage:" in result.stdout
 
 
-class TestValidateNoBackwardCompatMain:
-    """Tests for validate_no_backward_compatibility.py main() function."""
-
-    def test_main_with_invalid_directory(self) -> None:
-        """Test main() with non-existent directory."""
-        import subprocess
-
-        result = subprocess.run(
-            [
-                "python",
-                "scripts/validation/validate_no_backward_compatibility.py",
-                "-d",
-                "/nonexistent",
-            ],
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 1
-        assert (
-            "not found" in result.stdout.lower()
-            or "not a directory" in result.stdout.lower()
-        )
-
-    def test_main_with_clean_directory(self) -> None:
-        """Test main() with a clean temporary directory."""
-        import subprocess
-
-        code = """def modern_function():
-    return 42
-"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_file = Path(tmpdir) / "module.py"
-            test_file.write_text(code)
-            result = subprocess.run(
-                [
-                    "python",
-                    "scripts/validation/validate_no_backward_compatibility.py",
-                    "-d",
-                    tmpdir,
-                ],
-                cwd=PROJECT_ROOT,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            assert result.returncode == 0
-
-
 class TestValidateHttpImportsMain:
     """Tests for validate_http_imports.py main() function."""
 
@@ -2718,14 +2389,12 @@ class ModelUser(BaseModel):
             pydantic_violations = validate_pydantic_patterns(model_file)
             enum_violations = validate_enum_casing(model_file)
             single_class_violations = validate_single_class(model_file)
-            compat_violations = validate_no_backward_compat(model_file)
 
             # One non-enum class + one enum = allowed
             assert len(secret_violations) == 0
             assert len(pydantic_violations) == 0
             assert len(enum_violations) == 0
             assert len(single_class_violations) == 0
-            assert len(compat_violations) == 0
 
     def test_non_compliant_model_caught_by_multiple_validators(self) -> None:
         """Test that non-compliant code is caught by appropriate validators."""
@@ -2748,12 +2417,10 @@ class User(BaseModel):
             secret_violations = validate_secrets(path)
             pydantic_violations = validate_pydantic_patterns(path)
             enum_violations = validate_enum_casing(path)
-            compat_violations = validate_no_backward_compat(path)
 
             # Each type of violation should be caught
             assert len(secret_violations) >= 1  # Hardcoded API key
             assert len(pydantic_violations) >= 1  # Missing model_config
             assert len(enum_violations) >= 1  # Lowercase enum members
-            assert len(compat_violations) >= 1  # Backward compat comment
         finally:
             cleanup_temp_file(path)

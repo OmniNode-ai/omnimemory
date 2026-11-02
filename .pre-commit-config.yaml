@@ -40,7 +40,7 @@
 # validate-pydantic-patterns        | onex-validation          | python scripts/validation/validate_pydantic_patterns.py src/
 # validate-single-class-per-file    | onex-validation          | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
 # validate-enum-casing              | onex-validation          | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
-# validate-no-backward-compatibility| onex-validation          | python scripts/validation/validate_no_backward_compatibility.py -d src/
+# check-no-backward-compat (core)   | onex-validation          | python -m omnibase_core.nodes.node_backward_compat_check_compute.runtime_backward_compat_check --dir src/
 # validate-secrets                  | onex-validation          | python scripts/validation/validate_secrets.py src/
 # onex-validate-naming              | onex-validation          | python scripts/validation/validate_naming.py src/
 # validate-http-imports             | onex-validation          | python scripts/validation/validate_http_imports.py src/
@@ -198,6 +198,8 @@ repos:
       - id: spdx-headers-check
         files: ^(src|tests|scripts|examples)/.*\.py$
         exclude: ^(archived/|archive/)
+      # No backward-compatibility anti-patterns; scans src/ (hook default args)
+      - id: check-no-backward-compat
   # YAML formatting (standard across ecosystem)
   # Configuration in .yamlfmt file (ecosystem-aligned settings)
   - repo: https://github.com/google/yamlfmt
@@ -368,16 +370,6 @@ repos:
         pass_filenames: true
         files: ^src/omnimemory/models/.*\.py$
         exclude: ^(tests/|src/omnimemory/protocols/).*\.py$
-        stages: [pre-commit]
-
-      # ONEX No Backward Compatibility Anti-Pattern Detection
-      - id: validate-no-backward-compatibility
-        name: ONEX Backward Compatibility Anti-Pattern Detection
-        entry: python scripts/validation/validate_no_backward_compatibility.py
-        language: python
-        pass_filenames: true
-        types_or: [python, yaml]
-        files: ^(src/.*\.py|scripts/validation/validate_no_backward_compatibility\.py|\.pre-commit-config\.yaml)$
         stages: [pre-commit]
 
       # ONEX Enum Member Casing Validation

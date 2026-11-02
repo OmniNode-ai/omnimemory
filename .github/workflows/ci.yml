@@ -63,7 +63,7 @@ jobs:
   # onex-validation | validate-pydantic-patterns        | python scripts/validation/validate_pydantic_patterns.py src/
   # onex-validation | validate-single-class-per-file    | python scripts/validation/validate_single_class_per_file.py src/omnimemory/models/
   # onex-validation | validate-enum-casing              | python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
-  # onex-validation | validate-no-backward-compatibility| python scripts/validation/validate_no_backward_compatibility.py -d src/
+  # onex-validation | check-no-backward-compat (core)   | python -m omnibase_core.nodes.node_backward_compat_check_compute.runtime_backward_compat_check --dir src/
   # onex-validation | validate-secrets                  | python scripts/validation/validate_secrets.py src/
   # onex-validation | onex-validate-naming              | python scripts/validation/validate_naming.py src/
   # onex-validation | validate-http-imports             | python scripts/validation/validate_http_imports.py src/
@@ -181,9 +181,10 @@ jobs:
       - name: Validate enum casing
         run: uv run python scripts/validation/validate_enum_casing.py src/omnimemory/enums/
 
-      # SYNC: Pre-commit hook 'validate-no-backward-compatibility' at pre-commit stage
+      # SYNC: omnibase_core hook 'check-no-backward-compat' at pre-commit stage
+      # Same omnibase_core dev-merge tag as the hook in .pre-commit-config.yaml.
       - name: Validate no backward compatibility
-        run: uv run python scripts/validation/validate_no_backward_compatibility.py -d src/
+        run: uv run --isolated --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@dev-20261101233629-173cd14208fe" python -m omnibase_core.nodes.node_backward_compat_check_compute.runtime_backward_compat_check --dir src/
 
       # SYNC: Pre-commit hook 'validate-secrets' at pre-commit stage
       - name: Validate secrets

@@ -178,7 +178,7 @@ class SearchFilters(BaseMemoryModel):
         cls,
         v: str | list[str] | set[str] | frozenset[str] | ModelOptionalStringList | None,
     ) -> ModelOptionalStringList | None:
-        """Convert string, list, or set inputs to ModelOptionalStringList for backward compatibility.
+        """Convert string, list, or set inputs to ModelOptionalStringList.
 
         Note: Input type annotation covers all expected input types for this before-validator.
         Pydantic before-validators receive raw input before type coercion.

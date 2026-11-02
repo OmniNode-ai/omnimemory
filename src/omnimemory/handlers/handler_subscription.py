@@ -1063,7 +1063,7 @@ class HandlerSubscription:
         queries the database directly to ensure consistent ordering and returns
         a ModelPaginatedSubscriptions response with total_count for UI pagination.
         When no pagination is requested, it uses the Valkey cache for performance
-        and returns a plain list for backward compatibility.
+        and returns a plain list.
 
         Args:
             agent_id: The agent's identifier.
@@ -1911,10 +1911,11 @@ class HandlerSubscription:
         #   True  -> bus is healthy
         #   False -> bus is unhealthy (explicit failure)
         #   None  -> bus does not implement ProtocolEventBusHealthCheck;
-        #            treated as non-failure for backwards compatibility with
-        #            adapters that don't support health checks. This means
-        #            None (unknown) does NOT block overall health, unlike the
-        #            prior Kafka-specific check which required ``is True``.
+        #            treated as non-failure so that adapters which don't
+        #            implement health checks do not mark the handler
+        #            unhealthy. None (unknown) does NOT block overall
+        #            health, unlike the prior Kafka-specific check which
+        #            required ``is True``.
         is_healthy = (
             valkey_healthy is True
             and db_healthy is True

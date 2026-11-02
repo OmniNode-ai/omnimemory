@@ -30,7 +30,6 @@ scripts/validation/validate_http_imports.py
 scripts/validation/validate_kafka_imports.py
 scripts/validation/validate_model_locations.py
 scripts/validation/validate_naming.py
-scripts/validation/validate_no_backward_compatibility.py
 scripts/validation/validate_pydantic_patterns.py
 scripts/validation/validate_secrets.py
 scripts/validation/validate_single_class_per_file.py

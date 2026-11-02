@@ -24,14 +24,16 @@ def test_filename_scanners_only_check_supplied_file(tmp_path: Path) -> None:
     clean = tmp_path / "model_clean.py"
     dirty = tmp_path / "model_dirty.py"
     clean.write_text("class ModelClean:\n    pass\n", encoding="utf-8")
-    dirty.write_text("# deprecated\n", encoding="utf-8")
+    dirty.write_text(
+        "class ModelA:\n    pass\n\n\nclass ModelB:\n    pass\n", encoding="utf-8"
+    )
 
     clean_run = subprocess.run(
         [
             "uv",
             "run",
             "python",
-            "scripts/validation/validate_no_backward_compatibility.py",
+            "scripts/validation/validate_single_class_per_file.py",
             str(clean),
         ],
         cwd=REPO_ROOT,
@@ -42,7 +44,7 @@ def test_filename_scanners_only_check_supplied_file(tmp_path: Path) -> None:
             "uv",
             "run",
             "python",
-            "scripts/validation/validate_no_backward_compatibility.py",
+            "scripts/validation/validate_single_class_per_file.py",
             str(dirty),
         ],
         cwd=REPO_ROOT,

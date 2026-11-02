@@ -11,7 +11,7 @@ Enforced by pre-commit hooks (`.pre-commit-config.yaml`) backed by `scripts/vali
 - **Minimize `Any`** — precise types or explicit `object`; gates are `mypy --strict` + pyright at the **pre-push** stage (`pre-commit install --hook-type pre-push`). "Zero `Any` in `src/`" is aspiration, not fact: a handful of adapter/handler files still import `typing.Any` (probe: `grep -rln 'from typing import.*Any' src/`); no ANN401-style ban exists.
 - **`frozen=True, extra="forbid"` on boundary-crossing models** (`validate-pydantic-patterns` hook).
 - **`ModelSemVer` only for version fields** — never `str`, never `ModelSemVer | str`, no `mode="before"` coercion validators, no helper methods hiding the duality. Callers convert with `ModelSemVer.from_str(...)` before passing.
-- **No backwards compatibility, ever** — delete old code; no deprecated functions, no `OldName = NewName` alias shims (`validate-no-backward-compatibility` hook). No legacy omnibase_3 hybrid patterns — migrated code fully conforms to the ONEX 4.0 declarative pattern.
+- **No backwards compatibility, ever** — delete old code; no deprecated functions, no `OldName = NewName` alias shims (omnibase_core `check-no-backward-compat` hook). No legacy omnibase_3 hybrid patterns — migrated code fully conforms to the ONEX 4.0 declarative pattern.
 - **`Field(..., description="...")` on every model field** — no bare declarations.
 - **PEP 604 unions** (`X | Y`) — ruff UP007 is organizationally mandated; never add it to the ignore list (see the NOTE in `[tool.ruff.lint]`).
 - **Async-first** — all I/O is `async`; no blocking calls in async contexts.
