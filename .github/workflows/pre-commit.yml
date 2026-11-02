@@ -35,4 +35,4 @@ jobs:
       # own hook venv, so they run fine in this pre-commit env.
       - uses: pre-commit/action@v3.0.1
         env:
-          SKIP: contract-linter,check-ai-slop,onex-validate-links
+          SKIP: contract-linter,onex-validate-links

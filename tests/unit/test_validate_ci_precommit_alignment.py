@@ -367,7 +367,8 @@ class TestPrecommitHooksCoveredByAlignments:
             "check-toml",
             "debug-statements",
             "onex-validate-clean-root",
-            "no-internal-ips",
+            # OMN-21942: core hook id; CI twin is the onex-validation whole-tree step.
+            "check-private-ip-compute",
             "no-planning-docs",
             "no-env-file",
             "validate-string-versions",

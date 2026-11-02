@@ -132,6 +132,20 @@ repos:
       # suppression comment. CI twin: the Canonical File Shape job in
       # .github/workflows/ci.yml, same omnibase_core commit.
       - id: check-node-home
+  # OMN-21942: validators omnibase_core exports by hook id, consumed in place of
+  # the repository copies of the ai-slop, env-fallback and internal-IP checks.
+  # Same dev-merge tag as the canonical-file-shape block above. CI twins run the
+  # same modules: ai-slop-check job and the onex-validation job in
+  # .github/workflows/ci.yml.
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: dev-20261029151319-6e0a5eee541a
+    hooks:
+      - id: check-ai-slop
+      - id: check-no-env-fallbacks
+        files: ^src/
+        exclude: (^|/)tests?/
+      - id: check-private-ip-compute
+        files: ^(src|tests|docs|\.github)/
   - repo: https://github.com/OmniNode-ai/omnibase_core
     rev: 031148215620031436cba30619bbae67c0bb38ad  # pragma: allowlist secret
     hooks:
@@ -350,16 +364,6 @@ repos:
         exclude: ^(tests/|src/omnimemory/protocols/).*\.py$
         stages: [pre-commit]
 
-      # Silent env-fallback guard (OMN-10735)
-      # Prevents os.getenv/os.environ.get with localhost defaults in src/
-      - id: validate-no-env-fallbacks
-        name: ONEX No Silent Env Fallbacks
-        entry: python scripts/validation/validate_no_env_fallbacks.py
-        language: python
-        pass_filenames: true
-        files: ^(src/.*\.py|scripts/validation/validate_no_env_fallbacks\.py)$
-        stages: [pre-commit]
-
       # ONEX No Backward Compatibility Anti-Pattern Detection
       - id: validate-no-backward-compatibility
         name: ONEX Backward Compatibility Anti-Pattern Detection
@@ -469,20 +473,6 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
-      - id: no-internal-ips
-        name: Block hardcoded internal IPs
-        language: system
-        entry: bash scripts/validation/check_no_internal_ips.sh
-        pass_filenames: true
-        files: ^(src|tests|docs|\.github)/.*\.(py|sh|ya?ml|toml|md)$
-        stages: [pre-commit]
-      - id: check-ai-slop
-        name: Check for AI-slop patterns
-        language: system
-        entry: uv run python scripts/validation/check_ai_slop.py --strict
-        types_or: [python, markdown]
-        pass_filenames: true
         stages: [pre-commit]
 
       # --------------------------------------------------------------------------
