@@ -440,6 +440,7 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", tag = "dev-20261102080237-7e087d566f24" }
 omninode-memory = { workspace = true }
 # OMN-16760: the omnibase-core git-source override (rev dc35561cf, opened under
 # OMN-15639 to carry the canonical consumer-group util ahead of a release) is
