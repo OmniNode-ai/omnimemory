@@ -33,6 +33,8 @@ jobs:
       # NOTE(OMN-13283): io-audit removed from SKIP — the node-purity / transport
       # gates are now omnibase_core remote hooks that self-install core into their
       # own hook venv, so they run fine in this pre-commit env.
+      # OMN-21942: check-ai-slop removed from SKIP for the same reason — it is
+      # now the omnibase_core remote hook, not a local `uv run` script.
       - uses: pre-commit/action@v3.0.1
         env:
-          SKIP: contract-linter,check-ai-slop,onex-validate-links
+          SKIP: contract-linter,onex-validate-links

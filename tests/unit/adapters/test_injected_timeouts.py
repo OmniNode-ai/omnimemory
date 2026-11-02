@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 OmniNode.ai Inc.
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 """Timeouts and backoffs reach resilience code by injection, never by a literal default."""
 

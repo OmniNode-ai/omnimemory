@@ -22,9 +22,7 @@ scripts/graphify_to_memgraph.py
 scripts/graphify_to_qdrant.py
 scripts/validate_ci_precommit_alignment.py
 scripts/validation/__init__.py
-scripts/validation/check_ai_slop.py
 scripts/validation/check_kafka_no_hardcoded_fallback.sh
-scripts/validation/check_no_internal_ips.sh
 scripts/validation/check_precommit_additional_dependencies.sh
 scripts/validation/foundation_validation_common.py
 scripts/validation/validate_enum_casing.py
@@ -33,11 +31,9 @@ scripts/validation/validate_kafka_imports.py
 scripts/validation/validate_model_locations.py
 scripts/validation/validate_naming.py
 scripts/validation/validate_no_backward_compatibility.py
-scripts/validation/validate_no_env_fallbacks.py
 scripts/validation/validate_pydantic_patterns.py
 scripts/validation/validate_secrets.py
 scripts/validation/validate_single_class_per_file.py
-scripts/validation/validate_spdx_headers.py
 src/omnimemory/__init__.py
 src/omnimemory/_compat_imports.py
 src/omnimemory/adapters/__init__.py

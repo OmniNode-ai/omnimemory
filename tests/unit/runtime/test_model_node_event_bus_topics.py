@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 OmniNode.ai Inc.
+# SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 """A node contract's event_bus section is the one place its topics are written."""
 

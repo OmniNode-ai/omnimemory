@@ -29,7 +29,7 @@ pre-commit run --all-files
 
 ## SPDX Headers
 
-MIT SPDX headers required in `src/`, `tests/`, `scripts/`, `examples/` (spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`). Stamp: `onex spdx fix src tests scripts examples` (add `--check` to dry-run). TRAP: the `# spdx-skip: <reason>` bypass is honored by the `onex spdx` CLI only — the local `validate-spdx-headers` pre-commit hook just scans the first 512 bytes for `SPDX-License-Identifier: MIT` and ignores the skip token.
+MIT SPDX headers required in `src/`, `tests/`, `scripts/`, `examples/` (spec: `omnibase_core/docs/conventions/FILE_HEADERS.md`). Stamp: `onex spdx fix src tests scripts examples` (add `--check` to dry-run). Pre-commit runs omnibase_core's `spdx-headers-check` hook, which shares the `onex spdx validate` header logic: it requires the two exact canonical lines (`2025` year) and honours `# spdx-skip: <reason>`.
 
 ## Cross-Repo
 

@@ -61,7 +61,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ("validate-http-imports", "onex-validation", "validate_http_imports.py"),
     ("validate-kafka-imports", "onex-validation", "validate_kafka_imports.py"),
     ("validate-model-locations", "onex-validation", "validate_model_locations.py"),
-    ("validate-no-env-fallbacks", "onex-validation", "validate_no_env_fallbacks.py"),
+    ("check-no-env-fallbacks", "onex-validation", "runtime_no_env_fallbacks_check"),
     # OMN-19666
     (
         "no-git-precommit-additional-dependencies",
@@ -116,7 +116,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ("node-purity", "io-audit", "validator_node_purity"),
     ("contract-linter", "contract-validation", "contract_linter"),
     # AI-slop pattern checker
-    ("check-ai-slop", "ai-slop-check", "check_ai_slop.py"),
+    ("check-ai-slop", "ai-slop-check", "runtime_ai_slop_check"),
 ]
 
 # OMN-20702: register the node-home pair before its activation PR lands. It
