@@ -1,3 +1,14 @@
+## v0.18.9 (2026-11-02)
+
+### Release
+- Cut omnimemory from dev at 0.18.9 by the scheduled release train.
+- 2 release-relevant commit(s) merged since v0.18.8.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.8
+- : consume core check-no-backward-compat and delete the repository copy (#706)
+- : consume core validator hooks and delete the repository copies (#704)
+
 ## v0.18.8 (2026-11-01)
 
 v0.18.8 (2026-11-01) is a scheduled release train cut from dev, containing 11 release-relevant commits since v0.18.7, and opens only when the declared lab-evidence premise holds for the exact candidate.
