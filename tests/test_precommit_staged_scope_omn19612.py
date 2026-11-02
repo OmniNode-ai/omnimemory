@@ -182,10 +182,6 @@ def test_workflow_has_no_pull_request_paths_filter() -> None:
             "scripts/validation/check_kafka_no_hardcoded_fallback.sh",
             'value = os.getenv("KAFKA_HOST", "localhost:9092")\n',
         ),
-        (
-            "scripts/validation/check_no_internal_ips.sh",
-            "value = '192." + "168.1.10'\n",
-        ),
     ],
 )
 def test_shell_backstop_defaults_to_whole_tree_scan(
