@@ -218,7 +218,7 @@ class ModelMetadata(BaseModel):
         self.pairs.append(ModelKeyValuePair(key=key, value=value))
 
     def to_dict(self) -> dict[str, str]:
-        """Convert to dictionary format for backward compatibility."""
+        """Return the key-value pairs as a plain dictionary."""
         return {pair.key: pair.value for pair in self.pairs}
 
     @classmethod
@@ -269,7 +269,7 @@ class ModelStructuredData(BaseModel):
     )
     schema_version: ModelSemVer = Field(
         default_factory=lambda: ModelSemVer(major=1, minor=0, patch=0),
-        description="Semantic schema version for compatibility tracking",
+        description="Semantic schema version of the structured data",
     )
 
     def get_field_value(self, name: str) -> str | None:

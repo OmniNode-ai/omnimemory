@@ -63,3 +63,12 @@ dod_evidence:
         check_value: "uv run pytest tests/unit/test_validate_ci_precommit_alignment.py -q"
         cwd: "${OMNI_HOME}/omnimemory"
     binds_ac: ["AC3"]
+  - id: "dod-omn21942-core-backward-compat-hook"
+    description: "AC1: the pre-commit config consumes the core check-no-backward-compat hook in place
+      of the deleted repository copy."
+    source: "manual"
+    checks:
+      - check_type: "command"
+        check_value: "grep -q 'id: check-no-backward-compat' .pre-commit-config.yaml"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC1"]

@@ -290,8 +290,8 @@ class ModelArchiveRecord(BaseModel):  # omnimemory-model-exempt: archive record 
     file contains one JSONL record (one JSON object per line), compressed
     with gzip.
 
-    The archive_version field enables future schema migrations while
-    maintaining backwards compatibility with existing archives.
+    The archive_version field records the record schema version so that
+    readers can tell which schema an existing archive was written with.
 
     Attributes:
         memory_id: UUID of the archived memory.
