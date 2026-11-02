@@ -52,9 +52,9 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     ),
     ("validate-enum-casing", "onex-validation", "validate_enum_casing.py"),
     (
-        "validate-no-backward-compatibility",
+        "check-no-backward-compat",
         "onex-validation",
-        "validate_no_backward_compatibility.py",
+        "runtime_backward_compat_check",
     ),
     ("validate-secrets", "onex-validation", "validate_secrets.py"),
     ("onex-validate-naming", "onex-validation", "validate_naming.py"),

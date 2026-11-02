@@ -52,7 +52,7 @@ dod_evidence:
     source: "manual"
     checks:
       - check_type: "command"
-        check_value: "test ! -e scripts/validation/check_ai_slop.py"
+        check_value: "test \"$(git ls-files 'scripts/validation/check_ai_*' | wc -l)\" -eq 0"
         cwd: "${OMNI_HOME}/omnimemory"
     binds_ac: ["AC2"]
   - id: "dod-omn21942-alignment-test"
@@ -63,3 +63,20 @@ dod_evidence:
         check_value: "uv run pytest tests/unit/test_validate_ci_precommit_alignment.py -q"
         cwd: "${OMNI_HOME}/omnimemory"
     binds_ac: ["AC3"]
+  - id: "dod-omn21942-core-backward-compat-hook"
+    description: "AC1: the pre-commit config consumes the core check-no-backward-compat hook in place
+      of the local backward-compatibility hook."
+    source: "manual"
+    checks:
+      - check_type: "command"
+        check_value: "grep -q 'id: check-no-backward-compat$' .pre-commit-config.yaml"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC1"]
+  - id: "dod-omn21942-backward-compat-copy-deleted"
+    description: "AC2: the repository copy of the backward-compatibility checker is gone."
+    source: "manual"
+    checks:
+      - check_type: "command"
+        check_value: "test \"$(git ls-files 'scripts/validation/validate_no_*' | wc -l)\" -eq 0"
+        cwd: "${OMNI_HOME}/omnimemory"
+    binds_ac: ["AC2"]
