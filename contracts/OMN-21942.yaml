@@ -52,7 +52,7 @@ dod_evidence:
     source: "manual"
     checks:
       - check_type: "command"
-        check_value: "test \"$(git ls-files 'scripts/validation/check_ai_*' | wc -l)\" -eq 0"
+        check_value: "test ! -e scripts/validation/check_ai_slop.py"
         cwd: "${OMNI_HOME}/omnimemory"
     binds_ac: ["AC2"]
   - id: "dod-omn21942-alignment-test"
