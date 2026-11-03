@@ -118,9 +118,8 @@ def test_ci_job_runs_the_core_check_unconditionally_on_a_hosted_runner() -> None
     steps = job["steps"]
     assert isinstance(steps, list)
     runs = "\n".join(str(step.get("run", "")) for step in steps)
-    assert "omnibase_core.handlers.handler_public_runner_placement_cli" in runs
+    assert "omnibase_core.validation.validator_public_runner_placement" in runs
     assert "POSITIVE CONTROL FAILED" in runs
-    assert "--base-ref" in runs
     assert "--repo omnimemory --visibility public" in runs
 
 

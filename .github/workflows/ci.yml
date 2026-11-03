@@ -904,10 +904,9 @@ jobs:
 
   # OMN-19998: public-repository runner placement (RULING 2026-10-16T07:07:09Z,
   # "Ci runners should be for private repos only"). omnibase_core's check refuses
-  # a job whose runs-on is, or can resolve to, a self-hosted label unless core's
-  # shrink-only baseline (shipped in the package, not editable here) records it,
-  # and refuses a baselined job that is new or newly self-hosted against the base.
-  # Same core release as the check-public-runner-placement pre-commit hook.
+  # a job whose runs-on is, or can resolve to, anything but a GitHub-hosted label,
+  # with no baseline.
+  # Same core dev-merge tag as the check-public-runner-placement pre-commit hook.
   # Unconditional: no `if:`, no `needs:`; a CI Summary member below.
   public-runner-placement:
     name: Public Runner Placement (OMN-19998)
@@ -936,30 +935,20 @@ jobs:
             > .github/workflows/zz-canary-planted.yml
           git add .github/workflows/zz-canary-planted.yml
           if uv run --no-project --with "$RUNNER_PLACEMENT_CORE" \
-            python -m omnibase_core.handlers.handler_public_runner_placement_cli --repo omnimemory \
-            .github/workflows/zz-canary-planted.yml; then
+            python -m omnibase_core.validation.validator_public_runner_placement \
+            --repo omnimemory --visibility public .github/workflows/zz-canary-planted.yml; then
             echo "POSITIVE CONTROL FAILED: planted self-hosted job was accepted"
             exit 1
           fi
           echo "positive control: planted self-hosted job refused"
           git rm -q --cached .github/workflows/zz-canary-planted.yml
           rm .github/workflows/zz-canary-planted.yml
-      - name: Refuse new self-hosted jobs in this public repository
-        env:
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          MQ_BASE: ${{ github.event.merge_group.base_sha }}
-          PUSH_BEFORE: ${{ github.event.before }}
+      - name: Refuse self-hosted jobs in this public repository
         run: |
           set -u
-          base="${PR_BASE:-${MQ_BASE:-${PUSH_BEFORE:-}}}"
-          args=(--repo omnimemory --visibility public)
-          if [ -n "$base" ] && git cat-file -e "${base}^{commit}" 2>/dev/null; then
-            args+=(--base-ref "$(git merge-base "$base" HEAD)")
-          else
-            echo "no base revision on this event; checking the tree against the baseline only"
-          fi
           uv run --no-project --with "$RUNNER_PLACEMENT_CORE" \
-            python -m omnibase_core.handlers.handler_public_runner_placement_cli "${args[@]}"
+            python -m omnibase_core.validation.validator_public_runner_placement \
+            --repo omnimemory --visibility public .github/workflows/*.yml
 
   # OMN-22360 (operator ruling 2026-11-03T14:21:07Z): first-party dependency pins
   # follow omnibase_core's declared layer order, form no cycle, stay inside the pin

@@ -288,7 +288,8 @@ repos:
         stages: [pre-commit]
 
   # OMN-19183 plan task A3.x: shrink-only baseline config/hardcoded_model_config_baseline.yaml;
-  # no inline suppression marker; pin must equal core_ref in .github/workflows/hardcoded-model-config.yml.
+  # no inline suppression marker; core_ref in .github/workflows/hardcoded-model-config.yml
+  # is the commit this rev's tag points at (the reusable takes a 40-hex sha, not a tag).
   - repo: https://github.com/OmniNode-ai/omnibase_core
     rev: dev-20261103173624-74e0b0f12767
     hooks:
