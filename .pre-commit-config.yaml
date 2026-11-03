@@ -288,8 +288,10 @@ repos:
         stages: [pre-commit]
 
   # OMN-19183 plan task A3.x: shrink-only baseline config/hardcoded_model_config_baseline.yaml;
-  # no inline suppression marker; core_ref in .github/workflows/hardcoded-model-config.yml
-  # is the commit this rev's tag points at (the reusable takes a 40-hex sha, not a tag).
+  # no inline suppression marker. core_ref in .github/workflows/hardcoded-model-config.yml
+  # stays at f873d2c3: that workflow scans the whole tree (--all), and at this rev's tag
+  # the scan reports 48 findings (families O, B, F, M and E-LAN) that are not burned down
+  # yet, which the shrink-only baseline cannot take. Move it together with the burn-down.
   - repo: https://github.com/OmniNode-ai/omnibase_core
     rev: dev-20261103173624-74e0b0f12767
     hooks:
