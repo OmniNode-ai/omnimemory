@@ -93,7 +93,7 @@ def test_reject_underscore_spelling(mod, tmp_path: Path) -> None:
 def test_reject_branch_override(mod, tmp_path: Path) -> None:
     block = (
         "[tool.uv.sources]\n"
-        'omnibase-compat = { git = "https://github.com/OmniNode-ai/omnibase_compat.git", '
+        'omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", '
         'branch = "dev" }\n'
     )
     path = _write_pyproject(tmp_path, block)
@@ -116,7 +116,7 @@ def test_reject_tag_override(mod, tmp_path: Path) -> None:
 
 
 def test_allow_unlisted_package_git_override(mod, tmp_path: Path) -> None:
-    """Only the three PyPI-released first-party deps are policed."""
+    """Only the two PyPI-released first-party deps are policed."""
     block = (
         "[tool.uv.sources]\n"
         'some-other-dep = { git = "https://github.com/OmniNode-ai/some_other_dep.git", '

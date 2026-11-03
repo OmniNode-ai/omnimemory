@@ -8,7 +8,6 @@ resolution-markers = [
 
 [manifest]
 overrides = [
-    { name = "omnibase-compat", specifier = ">=0.5.0,<0.6.0" },
     { name = "omnibase-core", specifier = ">=0.47.0,<0.48.0" },
     { name = "omnibase-infra", specifier = ">=0.38.4,<0.39.0" },
     { name = "omnibase-spi", specifier = ">=0.23.0,<0.24.0" },
