@@ -55,7 +55,7 @@ _PG_DSN = os.environ.get("OMNIMEMORY_PG_DSN", "")
 _QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 _QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 _EMBEDDING_URL = os.environ.get(
-    "LLM_EMBEDDING_URL", "http://localhost:8100/v1/embeddings"
+    "LLM_EMBEDDING_URL", "http://svc.example.test:8100/v1/embeddings"
 )
 
 pytestmark = [

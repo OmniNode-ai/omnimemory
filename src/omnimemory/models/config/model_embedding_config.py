@@ -17,7 +17,7 @@ Example::
 
     config = ModelEmbeddingHttpClientConfig(
         provider=EnumEmbeddingProviderType.LOCAL,
-        base_url="http://localhost:8100",  # url-authority-ok: doc example for local embedding config model
+        base_url="http://svc.example.test:8100",  # url-authority-ok: doc example for local embedding config model
         model="gte-qwen2",
         embedding_dimension=1024,
     )

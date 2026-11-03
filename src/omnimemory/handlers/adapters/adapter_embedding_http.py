@@ -24,7 +24,7 @@ Example::
     async def example():
         config = ModelEmbeddingHttpClientConfig(
             provider="local",
-            base_url="http://localhost:8100",  # url-authority-ok: doc example for local embedding adapter configuration
+            base_url="http://svc.example.test:8100",  # url-authority-ok: doc example for local embedding adapter configuration
             model="gte-qwen2",
         )
         client = EmbeddingHttpClient(config)

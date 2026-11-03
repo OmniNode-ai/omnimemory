@@ -87,7 +87,7 @@ def _make_event(
 
 def _make_config(text_store_path: str) -> ModelKreuzbergParseConfig:
     return ModelKreuzbergParseConfig(
-        kreuzberg_url="http://localhost:8090",
+        kreuzberg_url="http://svc.example.test:8090",
         text_store_path=text_store_path,
         parser_version="1.0.0",
         max_doc_bytes=50_000_000,

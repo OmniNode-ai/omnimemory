@@ -55,8 +55,8 @@ def local_config() -> ModelEmbeddingHttpClientConfig:
     """Create a local provider configuration."""
     return ModelEmbeddingHttpClientConfig(
         provider=EnumEmbeddingProviderType.LOCAL,
-        base_url="http://localhost:8100",
-        model="gte-qwen2",
+        base_url="http://svc.example.test:8100",
+        model="test-embed-local",
         embedding_dimension=1024,
     )
 
@@ -67,7 +67,7 @@ def openai_config() -> ModelEmbeddingHttpClientConfig:
     return ModelEmbeddingHttpClientConfig(
         provider=EnumEmbeddingProviderType.OPENAI,
         base_url="https://api.openai.com",
-        model="text-embedding-3-small",
+        model="test-embed-remote",
         embedding_dimension=1536,
         auth_header="Bearer test-key",
         rate_limit_rpm=60,
@@ -114,7 +114,7 @@ def mock_openai_result() -> MagicMock:
             "headers": {"content-type": "application/json"},
             "body": {
                 "data": [{"embedding": [0.1] * 1536, "index": 0}],
-                "model": "text-embedding-3-small",
+                "model": "test-embed-remote",
                 "usage": {"prompt_tokens": 5, "total_tokens": 5},
             },
         },
@@ -139,7 +139,7 @@ class TestProtocolConformance:
         from omnimemory.protocols import ProtocolEmbeddingClient
 
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8000",
+            base_url="http://svc.example.test:8000",
         )
 
         with patch(
@@ -182,10 +182,12 @@ class TestModelEmbeddingHttpClientConfig:
     def test_default_values(self) -> None:
         """Test default configuration values."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8000",
+            base_url="http://svc.example.test:8000",
         )
         assert config.provider == EnumEmbeddingProviderType.LOCAL
-        assert config.model == "gte-qwen2"
+        assert (
+            config.model == ModelEmbeddingHttpClientConfig.model_fields["model"].default
+        )
         assert config.timeout_seconds == 30.0
         assert config.embedding_dimension == 1024
         assert config.strict_dimension_validation is False
@@ -196,15 +198,15 @@ class TestModelEmbeddingHttpClientConfig:
     def test_url_normalization(self) -> None:
         """Test URL trailing slash is stripped."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8000/",
+            base_url="http://svc.example.test:8000/",
         )
-        assert config.base_url == "http://localhost:8000"
+        assert config.base_url == "http://svc.example.test:8000"
 
     def test_embed_endpoint_local(
         self, local_config: ModelEmbeddingHttpClientConfig
     ) -> None:
         """Test embed endpoint for local provider."""
-        assert local_config.embed_endpoint == "http://localhost:8100/embed"
+        assert local_config.embed_endpoint == "http://svc.example.test:8100/embed"
 
     def test_embed_endpoint_openai(
         self, openai_config: ModelEmbeddingHttpClientConfig
@@ -215,34 +217,34 @@ class TestModelEmbeddingHttpClientConfig:
     def test_embed_endpoint_path_normalized(self) -> None:
         """Test embed_endpoint_path without leading slash is normalized."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8000",
+            base_url="http://svc.example.test:8000",
             embed_endpoint_path="custom/embed",
         )
         # Validator should prepend /
         assert config.embed_endpoint_path == "/custom/embed"
         # Full endpoint should be correct
-        assert config.embed_endpoint == "http://localhost:8000/custom/embed"
+        assert config.embed_endpoint == "http://svc.example.test:8000/custom/embed"
 
     def test_embed_endpoint_path_just_slash(self) -> None:
         """Test embed_endpoint_path handles just '/' correctly."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8000",
+            base_url="http://svc.example.test:8000",
             embed_endpoint_path="/",
         )
         assert config.embed_endpoint_path == "/"
-        assert config.embed_endpoint == "http://localhost:8000/"
+        assert config.embed_endpoint == "http://svc.example.test:8000/"
 
     def test_validation_timeout_bounds(self) -> None:
         """Test timeout validation bounds."""
         with pytest.raises(ValueError):
             ModelEmbeddingHttpClientConfig(
-                base_url="http://localhost",
+                base_url="http://svc.example.test",
                 timeout_seconds=0,
             )
 
         with pytest.raises(ValueError):
             ModelEmbeddingHttpClientConfig(
-                base_url="http://localhost",
+                base_url="http://svc.example.test",
                 timeout_seconds=500,
             )
 
@@ -250,7 +252,7 @@ class TestModelEmbeddingHttpClientConfig:
         """Test health_check_text validation constraints."""
         # Valid custom text
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost",
+            base_url="http://svc.example.test",
             health_check_text="custom health check phrase",
         )
         assert config.health_check_text == "custom health check phrase"
@@ -258,14 +260,14 @@ class TestModelEmbeddingHttpClientConfig:
         # Empty text should fail (min_length=1)
         with pytest.raises(ValueError):
             ModelEmbeddingHttpClientConfig(
-                base_url="http://localhost",
+                base_url="http://svc.example.test",
                 health_check_text="",
             )
 
         # Text exceeding max_length=100 should fail
         with pytest.raises(ValueError):
             ModelEmbeddingHttpClientConfig(
-                base_url="http://localhost",
+                base_url="http://svc.example.test",
                 health_check_text="x" * 101,
             )
 
@@ -403,7 +405,9 @@ class TestEmbeddingHttpClientEmbedding:
                 # Verify envelope structure
                 call_args = mock_handler.execute.call_args[0][0]
                 assert call_args["operation"] == "http.post"
-                assert call_args["payload"]["url"] == "http://localhost:8100/embed"
+                assert (
+                    call_args["payload"]["url"] == "http://svc.example.test:8100/embed"
+                )
                 assert call_args["payload"]["body"] == {"text": "Hello world"}
 
     @pytest.mark.asyncio
@@ -431,7 +435,7 @@ class TestEmbeddingHttpClientEmbedding:
                     call_args["payload"]["url"]
                     == "https://api.openai.com/v1/embeddings"
                 )
-                assert call_args["payload"]["body"]["model"] == "text-embedding-3-small"
+                assert call_args["payload"]["body"]["model"] == "test-embed-remote"
                 assert (
                     call_args["payload"]["headers"]["Authorization"]
                     == "Bearer test-key"
@@ -580,7 +584,7 @@ class TestEmbeddingHttpClientErrors:
         context = ModelInfraErrorContext(
             transport_type=EnumInfraTransportType.HTTP,
             operation="http.post",
-            target_name="http://localhost:8002/embed",
+            target_name="http://svc.example.test:8002/embed",
             correlation_id=uuid4(),
         )
         mock_handler.execute.side_effect = InfraConnectionError(
@@ -609,7 +613,7 @@ class TestEmbeddingHttpClientErrors:
         context = ModelTimeoutErrorContext(
             transport_type=EnumInfraTransportType.HTTP,
             operation="http.post",
-            target_name="http://localhost:8002/embed",
+            target_name="http://svc.example.test:8002/embed",
             correlation_id=uuid4(),
             timeout_seconds=30.0,
         )
@@ -696,7 +700,7 @@ class TestDimensionValidation:
         """Test dimension mismatch logs warning when strict mode is disabled (default)."""
         # Config expects 1024 dimensions
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             embedding_dimension=1024,
             strict_dimension_validation=False,  # default
         )
@@ -732,7 +736,7 @@ class TestDimensionValidation:
         """Test dimension mismatch raises error when strict mode is enabled."""
         # Config expects 1024 dimensions with strict validation
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             embedding_dimension=1024,
             strict_dimension_validation=True,
         )
@@ -766,7 +770,7 @@ class TestDimensionValidation:
     ) -> None:
         """Test correct dimensions do not raise even in strict mode."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             embedding_dimension=1024,
             strict_dimension_validation=True,
         )
@@ -793,7 +797,7 @@ class TestDimensionValidation:
     def test_strict_dimension_validation_default_is_false(self) -> None:
         """Test strict_dimension_validation defaults to False."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
         )
         assert config.strict_dimension_validation is False
 
@@ -814,7 +818,7 @@ class TestEmbeddingHttpClientRateLimiting:
     ) -> None:
         """Test rate limiter is created from config."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost",
+            base_url="http://svc.example.test",
             rate_limit_rpm=10,
         )
 
@@ -876,7 +880,7 @@ class TestEmbeddingHttpClientRateLimiting:
             match=r"TPM-only rate limiting is not supported.*rate_limit_rpm must also be > 0",
         ):
             ModelEmbeddingHttpClientConfig(
-                base_url="http://localhost",
+                base_url="http://svc.example.test",
                 rate_limit_rpm=0,  # No RPM limit
                 rate_limit_tpm=100_000,  # Only TPM limit - INVALID
             )
@@ -888,7 +892,7 @@ class TestEmbeddingHttpClientRateLimiting:
     ) -> None:
         """Test rate limiter is NOT created when both RPM and TPM are 0."""
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost",
+            base_url="http://svc.example.test",
             rate_limit_rpm=0,
             rate_limit_tpm=0,
         )
@@ -941,7 +945,7 @@ class TestEmbeddingHttpClientHealthCheck:
         context = ModelInfraErrorContext(
             transport_type=EnumInfraTransportType.HTTP,
             operation="http.post",
-            target_name="http://localhost:8002/embed",
+            target_name="http://svc.example.test:8002/embed",
             correlation_id=uuid4(),
         )
         mock_handler.execute.side_effect = InfraConnectionError(
@@ -969,7 +973,7 @@ class TestEmbeddingHttpClientHealthCheck:
         """
         # Config with rate limiting enabled
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             rate_limit_rpm=60,
         )
 
@@ -1038,7 +1042,7 @@ class TestEmbeddingHttpClientHealthCheck:
         """
         custom_text = "ping test for server health verification"
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             embedding_dimension=1024,
             health_check_text=custom_text,
         )
@@ -1069,7 +1073,7 @@ class TestEmbeddingHttpClientHealthCheck:
         """
         # Config expects 1024 dimensions
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             embedding_dimension=1024,
             strict_dimension_validation=False,
         )
@@ -1110,7 +1114,7 @@ class TestEmbeddingHttpClientHealthCheck:
         """
         # Config expects 1024 dimensions with STRICT validation
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             embedding_dimension=1024,
             strict_dimension_validation=True,  # Strict mode enabled
         )
@@ -1150,7 +1154,7 @@ class TestEmbeddingHttpClientHealthCheck:
         """
         # Config with very restrictive rate limit (1 RPM)
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             rate_limit_rpm=1,  # Only 1 request per minute allowed
         )
 
@@ -1198,7 +1202,7 @@ class TestEmbeddingHttpClientHealthCheck:
         """
         # Config with rate limiting
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
             rate_limit_rpm=10,  # 10 RPM to make counting clear
         )
 
@@ -1251,7 +1255,7 @@ class TestEmbeddingHttpClientHealthCheck:
         custom_cid = uuid4()
 
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
         )
 
         with patch(
@@ -1283,7 +1287,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = mock_handler_result
 
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
         )
 
         with patch(
@@ -1323,7 +1327,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = result
 
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
         )
 
         with patch(
@@ -1358,7 +1362,7 @@ class TestEmbeddingHttpClientHealthCheck:
         mock_handler.execute.return_value = result
 
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
         )
 
         with patch(
@@ -1388,7 +1392,7 @@ class TestEmbeddingHttpClientHealthCheck:
         context = ModelTimeoutErrorContext(
             transport_type=EnumInfraTransportType.HTTP,
             operation="http.post",
-            target_name="http://localhost:8002/embed",
+            target_name="http://svc.example.test:8002/embed",
             correlation_id=uuid4(),
             timeout_seconds=30.0,
         )
@@ -1397,7 +1401,7 @@ class TestEmbeddingHttpClientHealthCheck:
         )
 
         config = ModelEmbeddingHttpClientConfig(
-            base_url="http://localhost:8002",
+            base_url="http://svc.example.test:8002",
         )
 
         with patch(

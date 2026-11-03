@@ -122,7 +122,7 @@ handler_config:
 # === CONFIGURATION FIELDS (ModelKreuzbergParseConfig) ===
 config_fields:
   KREUZBERG_URL:
-    default: "http://localhost:8090"
+    default: "http://svc.example.test:8090"
     description: "Base URL of the kreuzberg Docker service"
   KREUZBERG_TEXT_STORE_PATH:
     required: true

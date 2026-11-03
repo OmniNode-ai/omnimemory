@@ -84,9 +84,9 @@ def test_qdrant_config_port_bounds() -> None:
     """ModelHandlerQdrantConfig rejects out-of-range ports."""
     with pytest.raises(ValidationError):
         ModelHandlerQdrantConfig(
-            embedding_server_url="http://localhost:8100", qdrant_port=0
+            embedding_server_url="http://svc.example.test:8100", qdrant_port=0
         )
     with pytest.raises(ValidationError):
         ModelHandlerQdrantConfig(
-            embedding_server_url="http://localhost:8100", qdrant_port=65536
+            embedding_server_url="http://svc.example.test:8100", qdrant_port=65536
         )

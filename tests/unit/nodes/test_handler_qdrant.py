@@ -38,7 +38,7 @@ def _make_config(max_chunk_chars: int = 2000) -> ModelHandlerQdrantConfig:
         qdrant_port=6333,
         collection_name="test_collection",
         vector_size=4,
-        embedding_server_url="http://localhost:8100",
+        embedding_server_url="http://svc.example.test:8100",
         max_chunk_chars=max_chunk_chars,
     )
 
