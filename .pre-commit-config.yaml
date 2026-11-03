@@ -192,6 +192,10 @@ repos:
       # Hardcoded internal IP guard (RFC1918 literals)
       - id: check-private-ip-compute
         files: ^(src|tests|docs|\.github)/.*\.(py|sh|ya?ml|toml|md)$
+      # OMN-22358: producer/consumer topic-normalization symmetry. The local entry
+      # named a module that never existed and ran manual-stage and skipped, so it
+      # never ran; core's own hook id runs at pre-commit and in pre-commit.ci.
+      - id: normalization-symmetry
       - id: check-ai-slop
         args: [--strict]
       # SPDX header enforcement (ONEX canonical)
@@ -553,13 +557,6 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-      - id: normalization-symmetry
-        name: normalization-symmetry
-        entry: uv run python -m omnibase_core.validators.normalization-symmetry
-        language: system
-        pass_filenames: false
-        stages: [manual]
-
   # Skip-token rejection gate (OMN-10414 / OMN-13296)
   # Blocks [skip-*] bypass tokens in staged markdown/yaml/txt files.
   # There is no escape hatch (OMN-20074): a skip token is rejected whatever comment accompanies it.
@@ -738,4 +735,3 @@ ci:
   autofix_prs: true
   autoupdate_schedule: weekly
   submodules: false
-  skip: [normalization-symmetry]
