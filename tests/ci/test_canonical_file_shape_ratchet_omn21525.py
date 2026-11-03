@@ -20,6 +20,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.ci.core_requirement import runnable_core_requirement
+
 pytestmark = pytest.mark.unit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,7 +40,7 @@ def _ci_core_pin() -> str:
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     pin = workflow["jobs"]["canonical-file-shape"]["env"]["CANONICAL_FILE_SHAPE_CORE"]
     assert isinstance(pin, str)
-    return pin
+    return runnable_core_requirement(pin)
 
 
 def _git(repo: Path, *args: str) -> str:

@@ -629,7 +629,7 @@ required_validators:
       tolerates a legitimate duplicate id disambiguated by a configured second
       field (e.g. routing_tiers.yaml's use_for) rather than banning duplicates
       outright. Consumption in omnimarket (routing_tiers.yaml) and
-      onex_change_control (prod_promotion_grants.yaml) is tracked as fast-follow
+      the change-control repository (prod_promotion_grants.yaml) is tracked as fast-follow
       — landed here first in omnibase_core, the only repo currently wired.
     central_source: "omnibase_core.validation.validator_duplicate_config_ids"
     pre_commit: required

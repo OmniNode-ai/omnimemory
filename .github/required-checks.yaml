@@ -14,7 +14,7 @@
 #
 # Applied via: gh api repos/OmniNode-ai/omnimemory/branches/main/protection -X PUT
 # Mode: strict (branch must be up-to-date before merging)
-# Manifest entries (including CI Summary members): 15
+# Manifest entries (including CI Summary members): 17
 
 required_checks:
   - name: "pr-title / check-title"
@@ -132,6 +132,28 @@ required_checks:
       pre-commit hook pins. Unconditional (no needs, no if); gates merges
       through the required CI Summary context, which needs: this job and
       accepts only a success result.
+
+  - name: "dependency-pins"
+    workflow: ci.yml
+    job_id: dependency-pins
+    conditional: false
+    rationale: >-
+      OMN-22360. Operator ruling 2026-11-03T14:21:07Z: first-party dependency pins
+      follow omnibase_core's declared layer order, form no cycle and stay inside the
+      pin policy; every core hook rev stays inside its bound. The job calls
+      omnibase_core's reusable workflow at the same dev-merge tag as the core hooks;
+      gates merges through the required CI Summary context, which needs: this job
+      and accepts only a success result.
+
+  - name: "Localhost URL Check (PR diff)"
+    workflow: ci.yml
+    job_id: localhost-url-check
+    conditional: false
+    rationale: >-
+      OMN-22360. omnibase_core's check-localhost-url-compute on the files a change
+      touches, the CI twin of the pre-commit hook the validator-requirements spec
+      requires. Gates merges through the required CI Summary context, which needs:
+      this job and accepts only a success result.
 
   # -- Phase 2: Full Test Suite ------------------------------------------------
 

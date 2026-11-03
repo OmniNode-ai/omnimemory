@@ -101,7 +101,14 @@ repos:
   - repo: https://github.com/OmniNode-ai/omnibase_core
     rev: dev-20261103173624-74e0b0f12767
     hooks:
+      # OMN-22360: the hook at this tag runs `uv run python -m ...` in the project
+      # environment, and no published omnibase-core release carries the
+      # validator_stub_implementations module it names (the lock holds the newest
+      # release, 0.47.62). The same module runs here from the core dev-merge tag, the
+      # way the CI jobs run the other core checks; move this tag with the rev above.
       - id: check-stub-implementations
+        entry: env -u PYTHONPATH uv run --isolated --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@dev-20261103173624-74e0b0f12767"
+          python -m omnibase_core.nodes.node_validation_report_write_effect.runtime_validator_run omnibase_core.validation.validator_stub_implementations:ValidatorStubImplementations
 
   # OMN-14350: non-canonical lifecycle-class ratchet (fan-out from the omnibase_core
   # canary #1430). Consumes the canonical omnibase_core remote hook and ratchets this

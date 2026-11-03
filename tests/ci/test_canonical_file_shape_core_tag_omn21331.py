@@ -14,7 +14,10 @@ pytestmark = pytest.mark.unit
 
 ROOT = Path(__file__).resolve().parents[2]
 CI = ROOT / ".github/workflows/ci.yml"
-CORE_GIT = "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@"
+CORE_GIT = (
+    "omnibase-core @ git+${{ github.server_url }}/"
+    "${{ github.repository_owner }}/omnibase_core@"
+)
 DEV_MERGE_TAG = re.compile(r"dev-\d{14}-[0-9a-f]{12}")
 
 

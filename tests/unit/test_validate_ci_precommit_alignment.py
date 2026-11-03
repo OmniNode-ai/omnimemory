@@ -415,6 +415,12 @@ class TestPrecommitHooksCoveredByAlignments:
             # test_deployment_config_context_omn20940.py); not a ci.yml job so
             # not in EXPECTED_ALIGNMENTS.
             "deployment-config",
+            # OMN-22360: CI counterpart is the localhost-url-check job in ci.yml
+            # (changed files, a CI Summary member, listed in
+            # .github/required-checks.yaml). Not in EXPECTED_ALIGNMENTS because
+            # scripts/validate_ci_precommit_alignment.py is a baselined file that
+            # may only shrink (canonical-file-shape ratchet).
+            "check-localhost-url-compute",
         }
     )
 
