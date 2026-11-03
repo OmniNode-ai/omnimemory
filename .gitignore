@@ -237,6 +237,10 @@ docs_private/
 
 # Optimization cache files
 .onex_cache/
+
+# OMN-22360: validation verdict reports the omnibase_core hooks write at run time
+# (machine state, never committed).
+.onex_state/
 docs_archived/
 
 # Codanna index files (keep configuration, ignore generated index data)
