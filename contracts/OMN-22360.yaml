@@ -1,0 +1,39 @@
+---
+schema_version: 1.0.0
+ticket_id: OMN-22360
+title: 'omnimemory: first-party dependency pins follow the core dependency-pin policy'
+summary: >-
+  The omnimarket override-dependency and its v0.4.0 git source are removed. omnimarket is above omnimemory
+  in the declared layer order, omnimemory never imports it, and omnimarket depends on omninode-memory,
+  so the declaration was an upward edge and a cycle.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: req-omn22360-omnimemory-pins
+    statement: omnimemory declares no first-party pin the core dependency-pin validator (OMN-22360) refuses.
+    acceptance:
+      - id: AC8
+        statement: "AC8: every violation the validator reports on the registry repositories at origin
+          of 2026-11-03 is fixed by a pull request named in a comment here, and none is recorded in a
+          baseline or allowlist"
+evidence_requirements:
+  - kind: tests
+    description: The manifest declares omnimarket in no dependency table and no uv source, and the lock
+      resolves without the override.
+    command: uv run --frozen pytest tests/ci/test_no_upward_omnimarket_pin_omn22360.py -q --no-cov
+emergency_bypass:
+  enabled: false
+  justification: ''
+  follow_up_ticket_id: ''
+dod_evidence:
+  - id: dod-omn22360-omnimemory-lock
+    description: The manifest declares omnimarket in no dependency table and no uv source, and the lock
+      resolves without the override.
+    source: manual
+    binds_ac:
+      - AC8
+    checks:
+      - check_type: test_passes
+        check_value: uv run --frozen pytest tests/ci/test_no_upward_omnimarket_pin_omn22360.py -q --no-cov
+        cwd: ${OMNI_HOME}/omnimemory
