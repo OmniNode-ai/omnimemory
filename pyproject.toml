@@ -436,7 +436,10 @@ override-dependencies = [
     # The override was also redundant: [tool.uv.sources] below already routes any
     # transitive dependency on omninode-memory to the workspace copy, which is
     # what the OMN-13837 omnimarket-chain note actually needed.
-    "omnimarket>=0.4.0,<0.5.0",
+    # OMN-22360: the omnimarket override and its v0.4.0 git source are removed.
+    # omnimarket sits above omnimemory in the declared layer order and omnimemory
+    # never imports it, so declaring it was an upward edge and a cycle with
+    # omnimarket's own dependency on omninode-memory.
 ]
 
 [tool.uv.sources]
@@ -454,4 +457,3 @@ omninode-memory = { workspace = true }
 # published on PyPI carrying the spi-0.23 pins (OMN-15604 cascade-leg
 # recovery), so the immutable-rev override is no longer needed; resolves from
 # PyPI via the >=0.38.4,<0.39.0 constraint above.
-omnimarket = { git = "https://github.com/OmniNode-ai/omnimarket.git", tag = "v0.4.0" }
