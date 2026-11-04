@@ -35,6 +35,17 @@ requirements:
           or when a dev tag for that sha already exists, pushes nothing in a dry run, and refuses a value
           that is not a full sha -- falsifier: uv run pytest tests/ci/test_dev_merge_tag_workflow_omn19998.py
           -q -n 0 fails at the merge base, where the workflow does not exist"
+  - id: "req-omn19998-changelog-secret-line-stable"
+    statement: "A release that prepends a CHANGELOG.md section does not make the detect-secrets hook rewrite
+      .secrets.baseline: the one CHANGELOG.md finding, a documentation placeholder URL, is allowlisted
+      on its own line and the baseline holds no CHANGELOG.md entry."
+    acceptance:
+      - id: "AC3"
+        statement: "AC3: .secrets.baseline holds no CHANGELOG.md entry and every placeholder credential
+          URL line in CHANGELOG.md carries the allowlist pragma, with a positive control that the line
+          exists -- falsifier: uv run pytest tests/ci/test_secrets_baseline_changelog_stable_omn19998.py
+          -q -n 0 fails at the merge base, where the baseline keys the finding to line 365 and omnimemory#719
+          failed ONEX Validation when a release moved it to line 377"
 evidence_requirements:
   - kind: "tests"
     description: "The placement tests read every workflow file for the fleet fallback, the ci.yml job,
@@ -60,3 +71,12 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "uv run pytest tests/ci/test_dev_merge_tag_workflow_omn19998.py -q -n 0"
     binds_ac: ["AC2"]
+  - id: "dod-omn19998-changelog-secret-line-stable"
+    description: "The baseline and CHANGELOG tests pass at the head; at the merge base the baseline keys
+      the CHANGELOG finding to a line number and the first test fails."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_secrets_baseline_changelog_stable_omn19998.py -q -n
+          0"
+    binds_ac: ["AC3"]

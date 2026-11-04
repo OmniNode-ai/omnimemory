@@ -326,18 +326,19 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: dev-20261103173624-74e0b0f12767
+    hooks:
+      # OMN-13873, OMN-22011: first-party packages resolve from the registry, a
+      # workspace or the dev-merge tag of their own repository, and from nothing
+      # else. The rule rows live in core (dep_provenance.validation.yaml); this
+      # repository no longer carries its own copy of the gate (OMN-17427).
+      - id: check-dep-provenance
+
   # Local hooks for cleanup, migration freeze, and ONEX validation
   # These use language: python or language: system with no Poetry dependency
   - repo: local
     hooks:
-      - id: check-dep-provenance
-        name: Forbid first-party git-source overrides (OMN-13873)
-        entry: uv run --frozen python scripts/check_dep_provenance.py
-        language: system
-        files: ^pyproject\.toml$
-        pass_filenames: false
-        stages: [pre-commit]
-
       # --------------------------------------------------------------------------
       # Migration Freeze Check - Block new migrations during DB-per-repo refactor
       # Validates: No new .sql files added to deployment/database/migrations/
