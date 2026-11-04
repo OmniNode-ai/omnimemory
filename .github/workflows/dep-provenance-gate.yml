@@ -78,4 +78,4 @@ jobs:
           fi
 
           echo "pyproject.toml modified in this PR — verifying dependency provenance."
-          env -u PYTHONPATH uv run --isolated --no-project --with "omnibase-core @ git+https://github.com/OmniNode-ai/omnibase_core@dev-20261103173624-74e0b0f12767" python -m omnibase_core.nodes.node_validation_report_write_effect.runtime_validator_run omnibase_core.validation.validator_dep_provenance:ValidatorDepProvenance pyproject.toml
+          uvx --from pre-commit pre-commit run check-dep-provenance --files pyproject.toml

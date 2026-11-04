@@ -12,7 +12,7 @@ the canonical-file-shape ratchet, so the allowance omniclaude and omnibase_infra
 carry could not be ported into it. Core's ``check-dep-provenance`` hook (OMN-22011)
 admits the registry, a workspace and the sibling's own dev merge tag, and refuses a
 revision, a branch, a release tag, a path and a foreign repository. This repository
-consumes it, at one core revision in the hook and in the workflow.
+consumes it through the pre-commit config, so the core revision has one home.
 """
 
 from __future__ import annotations
@@ -67,8 +67,7 @@ def test_the_hook_comes_from_a_core_dev_merge_tag() -> None:
     assert _REV_RE.fullmatch(_core_hook_rev())
 
 
-def test_the_workflow_runs_core_validator_at_the_hook_revision() -> None:
+def test_the_workflow_runs_the_same_hook_from_the_pre_commit_config() -> None:
     text = (_ROOT / ".github" / "workflows" / "dep-provenance-gate.yml").read_text()
     assert "scripts/check_dep_provenance.py" not in text
-    assert "validator_dep_provenance:ValidatorDepProvenance" in text
-    assert f"omnibase_core@{_core_hook_rev()}" in text
+    assert "pre-commit run check-dep-provenance" in text
