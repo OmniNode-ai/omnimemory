@@ -289,9 +289,9 @@ repos:
 
   # OMN-19183 plan task A3.x: shrink-only baseline config/hardcoded_model_config_baseline.yaml;
   # no inline suppression marker. core_ref in .github/workflows/hardcoded-model-config.yml
-  # stays at f873d2c3: that workflow scans the whole tree (--all), and at this rev's tag
-  # the scan reports 48 findings (families O, B, F, M and E-LAN) that are not burned down
-  # yet, which the shrink-only baseline cannot take. Move it together with the burn-down.
+  # is the commit of this rev's tag (74e0b0f1), so the pre-commit hook and the CI workflow
+  # scan the whole tree with the same core; the findings at this tag are burned down at
+  # their source, not added to the baseline.
   - repo: https://github.com/OmniNode-ai/omnibase_core
     rev: dev-20261103173624-74e0b0f12767
     hooks:
@@ -565,7 +565,8 @@ repos:
       - id: onex-validate-runtime-profiles
         name: Validate runtime_profiles on node contracts (OMN-12957)
         language: system
-        entry: uv run python scripts/ci/run_runtime_profiles_validator.py
+        entry: uv run python scripts/ci/run_runtime_profiles_validator.py validation/runtime_profiles_allowlist.yaml
+          src
         files: ^src/omnimemory/nodes/node_.*/contract\.yaml$
         pass_filenames: false
         stages: [pre-commit]

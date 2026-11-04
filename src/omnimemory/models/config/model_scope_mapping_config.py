@@ -188,23 +188,31 @@ _DEFAULT_PRIORITY_HINTS: Mapping[EnumDetectedDocType, int] = types.MappingProxyT
 #
 # Paths resolve relative to the OMNI_HOME environment variable, which must
 # point to the canonical omni_home checkout (e.g. /Users/you/Code/omni_home).
-# ~/.claude is resolved via Path.home() so it works on any machine.
+# The Claude config directory (~/.claude) is injected by the caller, so the
+# location is configuration, not a derivation from the home directory here.
 # In CI and production, callers MUST supply a ModelScopeMappingConfig
 # built from environment-appropriate paths (e.g., read from config file or
 # env vars). Do NOT call get_default_scope_mapping_config() in any deployed
 # or shared code path.
 
 
-def get_default_scope_mapping_config() -> ModelScopeMappingConfig:
+def get_default_scope_mapping_config(claude_dir: Path) -> ModelScopeMappingConfig:
     """Return a local-dev convenience scope mapping config.
 
     All paths are resolved at call time from the ``OMNI_HOME`` environment
-    variable (the canonical omni_home checkout root) and ``Path.home()``
-    (for ``~/.claude``). Raises ``KeyError`` if ``OMNI_HOME`` is not set.
+    variable (the canonical omni_home checkout root) and the injected
+    ``claude_dir`` (the caller's Claude config directory, normally the
+    ``.claude`` directory under the home directory). Raises ``KeyError`` if
+    ``OMNI_HOME`` is not set.
 
     This function is intentionally lazy: the config is only constructed when
     explicitly called, so importing this module in CI or production code does
     not silently embed wrong paths via a module-level side effect.
+
+    Args:
+        claude_dir: The Claude config directory; its path prefix maps to the
+            global-standards scope and its ``CLAUDE.md`` carries the top
+            priority hint.
 
     Returns:
         A ``ModelScopeMappingConfig`` covering the local developer's
@@ -217,7 +225,6 @@ def get_default_scope_mapping_config() -> ModelScopeMappingConfig:
         (e.g., environment variables or a config file).
     """
     omni_home = Path(os.environ["OMNI_HOME"])
-    claude_dir = Path.home() / ".claude"
 
     return ModelScopeMappingConfig(
         path_mappings=(

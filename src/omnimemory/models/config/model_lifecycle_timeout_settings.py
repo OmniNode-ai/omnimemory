@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelLifecycleTimeoutSettings(BaseModel):
-    """The database, circuit-breaker and projection-reader timeouts of the lifecycle handlers.
+    """The database, circuit-breaker and projection-reader timeouts, and the database retry limit, of the lifecycle handlers.
 
     Every field is required and has no default: the values are the node contract's
     ``descriptor`` entries (``${env.VAR:default}`` overlay values), resolved by the
@@ -36,6 +36,11 @@ class ModelLifecycleTimeoutSettings(BaseModel):
         gt=0,
         description="Timeout of one tick projection-reader call, in seconds",
     )
+    db_max_retries: int = Field(
+        ...,
+        ge=1,
+        description="Maximum attempts of one archive or expire database operation under contention",
+    )
     tick_circuit_breaker_recovery_seconds: float = Field(
         ...,
         gt=0,
@@ -49,7 +54,7 @@ class ModelLifecycleTimeoutSettings(BaseModel):
         The handlers call this when no settings are injected. Each descriptor entry
         is a ``${env.VAR:default}`` overlay value expanded by
         ``expand_contract_env_refs``, the sanctioned env-reading boundary; a missing
-        entry or a value that is not a positive number raises ``ValidationError``.
+        entry or a value that is not a positive number (a whole number for the retry limit) raises ``ValidationError``.
         """
         package = "omnimemory.nodes.node_memory_lifecycle_orchestrator"
         contract = yaml.safe_load(

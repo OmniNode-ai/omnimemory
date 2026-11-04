@@ -414,6 +414,11 @@ markers = [
     "embedding: marks tests as requiring an embedding server (LLM_EMBEDDING_URL)",
 ]
 
+[tool.omnimemory.ci]
+# CI wall-clock budgets the workflows read from here instead of writing them inline.
+uv_http_timeout_seconds = 600
+pin_resolve_timeout_seconds = 900
+
 [tool.uv]
 # Override transitive pins so our direct pins win.
 override-dependencies = [

@@ -90,12 +90,16 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
+      - name: Read the uv network budget
+        if: steps.resolve-branch.outputs.skip_validation != 'true'
+        # The budget is declared in pyproject.toml [tool.omnimemory.ci].
+        run: echo "UV_HTTP_TIMEOUT=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["tool"]["omnimemory"]["ci"]["uv_http_timeout_seconds"])')" >> "$GITHUB_ENV"
+
       - name: Run contract validation
         id: validate-contract
         if: steps.resolve-branch.outputs.skip_validation != 'true'
         env:
           BRANCH: ${{ steps.resolve-branch.outputs.resolved_branch }}
-          UV_HTTP_TIMEOUT: "600"
         run: |
           set -euo pipefail
 

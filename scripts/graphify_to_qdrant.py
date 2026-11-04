@@ -139,7 +139,7 @@ def embed_batch(
             resp = httpx.post(
                 f"{embedding_url}/v1/embeddings",
                 json=payload,
-                timeout=EMBED_BACKOFF_SECONDS[-1] * 15.0,
+                timeout=float(os.environ.get("GRAPHIFY_EMBED_TIMEOUT_SECONDS", "60")),
             )
             resp.raise_for_status()
             data = resp.json()

@@ -58,9 +58,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Contract SLA: max response time in milliseconds
-_CONTRACT_MAX_RESPONSE_TIME_MS = 100.0
-
 __all__ = ["HandlerIntentQuery", "ModelIntentQueryHealth", "ModelIntentQueryMetadata"]
 
 
@@ -254,6 +251,9 @@ class HandlerIntentQuery:
         """
         self._container = container
         self._config: ModelHandlerIntentQueryConfig | None = None
+        self._max_response_time_ms: float = (
+            ModelHandlerIntentQueryConfig().max_response_time_ms
+        )
         self._adapter: AdapterIntentGraph | None = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
@@ -312,6 +312,7 @@ class HandlerIntentQuery:
 
             # Set handler config
             self._config = config or ModelHandlerIntentQueryConfig()
+            self._max_response_time_ms = self._config.max_response_time_ms
 
             # Create and initialize adapter (handler owns lifecycle)
             effective_adapter_config = adapter_config or ModelAdapterIntentGraphConfig(
@@ -494,12 +495,12 @@ class HandlerIntentQuery:
 
         execution_time_ms = (time.monotonic() - start) * 1000
 
-        if execution_time_ms > _CONTRACT_MAX_RESPONSE_TIME_MS:
+        if execution_time_ms > self._max_response_time_ms:
             logger.warning(
                 "Query %s exceeded SLA: %.2fms (max: %.2fms)",
                 request.query_type,
                 execution_time_ms,
-                _CONTRACT_MAX_RESPONSE_TIME_MS,
+                self._max_response_time_ms,
             )
 
         if result.status == "error":
@@ -552,12 +553,12 @@ class HandlerIntentQuery:
 
         execution_time_ms = (time.monotonic() - start) * 1000
 
-        if execution_time_ms > _CONTRACT_MAX_RESPONSE_TIME_MS:
+        if execution_time_ms > self._max_response_time_ms:
             logger.warning(
                 "Query %s exceeded SLA: %.2fms (max: %.2fms)",
                 request.query_type,
                 execution_time_ms,
-                _CONTRACT_MAX_RESPONSE_TIME_MS,
+                self._max_response_time_ms,
             )
 
         if not result.success:
@@ -634,12 +635,12 @@ class HandlerIntentQuery:
 
         execution_time_ms = (time.monotonic() - start) * 1000
 
-        if execution_time_ms > _CONTRACT_MAX_RESPONSE_TIME_MS:
+        if execution_time_ms > self._max_response_time_ms:
             logger.warning(
                 "Query %s exceeded SLA: %.2fms (max: %.2fms)",
                 request.query_type,
                 execution_time_ms,
-                _CONTRACT_MAX_RESPONSE_TIME_MS,
+                self._max_response_time_ms,
             )
 
         if result.status == "error":

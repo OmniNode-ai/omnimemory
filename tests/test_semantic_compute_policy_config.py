@@ -177,16 +177,16 @@ class TestLlmModelValidation:
     def test_default_llm_in_allowed_list(self) -> None:
         """Test that default LLM in allowed list is accepted."""
         config = ModelSemanticComputePolicyConfig(
-            allowed_llm_models=["gpt-4", "claude-3", "llama-3"],
-            default_llm_model="claude-3",
+            allowed_llm_models=["fixture-chat-a", "fixture-chat-b", "fixture-chat-c"],
+            default_llm_model="fixture-chat-b",
         )
-        assert config.default_llm_model == "claude-3"
+        assert config.default_llm_model == "fixture-chat-b"
 
     def test_default_llm_not_in_allowed_list_rejected(self) -> None:
         """Test that default LLM not in allowed list is rejected."""
         with pytest.raises(ValidationError) as exc_info:
             ModelSemanticComputePolicyConfig(
-                allowed_llm_models=["gpt-4", "claude-3"],
+                allowed_llm_models=["fixture-chat-a", "fixture-chat-b"],
                 default_llm_model="gemini-pro",
             )
         error_str = str(exc_info.value)

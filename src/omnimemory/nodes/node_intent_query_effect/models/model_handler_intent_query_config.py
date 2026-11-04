@@ -50,6 +50,8 @@ class ModelHandlerIntentQueryConfig(BaseModel):
             when not explicitly specified.
         default_min_confidence: Default minimum confidence threshold for
             filtering results.
+        max_response_time_ms: Response-time SLA in milliseconds (the node
+            contract's performance.max_response_time_ms).
     """
 
     model_config = ConfigDict(
@@ -80,4 +82,12 @@ class ModelHandlerIntentQueryConfig(BaseModel):
         ge=0.0,
         le=1.0,
         description="Default minimum confidence threshold for filtering",
+    )
+    max_response_time_ms: float = Field(
+        default=100.0,
+        gt=0.0,
+        description=(
+            "Response-time SLA in milliseconds; a query slower than this logs a "
+            "warning. Equals the node contract's performance.max_response_time_ms"
+        ),
     )

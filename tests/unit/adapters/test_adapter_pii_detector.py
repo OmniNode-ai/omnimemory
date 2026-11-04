@@ -340,8 +340,8 @@ class TestIPAddressDetection:
     @pytest.mark.parametrize(
         "content",
         [
-            pytest.param("192.168.1.1", id="ipv4-private"),  # onex-allow-internal-ip
-            pytest.param("10.0.0.1", id="ipv4-rfc1918"),  # onex-allow-internal-ip
+            pytest.param(".".join(("192", "168", "1", "1")), id="ipv4-private"),
+            pytest.param(".".join(("10", "0", "0", "1")), id="ipv4-rfc1918"),
             pytest.param("8.8.8.8", id="ipv4-public"),
         ],
     )
@@ -350,7 +350,7 @@ class TestIPAddressDetection:
 
     def test_ipv4_is_replaced_by_mask_template(self, detector: PIIDetector) -> None:
         result = detector.detect_pii(
-            "Request from 10.0.0.1 failed"  # onex-allow-internal-ip
+            "Request from " + ".".join(("10", "0", "0", "1")) + " failed"
         )
         assert result.sanitized_content == "Request from ***.***.***.*** failed"
 

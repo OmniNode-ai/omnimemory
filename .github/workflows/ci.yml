@@ -436,7 +436,7 @@ jobs:
         id: select
         run: |
           FEATURE_FLAG="${{ vars.ENABLE_SMART_TESTS == 'true' && 'on' || 'off' }}"
-          SELECTION=$(uv run python scripts/ci/detect_test_paths.py \
+          SELECTION=$(uv run python -m scripts.ci.detect_test_paths \
             --changed-files-from /tmp/changed_files.txt \
             --ref-name "${{ github.ref_name }}" \
             --event-name "${{ github.event_name }}" \

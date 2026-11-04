@@ -166,7 +166,7 @@ handler_routing:
   # Their event_bus topics will be added when handlers are implemented
   default_handler: null
 
-# OMN-21623: the database, circuit-breaker and projection-reader timeouts are overlay
+# OMN-21623: the database, circuit-breaker and projection-reader timeouts and the database retry limit are overlay
 # values, not literals in the handlers. ``${env.VAR:default}`` is expanded by
 # ModelLifecycleTimeoutSettings.from_node_contract and injected into each handler as
 # ModelLifecycleTimeoutSettings; an operator overlay or the per-lane service env
@@ -176,6 +176,7 @@ descriptor:
   db_query_timeout_seconds: "${env.OMNIMEMORY_LIFECYCLE_DB_QUERY_TIMEOUT_SECONDS:30}"
   db_circuit_breaker_recovery_seconds: "${env.OMNIMEMORY_LIFECYCLE_DB_CB_RECOVERY_SECONDS:60}"
   projection_reader_timeout_seconds: "${env.OMNIMEMORY_LIFECYCLE_PROJECTION_READER_TIMEOUT_SECONDS:10}"
+  db_max_retries: "${env.OMNIMEMORY_LIFECYCLE_DB_MAX_RETRIES:3}"
   tick_circuit_breaker_recovery_seconds: "${env.OMNIMEMORY_LIFECYCLE_TICK_CB_RECOVERY_SECONDS:30}"
 
 # =============================================================================

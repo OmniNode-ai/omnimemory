@@ -429,14 +429,14 @@ class HandlerMemoryExpire:
             else ModelLifecycleTimeoutSettings.from_node_contract()
         )
         self._db_pool: Pool | None = None
-        self._max_retries: int = 3
+        self._max_retries: int = self._settings.db_max_retries
         self._circuit_breaker: CircuitBreaker | None = None
         self._initialized: bool = False
 
     async def initialize(
         self,
         db_pool: Pool,
-        max_retries: int = 3,
+        max_retries: int | None = None,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         """Initialize handler resources.
@@ -447,8 +447,8 @@ class HandlerMemoryExpire:
             db_pool: Database connection pool for database operations.
                 Required for all database operations.
             max_retries: Maximum retry attempts for handle_with_retry().
-                Defaults to 3, which balances retry opportunity against
-                excessive contention scenarios.
+                Defaults to the lifecycle settings' ``db_max_retries`` (the node
+                contract descriptor, 3 unless an overlay replaces it).
             circuit_breaker: Optional circuit breaker for database operations.
                 If None, a default circuit breaker is created with standard
                 settings (5 failures to open, 60s recovery, 2 successes to close).
@@ -457,6 +457,8 @@ class HandlerMemoryExpire:
         Raises:
             ValueError: If max_retries is less than 1.
         """
+        if max_retries is None:
+            max_retries = self._settings.db_max_retries
         if max_retries < 1:
             raise ValueError(f"max_retries must be >= 1, got {max_retries}")
 

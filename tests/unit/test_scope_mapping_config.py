@@ -8,7 +8,7 @@ Tests cover:
 - Path-to-scope longest-prefix-match (basic, tie-break, no-match, path boundary)
 - Linear scope resolution (exact, team fallback, no-match)
 - Priority hint resolution (path override, doc-type lookup, default fallback)
-- get_default_scope_mapping_config() sanity checks
+- get_default_scope_mapping_config(_CLAUDE_DIR) sanity checks
 - ModelScopeMappingConfig round-trip serialization
 
 Ticket: OMN-2426
@@ -254,8 +254,11 @@ class TestResolvePriorityHint:
 
 
 # ---------------------------------------------------------------------------
-# get_default_scope_mapping_config() sanity checks
+# get_default_scope_mapping_config(_CLAUDE_DIR) sanity checks
 # ---------------------------------------------------------------------------
+
+
+_CLAUDE_DIR = Path.home() / ".claude"
 
 
 @pytest.mark.unit
@@ -268,46 +271,65 @@ class TestDefaultScopeMappingConfig:
 
     def test_global_claude_md_resolves_to_global_standards(self) -> None:
         claude_dir = str(Path.home() / ".claude" / "CLAUDE.md")
-        result = get_default_scope_mapping_config().resolve_scope_for_path(claude_dir)
+        result = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_scope_for_path(
+            claude_dir
+        )
         assert result == "omninode/shared/global-standards"
 
     def test_repo_claude_md_resolves_to_repo_scope(self) -> None:
         omni_home = Path(os.environ["OMNI_HOME"])
-        result = get_default_scope_mapping_config().resolve_scope_for_path(
+        result = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_scope_for_path(
             str(omni_home / "omniintelligence" / "CLAUDE.md")
         )
         assert result == "omninode/omniintelligence"
 
     def test_omnimemory2_resolves_to_omnimemory(self) -> None:
         omni_home = Path(os.environ["OMNI_HOME"])
-        result = get_default_scope_mapping_config().resolve_scope_for_path(
+        result = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_scope_for_path(
             str(omni_home / "omnimemory2" / "src" / "omnimemory" / "models" / "foo.py")
         )
         assert result == "omninode/omnimemory"
 
     def test_design_doc_resolves_to_shared_design(self) -> None:
         omni_home = Path(os.environ["OMNI_HOME"])
-        result = get_default_scope_mapping_config().resolve_scope_for_path(
+        result = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_scope_for_path(
             str(omni_home / "omni_save" / "design" / "DESIGN_FOO.md")
         )
         assert result == "omninode/shared/design"
 
     def test_fallback_code_path_resolves_to_omninode_shared(self) -> None:
         omni_home = Path(os.environ["OMNI_HOME"])
-        result = get_default_scope_mapping_config().resolve_scope_for_path(
+        result = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_scope_for_path(
             str(omni_home / "some_unknown_repo" / "README.md")
         )
         assert result == "omninode/shared"
 
     def test_linear_omnimemory_project_resolves_correctly(self) -> None:
-        result = get_default_scope_mapping_config().resolve_scope_for_linear(
+        result = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_scope_for_linear(
             "OmniNode", "OmniMemory"
         )
         assert result == "omninode/omnimemory"
 
+    def test_injected_claude_dir_is_the_global_standards_prefix(
+        self, tmp_path: Path
+    ) -> None:
+        injected = tmp_path / "elsewhere"
+        config = get_default_scope_mapping_config(injected)
+        assert (
+            config.resolve_scope_for_path(str(injected / "CLAUDE.md"))
+            == "omninode/shared/global-standards"
+        )
+        assert (
+            config.resolve_priority_hint(
+                EnumDetectedDocType.CLAUDE_MD,
+                absolute_path=str(injected / "CLAUDE.md"),
+            )
+            == 95
+        )
+
     def test_global_claude_md_priority_hint(self) -> None:
         claude_md = str(Path.home() / ".claude" / "CLAUDE.md")
-        hint = get_default_scope_mapping_config().resolve_priority_hint(
+        hint = get_default_scope_mapping_config(_CLAUDE_DIR).resolve_priority_hint(
             EnumDetectedDocType.CLAUDE_MD,
             absolute_path=claude_md,
         )
@@ -354,7 +376,7 @@ class TestModelScopeMappingConfigSerialization:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OMNI_HOME", str(tmp_path))
-        default_cfg = get_default_scope_mapping_config()
+        default_cfg = get_default_scope_mapping_config(_CLAUDE_DIR)
         data = default_cfg.model_dump()
         restored = ModelScopeMappingConfig.model_validate(data)
         assert restored == default_cfg

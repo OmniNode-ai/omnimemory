@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelMemoryRuntimeTimeoutSettings(BaseModel):
-    """The probe timeout, heartbeat interval and storage timeout bounds of the memory runtime.
+    """The probe timeout, heartbeat interval and storage timeout and connection bounds of the memory runtime.
 
     Every field is required and has no default: the values are the storage effect
     node contract's ``descriptor`` entries (``${env.VAR:default}`` overlay values),
@@ -40,6 +40,12 @@ class ModelMemoryRuntimeTimeoutSettings(BaseModel):
         ...,
         gt=0,
         description="Largest connection or idle timeout a storage config accepts, in milliseconds",
+    )
+
+    max_connections_limit: int = Field(
+        ...,
+        gt=0,
+        description="Largest max_connections value a storage config accepts",
     )
 
     @classmethod

@@ -266,6 +266,11 @@ class MigrationProgressTracker(BaseModel):
         default_factory=dict, description="Error count by type"
     )
     recovery_attempts: int = Field(default=0, description="Number of recovery attempts")
+    max_file_retries: int = Field(
+        default=3,
+        ge=0,
+        description="Retry attempts a failed file gets before retry_failed_files skips it",
+    )
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -489,8 +494,16 @@ class MigrationProgressTracker(BaseModel):
         """Update the last modified timestamp."""
         self.updated_at = datetime.now(timezone.utc)
 
-    def retry_failed_files(self, max_retries: int = 3) -> list[FileProcessingInfo]:
-        """Get list of failed files that can be retried."""
+    def retry_failed_files(
+        self, max_retries: int | None = None
+    ) -> list[FileProcessingInfo]:
+        """Get list of failed files that can be retried.
+
+        Args:
+            max_retries: Retry attempts per file (omitted: ``max_file_retries``).
+        """
+        if max_retries is None:
+            max_retries = self.max_file_retries
         retryable_files = []
         for file_info in self.files:
             if (

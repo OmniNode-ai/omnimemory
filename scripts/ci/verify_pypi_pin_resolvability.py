@@ -89,7 +89,7 @@ _INSTALL_TIMEOUT_SECONDS = int(os.environ.get(_INSTALL_TIMEOUT_ENV_VAR, "1800"))
 #: Creating the scratch venv is purely local work (no index access), so it gets a
 #: much smaller budget of its own. Sharing the install budget would let a hung
 #: ``uv venv`` silently consume the entire allowance before the install starts.
-_VENV_TIMEOUT_SECONDS = 120
+_VENV_TIMEOUT_SECONDS = int(os.environ.get("PYPI_PIN_RESOLVE_VENV_TIMEOUT_SECONDS", "120"))
 
 
 class PinResolveTimeoutError(Exception):

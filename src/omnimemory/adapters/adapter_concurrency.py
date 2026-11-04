@@ -33,7 +33,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 
 # Type variable for generic function return types
 F = TypeVar("F", bound=Callable[..., Any])
@@ -45,6 +45,7 @@ import structlog
 from ..models.foundation.model_connection_metadata import (
     ConnectionMetadata,
 )
+from ..models.utils.model_concurrency import ModelConnectionPoolConfig
 from .adapter_correlation_context import (
     OperationType,
     correlation_context,
@@ -52,9 +53,6 @@ from .adapter_correlation_context import (
 )
 from .adapter_error_sanitizer import SanitizationLevel
 from .adapter_error_sanitizer import sanitize_error as _base_sanitize_error
-
-if TYPE_CHECKING:
-    from ..models.utils.model_concurrency import ModelConnectionPoolConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -517,12 +515,11 @@ class AsyncConnectionPool:
                 pool_name=self.config.name,
                 connection_id=connection_id,
             ):
-                max_retries = 3
                 current_retry = _retry_count
 
                 try:
                     # Use iterative retry loop instead of recursion
-                    while current_retry <= max_retries:
+                    while current_retry <= self.config.retry_attempts:
                         try:
                             # Try to get existing connection first
                             try:
@@ -581,16 +578,16 @@ class AsyncConnectionPool:
                                 await self._destroy_connection(connection)
 
                                 # Check retry limit
-                                if current_retry >= max_retries:
+                                if current_retry >= self.config.retry_attempts:
                                     logger.error(
                                         "connection_validation_max_retries_exceeded",
                                         pool_name=self.config.name,
                                         connection_id=connection_id,
-                                        max_retries=max_retries,
+                                        max_retries=self.config.retry_attempts,
                                     )
                                     msg = (
                                         f"Failed to acquire connection "
-                                        f"after {max_retries} attempts"
+                                        f"after {self.config.retry_attempts} attempts"
                                     )
                                     raise RuntimeError(msg)
 
@@ -1214,7 +1211,7 @@ class ConnectionPool:
 
     @asynccontextmanager
     async def acquire(
-        self, timeout: float | None = None, max_retries: int = 3
+        self, timeout: float | None = None, max_retries: int | None = None
     ) -> AsyncGenerator[Any, None]:
         """
         Acquire a connection from the pool.
@@ -1224,7 +1221,7 @@ class ConnectionPool:
 
         Args:
             timeout: Optional timeout override
-            max_retries: Maximum number of retry attempts for connection creation
+            max_retries: Retry attempts for connection creation (omitted: pool config default)
 
         Yields:
             Connection object
@@ -1232,6 +1229,8 @@ class ConnectionPool:
         connection_id = str(uuid4())
         connection = None
         effective_timeout = timeout if timeout is not None else self.timeout
+        if max_retries is None:
+            max_retries = ModelConnectionPoolConfig.default_retry_attempts()
         start_time = datetime.now(timezone.utc)
 
         try:

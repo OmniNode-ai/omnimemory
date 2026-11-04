@@ -15,7 +15,6 @@ from ..config.model_memory_runtime_timeout_settings import (
 )
 
 # Validation limits for storage configuration
-MAX_CONNECTIONS_LIMIT = 1000
 MAX_BATCH_SIZE = 10000
 
 
@@ -113,8 +112,11 @@ class ModelMemoryStorageConfig(BaseModel):
         """Validate max_connections is within reasonable bounds."""
         if v < 1:
             raise ValueError("max_connections must be at least 1")
-        if v > MAX_CONNECTIONS_LIMIT:
-            raise ValueError(f"max_connections cannot exceed {MAX_CONNECTIONS_LIMIT}")
+        limit = (
+            ModelMemoryRuntimeTimeoutSettings.from_node_contract().max_connections_limit
+        )
+        if v > limit:
+            raise ValueError(f"max_connections cannot exceed {limit}")
         return v
 
     @field_validator("connection_timeout_ms", "idle_timeout_ms")
