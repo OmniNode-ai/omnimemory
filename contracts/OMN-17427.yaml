@@ -63,13 +63,13 @@ requirements:
           widened upper bound without rewriting dependency metadata.
   - id: "req-release-metadata-floor"
     statement: >-
-      The release metadata test asserts a version floor, so a release PR the train opens without
-      editing it does not fail Tests on an exact-version assertion.
+      The release metadata test asserts a version floor, so a release PR the train opens without editing
+      it does not fail Tests on an exact-version assertion.
     acceptance:
       - id: "AC11"
         statement: >-
-          AC11: tests/test_release_metadata_omn18595.py accepts any release at or above 0.18.9 --
-          falsifier: with pyproject.toml at 0.18.10 the file fails at the merge base and passes here.
+          AC11: tests/test_release_metadata_omn18595.py accepts any release at or above 0.18.9 -- falsifier:
+          with pyproject.toml at 0.18.10 the file fails at the merge base and passes here.
 evidence_requirements:
   - kind: "tests"
     description: "Documentation inventory, local links and existing release metadata checks."
@@ -162,4 +162,5 @@ dod_evidence:
     binds_ac: ["AC11"]
     checks:
       - check_type: "test_passes"
-        check_value: "uv run --no-project --python 3.12 python tests/test_release_metadata_omn18595.py"
+        check_value: "uv run --frozen pytest tests/test_release_metadata_omn18595.py -q --no-cov"
+        cwd: "${OMNI_HOME}/omnimemory"
