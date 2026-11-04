@@ -362,7 +362,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking Changes
 
 - **`frozen=True` on boundary-crossing models** ([#48](https://github.com/OmniNode-ai/omnimemory/pull/48)): All Pydantic models that cross subsystem boundaries now have `frozen=True`. Any code that mutates these models after construction will raise a `ValidationError`. Callers must construct new instances instead of modifying existing ones.
-- **`OMNIMEMORY_DB_URL` replaces previous database URL configuration** ([#49](https://github.com/OmniNode-ai/omnimemory/pull/49)): The database connection is now read exclusively from `OMNIMEMORY_DB_URL`. Update your `.env` file accordingly (e.g. `OMNIMEMORY_DB_URL=postgresql://user:pass@host:port/db`).
+- **`OMNIMEMORY_DB_URL` replaces previous database URL configuration** ([#49](https://github.com/OmniNode-ai/omnimemory/pull/49)): The database connection is now read exclusively from `OMNIMEMORY_DB_URL`. Update your `.env` file accordingly (e.g. `OMNIMEMORY_DB_URL=postgresql://user:pass@host:port/db`). <!-- pragma: allowlist secret -->
 
 ## [0.2.0] - 2026-02-13
 
