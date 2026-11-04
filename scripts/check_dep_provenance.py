@@ -17,7 +17,12 @@ Forbidden first-party deps (both hyphen and underscore spellings):
     omnibase-core   omnibase-spi
 
 A ``[tool.uv.sources]`` entry for any of the above with a ``git`` / ``rev`` /
-``branch`` / ``tag`` key is a forbidden override and fails the gate.
+``branch`` / ``tag`` key is a forbidden override and fails the gate, with one
+exception (OMN-17427, OMN-19998): the sibling's own OmniNode-ai repository pinned
+by ``tag`` alone to a dev merge tag ``dev-<UTC YYYYMMDDHHMMSS>-<sha12>``, which
+is how the dependency cascade (omnibase_core ``dependency-cascade.yml``, RULING
+2026-10-29T01:50:26Z) and every consumer read a sibling without waiting for a
+release. omniclaude and omnibase_infra already accept exactly that shape.
 
 Escape hatch (Rule-10 style): a forbidden source line may carry an inline
 comment ``# raw-override-ok: <ticket>`` with a NON-EMPTY token. This exempts the
@@ -61,6 +66,11 @@ _FORBIDDEN_PACKAGES: frozenset[str] = frozenset(
 # a first-party dep). A PyPI source has none of these.
 _GIT_SOURCE_KEYS: frozenset[str] = frozenset({"git", "rev", "branch", "tag"})
 
+# A dev merge tag: ``dev-<UTC YYYYMMDDHHMMSS>-<sha12>``, made by the sibling's own
+# dev-merge-tag.yml on every dev push (lightweight tag; uv.lock records the full
+# commit it names, so the pin is content-addressed).
+_DEV_MERGE_TAG_RE = re.compile(r"dev-\d{14}-[0-9a-f]{12}")
+
 # Inline escape token: `# raw-override-ok: <ticket>` with a non-empty token.
 _ESCAPE_TOKEN_RE = re.compile(r"#\s*raw-override-ok:\s*(\S+)")
 
@@ -89,6 +99,21 @@ _KV_RE = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 def _normalize(pkg: str) -> str:
     """Canonicalize a package name to hyphen form for comparison."""
     return pkg.strip().strip('"').strip("'").replace("_", "-").lower()
+
+
+def _is_dev_merge_tag_pin(pkg: str, attrs: dict[str, str]) -> bool:
+    """True when the source pins the sibling's own repository at a dev merge tag.
+
+    Exactly ``git`` + ``tag``: the sibling's own OmniNode-ai repository and a name
+    that is a dev merge tag. A rev, a branch, a release tag or a fork stays
+    forbidden.
+    """
+    if set(attrs) & _GIT_SOURCE_KEYS != {"git", "tag"}:
+        return False
+    return (
+        attrs["git"] == f"https://github.com/OmniNode-ai/{pkg.replace('-', '_')}.git"
+        and _DEV_MERGE_TAG_RE.fullmatch(attrs["tag"]) is not None
+    )
 
 
 def _uv_sources_block(text: str) -> str | None:
@@ -147,6 +172,8 @@ def find_violations(text: str) -> list[str]:
         if not git_keys:
             # A non-git source (unusual, but not a provenance violation).
             continue
+        if _is_dev_merge_tag_pin(pkg, attrs):
+            continue
 
         raw_line = _line_for_package(block, pkg)
         if raw_line is not None:
@@ -202,10 +229,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {msg}", file=sys.stderr)
         print(
             "\nomnibase-core / omnibase-spi are PyPI-published "
-            "first-party deps and must NOT be pinned to git commits/branches/tags "
-            "on dev/main. Resolve them from PyPI (release the dep first if the "
-            "needed version is unpublished). If a temporary override is genuinely "
-            "unavoidable, annotate the exact line with "
+            "first-party deps and must NOT be pinned to git commits, branches or "
+            "release tags on dev/main. Resolve them from PyPI, or pin the "
+            "sibling's newest dev merge tag: { git = "
+            '"https://github.com/OmniNode-ai/<repo>.git", tag = '
+            '"dev-<UTC YYYYMMDDHHMMSS>-<sha12>" } (OMN-17427). If another '
+            "override is genuinely unavoidable, annotate the exact line with "
             "'# raw-override-ok: <ticket>' (non-empty token).",
             file=sys.stderr,
         )

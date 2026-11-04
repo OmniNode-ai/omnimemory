@@ -13,7 +13,10 @@
 # any of omnibase-core / omnibase-spi / omnibase-compat (hyphen or underscore
 # spelling) has a git / rev / branch / tag source override in pyproject.toml's
 # [tool.uv.sources] block. A single line may be exempted with an inline
-# '# raw-override-ok: <ticket>' comment carrying a non-empty token.
+# '# raw-override-ok: <ticket>' comment carrying a non-empty token. The one
+# exception is the sibling's own OmniNode-ai repository pinned by `tag` alone to
+# a dev merge tag `dev-<UTC YYYYMMDDHHMMSS>-<sha12>` (OMN-17427, OMN-19998), the
+# shape the dependency cascade writes.
 #
 # Scoping: the whole-file gate runs only when a PR actually modifies
 # pyproject.toml (a forbidden override cannot be introduced without editing

@@ -205,3 +205,80 @@ def test_escape_is_per_line(mod, tmp_path: Path) -> None:
 def test_missing_pyproject_fails_closed(mod, tmp_path: Path) -> None:
     missing = tmp_path / "nope" / "pyproject.toml"
     assert mod.main(["--pyproject", str(missing)]) == 1
+
+
+# ---------------------------------------------------------------------------
+# ALLOW: the sibling's own dev merge tag (OMN-17427, OMN-19998)
+#
+# The dependency cascade (omnibase_core dependency-cascade.yml, RULING
+# 2026-10-29T01:50:26Z) pins a sibling at its newest dev merge tag
+# ``dev-<UTC YYYYMMDDHHMMSS>-<sha12>`` as a ``tag``-only git source. omniclaude
+# and omnibase_infra already accept exactly that shape. Anything else stays
+# forbidden: a rev, a branch, a release tag or a fork.
+# ---------------------------------------------------------------------------
+
+_DEV_TAG = "dev-20261104102410-b002ec3ceab1"
+
+
+def test_allow_own_repo_dev_merge_tag(mod, tmp_path: Path) -> None:
+    block = (
+        "[tool.uv.sources]\n"
+        'omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", '
+        f'tag = "{_DEV_TAG}" }}\n'
+        'omnibase-spi = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", '
+        'tag = "dev-20261103173624-74e0b0f12767" }\n'
+    )
+    path = _write_pyproject(tmp_path, block)
+    assert mod.find_violations(path.read_text()) == []
+    assert mod.main(["--pyproject", str(path)]) == 0
+
+
+def test_reject_dev_merge_tag_with_rev(mod, tmp_path: Path) -> None:
+    block = (
+        "[tool.uv.sources]\n"
+        'omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", '
+        f'tag = "{_DEV_TAG}", rev = "2a07385dec0ff06903f62572c546ec201f964aaf" }}\n'
+    )
+    path = _write_pyproject(tmp_path, block)
+    assert mod.main(["--pyproject", str(path)]) == 1
+
+
+def test_reject_dev_merge_tag_from_a_fork(mod, tmp_path: Path) -> None:
+    block = (
+        "[tool.uv.sources]\n"
+        'omnibase-core = { git = "https://github.com/someone-else/omnibase_core.git", '
+        f'tag = "{_DEV_TAG}" }}\n'
+    )
+    path = _write_pyproject(tmp_path, block)
+    assert mod.main(["--pyproject", str(path)]) == 1
+
+
+def test_reject_dev_merge_tag_from_the_wrong_sibling(mod, tmp_path: Path) -> None:
+    block = (
+        "[tool.uv.sources]\n"
+        'omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_spi.git", '
+        f'tag = "{_DEV_TAG}" }}\n'
+    )
+    path = _write_pyproject(tmp_path, block)
+    assert mod.main(["--pyproject", str(path)]) == 1
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        "dev",
+        "dev-20261104102410",
+        "dev-20261104102410-b002ec3",
+        "dev-2026110410241-b002ec3ceab1",
+        "dev-20261104102410-B002EC3CEAB1",
+        "v0.47.66",
+    ],
+)
+def test_reject_tags_that_are_not_dev_merge_tags(mod, tmp_path: Path, tag: str) -> None:
+    block = (
+        "[tool.uv.sources]\n"
+        'omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", '
+        f'tag = "{tag}" }}\n'
+    )
+    path = _write_pyproject(tmp_path, block)
+    assert mod.main(["--pyproject", str(path)]) == 1
