@@ -5,7 +5,7 @@
 
 The release train prepends a section to the top of CHANGELOG.md on every release.
 The only credential-shaped text in the file is a historical documentation example
-(``postgresql://user:pass@host:port/db``). While it was tracked in
+(a database URL with a user and a password in it). While it was tracked in
 ``.secrets.baseline`` by line number, every release shifted it, the
 detect-secrets hook rewrote the baseline and exited 3, and the release PR failed
 the pre-commit, Detect Secrets and ONEX Validation jobs until someone refreshed
