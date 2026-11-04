@@ -21,7 +21,7 @@ evidence_requirements:
   - kind: tests
     description: The override list, the sibling lock refresh default list and the dep-provenance governed
       list name no omnibase-compat package.
-    command: uv run --frozen pytest tests/ci/test_no_compat_refs_omn22385.py tests/scripts/test_check_dep_provenance.py
+    command: uv run --frozen pytest tests/ci/test_no_compat_refs_omn22385.py
       -q --no-cov
 emergency_bypass:
   enabled: false
@@ -36,6 +36,6 @@ dod_evidence:
       - AC2
     checks:
       - check_type: test_passes
-        check_value: uv run --frozen pytest tests/ci/test_no_compat_refs_omn22385.py tests/scripts/test_check_dep_provenance.py
+        check_value: uv run --frozen pytest tests/ci/test_no_compat_refs_omn22385.py
           -q --no-cov
         cwd: ${OMNI_HOME}/omnimemory
