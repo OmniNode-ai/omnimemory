@@ -29,6 +29,13 @@ class TestMemoryRuntimeTimeoutSettings:
         assert settings.memgraph_probe_timeout_seconds > 0
         assert settings.heartbeat_interval_seconds > 0
         assert 0 < settings.min_timeout_ms < settings.max_timeout_ms
+        assert settings.max_connections_limit > 0
+
+    def test_max_connections_limit_keeps_its_previous_value(self) -> None:
+        assert (
+            ModelMemoryRuntimeTimeoutSettings.from_node_contract().max_connections_limit
+            == 1000
+        )
 
     def test_overlay_replaces_the_contract_default(
         self, monkeypatch: pytest.MonkeyPatch
@@ -79,6 +86,20 @@ class TestStorageConfigBoundsFromContract:
         with pytest.raises(ValidationError, match="cannot exceed 9,000ms"):
             _storage_config(idle_timeout_ms=9001)
         assert _storage_config(connection_timeout_ms=5000).connection_timeout_ms == 5000
+
+
+@pytest.mark.unit
+class TestStorageConfigConnectionLimitFromContract:
+    def test_default_limit_is_unchanged(self) -> None:
+        assert _storage_config(max_connections=1000).max_connections == 1000
+        with pytest.raises(ValidationError, match="cannot exceed 1000"):
+            _storage_config(max_connections=1001)
+
+    def test_limit_follows_the_overlay(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OMNIMEMORY_STORAGE_MAX_CONNECTIONS_LIMIT", "50")
+        assert _storage_config(max_connections=50).max_connections == 50
+        with pytest.raises(ValidationError, match="cannot exceed 50"):
+            _storage_config(max_connections=51)
 
 
 @pytest.mark.unit

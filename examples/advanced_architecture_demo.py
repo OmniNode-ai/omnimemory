@@ -19,6 +19,7 @@ ONEX Compliance:
 """
 
 import asyncio
+import os
 import time
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -81,7 +82,7 @@ class ONEXArchitectureDemo:
             source_node_id=str(uuid4()),  # This will need UUID fix
             operation_type="store",
             priority="normal",
-            timeout_seconds=30,
+            timeout_seconds=int(os.environ.get("DEMO_TIMEOUT_SECONDS", "30")),
             retry_count=3,
             created_at=datetime.now(timezone.utc),
             metadata={"demo": True, "node_type": "effect"},
@@ -97,7 +98,6 @@ class ONEXArchitectureDemo:
             correlation_id=self.demo_correlation_id,
             operation_type="store",
             start_time=datetime.now(timezone.utc),
-            execution_time_ms=100,
             memory_usage_mb=2.5,
             cpu_usage_percent=15.0,
             success_count=1,

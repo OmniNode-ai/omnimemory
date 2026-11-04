@@ -191,7 +191,7 @@ async def retry_with_backoff(
 
 def retry_decorator(
     config: ModelRetryConfig | None = None,
-    max_attempts: int = 3,
+    max_attempts: int | None = None,
     base_delay_ms: int | None = None,
     max_delay_ms: int | None = None,
     exponential_multiplier: float = 2.0,
@@ -203,7 +203,7 @@ def retry_decorator(
 
     Args:
         config: Retry configuration (if provided, other params ignored)
-        max_attempts: Maximum retry attempts
+        max_attempts: Maximum retry attempts (omitted: the ModelRetryConfig value)
         base_delay_ms: Base delay in ms (omitted: the ModelRetryConfig value)
         max_delay_ms: Maximum delay in ms (omitted: the ModelRetryConfig value)
         exponential_multiplier: Exponential backoff multiplier

@@ -16,7 +16,7 @@ Test Categories:
     - Envelope: Verify envelope format correctness for real HTTP calls
 
 Prerequisites:
-    - Embedding server running at EMBEDDING_SERVER_URL (default: http://localhost:8100)
+    - Embedding server running at EMBEDDING_SERVER_URL (default: http://svc.example.test:8100)
     - omnibase_infra installed (dev dependency)
 
 Usage:
@@ -30,8 +30,8 @@ Usage:
     pytest -m integration -v
 
 Environment Variables:
-    EMBEDDING_SERVER_URL: Embedding server base URL (default: http://localhost:8100)
-    EMBEDDING_MODEL: Model name (default: gte-qwen2)
+    EMBEDDING_SERVER_URL: Embedding server base URL (default: http://svc.example.test:8100)
+    EMBEDDING_MODEL: Model name (default: test-embed-local)
     EMBEDDING_DIMENSION: Expected dimension (default: 1024)
 
 .. versionadded:: 0.2.0
@@ -80,8 +80,8 @@ if TYPE_CHECKING:
 # =============================================================================
 
 # Default embedding server settings (configure via EMBEDDING_SERVER_URL or LLM_EMBEDDING_URL env var)
-DEFAULT_EMBEDDING_SERVER_URL = "http://localhost:8100"
-DEFAULT_EMBEDDING_MODEL = "gte-qwen2"
+DEFAULT_EMBEDDING_SERVER_URL = "http://svc.example.test:8100"
+DEFAULT_EMBEDDING_MODEL = "test-embed-local"
 DEFAULT_EMBEDDING_DIMENSION = 1024
 
 # Test timeout for server availability check
@@ -553,7 +553,7 @@ class TestRealHealthCheck:
         # Config pointing to non-existent server
         config = ModelEmbeddingHttpClientConfig(
             provider=EnumEmbeddingProviderType.LOCAL,
-            base_url="http://localhost:9999",  # Unlikely to be running
+            base_url="http://svc.example.test:9999",  # Unlikely to be running
             model="test-model",
             embedding_dimension=1024,
             timeout_seconds=2.0,  # Short timeout

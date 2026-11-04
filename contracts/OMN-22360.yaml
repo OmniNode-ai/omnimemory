@@ -3,7 +3,9 @@ schema_version: 1.0.0
 ticket_id: OMN-22360
 title: 'omnimemory: first-party dependency pins follow the core dependency-pin policy'
 summary: >-
-  The omnimarket override-dependency and its v0.4.0 git source are removed. omnimarket is above omnimemory
+  omnimemory runs the core dependency-pin check as a CI Summary member at the core dev-merge tag, every
+  core hook revision is that tag, and the findings the moved hooks raised are fixed at their source. The
+  omnimarket override-dependency and its v0.4.0 git source are removed. omnimarket is above omnimemory
   in the declared layer order, omnimemory never imports it, and omnimarket depends on omninode-memory,
   so the declaration was an upward edge and a cycle.
 is_seam_ticket: false
@@ -13,6 +15,9 @@ requirements:
   - id: req-omn22360-omnimemory-pins
     statement: omnimemory declares no first-party pin the core dependency-pin validator (OMN-22360) refuses.
     acceptance:
+      - id: AC7
+        statement: "AC7: every registry repository with a dependency manifest runs the check as a required
+          context on its landing branch, and the check refuses a canary branch that adds an upward pin"
       - id: AC8
         statement: "AC8: every violation the validator reports on the registry repositories at origin
           of 2026-11-03 is fixed by a pull request named in a comment here, and none is recorded in a
@@ -36,4 +41,14 @@ dod_evidence:
     checks:
       - check_type: test_passes
         check_value: uv run --frozen pytest tests/ci/test_no_upward_omnimarket_pin_omn22360.py -q --no-cov
+        cwd: ${OMNI_HOME}/omnimemory
+  - id: dod-omn22360-omnimemory-wired
+    description: The dependency-pins job calls the core reusable workflow, CI Summary needs it, and every
+      core hook revision in .pre-commit-config.yaml is the tag the job calls.
+    source: manual
+    binds_ac:
+      - AC7
+    checks:
+      - check_type: test_passes
+        check_value: uv run --frozen pytest tests/ci/test_dependency_pins_wired_omn22360.py -q --no-cov
         cwd: ${OMNI_HOME}/omnimemory

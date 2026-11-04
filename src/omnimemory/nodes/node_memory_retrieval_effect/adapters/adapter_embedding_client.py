@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 import httpx  # transport-import-ok node-purity-ok: effect-node embedding client httpx (designated I/O boundary), OMN-13283
@@ -52,8 +53,9 @@ from ..models import ModelEmbeddingClientConfig
 logger = logging.getLogger(__name__)
 
 # HTTP status code ranges for error classification
-HTTP_CLIENT_ERROR_MIN = 400
-HTTP_CLIENT_ERROR_MAX = 500  # Exclusive upper bound for client errors (4xx range)
+HTTP_CLIENT_ERROR_MIN = HTTPStatus.BAD_REQUEST.value
+# Exclusive upper bound for client errors (4xx range): the first 5xx status.
+HTTP_CLIENT_ERROR_MAX = HTTPStatus.INTERNAL_SERVER_ERROR.value
 
 __all__ = [
     "EmbeddingClient",

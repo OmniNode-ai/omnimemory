@@ -122,8 +122,9 @@ handler_config:
 # === CONFIGURATION FIELDS (ModelKreuzbergParseConfig) ===
 config_fields:
   KREUZBERG_URL:
-    default: "http://localhost:8090"
-    description: "Base URL of the kreuzberg Docker service"
+    required: true
+    description: "Base URL of the kreuzberg Docker service, resolved from the routing authority (ModelKreuzbergParseConfig.kreuzberg_url
+      has no default)"
   KREUZBERG_TEXT_STORE_PATH:
     required: true
     description: "Filesystem path where extracted text files are stored"

@@ -10,7 +10,7 @@ Example environment variables:
     OMNIMEMORY__FILESYSTEM__BASE_PATH=/data/omnimemory
     OMNIMEMORY__FILESYSTEM__MAX_FILE_SIZE_BYTES=20971520
     OMNIMEMORY_DB_URL=postgresql://user:pass@localhost:5432/omnimemory
-    OMNIMEMORY__QDRANT__URL=http://localhost:6333
+    OMNIMEMORY__QDRANT__URL=http://svc.example.test:6333
     OMNIMEMORY__POSTGRES_ENABLED=true
     OMNIMEMORY__QDRANT_ENABLED=true
 """
@@ -302,7 +302,7 @@ class EmbeddingSettings(BaseSettings):
         DIMENSION: Expected embedding vector dimension (default: 1024)
 
     Example:
-        export OMNIMEMORY__EMBEDDING__SERVER_URL=http://localhost:8100
+        export OMNIMEMORY__EMBEDDING__SERVER_URL=http://svc.example.test:8100
     """
 
     model_config = SettingsConfigDict(

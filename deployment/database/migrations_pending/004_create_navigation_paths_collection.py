@@ -60,7 +60,7 @@ async def create_collection() -> None:
         port=QDRANT_PORT,
         api_key=QDRANT_API_KEY,
         https=False,
-        timeout=30,
+        timeout=int(os.environ.get("QDRANT_TIMEOUT_SECONDS", "30")),
     )
 
     try:

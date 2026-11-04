@@ -1,16 +1,12 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
-"""Change-aware test path resolution for omnimemory CI."""
+"""Change-aware test path resolution for omnimemory CI (run as ``python -m scripts.ci.detect_test_paths``)."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.ci.test_selection_loader import (
     ModelAdjacencyMap,
@@ -164,8 +160,10 @@ def compute_selection(
     ref_name: str,
     event_name: str = "pull_request",
     feature_flag_enabled: bool = True,
-    repo_root: Path = REPO_ROOT,
+    repo_root: Path | None = None,
 ) -> ModelTestSelection:
+    if repo_root is None:
+        repo_root = Path.cwd()
     config = load_adjacency_map(adjacency_path)
 
     # 0. Feature flag short-circuit: off → legacy full suite.

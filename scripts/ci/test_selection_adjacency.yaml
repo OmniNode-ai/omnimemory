@@ -291,6 +291,11 @@ test_families:
   tests/unit/test_persona_enums.py:
     triggers:
       - src/omnimemory/enums/
+  tests/unit/test_retry_defaults_from_models.py:
+    triggers:
+      - src/omnimemory/adapters/
+      - src/omnimemory/models/foundation/
+      - src/omnimemory/models/utils/
   tests/unit/test_scope_mapping_config.py:
     triggers:
       - src/omnimemory/models/config/

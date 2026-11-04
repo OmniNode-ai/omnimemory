@@ -64,7 +64,7 @@ def _declarations(hook_id: str) -> list[tuple[dict[str, object], dict[str, objec
 
 
 @pytest.mark.parametrize("hook_id", sorted(EXPECTED_EXCLUDE))
-def test_hook_is_declared_once_in_an_omnibase_core_block_at_a_full_sha(
+def test_hook_is_declared_once_in_an_omnibase_core_block_at_a_pinned_rev(
     hook_id: str,
 ) -> None:
     found = _declarations(hook_id)
@@ -73,7 +73,7 @@ def test_hook_is_declared_once_in_an_omnibase_core_block_at_a_full_sha(
     assert repo["repo"] == CORE_REPO
     rev = repo["rev"]
     assert isinstance(rev, str)
-    assert re.fullmatch(r"[0-9a-f]{40}", rev)
+    assert re.fullmatch(r"dev-\d{14}-[0-9a-f]{12}", rev)
 
 
 @pytest.mark.parametrize("hook_id", sorted(EXPECTED_EXCLUDE))

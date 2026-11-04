@@ -12,13 +12,13 @@ into a Qdrant collection.
 Usage:
     uv run python scripts/graphify_to_qdrant.py \\
         --graph-dir /path/to/graphify-graphs/ \\
-        --qdrant-url http://localhost:6333 \\
-        --embedding-url http://localhost:8100 \\
+        --qdrant-url http://svc.example.test:6333 \\
+        --embedding-url http://svc.example.test:8100 \\
         --collection onex-graphify
 
     # Or via env vars:
-    QDRANT_URL=http://localhost:6333 \\
-    EMBEDDING_MODEL_URL=http://localhost:8100 \\
+    QDRANT_URL=http://svc.example.test:6333 \\
+    EMBEDDING_MODEL_URL=http://svc.example.test:8100 \\
     uv run python scripts/graphify_to_qdrant.py
 """
 
@@ -40,8 +40,8 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 UPSERT_BATCH_SIZE = 100
-EMBED_RETRY_ATTEMPTS = 3
 EMBED_BACKOFF_SECONDS = [1, 2, 4]
+EMBED_RETRY_ATTEMPTS = len(EMBED_BACKOFF_SECONDS)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -139,7 +139,7 @@ def embed_batch(
             resp = httpx.post(
                 f"{embedding_url}/v1/embeddings",
                 json=payload,
-                timeout=60.0,
+                timeout=float(os.environ.get("GRAPHIFY_EMBED_TIMEOUT_SECONDS", "60")),
             )
             resp.raise_for_status()
             data = resp.json()

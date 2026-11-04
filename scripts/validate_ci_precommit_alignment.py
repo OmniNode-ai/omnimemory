@@ -103,7 +103,7 @@ EXPECTED_ALIGNMENTS: list[tuple[str, str, str]] = [
     (
         "check-public-runner-placement",
         "public-runner-placement",
-        "omnibase_core.handlers.handler_public_runner_placement_cli",
+        "omnibase_core.validation.validator_public_runner_placement",
     ),
     # Infrastructure hooks
     ("migration-freeze-check", "migration-freeze", "check_migration_freeze.sh"),

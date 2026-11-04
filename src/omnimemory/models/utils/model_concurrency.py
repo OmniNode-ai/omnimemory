@@ -37,6 +37,11 @@ class ModelConnectionPoolConfig(BaseModel):
         default=3, ge=0, description="Retry attempts for failed connections"
     )
 
+    @classmethod
+    def default_retry_attempts(cls) -> int:
+        """Return the declared default of ``retry_attempts``."""
+        return int(cls.model_fields["retry_attempts"].get_default())
+
     @model_validator(mode="after")
     def validate_connection_bounds(self) -> ModelConnectionPoolConfig:
         """Validate that max_connections >= min_connections."""

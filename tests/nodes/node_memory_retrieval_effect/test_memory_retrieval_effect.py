@@ -1009,10 +1009,10 @@ class TestQdrantMockConfigCrossFieldValidation:
         """Test valid config with real embeddings and HTTP URL."""
         config = ModelHandlerQdrantMockConfig(
             use_real_embeddings=True,
-            embedding_server_url="http://localhost:8002/v1",
+            embedding_server_url="http://svc.example.test:8002/v1",
         )
         assert config.use_real_embeddings is True
-        assert config.embedding_server_url == "http://localhost:8002/v1"
+        assert config.embedding_server_url == "http://svc.example.test:8002/v1"
 
     def test_valid_config_real_embeddings_with_https_url(self) -> None:
         """Test valid config with real embeddings and HTTPS URL."""

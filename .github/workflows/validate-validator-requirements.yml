@@ -31,9 +31,10 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: OmniNode-ai/omnibase_core
-          # Pinned to the commit that exports the validate-validator-requirements hook (OMN-13291).
-          # Update by running: gh api repos/OmniNode-ai/omnibase_core/commits/dev --jq '.sha'
-          ref: d163312724489f10f58ffdf8115ba1fa9d5783e8
+          # The commit of core dev-merge tag dev-20261103173624-74e0b0f12767, the
+          # validate-validator-requirements hook rev in .pre-commit-config.yaml
+          # (OMN-13291, OMN-22360); a checkout ref here is a 40-hex sha.
+          ref: 74e0b0f127670fd0d675b83ee9f4d3e1268cc630
           path: omnibase_core
           token: ${{ secrets.OMNIBASE_CORE_TOKEN || secrets.GITHUB_TOKEN }}
 

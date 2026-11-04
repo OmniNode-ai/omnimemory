@@ -150,7 +150,7 @@ class TestBootstrapSuccess:
         """Test bootstrap with qdrant backend configured."""
         config = ModelMemoryServiceConfig(
             filesystem=ModelFilesystemConfig(base_path=tmp_path),
-            qdrant=ModelQdrantConfig(url="http://localhost:6333"),
+            qdrant=ModelQdrantConfig(url="http://svc.example.test:6333"),
         )
 
         result = await bootstrap(config)
@@ -169,7 +169,7 @@ class TestBootstrapSuccess:
             postgres=ModelPostgresConfig(
                 dsn="postgresql://user:pass@localhost/db",
             ),
-            qdrant=ModelQdrantConfig(url="http://localhost:6333"),
+            qdrant=ModelQdrantConfig(url="http://svc.example.test:6333"),
         )
 
         result = await bootstrap(config)
@@ -188,7 +188,7 @@ class TestBootstrapSuccess:
         config = ModelMemoryServiceConfig(
             filesystem=ModelFilesystemConfig(base_path=tmp_path),
             qdrant=ModelQdrantConfig(
-                url="http://localhost:6333",
+                url="http://svc.example.test:6333",
                 api_key=None,  # No API key
             ),
         )

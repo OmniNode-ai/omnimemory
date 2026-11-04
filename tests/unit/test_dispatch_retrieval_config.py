@@ -63,7 +63,7 @@ class TestRetrievalConfigFromEnv:
             "OMNIMEMORY_USE_STUB_HANDLERS": "  false  ",
             "QDRANT_HOST": "localhost",
             "QDRANT_PORT": "6333",
-            "LLM_EMBEDDING_URL": "http://localhost:8100",
+            "LLM_EMBEDDING_URL": "http://svc.example.test:8100",
         }
         with patch.dict(os.environ, env, clear=True):
             config = build_retrieval_config_from_env()

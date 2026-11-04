@@ -98,7 +98,7 @@ def _make_config(
     document_root: str | None = None,
 ) -> ModelKreuzbergParseConfig:
     kwargs: dict[str, object] = {
-        "kreuzberg_url": "http://localhost:8090",
+        "kreuzberg_url": "http://svc.example.test:8090",
         "text_store_path": text_store_path,
         "parser_version": "1.0.0",
         "max_doc_bytes": max_doc_bytes,

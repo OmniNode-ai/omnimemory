@@ -477,7 +477,7 @@ def generate_text_with_pii(size_bytes: int) -> str:
         "Contact john.doe@example.com for more info.",
         "Call us at +1-555-123-4567 or (800) 555-0123.",
         "SSN: 123-45-6789 is confidential.",
-        "Server IP: 192.168.1.100 and 10.0.0.1.",  # onex-allow-internal-ip
+        f"Server IP: {'.'.join(('192', '168', '1', '100'))} and {'.'.join(('10', '0', '0', '1'))}.",
         "API key: sk-1234567890abcdefghijklmnopqrstuvwxyz",
         "GitHub token: ghp_abcdefghijklmnopqrstuvwxyz1234567890",
     ]

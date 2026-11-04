@@ -28,7 +28,7 @@ FLEET_FALLBACK = """'["self-hosted","omnibase-ci"]'"""
 JOB_ID = "public-runner-placement"
 JOB_NAME = "Public Runner Placement (OMN-19998)"
 HOOK_ID = "check-public-runner-placement"
-CORE_RELEASE = "0.47.46"
+CORE_TAG = "dev-20261103173624-74e0b0f12767"
 
 
 def _load(path: Path) -> dict[object, object]:
@@ -118,20 +118,21 @@ def test_ci_job_runs_the_core_check_unconditionally_on_a_hosted_runner() -> None
     steps = job["steps"]
     assert isinstance(steps, list)
     runs = "\n".join(str(step.get("run", "")) for step in steps)
-    assert "omnibase_core.handlers.handler_public_runner_placement_cli" in runs
+    assert "omnibase_core.validation.validator_public_runner_placement" in runs
     assert "POSITIVE CONTROL FAILED" in runs
-    assert "--base-ref" in runs
     assert "--repo omnimemory --visibility public" in runs
 
 
 def test_ci_job_and_hook_run_the_same_core_release() -> None:
-    """The CI job installs 0.47.46 and the hook's rev is that release's tag."""
+    """The CI job installs the core dev-merge tag that is also the hook's rev."""
     env = _ci_job()["env"]
     assert isinstance(env, dict)
-    assert env["RUNNER_PLACEMENT_CORE"] == f"omnibase-core=={CORE_RELEASE}"
+    requirement = str(env["RUNNER_PLACEMENT_CORE"])
+    assert requirement.startswith("omnibase-core @ git+")
+    assert requirement.endswith(f"/omnibase_core@{CORE_TAG}")
     hooks = _hooks()
     assert len(hooks) == 1, f"expected one {HOOK_ID} hook, found {len(hooks)}"
-    assert hooks[0][0] == f"v{CORE_RELEASE}"
+    assert hooks[0][0] == CORE_TAG
 
 
 def test_ci_summary_requires_the_job_to_succeed() -> None:

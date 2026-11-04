@@ -3,8 +3,8 @@
 """Run the runtime_profiles contract validator with the omnimemory allowlist.
 
 Mirrors the required CI gate `.github/workflows/validator-runtime-profiles.yml`
-exactly: it constructs `ValidatorRuntimeProfiles` with the repo-local
-`validation/runtime_profiles_allowlist.yaml` and validates `src/`.
+exactly: it constructs `ValidatorRuntimeProfiles` with the repo-local allowlist
+and validates the source tree, both passed as the arguments `<allowlist> <src-root>`.
 
 This script exists so the local pre-commit hook and CI run the SAME invocation.
 The validator's module `__main__` entry point resolves its allowlist from the
@@ -17,18 +17,17 @@ omnimarket).
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from omnibase_core.validation.validator_runtime_profiles import (
     ValidatorRuntimeProfiles,
 )
 
-ALLOWLIST_PATH = Path("validation/runtime_profiles_allowlist.yaml")
-SRC_ROOT = Path("src")
-
 
 def main() -> int:
-    result = ValidatorRuntimeProfiles(allowlist_path=ALLOWLIST_PATH).validate(SRC_ROOT)
+    allowlist, src_root = (Path(arg) for arg in sys.argv[1:3])
+    result = ValidatorRuntimeProfiles(allowlist_path=allowlist).validate(src_root)
     for issue in result.issues:
         print(
             f"[{issue.severity.value}] {issue.file_path}:{issue.line_number}: {issue.message}"

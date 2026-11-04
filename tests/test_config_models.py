@@ -291,30 +291,30 @@ class TestModelQdrantConfig:
     def test_valid_config_with_proper_http_url_type(self) -> None:
         """Test valid qdrant config with proper HttpUrl type."""
         config = ModelQdrantConfig(
-            url="http://localhost:6333",
+            url="http://svc.example.test:6333",
             collection_name="test_collection",
         )
         # Verify URL is proper HttpUrl type, not a plain string
         assert isinstance(config.url, HttpUrl)
         # URL may have trailing slash added by Pydantic
-        assert str(config.url).rstrip("/") == "http://localhost:6333"
+        assert str(config.url).rstrip("/") == "http://svc.example.test:6333"
 
     def test_explicit_url_is_http_url_type(self) -> None:
         """Test explicitly provided URL becomes proper HttpUrl type."""
         # Note: The default value is stored as string, but explicit values
         # are coerced to HttpUrl by Pydantic validation
-        config = ModelQdrantConfig(url="http://localhost:6333")
+        config = ModelQdrantConfig(url="http://svc.example.test:6333")
         assert isinstance(config.url, HttpUrl)
 
     def test_api_key_is_optional(self) -> None:
         """Test api_key is optional and None by default."""
-        config = ModelQdrantConfig(url="http://localhost:6333")
+        config = ModelQdrantConfig(url="http://svc.example.test:6333")
         assert config.api_key is None
 
     def test_api_key_uses_secret_str(self) -> None:
         """Test api_key uses SecretStr when provided."""
         config = ModelQdrantConfig(
-            url="http://localhost:6333",
+            url="http://svc.example.test:6333",
             api_key=SecretStr("my-api-key"),
         )
         assert isinstance(config.api_key, SecretStr)
@@ -322,7 +322,7 @@ class TestModelQdrantConfig:
     def test_api_key_not_leaked_in_str(self) -> None:
         """Test api_key does NOT appear in string representation."""
         config = ModelQdrantConfig(
-            url="http://localhost:6333",
+            url="http://svc.example.test:6333",
             api_key=SecretStr("secret-api-key-xyz"),
         )
         assert "secret-api-key-xyz" not in str(config)
@@ -331,7 +331,7 @@ class TestModelQdrantConfig:
     def test_api_key_excluded_from_model_dump(self) -> None:
         """Test api_key is excluded from model_dump() by default."""
         config = ModelQdrantConfig(
-            url="http://localhost:6333",
+            url="http://svc.example.test:6333",
             api_key=SecretStr("secret-key"),
         )
         dumped = config.model_dump()
@@ -421,7 +421,7 @@ class TestModelMemoryServiceConfig:
             postgres=ModelPostgresConfig(
                 dsn="postgresql://user:pass@localhost/db",
             ),
-            qdrant=ModelQdrantConfig(url="http://localhost:6333"),
+            qdrant=ModelQdrantConfig(url="http://svc.example.test:6333"),
         )
         assert config.filesystem is not None
         assert config.postgres is not None
@@ -481,7 +481,7 @@ class TestModelMemoryServiceConfig:
                 dsn="postgresql://user:pass@localhost/db",
             ),
             qdrant=ModelQdrantConfig(
-                url="http://localhost:6333",
+                url="http://svc.example.test:6333",
                 api_key=SecretStr("qdrant_secret_key"),
             ),
         )

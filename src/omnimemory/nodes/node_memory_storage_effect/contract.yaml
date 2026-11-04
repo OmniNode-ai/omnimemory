@@ -235,6 +235,7 @@ descriptor:
   heartbeat_interval_seconds: "${env.OMNIMEMORY_HEARTBEAT_INTERVAL_SECONDS:30.0}"
   min_timeout_ms: "${env.OMNIMEMORY_STORAGE_MIN_TIMEOUT_MS:100}"
   max_timeout_ms: "${env.OMNIMEMORY_STORAGE_MAX_TIMEOUT_MS:300000}"
+  max_connections_limit: "${env.OMNIMEMORY_STORAGE_MAX_CONNECTIONS_LIMIT:1000}"
 
 # === TAGS ===
 tags:

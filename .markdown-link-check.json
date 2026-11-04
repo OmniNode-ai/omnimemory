@@ -1,9 +1,7 @@
 {
     "ignorePatterns": [
         {"pattern": "^https://linear\\.app"},
-        {"pattern": "^https://github\\.com/OmniNode-ai"},
-        {"pattern": "^http://localhost"},
-        {"pattern": "^https://localhost"}
+        {"pattern": "^https://github\\.com/OmniNode-ai"}
     ],
     "excludeFiles": [
         ".pytest_cache/**",

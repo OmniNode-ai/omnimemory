@@ -35,6 +35,7 @@ _ENV_BY_FIELD = {
         "OMNIMEMORY_LIFECYCLE_PROJECTION_READER_TIMEOUT_SECONDS"
     ),
     "tick_circuit_breaker_recovery_seconds": "OMNIMEMORY_LIFECYCLE_TICK_CB_RECOVERY_SECONDS",
+    "db_max_retries": "OMNIMEMORY_LIFECYCLE_DB_MAX_RETRIES",
 }
 
 _INJECTED = ModelLifecycleTimeoutSettings(
@@ -42,6 +43,7 @@ _INJECTED = ModelLifecycleTimeoutSettings(
     db_circuit_breaker_recovery_seconds=2.5,
     projection_reader_timeout_seconds=3.5,
     tick_circuit_breaker_recovery_seconds=4.5,
+    db_max_retries=7,
 )
 
 
@@ -57,6 +59,7 @@ def test_contract_defaults_resolve() -> None:
     assert settings.db_circuit_breaker_recovery_seconds == 60.0
     assert settings.projection_reader_timeout_seconds == 10.0
     assert settings.tick_circuit_breaker_recovery_seconds == 30.0
+    assert settings.db_max_retries == 3
 
 
 def test_env_overlay_replaces_every_value(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,6 +70,7 @@ def test_env_overlay_replaces_every_value(monkeypatch: pytest.MonkeyPatch) -> No
     assert settings.db_circuit_breaker_recovery_seconds == 22.0
     assert settings.projection_reader_timeout_seconds == 33.0
     assert settings.tick_circuit_breaker_recovery_seconds == 44.0
+    assert settings.db_max_retries == 55
 
 
 @pytest.mark.parametrize("name", sorted(_ENV_BY_FIELD.values()))
@@ -128,3 +132,22 @@ def test_handlers_without_settings_resolve_the_contract() -> None:
     assert (
         HandlerMemoryTick(container)._settings.projection_reader_timeout_seconds == 10.0
     )
+
+
+def test_expire_handler_default_retry_limit_is_the_contract_value() -> None:
+    assert HandlerMemoryExpire(ModelONEXContainer()).max_retries == 3
+
+
+def test_expire_handler_retry_limit_follows_injected_settings() -> None:
+    assert (
+        HandlerMemoryExpire(ModelONEXContainer(), settings=_INJECTED).max_retries == 7
+    )
+
+
+@pytest.mark.asyncio
+async def test_expire_handler_initialize_defaults_to_the_settings_retry_limit() -> None:
+    handler = HandlerMemoryExpire(ModelONEXContainer(), settings=_INJECTED)
+    await handler.initialize(db_pool=MagicMock())
+    assert handler.max_retries == 7
+    await handler.initialize(db_pool=MagicMock(), max_retries=2)
+    assert handler.max_retries == 2

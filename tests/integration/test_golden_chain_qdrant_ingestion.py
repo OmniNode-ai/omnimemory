@@ -53,7 +53,7 @@ def _make_config() -> ModelHandlerQdrantConfig:
         qdrant_port=6333,
         collection_name="test_col",
         vector_size=_VECTOR_SIZE,
-        embedding_server_url="http://localhost:8100",
+        embedding_server_url="http://svc.example.test:8100",
         max_chunk_chars=2000,
     )
 

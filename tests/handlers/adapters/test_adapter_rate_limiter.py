@@ -47,7 +47,7 @@ def config() -> ModelRateLimiterConfig:
     """Create a default rate limiter configuration."""
     return ModelRateLimiterConfig(
         provider="openai",
-        model="text-embedding-3-small",
+        model="fixture-embedding-small",
         requests_per_minute=60,
         tokens_per_minute=0,
     )
@@ -58,7 +58,7 @@ def config_with_tokens() -> ModelRateLimiterConfig:
     """Create a config with token limiting enabled."""
     return ModelRateLimiterConfig(
         provider="openai",
-        model="text-embedding-3-small",
+        model="fixture-embedding-small",
         requests_per_minute=60,
         tokens_per_minute=1000,
     )
@@ -107,9 +107,9 @@ class TestModelRateLimiterConfig:
         """Test the (provider, model) key property."""
         config = ModelRateLimiterConfig(
             provider="openai",
-            model="text-embedding-3-small",
+            model="fixture-embedding-small",
         )
-        assert config.key == ("openai", "text-embedding-3-small")
+        assert config.key == ("openai", "fixture-embedding-small")
 
     def test_validation_min_requests(self) -> None:
         """Test validation rejects zero requests per minute."""
@@ -525,7 +525,7 @@ class TestRateLimiterRegistry:
         """Test get_or_create creates new limiter."""
         limiter = await registry.get_or_create(
             provider="openai",
-            model="text-embedding-3-small",
+            model="fixture-embedding-small",
         )
         assert limiter is not None
         assert registry.count == 1
@@ -538,11 +538,11 @@ class TestRateLimiterRegistry:
         """Test get_or_create returns existing limiter."""
         limiter1 = await registry.get_or_create(
             provider="openai",
-            model="text-embedding-3-small",
+            model="fixture-embedding-small",
         )
         limiter2 = await registry.get_or_create(
             provider="openai",
-            model="text-embedding-3-small",
+            model="fixture-embedding-small",
         )
         assert limiter1 is limiter2
         assert registry.count == 1
@@ -555,11 +555,11 @@ class TestRateLimiterRegistry:
         """Test keys are normalized for consistent lookup."""
         limiter1 = await registry.get_or_create(
             provider="OpenAI",
-            model="Text-Embedding-3-Small",
+            model="Fixture-Embedding-Small",
         )
         limiter2 = await registry.get_or_create(
             provider="openai",
-            model="text-embedding-3-small",
+            model="fixture-embedding-small",
         )
         assert limiter1 is limiter2
 
@@ -669,14 +669,14 @@ class TestRateLimiterRegistry:
         """Test that valid identifier patterns are accepted."""
         # Test various valid patterns
         valid_pairs = [
-            ("openai", "text-embedding-3-small"),
+            ("openai", "fixture-embedding-small"),
             ("local_provider", "model_v2"),
             ("provider.name", "model.version"),
             ("UPPERCASE", "MixedCase"),
             ("provider-with-dashes", "model-with-dashes"),
             ("provider_with_underscores", "model_with_underscores"),
             ("provider123", "model456"),
-            ("local/provider", "models/gpt-4"),
+            ("local/provider", "models/fixture-chat"),
         ]
         for provider, model in valid_pairs:
             limiter = await registry.get_or_create(provider=provider, model=model)

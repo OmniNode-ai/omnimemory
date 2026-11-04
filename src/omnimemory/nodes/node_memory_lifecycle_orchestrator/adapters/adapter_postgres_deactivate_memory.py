@@ -177,7 +177,7 @@ class AdapterPostgresDeactivateMemory:
     async def initialize(
         self,
         db_pool: Pool,
-        max_retries: int = 3,
+        max_retries: int | None = None,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         """Initialize the adapter and the underlying expire handler.
@@ -185,7 +185,7 @@ class AdapterPostgresDeactivateMemory:
         Args:
             db_pool: PostgreSQL connection pool for database operations.
             max_retries: Maximum retry attempts for deactivate_with_retry().
-                Defaults to 3 attempts.
+                Defaults to the handler's lifecycle settings ``db_max_retries``.
             circuit_breaker: Optional circuit breaker for database operation
                 resilience. A default is created if not provided.
 
@@ -201,7 +201,7 @@ class AdapterPostgresDeactivateMemory:
         self._initialized = True
         logger.info(
             "AdapterPostgresDeactivateMemory initialized",
-            extra={"max_retries": max_retries},
+            extra={"max_retries": self._handler.max_retries},
         )
 
     async def shutdown(self) -> None:
