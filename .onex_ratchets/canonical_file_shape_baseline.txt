@@ -8,7 +8,6 @@ deployment/database/migrations_pending/004_create_navigation_paths_collection.py
 examples/__init__.py
 examples/advanced_architecture_demo.py
 scripts/__init__.py
-scripts/check_dep_provenance.py
 scripts/check_migration_freeze.sh
 scripts/check_no_hardcoded_bolt.sh
 scripts/ci/__init__.py
