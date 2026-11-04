@@ -16,10 +16,15 @@ class TestReleaseMetadata(unittest.TestCase):
     """Keep the package, editable lock entry and newest release notes in sync."""
 
     def test_release_includes_omn18595_version(self) -> None:
-        """The release must advance beyond the 0.18.8 merge-base version."""
+        """The release must not fall behind the 0.18.9 floor.
+
+        A floor, not an equality: the release train opens every later release PR
+        (0.18.10 and on) without editing this file, so an exact version here turns
+        each one red in Tests until a person re-pins it (OMN-17427).
+        """
         project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text())["project"]
         version = tuple(int(part) for part in project["version"].split("."))
-        assert version == (0, 18, 9), f"Expected release 0.18.9, got {version}"
+        assert version >= (0, 18, 9), f"Release {version} predates 0.18.9"
 
     def test_lock_matches_project_version(self) -> None:
         """The editable package must carry the published project version."""
