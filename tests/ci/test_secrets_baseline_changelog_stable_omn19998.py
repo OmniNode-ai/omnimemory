@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 
 import pytest
+from detect_secrets.pre_commit_hook import main as secrets_hook
 
 pytestmark = pytest.mark.unit
 
@@ -40,3 +41,27 @@ def test_placeholder_credential_url_lines_are_allowlisted_in_place() -> None:
     assert placeholder_lines, "positive control: the placeholder line must exist"
     unmarked = [line[:80] for line in placeholder_lines if PRAGMA not in line]
     assert unmarked == [], f"placeholder credential URL without {PRAGMA!r}: {unmarked}"
+
+
+@pytest.mark.parametrize("prepended_lines", [0, 12])
+def test_release_prepend_leaves_baseline_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prepended_lines: int
+) -> None:
+    baseline = tmp_path / ".secrets.baseline"
+    before = (REPO_ROOT / ".secrets.baseline").read_bytes()
+    baseline.write_bytes(before)
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(
+        "\n" * prepended_lines
+        + (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    args = ["--baseline", ".secrets.baseline", "CHANGELOG.md"]
+    assert secrets_hook(args) == 0
+    assert baseline.read_bytes() == before
+
+    # Positive control: the same hook must still reject an unmarked credential.
+    changelog.write_text(changelog.read_text().replace(PRAGMA, ""), encoding="utf-8")
+    assert secrets_hook(args) == 1
+    assert baseline.read_bytes() == before

@@ -23,7 +23,6 @@ COMPAT = re.compile(r"omnibase[_-]compat")
 RUNNING_FILES = (
     "pyproject.toml",
     ".github/workflows/sibling-lock-refresh.yml",
-    "scripts/check_dep_provenance.py",
 )
 
 

@@ -21,8 +21,6 @@ CHANGE_CONTROL = re.compile(r"onex[_-]change[_-]control")
 # Live configuration and tooling that used to name the repository.
 CLEAN_FILES = (
     "architecture-handshakes/validator-requirements.yaml",
-    "scripts/check_dep_provenance.py",
-    "tests/scripts/test_check_dep_provenance.py",
     ".github/workflows/dep-provenance-gate.yml",
 )
 

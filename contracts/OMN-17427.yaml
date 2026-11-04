@@ -46,6 +46,18 @@ requirements:
         statement: >-
           contracts/OMN-17390.yaml and contracts/OMN-20868.yaml contain exactly the source bytes from
           change-control commit 49cfc14c21a2c50f9964c1aeed4b66001ce279a3, readable without a sibling checkout.
+  - id: "req-dep-provenance-core-hook"
+    statement: >-
+      The dependency-provenance gate is core's check-dep-provenance validator, so the cascade's own pin
+      (a tag-only source at the sibling's dev merge tag) passes and a revision, a branch, a release tag
+      or a foreign repository is still refused; this repository carries no copy of the gate.
+    acceptance:
+      - id: "AC9"
+        statement: >-
+          AC9: scripts/check_dep_provenance.py is deleted, the check-dep-provenance hook comes from omnibase_core
+          at a dev merge tag, and dep-provenance-gate.yml runs that same hook through pre-commit -- falsifier:
+          python -m pytest tests/ci/test_dep_provenance_consumes_core_omn17427.py -q fails at the merge
+          base.
   - id: "req-pr677-qdrant-lock"
     statement: "PR 677's widened Qdrant requirement remains installable from the committed lockfile."
     acceptance:
@@ -54,6 +66,16 @@ requirements:
           locked dependency resolution succeeds without rewriting it."
       - id: "AC8"
         statement: "The existing focused Qdrant handler tests pass with the locked dependencies."
+  - id: "req-changelog-secret-line-independent"
+    statement: >-
+      CHANGELOG.md carries no .secrets.baseline entry that a release can move, so a release PR that prepends
+      its notes does not make the detect-secrets hook rewrite the baseline and fail.
+    acceptance:
+      - id: "AC10"
+        statement: >-
+          AC10: CHANGELOG.md has no entry in .secrets.baseline and every credential-shaped line in it
+          carries an inline allowlist marker -- falsifier: python -m pytest tests/ci/test_changelog_secret_line_independent_omn17427.py
+          -q fails at the merge base.
   - id: "req-fastapi-lock-pr676"
     statement: "The FastAPI requirement update in PR 676 remains installable with the committed lockfile."
     acceptance:
@@ -61,14 +83,29 @@ requirements:
         statement: >-
           uv.lock records the FastAPI requirement from pyproject.toml, so uv lock --check accepts the
           widened upper bound without rewriting dependency metadata.
+  - id: "req-release-metadata-floor"
+    statement: >-
+      The release metadata test asserts a version floor, so a release PR the train opens without editing
+      it does not fail Tests on an exact-version assertion.
+    acceptance:
+      - id: "AC11"
+        statement: >-
+          AC11: tests/test_release_metadata_omn18595.py accepts any release at or above 0.18.9 -- falsifier:
+          with pyproject.toml at 0.18.10 the file fails at the merge base and passes here.
 evidence_requirements:
   - kind: "tests"
     description: "Documentation inventory, local links and existing release metadata checks."
     command: "uv run --no-project --python 3.12 python tests/test_documentation_inventory_omn17427.py"
   - kind: "tests"
+    description: "The provenance gate is consumed from core and the repository carries no copy."
+    command: "uv run --frozen pytest tests/ci/test_dep_provenance_consumes_core_omn17427.py -q --no-cov"
+  - kind: "tests"
     description: "Focused workflow, context, manifest and installed-node verdict checks."
     command: "uv run --no-project --with pytest --with pytest-asyncio --with pytest-xdist --with pyyaml
       pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -n 0"
+  - kind: "tests"
+    description: "CHANGELOG.md is independent of a baseline line number."
+    command: "uv run --frozen pytest tests/ci/test_changelog_secret_line_independent_omn17427.py -q --no-cov"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -124,6 +161,16 @@ dod_evidence:
     checks:
       - check_type: "test_passes"
         check_value: "python3 tests/ci/test_migrated_contracts_omn17427.py"
+  - id: "dod-dep-provenance-core-hook"
+    description: "The provenance gate is core's hook, run by the workflow from the pre-commit config,
+      and no local copy of the script remains."
+    source: "manual"
+    binds_ac: ["AC9"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --frozen pytest tests/ci/test_dep_provenance_consumes_core_omn17427.py -q
+          --no-cov"
+        cwd: "${OMNI_HOME}/omnimemory"
   - id: "dod-pr677-qdrant-lock"
     description: "Locked resolution accepts the manifest and lockfile after the Qdrant ceiling change."
     source: "manual"
@@ -139,6 +186,16 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "env PYTHONDONTWRITEBYTECODE=1 uv run --locked pytest tests/unit/nodes/test_handler_qdrant.py
           -q"
+  - id: "dod-changelog-secret-line-independent"
+    description: "CHANGELOG.md has no baseline entry and its credential-shaped example is allowlisted
+      inline."
+    source: "manual"
+    binds_ac: ["AC10"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --frozen pytest tests/ci/test_changelog_secret_line_independent_omn17427.py
+          -q --no-cov"
+        cwd: "${OMNI_HOME}/omnimemory"
   - id: "dod-fastapi-lock-pr676"
     description: "The dependency lock accepts the widened FastAPI requirement without an update."
     source: "manual"
@@ -146,4 +203,12 @@ dod_evidence:
     checks:
       - check_type: "command"
         check_value: "uv lock --check"
+        cwd: "${OMNI_HOME}/omnimemory"
+  - id: "dod-release-metadata-floor"
+    description: "The release metadata test passes for the current release and asserts a floor."
+    source: "manual"
+    binds_ac: ["AC11"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --frozen pytest tests/test_release_metadata_omn18595.py -q --no-cov"
         cwd: "${OMNI_HOME}/omnimemory"

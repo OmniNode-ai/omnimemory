@@ -291,10 +291,6 @@ known-first-party = ["omnimemory"]
     "ERA001",  # Commented-out code in examples
     "T201",  # print() is intentional user-facing output
 ]
-# Dep-provenance gate CLI (OMN-13873) — user-facing print() diagnostics
-"scripts/check_dep_provenance.py" = [
-    "T201",  # print() is intentional user-facing CLI output
-]
 # Root foundation validators are user-facing CLI scripts.
 "validate_foundation*.py" = [
     "T201",  # print() is intentional user-facing output
@@ -312,8 +308,6 @@ known-first-party = ["omnimemory"]
 "src/omnimemory/tools/contract_linter.py" = ["T201"]
 # Performance benchmark test — uses print() for results output
 "tests/test_performance.py" = ["T201"]
-# Dep-provenance gate test (OMN-13873) — importlib spec+loader guard assert
-"tests/scripts/test_check_dep_provenance.py" = ["PT018"]
 # Test-only rules - acceptable in test files
 "tests/**/*" = [
     "SLF001",  # Private member accessed (tests need to verify internals)

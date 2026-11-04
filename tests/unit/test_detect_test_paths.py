@@ -565,7 +565,6 @@ class TestNarrowingNoRegression:
         )
         assert not sel.is_full_suite
         assert _covers(sel.selected_paths, "tests/unit/test_detect_test_paths.py")
-        assert _covers(sel.selected_paths, "tests/scripts/test_check_dep_provenance.py")
 
     def test_contract_only_change_still_runs_node_uuid_gate(self) -> None:
         # tests/unit/test_no_duplicate_node_uuids.py sits directly under
