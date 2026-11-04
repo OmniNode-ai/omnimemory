@@ -54,6 +54,16 @@ requirements:
           locked dependency resolution succeeds without rewriting it."
       - id: "AC8"
         statement: "The existing focused Qdrant handler tests pass with the locked dependencies."
+  - id: "req-changelog-secret-line-independent"
+    statement: >-
+      CHANGELOG.md carries no .secrets.baseline entry that a release can move, so a release PR that
+      prepends its notes does not make the detect-secrets hook rewrite the baseline and fail.
+    acceptance:
+      - id: "AC10"
+        statement: >-
+          AC10: CHANGELOG.md has no entry in .secrets.baseline and every credential-shaped line in it
+          carries an inline allowlist marker -- falsifier: python -m pytest
+          tests/ci/test_changelog_secret_line_independent_omn17427.py -q fails at the merge base.
   - id: "req-fastapi-lock-pr676"
     statement: "The FastAPI requirement update in PR 676 remains installable with the committed lockfile."
     acceptance:
@@ -69,6 +79,10 @@ evidence_requirements:
     description: "Focused workflow, context, manifest and installed-node verdict checks."
     command: "uv run --no-project --with pytest --with pytest-asyncio --with pytest-xdist --with pyyaml
       pytest tests/ci/test_pr_title_check_omnimarket_node.py -q -n 0"
+  - kind: "tests"
+    description: "CHANGELOG.md is independent of a baseline line number."
+    command: "uv run --no-project --with pytest pytest tests/ci/test_changelog_secret_line_independent_omn17427.py
+      -q -n 0"
 emergency_bypass:
   enabled: false
   justification: ""
@@ -139,6 +153,14 @@ dod_evidence:
       - check_type: "test_passes"
         check_value: "env PYTHONDONTWRITEBYTECODE=1 uv run --locked pytest tests/unit/nodes/test_handler_qdrant.py
           -q"
+  - id: "dod-changelog-secret-line-independent"
+    description: "CHANGELOG.md has no baseline entry and its credential-shaped example is allowlisted inline."
+    source: "manual"
+    binds_ac: ["AC10"]
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run --no-project --with pytest pytest tests/ci/test_changelog_secret_line_independent_omn17427.py
+          -q -n 0"
   - id: "dod-fastapi-lock-pr676"
     description: "The dependency lock accepts the widened FastAPI requirement without an update."
     source: "manual"
