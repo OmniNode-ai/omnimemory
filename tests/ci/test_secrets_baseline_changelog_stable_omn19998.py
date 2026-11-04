@@ -15,6 +15,7 @@ CHANGELOG.md entry to go stale.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,8 @@ def test_release_prepend_leaves_baseline_unchanged(
         + (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    # The hook asks git which files are changed but unstaged; it needs a repo.
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     monkeypatch.chdir(tmp_path)
     args = ["--baseline", ".secrets.baseline", "CHANGELOG.md"]
     assert secrets_hook(args) == 0
