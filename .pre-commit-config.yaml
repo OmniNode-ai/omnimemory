@@ -671,7 +671,7 @@ repos:
   # the two verdicts cannot diverge. Advancing it is those two lines, together.
   # --------------------------------------------------------------------------
   - repo: https://github.com/OmniNode-ai/omniclaude
-    rev: 0c9f9146d8dd0446fc5c10952aa57247b3a880ae  # pragma: allowlist secret
+    rev: ea35e6f65f0a1b290982743e8b779be8a585473c  # pragma: allowlist secret
     hooks:
       - id: secrets-baseline-wired
       # OMN-20940: the local twin of the required CI context
