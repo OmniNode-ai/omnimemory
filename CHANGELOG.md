@@ -1,3 +1,17 @@
+## v0.18.10 (2026-11-05)
+
+### Release
+- Cut omnimemory from dev at 0.18.10 by the scheduled release train.
+- 5 release-relevant commit(s) merged since v0.18.9.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.9
+- chore(deps): bump omnibase_core to dev-20261104102410-b002ec3ceab1 (#720)
+- fix: consume core's check-dep-provenance so the cascade's dev merge tag pin passes (#721)
+- feat: wire the core dependency-pin check into omnimemory CI Summary (#717)
+- chore(deps): drop retired omnibase-compat from override, lock refresh and provenance list (#716)
+- fix: omnimemory declares no upward omnimarket pin (#715)
+
 ## v0.18.9 (2026-11-02)
 
 ### Release
