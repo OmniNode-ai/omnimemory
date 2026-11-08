@@ -8,7 +8,7 @@ resolution-markers = [
 
 [manifest]
 overrides = [
-    { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?tag=dev-20261108014124-2fe30fd9dc47" },
+    { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?tag=dev-20261108164157-61505c5cac1f" },
     { name = "omnibase-infra", specifier = ">=0.38.4,<0.39.0" },
     { name = "omnibase-spi", specifier = ">=0.23.0,<0.24.0" },
 ]
@@ -1676,8 +1676,8 @@ wheels = [
 
 [[package]]
 name = "omnibase-core"
-version = "0.47.69"
-source = { git = "https://github.com/OmniNode-ai/omnibase_core.git?tag=dev-20261108014124-2fe30fd9dc47#2fe30fd9dc47fcf0e25bead887ea7505b39612b9" }
+version = "0.47.70"
+source = { git = "https://github.com/OmniNode-ai/omnibase_core.git?tag=dev-20261108164157-61505c5cac1f#61505c5cac1f9c09affcfd6b7d24edde1749e7c7" }
 dependencies = [
     { name = "blake3" },
     { name = "click" },
@@ -1841,7 +1841,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'graph'", specifier = ">=0.28.1,<1.0.0" },
     { name = "mcp", specifier = ">=1.27.2,<3.0.0" },
     { name = "neo4j", marker = "extra == 'graph'", specifier = ">=5.0.0,<7.0.0" },
-    { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?tag=dev-20261108014124-2fe30fd9dc47" },
+    { name = "omnibase-core", git = "https://github.com/OmniNode-ai/omnibase_core.git?tag=dev-20261108164157-61505c5cac1f" },
     { name = "omnibase-infra", specifier = ">=0.38.4,<0.39.0" },
     { name = "omnibase-spi", specifier = ">=0.23.0,<0.24.0" },
     { name = "pinecone-client", specifier = ">=6.0.0,<7.0.0" },
