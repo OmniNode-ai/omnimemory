@@ -1774,7 +1774,7 @@ wheels = [
 
 [[package]]
 name = "omninode-memory"
-version = "0.18.12"
+version = "0.18.13"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
