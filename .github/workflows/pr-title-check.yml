@@ -22,6 +22,6 @@ jobs:
     # `pr-title / check-title` on pull_request and merge_group alike.
     permissions:
       contents: read
-    uses: OmniNode-ai/omnibase_core/.github/workflows/pr-title-check.yml@6d562b13401684270453f1dedd22f8737110f2f2
+    uses: OmniNode-ai/omnibase_core/.github/workflows/pr-title-check.yml@56c0e1ae8cc38712a7598f44f9a6d14fe104b233
     with:
       omnimarket-version: "0.4.310"
