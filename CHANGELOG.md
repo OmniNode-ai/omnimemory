@@ -1,3 +1,13 @@
+## v0.18.14 (2026-11-11)
+
+### Release
+- Cut omnimemory from dev at 0.18.14 by the scheduled release train.
+- 1 release-relevant commit(s) merged since v0.18.13.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.13
+- build(deps): update cachetools requirement from <8.0.0,>=6.2.4 to >=6.2.4,<9.0.0 (#738)
+
 ## v0.18.13 (2026-11-09)
 
 ### Release
