@@ -76,6 +76,17 @@
 #   pre-commit run --all-files --hook-stage pre-push  # Run pre-push hooks
 
 repos:
+  # OMN-24065: generic validators omnibase_core merged (core 2290 to 2294), run here by hook id.
+  # rev is the dev-merge tag the lock resolves for omnibase-core, a revision that carries each hook.
+  # No baseline file and no allowlist: each hook passes over the whole tree. no-naive-timestamp is
+  # not listed because it refuses code already in the tree.
+  - repo: https://github.com/OmniNode-ai/omnibase_core
+    rev: dev-20261111183916-a85cb916d4c1
+    hooks:
+      - id: declared-timeout-reaches-call
+      - id: no-time-bound-truncation
+      - id: no-id-from-stamp
+      - id: no-fixed-tmp-atomic-write
   # No hardcoded ONEX topic strings and ticketed TODO format — sourced from omnibase_core
   # (OMN-5259; OMN-20074, OCC retirement S8: same hook ids, no longer pulled from
   # the change-control repository)
