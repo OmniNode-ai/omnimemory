@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
 
-"""OMN-23949: the omnibase-core source names one revision everywhere.
+"""OMN-20413: the omnibase-core source names one revision everywhere.
 
 pyproject.toml, uv.lock and the check-handshake workflow must all name the
-dev-20261111183916-a85cb916d4c1 tag. The lock additionally records the
+dev-20261113013358-a09066caf945 tag. The lock additionally records the
 resolved commit, which the handshake workflow checks out by raw sha, so the
 three references are only consistent when the sha extends the tag suffix.
 """
@@ -20,7 +20,7 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-EXPECTED_CORE_TAG = "dev-20261111183916-a85cb916d4c1"
+EXPECTED_CORE_TAG = "dev-20261113013358-a09066caf945"
 CORE_GIT_URL = "https://github.com/OmniNode-ai/omnibase_core.git"
 
 

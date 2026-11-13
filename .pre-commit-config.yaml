@@ -81,7 +81,7 @@ repos:
   # No baseline file and no allowlist: each hook passes over the whole tree. no-naive-timestamp is
   # not listed because it refuses code already in the tree.
   - repo: https://github.com/OmniNode-ai/omnibase_core
-    rev: dev-20261111183916-a85cb916d4c1
+    rev: dev-20261113013358-a09066caf945
     hooks:
       - id: declared-timeout-reaches-call
       - id: no-time-bound-truncation
