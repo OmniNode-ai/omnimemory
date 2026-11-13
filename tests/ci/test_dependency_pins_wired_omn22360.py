@@ -40,7 +40,9 @@ def test_dependency_pins_job_calls_the_core_workflow() -> None:
 
 def test_dependency_pins_job_uses_the_core_hook_tag() -> None:
     tag = str(_jobs()["dependency-pins"]["uses"]).removeprefix(WORKFLOW)
-    assert _core_hook_revs() == {tag}
+    # OMN-24065: a second core block pins a newer rev for the validators added there;
+    # the workflow tag must still be one of the revs the config pins.
+    assert tag in _core_hook_revs()
 
 
 def test_ci_summary_needs_dependency_pins() -> None:
