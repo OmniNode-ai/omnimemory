@@ -385,6 +385,11 @@ class TestPrecommitHooksCoveredByAlignments:
             "reject-deploy-gate-skip-token-commit-msg",
             "strip-ai-coauthor-trailer",
             "validate-validator-requirements",
+            # OMN-24065: generic core validators with no ci.yml counterpart job
+            "declared-timeout-reaches-call",
+            "no-time-bound-truncation",
+            "no-id-from-stamp",
+            "no-fixed-tmp-atomic-write",
             # CI counterpart is the standalone dep-provenance-gate.yml workflow
             # (OMN-13873), not a ci.yml job, so it is excluded from the
             # ci.yml-scoped EXPECTED_ALIGNMENTS — same as check-url-authority
