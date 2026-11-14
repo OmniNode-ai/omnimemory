@@ -238,6 +238,15 @@ test_families:
   tests/unit/scripts/:
     triggers:
       - scripts/
+  # OMN-23140: overlay env-reference suites. They pin that the contract env-ref
+  # expansion imported from omnibase_core resolves in the config models, the
+  # retrieval node contract, error_models and the runtime plugin.
+  tests/unit/overlay/:
+    triggers:
+      - src/omnimemory/models/config/
+      - src/omnimemory/nodes/node_memory_retrieval_effect/
+      - src/omnimemory/protocols/error_models.py
+      - src/omnimemory/runtime/plugin.py
   tests/unit/test_auto_tag_app_token_push_omn18662.py:
     triggers:
       - .github/workflows/
