@@ -15,7 +15,7 @@ from collections.abc import Callable
 from typing import Self
 
 import yaml
-from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
+from omnibase_core.overlays.contract_env_ref import expand_contract_env_refs
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...enums.enum_entity_extraction_mode import EnumEntityExtractionMode

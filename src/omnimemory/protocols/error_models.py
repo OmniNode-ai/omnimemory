@@ -27,7 +27,7 @@ FieldValueType = (
 # Import ModelOnexError from omnibase_core
 import yaml
 from omnibase_core.models.errors.model_onex_error import ModelOnexError
-from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
+from omnibase_core.overlays.contract_env_ref import expand_contract_env_refs
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.foundation import ModelMetadata

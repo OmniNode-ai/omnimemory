@@ -126,7 +126,7 @@ dependencies:
 # ${env.VAR} overlay convention so an operator overlay / the per-lane service env
 # supplies the real endpoint per lane — never a hardcoded host in source. The
 # config defaults resolve these through
-# omnibase_infra.runtime.overlay.contract_env_ref.expand_contract_env_refs (the
+# omnibase_core.overlays.contract_env_ref.expand_contract_env_refs (the
 # one sanctioned env-reading boundary) and fail closed: an unset/empty host
 # raises rather than silently defaulting to localhost.
 descriptor:
