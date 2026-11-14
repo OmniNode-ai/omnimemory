@@ -23,8 +23,9 @@ pytestmark = pytest.mark.unit
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CALLER = REPO_ROOT / ".github" / "workflows" / "security-scan.yml"
 
-# Squash commit of omnibase_core#1940, which adds the reusable on that repository's dev branch.
-CORE_REUSABLE_PIN_PREFIX = "3fbb43ea"
+# omnibase_core dev commit the caller pins (moved by omnimemory#713); the reusable
+# itself landed in omnibase_core#1940.
+CORE_REUSABLE_PIN_PREFIX = "666ba3b0"
 CORE_REUSABLE_PATH = "OmniNode-ai/omnibase_core/.github/workflows/codeql-reusable.yml"
 FORBIDDEN_REFERENCE = "onex_change_control"
 CALLER_JOB_ID = "codeql"

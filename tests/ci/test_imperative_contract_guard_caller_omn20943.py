@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github/workflows"
 CALLER = WORKFLOWS / "imperative-contract-guard.yml"
 ALLOWLIST = ROOT / "imperative-contract-allowlist.yaml"
-CORE_SHA_PREFIX = "031148215"
+CORE_SHA_PREFIX = "666ba3b03"
 CORE_USES = "OmniNode-ai/omnibase_core/.github/workflows/imperative-contract-guard.yml"
 RECORDED_PATHS = [
     "src/omnimemory/handlers/adapters/adapter_valkey.py",

@@ -29,9 +29,10 @@ REPO_ROOT = Path(
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 REQUIRED_CHECKS = REPO_ROOT / ".github" / "required-checks.yaml"
 CALLER_PATH = WORKFLOWS / "call-repo-evidence-gate.yml"
-# 8-character prefix of omniclaude#2656's squash commit: the runner-IP reusable no
-# longer runs a nested OCC preflight.
-RUNNER_IP_PIN_PREFIX = "a45ba68f"
+# 8-character prefix of the omniclaude dev commit the caller pins (moved by
+# omnimemory#713) forward from a45ba68f, omniclaude#2656's squash commit, where the
+# runner-IP reusable stopped running a nested OCC preflight.
+RUNNER_IP_PIN_PREFIX = "ea35e6f6"
 
 _OCC_REUSABLE = re.compile(r"^(?:call-)?occ-[a-z0-9-]+\.ya?ml$")
 _OCC_JOB = re.compile(r"occ-(preflight|eligibility|companion|autobind)")

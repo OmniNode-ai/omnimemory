@@ -46,6 +46,20 @@ requirements:
           exists -- falsifier: uv run pytest tests/ci/test_secrets_baseline_changelog_stable_omn19998.py
           -q -n 0 fails at the merge base, where the baseline keys the finding to line 365 and omnimemory#719
           failed ONEX Validation when a release moved it to line 377"
+  - id: "req-omn19998-actions-pin-parity"
+    statement: "When the reusable-workflow pins move (the Dependabot actions group, omnimemory#713), every
+      record of the same pin moves with them: the required-checks manifest's cross_repo_ref, the shared
+      omniclaude pre-commit hook block that is the local twin of public-repo-hygiene, and the pin each
+      caller test names."
+    acceptance:
+      - id: "AC4"
+        statement: "AC4: the pr-title manifest row's cross_repo_ref equals the caller's uses, the omniclaude
+          pre-commit block running deployment-config sits at the public-repo-hygiene caller's commit,
+          and the codeql, imperative-contract-guard and runner-IP caller tests name the pins the callers
+          use -- falsifier: uv run pytest tests/ci/test_pr_title_check_omnimarket_node.py tests/ci/test_codeql_from_core_omn20074.py
+          tests/ci/test_imperative_contract_guard_caller_omn20943.py tests/ci/test_no_occ_callers_omn20074.py
+          tests/ci/test_deployment_config_context_omn20940.py -q -n 0 has 5 failures with omnimemory#713's
+          workflow bump alone on dev b0ca9f47"
 evidence_requirements:
   - kind: "tests"
     description: "The placement tests read every workflow file for the fleet fallback, the ci.yml job,
@@ -80,3 +94,13 @@ dod_evidence:
         check_value: "uv run pytest tests/ci/test_secrets_baseline_changelog_stable_omn19998.py -q -n
           0"
     binds_ac: ["AC3"]
+  - id: "dod-omn19998-actions-pin-parity"
+    description: "The pin-parity and caller tests pass at the head; with omnimemory#713's workflow bump
+      alone on dev, 5 of them fail."
+    source: "manual"
+    checks:
+      - check_type: "test_passes"
+        check_value: "uv run pytest tests/ci/test_pr_title_check_omnimarket_node.py tests/ci/test_codeql_from_core_omn20074.py
+          tests/ci/test_imperative_contract_guard_caller_omn20943.py tests/ci/test_no_occ_callers_omn20074.py
+          tests/ci/test_deployment_config_context_omn20940.py -q -n 0"
+    binds_ac: ["AC4"]
