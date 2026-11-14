@@ -23,7 +23,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
+from omnibase_core.overlays.contract_env_ref import expand_contract_env_refs
 
 _CONTRACT = Path(__file__).resolve().parent / "contract.yaml"
 

@@ -90,8 +90,8 @@ from omnibase_core.event_bus.util_consumer_group import derive_consumer_group_id
 from omnibase_core.models.event_bus.model_consumer_group_scope import (
     ModelConsumerGroupScope,
 )
+from omnibase_core.overlays.contract_env_ref import expand_contract_env_refs
 from omnibase_infra.runtime.models.model_handshake_result import ModelHandshakeResult
-from omnibase_infra.runtime.overlay.contract_env_ref import expand_contract_env_refs
 from omnibase_infra.runtime.protocol_domain_plugin import (
     ModelDomainPluginConfig,
     ModelDomainPluginResult,
