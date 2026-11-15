@@ -46,6 +46,15 @@ requirements:
           exists -- falsifier: uv run pytest tests/ci/test_secrets_baseline_changelog_stable_omn19998.py
           -q -n 0 fails at the merge base, where the baseline keys the finding to line 365 and omnimemory#719
           failed ONEX Validation when a release moved it to line 377"
+  - id: "req-omn19998-no-compat-references"
+    statement: "Operator ruling 2026-11-15T17:59:49Z: omnibase_compat is removed; no running file, workflow
+      comment or validator list in omnimemory names it."
+    acceptance:
+      - id: "AC4"
+        statement: "AC4: architecture-handshakes/validator-requirements.yaml, the ban-hardcoded-runner-ip
+          and release workflows, scripts/ci/verify_pypi_pin_resolvability.py and tests/gates/test_ban_hardcoded_runner_ip_scope.py
+          hold no omnibase_compat or omnibase-compat reference -- falsifier: the grep command fails at
+          the merge base, where validator-requirements.yaml lists omnibase_compat"
 evidence_requirements:
   - kind: "tests"
     description: "The placement tests read every workflow file for the fleet fallback, the ci.yml job,
@@ -80,3 +89,13 @@ dod_evidence:
         check_value: "uv run pytest tests/ci/test_secrets_baseline_changelog_stable_omn19998.py -q -n
           0"
     binds_ac: ["AC3"]
+  - id: "dod-omn19998-no-compat-references"
+    description: "The changed files name no retired omnibase_compat package; at the merge base validator-requirements.yaml
+      names it and the grep finds a match."
+    source: "manual"
+    checks:
+      - check_type: "command"
+        check_value: "! grep -rEn 'omnibase[_-]compat' architecture-handshakes/validator-requirements.yaml
+          .github/workflows/ban-hardcoded-runner-ip.yml .github/workflows/release.yml scripts/ci/verify_pypi_pin_resolvability.py
+          tests/gates/test_ban_hardcoded_runner_ip_scope.py"
+    binds_ac: ["AC4"]
