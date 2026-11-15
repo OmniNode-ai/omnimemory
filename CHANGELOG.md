@@ -1,3 +1,14 @@
+## v0.18.15 (2026-11-15)
+
+### Release
+- Cut omnimemory from dev at 0.18.15 by the scheduled release train.
+- 2 release-relevant commit(s) merged since v0.18.14.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.14
+- : memory consumers expand environment references through omnibase_core, not the infra overlay package (#742)
+- : bump omnibase-core dev tag to dev-20261111183916-a85cb916d4c1 (#740)
+
 ## v0.18.14 (2026-11-11)
 
 ### Release
