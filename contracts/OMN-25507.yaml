@@ -1,0 +1,118 @@
+---
+schema_version: 1.0.0
+ticket_id: OMN-25507
+title: 'omnimemory: take the omnibase-core source to the revision the omnibase_infra dev tags use'
+summary: >-
+  The omnibase-core source tag in pyproject.toml, the lock, the check-handshake workflow ref and the pre-commit
+  hook rev all name dev-20261113013358-a09066caf945, the core tag every omnibase_infra dev tag from dev-20261113053642-6cea249fb8cf
+  pins, so an omnimarket change that takes such an infra tag no longer hits conflicting omnibase-core
+  URLs through omninode-memory. This contract binds every criterion AC1 to AC4 the live ticket carries,
+  in requirements[].acceptance with its live text; AC1 and AC4 are open here and read by a verifier lane.
+  No criterion_hash pin is recorded: detect-secrets flags a 64-character hex value in this repository,
+  and the canonical-file-shape ratchet refuses both an inline suppression and a baseline entry for it.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: req-omn25507-cause-named
+    statement: "The shared cause of the red Tests (Split 7/20) check is named from failure text with job
+      ids and quoted lines."
+    acceptance:
+      - id: AC1
+        statement: "AC1: the shared cause is named from the failure text read on at least three of PRs
+          6001, 6094, 6306 and 6334, with job ids and quoted lines in the lane's STATUS row -- falsifier:
+          the ledger holds no STATUS row from the lane naming the cause with job ids and quotes for three
+          PRs"
+  - id: req-omn25507-core-pin
+    statement: "omnimemory's omnibase-core source tag, its uv.lock record, the check-handshake workflow
+      ref and the pre-commit hook rev name the same revision, and a test fails on the unfixed pin."
+    acceptance:
+      - id: AC2
+        statement: "AC2: one pull request on the default branch of the repository that owns the cause
+          fixes it at the source, with a test that fails on the unfixed code and passes on the fix --
+          falsifier: `uv run pytest <the new test path> -q` run at the unfixed base commit passes, or
+          `onex scm pr-view` shows no such pull request"
+  - id: req-omn25507-no-widening
+    statement: "The fix removes no assertion and adds no skip, xfail, loosened threshold or changed required-check
+      list."
+    acceptance:
+      - id: AC3
+        statement: "AC3: the fix widens or bypasses no check, so the diff removes no assertion and adds
+          no skip, xfail, loosened threshold or changed required-check list -- falsifier: `git diff <base>
+          <head> -- tests/ .github/` shows a removed assert, a new skip or xfail marker or a changed required-check
+          list"
+  - id: req-omn25507-lab-and-terminal
+    statement: "The PR body carries a Lab line and the lane's TERMINAL names the head."
+    acceptance:
+      - id: AC4
+        statement: "AC4: the PR body carries a Lab line and the lane's TERMINAL names the head -- falsifier:
+          the PR body carries no line starting `Lab:`"
+evidence_requirements:
+  - kind: tests
+    description: The pyproject.toml tag, the uv.lock source for omnibase-core and the check-handshake
+      workflow ref all name dev-20261113013358-a09066caf945.
+    command: uv run --frozen pytest tests/ci/test_core_pin_matches_lock.py -q --no-cov
+emergency_bypass:
+  enabled: false
+  justification: ''
+  follow_up_ticket_id: ''
+dod_evidence:
+  - id: dod-omn25507-ac1-cause-named
+    description: "OPEN in this contract. The evidence is two ledger STATUS rows, one of lane cause5-2049
+      (2026-11-17T21:24:57Z) and one of lane cause4-0011 (2026-11-18T00:57:04Z): they name the cause (omninode-memory
+      pins omnibase-core dev-20261111183916-a85cb916d4c1 while the omnimarket PRs pin dev-20261113013358-a09066caf945)
+      with job ids 133742790871, 133742791486 and 133918878123 and quoted lines for omnimarket PRs 6001,
+      6094 and 6306. A hosted runner cannot read the ledger, so a verifier lane reads those rows; the
+      check only pins the fix the cause names."
+    source: manual
+    binds_ac:
+      - AC1
+    checks:
+      - check_type: command
+        check_value: "grep -q 'dev-20261113013358-a09066caf945' pyproject.toml"
+        cwd: ${OMNI_HOME}/omnimemory
+  - id: dod-omn25507-ac2-core-pin
+    description: "The pyproject.toml tag, the uv.lock source for omnibase-core and the check-handshake
+      workflow ref all name dev-20261113013358-a09066caf945. Run at the PR head: the new-pin test file
+      passes (3 passed); the same test file read against the pyproject.toml, uv.lock and check-handshake.yml
+      of origin/dev fails (3 failed); and the version parse in the contract-validation test takes only
+      the leading release segment."
+    source: manual
+    binds_ac:
+      - AC2
+    checks:
+      - check_type: test_passes
+        check_value: "uv run --frozen pytest tests/ci/test_core_pin_matches_lock.py -q --no-cov"
+        cwd: ${OMNI_HOME}/omnimemory
+      - check_type: test_passes
+        check_value: "uv run --frozen pytest tests/ci/test_contract_validation_core_validator_omn20074.py
+          -q --no-cov -k test_workflow_validates_at_the_locked_core"
+        cwd: ${OMNI_HOME}/omnimemory
+  - id: dod-omn25507-ac3-no-widening
+    description: "Read from the diff of the PR head against origin/dev: the only .github change is the
+      core ref in check-handshake.yml; the tests/ change adds one assertion and removes none, and adds
+      no skip or xfail; no required-check list changes. The check pins the skip and xfail part over the
+      two changed test files."
+    source: manual
+    binds_ac:
+      - AC3
+    checks:
+      - check_type: command
+        check_value: "grep -q 'ref: a09066caf945' .github/workflows/check-handshake.yml && test -f tests/ci/test_core_pin_matches_lock.py
+          && ! grep -nE 'pytest\\.mark\\.(skip|xfail)|pytest\\.skip|xfail' tests/ci/test_core_pin_matches_lock.py
+          tests/ci/test_contract_validation_core_validator_omn20074.py"
+        cwd: ${OMNI_HOME}/omnimemory
+  - id: dod-omn25507-ac4-lab-and-terminal
+    description: "OPEN in this contract: a hosted runner reads neither the PR body nor the ledger, so
+      a verifier lane reads both. Read by the lane that wrote this binding from the PR watcher state:
+      the PR body carries a line starting Lab: (host h051, lane cause5-2049), and the TERMINAL of lane
+      cause5-0111 (2026-11-18T01:47:32Z) names head 1a2d4059b55f021978b958f9344b1c81556a2f97. The check
+      pins that this contract names the ticket and that the pin it binds is in pyproject.toml."
+    source: manual
+    binds_ac:
+      - AC4
+    checks:
+      - check_type: command
+        check_value: "grep -q 'ticket_id: OMN-25507' contracts/OMN-25507.yaml && grep -q 'dev-20261113013358-a09066caf945'
+          pyproject.toml"
+        cwd: ${OMNI_HOME}/omnimemory
