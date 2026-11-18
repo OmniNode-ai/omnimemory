@@ -7,11 +7,10 @@ S6 cut-over: ``shadow`` and ``compare-with-occ`` are both "false", so
 OCC's. Every OCC caller and the in-CI OCC preflight are gone (see
 ``test_no_occ_callers_omn20074.py``).
 
-Failure modes this catches: the caller turned ``shadow`` or ``compare-with-occ``
-back on (admission would wait on a verdict nobody reports); the pin moved to a
-branch name or an older reusable; the caller moved to ``pull_request`` (a PR could
-then edit what judges it); a job name was added (the context prefix would change);
-an OCC caller came back; the repo contract lost a falsifier.
+These tests catch a caller that turns ``shadow`` or ``compare-with-occ`` back on,
+changes the reusable pin, changes the ``pull_request`` trigger or adds a filter,
+or changes the check context by adding a job name. They also catch a returning
+OCC caller or a missing contract falsifier.
 """
 
 from __future__ import annotations
@@ -54,19 +53,22 @@ def _job() -> dict[str, Any]:
     return job
 
 
-def test_caller_runs_from_the_base_branch_on_dev_and_main() -> None:
+def test_caller_runs_on_pull_request_for_dev_and_main_base_branches() -> None:
     doc = _load(CALLER)
     # YAML 1.1 reads a bare `on` as the boolean True.
     triggers = doc["on"] if "on" in doc else doc[True]
-    assert set(triggers) == {"pull_request_target"}
-    assert triggers["pull_request_target"]["branches"] == ["dev", "main"]
-    assert triggers["pull_request_target"]["types"] == [
-        "opened",
-        "synchronize",
-        "reopened",
-        "edited",
-        "ready_for_review",
-    ]
+    assert triggers == {
+        "pull_request": {
+            "branches": ["dev", "main"],
+            "types": [
+                "opened",
+                "synchronize",
+                "reopened",
+                "edited",
+                "ready_for_review",
+            ],
+        },
+    }
     assert doc["permissions"] == {"contents": "read", "pull-requests": "read"}
     assert set(doc["jobs"]) == {"repo-evidence"}
 
