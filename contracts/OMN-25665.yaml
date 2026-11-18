@@ -1,0 +1,55 @@
+---
+schema_version: "1.0.0"
+ticket_id: OMN-25665
+title: Repo Evidence Gate caller runs on pull_request in omnimemory
+summary: >-
+  Move the omnimemory Repo Evidence Gate caller to pull_request and retain the repo-evidence / dod-verify
+  check context.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: req-repo-evidence-caller-trigger
+    statement: Migrate the caller and its trigger test in omnimemory.
+    acceptance:
+      - id: AC1
+        statement: >-
+          AC1: omnimemory's call-repo-evidence-gate.yml on its default branch triggers on pull_request
+          with the same types and branches, keeps job id repo-evidence so the context name repo-evidence
+          / dod-verify is unchanged, and no longer names pull_request_target -- falsifier: git grep -c
+          pull_request_target origin/dev -- .github/workflows/call-repo-evidence-gate.yml returns 0 in
+          omnimemory
+      - id: AC2
+        statement: >-
+          AC2: the tests that pin the old trigger in omnimemory are rewritten to pin the new one with
+          the same strictness, fail on the old workflow and pass on the new one -- falsifier: the repository's
+          caller-trigger test run with pytest red on the base workflow and green on the head, receipt
+          in the PR body
+# The published PR supplies the evidence for AC3 and AC4.
+dod_evidence:
+  - id: dod-omn25665-caller-trigger
+    description: The caller declares pull_request and the repo-evidence job and has no pull_request_target
+      matches.
+    source: manual
+    binds_ac: [AC1]
+    checks:
+      - check_type: command
+        check_value: >-
+          git grep -q '^  pull_request:$' -- .github/workflows/call-repo-evidence-gate.yml && git grep
+          -q '^  repo-evidence:$' -- .github/workflows/call-repo-evidence-gate.yml && (if git grep -c
+          pull_request_target -- .github/workflows/call-repo-evidence-gate.yml; then exit 1; else test
+          "$?" -eq 1; fi)
+        cwd: ${OMNI_HOME}/omnimemory
+  - id: dod-omn25665-caller-tests
+    description: >-
+      The trigger, caller pin, and verifier floor tests pass. The command requires the new trigger even
+      when the merge-base checkout runs the previous test expectations.
+    source: manual
+    binds_ac: [AC2]
+    checks:
+      - check_type: test_passes
+        check_value: >-
+          uv run --frozen pytest -q tests/ci/test_repo_evidence_caller_omn20074.py tests/ci/test_receipt_gate_caller_pin_omn20134.py
+          tests/ci/test_repo_evidence_caller_verifier_floor_omn20032.py && git grep -q '^  pull_request:$'
+          -- .github/workflows/call-repo-evidence-gate.yml
+        cwd: ${OMNI_HOME}/omnimemory
