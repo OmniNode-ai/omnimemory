@@ -98,7 +98,8 @@ dod_evidence:
       - AC3
     checks:
       - check_type: command
-        check_value: "! grep -nE 'pytest\\.mark\\.(skip|xfail)|pytest\\.skip|xfail' tests/ci/test_core_pin_matches_lock.py
+        check_value: "grep -q 'ref: a09066caf945' .github/workflows/check-handshake.yml && test -f tests/ci/test_core_pin_matches_lock.py
+          && ! grep -nE 'pytest\\.mark\\.(skip|xfail)|pytest\\.skip|xfail' tests/ci/test_core_pin_matches_lock.py
           tests/ci/test_contract_validation_core_validator_omn20074.py"
         cwd: ${OMNI_HOME}/omnimemory
   - id: dod-omn25507-ac4-lab-and-terminal
@@ -106,11 +107,12 @@ dod_evidence:
       a verifier lane reads both. Read by the lane that wrote this binding from the PR watcher state:
       the PR body carries a line starting Lab: (host h051, lane cause5-2049), and the TERMINAL of lane
       cause5-0111 (2026-11-18T01:47:32Z) names head 1a2d4059b55f021978b958f9344b1c81556a2f97. The check
-      only pins that this contract names the ticket."
+      pins that this contract names the ticket and that the pin it binds is in pyproject.toml."
     source: manual
     binds_ac:
       - AC4
     checks:
       - check_type: command
-        check_value: "grep -q 'ticket_id: OMN-25507' contracts/OMN-25507.yaml"
+        check_value: "grep -q 'ticket_id: OMN-25507' contracts/OMN-25507.yaml && grep -q 'dev-20261113013358-a09066caf945'
+          pyproject.toml"
         cwd: ${OMNI_HOME}/omnimemory
