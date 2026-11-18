@@ -1,3 +1,13 @@
+## v0.18.16 (2026-11-18)
+
+### Release
+- Cut omnimemory from dev at 0.18.16 by the scheduled release train.
+- 1 release-relevant commit(s) merged since v0.18.15.
+- Opened by the release train, which cuts only when the repo's declared lab-evidence premise holds for the exact candidate commit.
+
+### Included Since v0.18.15
+- : pin omnibase-core to dev-20261113013358-a09066caf945 (#746)
+
 ## v0.18.15 (2026-11-15)
 
 ### Release
