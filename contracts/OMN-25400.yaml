@@ -1,0 +1,111 @@
+---
+schema_version: "1.0.0"
+ticket_id: "OMN-25400"
+title: Third-party dependency bumps ride the release train; omnimemory opens no Dependabot version-update
+  pull requests
+summary: >-
+  omnimemory drops its Dependabot version-update schedules by deleting .github/dependabot.yml, which declared
+  nothing else. Security alerts are repository settings and are not touched. The registry-wide ratchet
+  and the release-train refresh are in omnibase_infra (OMN-21351). This contract binds every criterion
+  AC1 to AC4 the live ticket carries, in requirements[].acceptance with its live text; the four describe
+  repairing Dependabot pull request 745 in place, which this pull request replaces, so each is open here
+  and read by a verifier lane. No criterion_hash pin is recorded: detect-secrets flags a 64-character
+  hex value in this repository.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: req-no-dependabot-version-updates
+    statement: omnimemory declares no Dependabot version-update schedule, which is the change this pull
+      request makes; the four live criteria of the ticket describe repairing Dependabot pull request 745
+      in place, which this pull request replaces, so each is declared open below and none is claimed met.
+    acceptance:
+      - id: "AC1"
+        statement: "AC1: the required check public-repo-hygiene / public-repo-hygiene of omnimemory PR
+          745 reads success at a new head, read through the declared scm path after the fix push -- falsifier:
+          `onex scm pr-checks OmniNode-ai/omnimemory#745` lists public-repo-hygiene / public-repo-hygiene
+          as not success at the new head"
+      - id: "AC2"
+        statement: "AC2: the fix weakens no check, so the diff from head 89e2ed8fbc1a to the new head
+          removes no assertion, adds no skip, xfail or loosened threshold and edits no hygiene vocabulary,
+          workflow gate or hook config -- falsifier: `git diff 89e2ed8fbc1a <new head> -- tests/ .github/
+          .pre-commit-config.yaml` shows a removed assert, a new skip or xfail marker or a widened check"
+      - id: "AC3"
+        statement: "AC3: the new head is on the PR as a comment starting `Lab: head=<new head>` that carries
+          the lab red then green result -- falsifier: `onex scm pr-view OmniNode-ai/omnimemory#745` shows
+          no comment starting `Lab: head=` with the new head"
+      - id: "AC4"
+        statement: "AC4: a cause outside the PR is recorded and not patched around, as a STATUS row with
+          `cause=` and `shared=yes` naming the evidence -- falsifier: `grep -F 'unblk745-1511' \"$ONEX_LEDGER_PATH\"`
+          shows no STATUS row with shared=yes while a required check stays red for a cause that the base
+          branch also shows"
+evidence_requirements:
+  - kind: manual
+    description: .github/dependabot.yml is absent from the repository.
+    command: test ! -e .github/dependabot.yml
+emergency_bypass:
+  enabled: false
+  justification: ''
+  follow_up_ticket_id: ''
+dod_evidence:
+  - id: dod-no-dependabot-version-updates-ac1
+    description: "OPEN: this pull request deletes .github/dependabot.yml (the check below); it does not
+      make public-repo-hygiene / public-repo-hygiene of pull request 745 read success at a new head, because
+      745 is closed and not repaired. AC1 remains open: 745 is not repaired, and the criterion as the
+      ticket words it cannot be met by this pull request."
+    source: manual
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/unit/test_no_dependabot_version_updates_omn25400.py -q -n 0
+        cwd: "."
+      - check_type: command
+        check_value: test ! -e .github/dependabot.yml
+        cwd: "."
+    binds_ac:
+      - AC1
+  - id: dod-no-dependabot-version-updates-ac2
+    description: "OPEN: AC2 describes the diff from head 89e2ed8fbc1a of pull request 745 to a repaired
+      head, and no such head exists. This pull request edits no workflow gate, hook config or hygiene
+      vocabulary, and the check below proves only the deletion of .github/dependabot.yml and its guard
+      test. AC2 remains open."
+    source: manual
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/unit/test_no_dependabot_version_updates_omn25400.py -q -n 0
+        cwd: "."
+      - check_type: command
+        check_value: test ! -e .github/dependabot.yml
+        cwd: "."
+    binds_ac:
+      - AC2
+  - id: dod-no-dependabot-version-updates-ac3
+    description: "OPEN: AC3 asks for a Lab: head= comment on pull request 745 at a repaired head carrying
+      a red then green result, and 745 has none. The lab red and green of this pull request are in its
+      body and in a Lab: head= comment on it, for the deletion of .github/dependabot.yml; the check below
+      proves only that deletion. AC3 remains open."
+    source: manual
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/unit/test_no_dependabot_version_updates_omn25400.py -q -n 0
+        cwd: "."
+      - check_type: command
+        check_value: test ! -e .github/dependabot.yml
+        cwd: "."
+    binds_ac:
+      - AC3
+  - id: dod-no-dependabot-version-updates-ac4
+    description: "OPEN: AC4 asks for a STATUS row with cause= and shared=yes by lane unblk745-1511; the
+      ledger copy this lane read holds no row of that lane, and a STATUS row of lane unblk745-0111 was
+      refused by the relay. The cause named by lane unblk745-0111 (public-repo-hygiene red on Dependabot
+      runs because the App client-id input is empty) is written as a STATUS row by lane drift2-0750 with
+      shared=yes. The check below proves only the deletion of .github/dependabot.yml. AC4 remains open."
+    source: manual
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/unit/test_no_dependabot_version_updates_omn25400.py -q -n 0
+        cwd: "."
+      - check_type: command
+        check_value: test ! -e .github/dependabot.yml
+        cwd: "."
+    binds_ac:
+      - AC4

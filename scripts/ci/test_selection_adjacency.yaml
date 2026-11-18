@@ -294,6 +294,9 @@ test_families:
     triggers:
       - src/omnimemory/models/persona/
       - src/omnimemory/enums/
+  tests/unit/test_no_dependabot_version_updates_omn25400.py:
+    triggers:
+      - .github/
   tests/unit/test_no_duplicate_node_uuids.py:
     triggers:
       - src/omnimemory/nodes/
