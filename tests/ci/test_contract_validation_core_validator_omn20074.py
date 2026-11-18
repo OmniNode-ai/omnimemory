@@ -21,6 +21,7 @@ locked core installed.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -178,7 +179,9 @@ def test_workflow_validates_at_the_locked_core_with_the_binds_ac_rules() -> None
     block = UV_LOCK.read_text(encoding="utf-8").split(
         'name = "omnibase-core"\nversion = "', 1
     )[1]
-    version = tuple(int(part) for part in block.split('"', 1)[0].split("."))
+    release = re.match(r"\d+(?:\.\d+)*", block.split('"', 1)[0])
+    assert release is not None, block[:40]
+    version = tuple(int(part) for part in release.group().split("."))
     assert version >= CORE_WITH_BINDS_AC_RULES, version
 
 
