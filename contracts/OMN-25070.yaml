@@ -19,6 +19,13 @@ requirements:
           AC6: the onex-validate-links hook entry in .pre-commit-config.yaml ends with python -m omnibase_core.nodes.node_markdown_links_check_compute.runtime_markdown_links_check
           --verbose and that module exits 0 on this repository -- falsifier: tests/ci/test_validate_links_hook_module_omn25070.py
           fails at the merge base, where the entry is uv run onex-validate-links --verbose
+  - id: req-omn25070-omnimemory-no-launcher-callers
+    statement: No CI step or pre-commit hook in omnimemory runs the onex launcher, so CI keeps working
+      once only omninode-onex declares it.
+    acceptance:
+      - id: AC3
+        statement: "AC3 (this repository's launcher-move part): CI and hook callers run python -m omnibase_core.cli.cli_commands
+          -- falsifier: the bound check fails at the merge base, where they run uv run onex"
 dod_evidence:
   - id: dod-omn25070-validate-links-module
     description: The hook entry runs the link check module, and the module passes on this repository.
@@ -30,4 +37,13 @@ dod_evidence:
           uv run --frozen pytest -q tests/ci/test_validate_links_hook_module_omn25070.py && uv run --frozen
           python -m omnibase_core.nodes.node_markdown_links_check_compute.runtime_markdown_links_check
           --verbose
+        cwd: ${OMNI_HOME}/omnimemory
+  - id: dod-omn25070-ac3-omnimemory-no-launcher-calls
+    description: No CI step or hook entry runs uv run onex; the callers run python -m omnibase_core.cli.cli_commands.
+      At the merge base .github/workflows/ci.yml still run uv run onex, so the check fails there.
+    source: manual
+    binds_ac: [AC3]
+    checks:
+      - check_type: test_passes
+        check_value: uv run --frozen pytest -q --no-cov tests/ci/test_onex_launcher_callers_omn25070.py
         cwd: ${OMNI_HOME}/omnimemory

@@ -4,7 +4,7 @@
 """OMN-25507: the omnibase-core source names one revision everywhere.
 
 pyproject.toml, uv.lock and the check-handshake workflow must all name the
-dev-20261113013358-a09066caf945 tag. The lock additionally records the
+dev-20261120075721-2a9efbda3548 tag. The lock additionally records the
 resolved commit, which the handshake workflow checks out by raw sha, so the
 three references are only consistent when the sha extends the tag suffix.
 """
@@ -20,7 +20,7 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-EXPECTED_CORE_TAG = "dev-20261113013358-a09066caf945"
+EXPECTED_CORE_TAG = "dev-20261120075721-2a9efbda3548"
 CORE_GIT_URL = "https://github.com/OmniNode-ai/omnibase_core.git"
 
 
