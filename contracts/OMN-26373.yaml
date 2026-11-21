@@ -1,0 +1,65 @@
+---
+schema_version: "1.0.0"
+ticket_id: OMN-26373
+title: The omnimemory census baseline pull request reads every required check green on its head
+summary: >-
+  The census baseline pull request for omnimemory read three required checks red on head cbfe808d0301:
+  repo-evidence / dod-verify (no test-side change, so the bound tests could not be shown to fail at the
+  merge base), dependency-pins / Dependency Pins (omnibase-infra pinned at 0.38.76 in uv.lock, four releases
+  behind the newest 0.38.80 where the policy allows three) and CI Summary (a follower of the pin check).
+  This change adds the census guard test that fails at the merge base and passes at the head, binds it
+  in the census contract, and moves the omnibase-infra lock entry to 0.38.80, the move the pin check names.
+  No ratchet row, pin bound or check definition is loosened.
+is_seam_ticket: false
+interface_change: false
+interfaces_touched: []
+requirements:
+  - id: req-omn26373-census-baseline-green
+    statement: The census baseline pull request reads every required check green with no check loosened.
+    acceptance:
+      - id: AC1
+        statement: >-
+          AC1: the check runs of omnimemory#753 named CI Summary, dependency-pins / Dependency Pins and
+          repo-evidence / dod-verify read conclusion success on the PR's current head -- falsifier: python3
+          pr_state_local.py --pr omnimemory#753 prints ci=GREEN with red= empty
+      - id: AC2
+        statement: >-
+          AC2: no pin, ratchet row or check definition is loosened in the fix diff, and no pin moves without
+          a reason the check names -- falsifier: git diff origin/dev...HEAD shows no raised ratchet count
+          and only the pin change the Dependency Pins check demands
+evidence_requirements:
+  - kind: manual
+    description: The census guard test passes at the head, and uv.lock pins omnibase-infra at 0.38.80.
+emergency_bypass:
+  enabled: false
+  justification: ''
+  follow_up_ticket_id: ''
+dod_evidence:
+  - id: dod-omn26373-ac1-checks-green
+    description: >-
+      The two causes the failing jobs named are gone at the head: the census guard test (the test-side
+      change dod-verify needs) passes, and the lock entry for omnibase-infra is the newest release. The
+      watcher reading of the three checks on the new head is the final falsifier and is read after the
+      push.
+    source: manual
+    binds_ac: [AC1]
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/ci/test_ledger_file_census_ratchet_omn26318.py -q -n 0
+        cwd: .
+      - check_type: command
+        check_value: >-
+          grep -A1 '^name = "omnibase-infra"$' uv.lock | grep -Fxq 'version = "0.38.80"'
+        cwd: .
+  - id: dod-omn26373-ac2-nothing-loosened
+    description: >-
+      The census ratchet row for omnimemory is still the measured 1 and its per-file table still lists
+      the one file; pyproject.toml keeps the omnibase-infra range unchanged.
+    source: manual
+    binds_ac: [AC2]
+    checks:
+      - check_type: command
+        check_value: >-
+          grep -Fxq '  omnimemory: 1' config/ledger_file_census_ratchet.yaml && grep -Fq '"omnibase-infra>=0.38.4,<0.39.0"'
+          pyproject.toml
+        cwd: .
