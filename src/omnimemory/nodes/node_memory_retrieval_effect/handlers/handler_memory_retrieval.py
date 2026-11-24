@@ -2,40 +2,27 @@
 # SPDX-License-Identifier: MIT
 
 # Copyright (c) 2025 OmniNode Team
-"""Memory Retrieval Handler - Routes requests to appropriate backend handlers.
+"""Memory Retrieval Handler - answers searches from injected stores or refuses by name.
 
-routing requests to the appropriate handler based on the operation type:
-- search: Routes to Qdrant handler for semantic similarity search
-- search_text: Routes to Database handler for full-text search
-- search_graph: Routes to Graph handler for relationship traversal
+The handler routes a request to the store that serves its operation:
+- search: the vector store (semantic similarity)
+- search_text: the database store (full-text)
+- search_graph: the graph store (relationship traversal)
+- search_hybrid: the vector and database stores, fused by rank
 
-The handler abstracts the underlying handlers, providing a unified interface
-for memory retrieval operations.
+It builds none of those stores. They are injected behind their protocols
+(``omnimemory.protocols.protocol_retrieval_store``) and resolved from settings
+by ``container.registry_memory_retrieval``. A store that is absent, or that
+cannot be reached, is answered with a ``refused`` response that names it and
+carries no rows (OMN-26659).
 
 Example::
 
-    import asyncio
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers import (
-        HandlerMemoryRetrieval,
+    handler = HandlerMemoryRetrieval(vector_store=vector_store)
+    response = await handler.execute(
+        ModelMemoryRetrievalRequest(operation="search", query_text="auth")
     )
-    from omnimemory.nodes.node_memory_retrieval_effect.models import (
-        ModelHandlerMemoryRetrievalConfig,
-        ModelMemoryRetrievalRequest,
-    )
-
-    async def example():
-        config = ModelHandlerMemoryRetrievalConfig()
-        handler = HandlerMemoryRetrieval(config)
-        await handler.initialize()
-
-        # Semantic search
-        request = ModelMemoryRetrievalRequest(
-            operation="search",
-            query_text="authentication decision",
-        )
-        response = await handler.execute(request)
-
-    asyncio.run(example())
+    # response.status == "success", or "refused" naming the vector store.
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
@@ -49,32 +36,30 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from omnimemory.protocols.protocol_retrieval_store import (
+        ProtocolDatabaseStore,
+        ProtocolGraphStore,
+        ProtocolRetrievalStore,
+        ProtocolVectorStore,
+    )
 
-    from .handler_db_mock import HandlerDbMock
     from .handler_decay import HandlerActivationDecay
-    from .handler_graph_mock import HandlerGraphMock
-    from .handler_qdrant_mock import HandlerQdrantMock
 
-from omnibase_core.models.omnimemory import (
-    ModelMemorySnapshot,
-)
+from omnimemory.enums.enum_memory_store import EnumMemoryStore
+from omnimemory.enums.enum_store_refusal_reason import EnumStoreRefusalReason
 
 from ..container.registry_memory_retrieval import (
     bind_activation_decay,
-    bind_db_mock,
-    bind_graph_mock,
-    bind_qdrant_mock,
     bind_rank_fusion,
 )
 from ..models import (
     ModelActivationDecayRequest,
-    ModelHandlerMemoryRetrievalConfig,
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
     ModelRankedEntry,
     ModelRankedLeg,
     ModelRankFusionRequest,
+    ModelStoreRefusal,
 )
 from .handler_fusion import (
     MIN_LEXICAL_TS_RANK,
@@ -89,177 +74,127 @@ __all__ = [
 ]
 
 
-class HandlerMemoryRetrieval:
-    """Main handler for memory retrieval operations.
+def _refusal(
+    store: EnumMemoryStore, reason: EnumStoreRefusalReason, detail: str
+) -> ModelMemoryRetrievalResponse:
+    """Build a refused response: the store named, no rows."""
+    return ModelMemoryRetrievalResponse(
+        status="refused",
+        refusal=ModelStoreRefusal(store=store, reason=reason, detail=detail),
+    )
 
-    operations, routing requests to the appropriate backend handler based
-    on the operation type.
+
+class HandlerMemoryRetrieval:
+    """Routes retrieval requests to the injected stores, or refuses by name.
 
     Supported operations:
-        - search: Semantic similarity search (Qdrant)
-        - search_text: Full-text search (PostgreSQL)
-        - search_graph: Relationship traversal (Graph DB)
+        - search: Semantic similarity search (vector store)
+        - search_text: Full-text search (database store)
+        - search_graph: Relationship traversal (graph store)
+        - search_hybrid: Fused semantic and full-text retrieval
 
-    The handler manages handler lifecycle and ensures consistent error
-    handling across all backends.
-
-    Attributes:
-        config: The handler configuration.
-
-    Example::
-
-        handler = HandlerMemoryRetrieval(ModelHandlerMemoryRetrievalConfig())
-        await handler.initialize()
-
-        # Seed test data (for mock handlers)
-        handler.seed_snapshots([snapshot1, snapshot2])
-
-        # Execute search
-        request = ModelMemoryRetrievalRequest(
-            operation="search",
-            query_text="user authentication",
-        )
-        response = await handler.execute(request)
-        for result in response.results:
-            print(f"{result.snapshot.snapshot_id}: {result.score:.2f}")
+    Every store is optional at construction. A request whose store is absent
+    is refused with ``reason=not_configured``; a store that fails to connect or
+    raises while answering is refused with ``reason=unreachable``. Neither
+    returns rows, and neither is answered from anything but the real store.
     """
 
     def __init__(
         self,
-        config: ModelHandlerMemoryRetrievalConfig | None = None,
+        vector_store: ProtocolVectorStore | None = None,
+        database_store: ProtocolDatabaseStore | None = None,
+        graph_store: ProtocolGraphStore | None = None,
         fusion: HandlerRankFusion | None = None,
         decay: HandlerActivationDecay | None = None,
     ) -> None:
-        """Initialize the handler with configuration.
+        """Hold the injected stores and the ranking collaborators.
 
         Args:
-            config: The handler configuration. If None, defaults are used.
+            vector_store: Store behind ``search``; None when not configured.
+            database_store: Store behind ``search_text``; None when not configured.
+            graph_store: Store behind ``search_graph``; None when not configured.
             fusion: Stateless rank fusion collaborator, constructed when None.
             decay: Stateless activation decay collaborator, constructed when None.
         """
         self._fusion = bind_rank_fusion() if fusion is None else fusion
         self._decay = bind_activation_decay() if decay is None else decay
-        self._config = config or ModelHandlerMemoryRetrievalConfig()
-        self._qdrant_handler: HandlerQdrantMock | None = None
-        self._db_handler: HandlerDbMock | None = None
-        self._graph_handler: HandlerGraphMock | None = None
-        self._initialized = False
-        self._init_lock = asyncio.Lock()
+        self._stores: dict[EnumMemoryStore, ProtocolRetrievalStore | None] = {
+            EnumMemoryStore.VECTOR: vector_store,
+            EnumMemoryStore.DATABASE: database_store,
+            EnumMemoryStore.GRAPH: graph_store,
+        }
+        self._connected: set[EnumMemoryStore] = set()
+        self._connect_lock = asyncio.Lock()
 
     @property
-    def config(self) -> ModelHandlerMemoryRetrievalConfig:
-        """Get the handler configuration."""
-        return self._config
+    def configured_stores(self) -> frozenset[EnumMemoryStore]:
+        """The stores this handler was given."""
+        return frozenset(k for k, v in self._stores.items() if v is not None)
 
-    @property
-    def is_initialized(self) -> bool:
-        """Check if the handler has been initialized."""
-        return self._initialized
+    async def _connect(
+        self, store: EnumMemoryStore
+    ) -> ModelMemoryRetrievalResponse | None:
+        """Connect one store on first use.
 
-    async def initialize(self) -> None:
-        """Initialize the handler and all sub-handlers.
-
-        Thread-safe: Uses asyncio.Lock to prevent concurrent initialization.
+        Returns:
+            None when the store is connected; a refusal naming it when it is
+            not configured or cannot be reached. A failed connect is not
+            cached, so the next request tries again.
         """
-        if self._initialized:
-            return
-
-        async with self._init_lock:
-            if self._initialized:
-                return
-
-            if self._config.use_stub_handlers:
-                # Initialize stub (mock) handlers
-                self._qdrant_handler = bind_qdrant_mock(self._config.qdrant_mock_config)
-                self._db_handler = bind_db_mock(self._config.db_config)
-                self._graph_handler = bind_graph_mock(self._config.graph_config)
-
-                await asyncio.gather(
-                    self._qdrant_handler.initialize(),
-                    self._db_handler.initialize(),
-                    self._graph_handler.initialize(),
+        backend = self._stores[store]
+        if backend is None:
+            return _refusal(
+                store,
+                EnumStoreRefusalReason.NOT_CONFIGURED,
+                f"no {store.value} store is configured for this runtime",
+            )
+        if store in self._connected:
+            return None
+        async with self._connect_lock:
+            if store in self._connected:
+                return None
+            try:
+                await backend.initialize()
+            except Exception as exc:
+                logger.exception("Memory %s store could not be reached", store.value)
+                return _refusal(
+                    store,
+                    EnumStoreRefusalReason.UNREACHABLE,
+                    f"{type(exc).__name__}: {exc}",
                 )
+            self._connected.add(store)
+        return None
 
-                logger.info("Memory retrieval handler initialized with stub handlers")
-            else:
-                # stub-ok: OMN-4475 — HandlerQdrant production wiring deferred to Task 5
-                raise NotImplementedError(
-                    "Production handlers not yet implemented. Set use_stub_handlers=True"
-                )
-
-            self._initialized = True
-
-    def seed_snapshots(
-        self,
-        snapshots: Sequence[ModelMemorySnapshot],
-        embeddings: dict[str, list[float]] | None = None,
-    ) -> None:
-        """Seed all handlers with test snapshots.
-
-        This is primarily for testing with mock handlers. Each handler
-        receives the same set of snapshots.
-
-        Args:
-            snapshots: List of snapshots to seed.
-            embeddings: Optional pre-computed embeddings for Qdrant handler.
-
-        Raises:
-            RuntimeError: If the handler is not initialized.
-        """
-        if not self._initialized:
-            raise RuntimeError("Handler not initialized. Call initialize() first.")
-
-        if self._qdrant_handler:
-            self._qdrant_handler.seed_snapshots(snapshots, embeddings)
-        if self._db_handler:
-            self._db_handler.seed_snapshots(snapshots)
-        if self._graph_handler:
-            self._graph_handler.seed_snapshots(snapshots)
-
-        logger.debug("Seeded %d snapshots into all handlers", len(snapshots))
-
-    def add_graph_relationship(
-        self,
-        source_id: str,
-        target_id: str,
-        relationship_type: str,
-        weight: float = 1.0,
-    ) -> None:
-        """Add a relationship to the graph handler.
-
-        Args:
-            source_id: The source snapshot ID.
-            target_id: The target snapshot ID.
-            relationship_type: The type of relationship.
-            weight: Optional weight (0.0-1.0).
-
-        Raises:
-            RuntimeError: If handler is not initialized or graph unavailable.
-        """
-        if not self._initialized:
-            raise RuntimeError("Handler not initialized. Call initialize() first.")
-        if not self._graph_handler:
-            raise RuntimeError("Graph handler not available")
-
-        self._graph_handler.add_relationship(
-            source_id, target_id, relationship_type, weight
-        )
-
-    def reset(self) -> None:
-        """Drop all data from all handlers.
-
-        Raises:
-            RuntimeError: If the handler is not initialized.
-        """
-        if not self._initialized:
-            raise RuntimeError("Handler not initialized. Call initialize() first.")
-
-        if self._qdrant_handler:
-            self._qdrant_handler.reset()
-        if self._db_handler:
-            self._db_handler.reset()
-        if self._graph_handler:
-            self._graph_handler.reset()
+    async def _ask(
+        self, store: EnumMemoryStore, request: ModelMemoryRetrievalRequest
+    ) -> ModelMemoryRetrievalResponse:
+        """Send one request to one store; refuse by name when it cannot answer."""
+        refusal = await self._connect(store)
+        if refusal is not None:
+            return refusal
+        backend = self._stores[store]
+        if backend is None:  # pragma: no cover - _connect refused above
+            raise RuntimeError(f"{store.value} store vanished after connect")
+        try:
+            return await backend.execute(request)
+        except Exception as exc:
+            logger.exception(
+                "Memory %s store failed answering %s", store.value, request.operation
+            )
+            # A dropped connection or a timeout means the service is gone; any
+            # other error means the store was reached and could not answer.
+            reachable = not isinstance(exc, OSError)
+            if not reachable:
+                self._connected.discard(store)
+            return _refusal(
+                store,
+                (
+                    EnumStoreRefusalReason.FAILED
+                    if reachable
+                    else EnumStoreRefusalReason.UNREACHABLE
+                ),
+                f"{type(exc).__name__}: {exc}",
+            )
 
     async def handle(
         self, request: ModelMemoryRetrievalRequest
@@ -288,79 +223,26 @@ class HandlerMemoryRetrieval:
     ) -> ModelMemoryRetrievalResponse:
         """Execute a memory retrieval operation.
 
-        Routes the request to the appropriate handler based on operation type.
+        Routes the request to the store that serves its operation and returns
+        that store's answer, or a refusal naming the store that could not give one.
 
         Args:
             request: The retrieval request.
 
         Returns:
-            Response with search results or error information.
+            Response with search results, a store's own error, or a refusal.
         """
-        if not self._initialized:
-            await self.initialize()
-
-        try:
-            match request.operation:
-                case "search":
-                    if not self._qdrant_handler:
-                        return ModelMemoryRetrievalResponse(
-                            status="error",
-                            error_message=(
-                                f"{self.__class__.__name__}: Qdrant handler not "
-                                f"available for operation '{request.operation}'"
-                            ),
-                        )
-                    return await self._qdrant_handler.execute(request)
-
-                case "search_text":
-                    if not self._db_handler:
-                        return ModelMemoryRetrievalResponse(
-                            status="error",
-                            error_message=(
-                                f"{self.__class__.__name__}: Database handler not "
-                                f"available for operation '{request.operation}'"
-                            ),
-                        )
-                    return await self._db_handler.execute(request)
-
-                case "search_graph":
-                    if not self._graph_handler:
-                        return ModelMemoryRetrievalResponse(
-                            status="error",
-                            error_message=(
-                                f"{self.__class__.__name__}: Graph handler not "
-                                f"available for operation '{request.operation}'"
-                            ),
-                        )
-                    return await self._graph_handler.execute(request)
-
-                case "search_hybrid":
-                    if not self._qdrant_handler or not self._db_handler:
-                        return ModelMemoryRetrievalResponse(
-                            status="error",
-                            error_message=(
-                                f"{self.__class__.__name__}: Hybrid search needs "
-                                f"both the Qdrant and Database handlers for "
-                                f"operation '{request.operation}'"
-                            ),
-                        )
-                    return await self._execute_hybrid(request)
-
-                case _:
-                    assert_never(request.operation)
-
-        except Exception as e:
-            logger.exception(
-                "Error executing retrieval operation %s",
-                request.operation,
-            )
-            return ModelMemoryRetrievalResponse(
-                status="error",
-                error_message=(
-                    f"{self.__class__.__name__}: Retrieval failed: {e} "
-                    f"for operation '{request.operation}'"
-                ),
-            )
+        match request.operation:
+            case "search":
+                return await self._ask(EnumMemoryStore.VECTOR, request)
+            case "search_text":
+                return await self._ask(EnumMemoryStore.DATABASE, request)
+            case "search_graph":
+                return await self._ask(EnumMemoryStore.GRAPH, request)
+            case "search_hybrid":
+                return await self._execute_hybrid(request)
+            case _:
+                assert_never(request.operation)
 
     async def _execute_hybrid(
         self, request: ModelMemoryRetrievalRequest
@@ -385,20 +267,24 @@ class HandlerMemoryRetrieval:
             the request's limit. If either leg errors, that error is returned
             rather than a half-fused ranking presented as a whole answer.
         """
-        if self._qdrant_handler is None or self._db_handler is None:
-            raise RuntimeError("Hybrid search requires both Qdrant and DB handlers")
+        for needed in (EnumMemoryStore.VECTOR, EnumMemoryStore.DATABASE):
+            refusal = await self._connect(needed)
+            if refusal is not None:
+                return refusal
 
         vector_response, lexical_response = await asyncio.gather(
-            self._qdrant_handler.execute(
-                request.model_copy(update={"operation": "search"})
+            self._ask(
+                EnumMemoryStore.VECTOR,
+                request.model_copy(update={"operation": "search"}),
             ),
-            self._db_handler.execute(
-                request.model_copy(update={"operation": "search_text"})
+            self._ask(
+                EnumMemoryStore.DATABASE,
+                request.model_copy(update={"operation": "search_text"}),
             ),
         )
 
         for leg_response in (vector_response, lexical_response):
-            if leg_response.status == "error":
+            if leg_response.status in ("error", "refused"):
                 return leg_response
 
         by_id = {
@@ -499,24 +385,8 @@ class HandlerMemoryRetrieval:
         )
 
     async def shutdown(self) -> None:
-        """Shutdown the handler and all sub-handlers."""
-        if not self._initialized:
-            return
-
-        shutdown_tasks = []
-        if self._qdrant_handler:
-            shutdown_tasks.append(self._qdrant_handler.shutdown())
-        if self._db_handler:
-            shutdown_tasks.append(self._db_handler.shutdown())
-        if self._graph_handler:
-            shutdown_tasks.append(self._graph_handler.shutdown())
-
-        if shutdown_tasks:
-            await asyncio.gather(*shutdown_tasks)
-
-        self._qdrant_handler = None
-        self._db_handler = None
-        self._graph_handler = None
-        self._initialized = False
-
+        """Release every store this handler connected."""
+        connected = [self._stores[k] for k in self._connected]
+        self._connected.clear()
+        await asyncio.gather(*(b.shutdown() for b in connected if b is not None))
         logger.info("Memory retrieval handler shutdown complete")

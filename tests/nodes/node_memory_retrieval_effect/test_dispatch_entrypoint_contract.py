@@ -51,15 +51,15 @@ from omnibase_core.models.omnimemory import (
 from omnibase_core.models.primitives.model_semver import ModelSemVer
 
 from omnimemory.nodes.node_memory_retrieval_effect import (
-    ModelHandlerMemoryRetrievalConfig,
     ModelMemoryRetrievalRequest,
 )
 from omnimemory.nodes.node_memory_retrieval_effect.handlers import (
     HandlerMemoryRetrieval,
-    ModelHandlerDbMockConfig,
-    ModelHandlerGraphMockConfig,
-    ModelHandlerQdrantMockConfig,
 )
+from tests.stand_ins.stand_in_database_config import ModelHandlerDbMockConfig
+from tests.stand_ins.stand_in_graph_config import ModelHandlerGraphMockConfig
+from tests.stand_ins.stand_in_retrieval_handler import StandInHandlerMemoryRetrieval
+from tests.stand_ins.stand_in_vector_config import ModelHandlerQdrantMockConfig
 
 # =============================================================================
 # Verbatim gate predicates (copied — see module docstring)
@@ -167,19 +167,16 @@ _SEAM_NAME: Final = "HandlerMemoryRetrieval"
 
 
 @pytest.fixture
-async def seeded_handler() -> tuple[HandlerMemoryRetrieval, str]:
+async def seeded_handler() -> tuple[StandInHandlerMemoryRetrieval, str]:
     """An initialised handler seeded with two related snapshots.
 
     Returns:
         The handler and the ``snapshot_id`` of the traversal root, as a string.
     """
-    handler = HandlerMemoryRetrieval(
-        ModelHandlerMemoryRetrievalConfig(
-            use_stub_handlers=True,
-            qdrant_mock_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
-            db_config=ModelHandlerDbMockConfig(case_sensitive=False),
-            graph_config=ModelHandlerGraphMockConfig(bidirectional=True),
-        )
+    handler = StandInHandlerMemoryRetrieval(
+        vector_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
+        database_config=ModelHandlerDbMockConfig(case_sensitive=False),
+        graph_config=ModelHandlerGraphMockConfig(bidirectional=True),
     )
     await handler.initialize()
 
@@ -332,7 +329,7 @@ class TestHandleMatchesExecute:
     async def test_handle_equals_execute(
         self,
         operation: str,
-        seeded_handler: tuple[HandlerMemoryRetrieval, str],
+        seeded_handler: tuple[StandInHandlerMemoryRetrieval, str],
     ) -> None:
         """For every operation, ``handle`` returns what ``execute`` returns."""
         handler, root_id = seeded_handler
@@ -355,7 +352,7 @@ class TestRoutingPreservedThroughHandle:
     @pytest.mark.asyncio
     async def test_search_graph_through_handle_reaches_graph_sub_handler(
         self,
-        seeded_handler: tuple[HandlerMemoryRetrieval, str],
+        seeded_handler: tuple[StandInHandlerMemoryRetrieval, str],
     ) -> None:
         """``search_graph`` via ``handle()`` still lands on the graph sub-handler.
 
@@ -376,7 +373,7 @@ class TestRoutingPreservedThroughHandle:
     @pytest.mark.asyncio
     async def test_search_through_handle_reaches_semantic_sub_handler(
         self,
-        seeded_handler: tuple[HandlerMemoryRetrieval, str],
+        seeded_handler: tuple[StandInHandlerMemoryRetrieval, str],
     ) -> None:
         """``search`` via ``handle()`` still lands on the semantic sub-handler.
 

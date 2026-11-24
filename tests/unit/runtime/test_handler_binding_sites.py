@@ -26,15 +26,12 @@ from omnimemory.nodes.node_memory_lifecycle_orchestrator.container.registry_memo
 )
 from omnimemory.nodes.node_memory_retrieval_effect.container.registry_memory_retrieval import (
     bind_activation_decay,
-    bind_db_mock,
-    bind_graph_mock,
-    bind_qdrant_mock,
+    bind_memory_retrieval,
     bind_rank_fusion,
+    bind_vector_store,
 )
-from omnimemory.nodes.node_memory_retrieval_effect.models import (
-    ModelHandlerDbMockConfig,
-    ModelHandlerGraphMockConfig,
-    ModelHandlerQdrantMockConfig,
+from omnimemory.nodes.node_memory_retrieval_effect.models.model_retrieval_store_settings import (
+    ModelRetrievalStoreSettings,
 )
 from omnimemory.nodes.node_memory_storage_effect.container.registry_filesystem import (
     bind_filesystem_handler,
@@ -54,7 +51,7 @@ _BOUND_SITES = (
     "handlers/adapters/adapter_embedding_http.py",
     "nodes/node_intent_query_effect/container/registry_intent_query_effect.py",
     "nodes/node_memory_lifecycle_orchestrator/adapters/adapter_postgres_deactivate_memory.py",
-    "nodes/node_memory_retrieval_effect/handlers/handler_graph_mock.py",
+    "nodes/node_memory_retrieval_effect/container/registry_memory_retrieval.py",
     "nodes/node_memory_retrieval_effect/handlers/handler_memory_retrieval.py",
     "nodes/node_memory_storage_effect/adapters/adapter_filesystem.py",
     "nodes/node_navigation_history_reducer/handlers/handler_navigation_history_reducer.py",
@@ -115,13 +112,19 @@ def test_binders_build_their_handlers() -> None:
     assert type(bind_rank_fusion()).__name__ == "HandlerRankFusion"
     assert type(bind_activation_decay()).__name__ == "HandlerActivationDecay"
     assert (
-        type(bind_qdrant_mock(ModelHandlerQdrantMockConfig())).__name__
-        == "HandlerQdrantMock"
+        type(bind_memory_retrieval(ModelRetrievalStoreSettings())).__name__
+        == "HandlerMemoryRetrieval"
     )
-    assert type(bind_db_mock(ModelHandlerDbMockConfig())).__name__ == "HandlerDbMock"
     assert (
-        type(bind_graph_mock(ModelHandlerGraphMockConfig())).__name__
-        == "HandlerGraphMock"
+        type(
+            bind_vector_store(
+                ModelRetrievalStoreSettings(
+                    qdrant_host="qdrant.test",
+                    embedding_server_url="http://embed.test:8100",
+                )
+            )
+        ).__name__
+        == "HandlerQdrant"
     )
     assert type(bind_memory_expire(container)).__name__ == "HandlerMemoryExpire"
     assert (

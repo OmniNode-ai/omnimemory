@@ -30,6 +30,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from qdrant_client import QdrantClient
 
 from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_qdrant import (
     HandlerQdrant,
@@ -59,10 +60,12 @@ def _make_config() -> ModelHandlerQdrantConfig:
 
 
 def _make_qdrant_mock() -> MagicMock:
-    client = MagicMock()
+    # spec: a call to a method the installed qdrant-client lacks (the removed
+    # ``search``) raises AttributeError here instead of passing on a bare mock.
+    client = MagicMock(spec=QdrantClient)
     client.collection_exists = MagicMock(return_value=True)
     client.create_collection = MagicMock()
-    client.search = MagicMock(return_value=[])
+    client.query_points = MagicMock(return_value=SimpleNamespace(points=[]))
     client.upsert = MagicMock()
     client.close = MagicMock()
     return client
@@ -165,13 +168,13 @@ class TestGoldenChainQdrantIndex:
 
 @pytest.mark.unit
 class TestGoldenChainQdrantSearch:
-    """Golden chain: search command → HandlerQdrant → embedding → qdrant.search()."""
+    """Golden chain: search command → HandlerQdrant → embedding → qdrant.query_points()."""
 
     @pytest.mark.asyncio
     async def test_search_command_calls_embedding_then_qdrant_search(self) -> None:
-        """Search embeds query text and passes vector to qdrant.search."""
+        """Search embeds query text and passes vector to qdrant.query_points."""
         qdrant = _make_qdrant_mock()
-        qdrant.search = MagicMock(return_value=[])
+        qdrant.query_points = MagicMock(return_value=SimpleNamespace(points=[]))
         emb = _make_embedding_mock(vector=[0.5, 0.5, 0.5, 0.5])
         handler = _initialized_handler(qdrant=qdrant, emb=emb)
 
@@ -186,10 +189,10 @@ class TestGoldenChainQdrantSearch:
             response = await handler.execute(request)
 
         emb.get_embedding.assert_awaited_once_with("test query")
-        qdrant.search.assert_called_once()
-        call_args = qdrant.search.call_args
+        qdrant.query_points.assert_called_once()
+        call_args = qdrant.query_points.call_args
         assert call_args.args[0] == "test_col"
-        assert call_args.kwargs["query_vector"] == [0.5, 0.5, 0.5, 0.5]
+        assert call_args.kwargs["query"] == [0.5, 0.5, 0.5, 0.5]
 
         assert response.status == "no_results"
         assert response.query_embedding_used == [0.5, 0.5, 0.5, 0.5]
@@ -232,7 +235,7 @@ class TestGoldenChainQdrantSearch:
         fake_hit.payload = fake_payload
 
         qdrant = _make_qdrant_mock()
-        qdrant.search = MagicMock(return_value=[fake_hit])
+        qdrant.query_points = MagicMock(return_value=SimpleNamespace(points=[fake_hit]))
         handler = _initialized_handler(qdrant=qdrant)
 
         request = ModelMemoryRetrievalRequest(operation="search", query_text="find me")

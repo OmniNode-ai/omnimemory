@@ -23,6 +23,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from qdrant_client import QdrantClient
 
 from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_qdrant import (
     HandlerQdrant,
@@ -44,10 +45,12 @@ def _make_config(max_chunk_chars: int = 2000) -> ModelHandlerQdrantConfig:
 
 
 def _mock_qdrant_client(collection_exists: bool) -> MagicMock:
-    client = MagicMock()
+    # spec: a call to a method the installed qdrant-client lacks (the removed
+    # ``search``) raises AttributeError here instead of passing on a bare mock.
+    client = MagicMock(spec=QdrantClient)
     client.collection_exists = MagicMock(return_value=collection_exists)
     client.create_collection = MagicMock()
-    client.search = MagicMock(return_value=[])
+    client.query_points = MagicMock(return_value=SimpleNamespace(points=[]))
     client.upsert = MagicMock()
     client.close = MagicMock()
     return client
@@ -201,7 +204,7 @@ class TestHandlerQdrantExecute:
         handler = HandlerQdrant(config=_make_config())
         emb = _mock_embedding_client(vector=[0.1, 0.2, 0.3, 0.4])
         qdrant = _mock_qdrant_client(collection_exists=True)
-        qdrant.search = MagicMock(return_value=[fake_hit])
+        qdrant.query_points = MagicMock(return_value=SimpleNamespace(points=[fake_hit]))
 
         # Force initialized state
         handler._initialized = True

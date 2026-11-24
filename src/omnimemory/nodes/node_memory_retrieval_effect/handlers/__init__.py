@@ -4,19 +4,17 @@
 # Copyright (c) 2025 OmniNode Team
 """Memory Retrieval Effect handlers.
 
-This package contains IHandler implementations for the memory_retrieval_effect node.
-Currently provides mock handlers for development and testing. Real handlers
-wrapping omnibase_infra can be added when infrastructure is available.
-
 Handlers:
-    - HandlerMemoryRetrieval: Main routing handler that dispatches to backend handlers
-    - HandlerQdrantMock: Simulates semantic similarity search
-    - HandlerDbMock: Simulates full-text SQL search
-    - HandlerGraphMock: Simulates graph traversal
+    - HandlerMemoryRetrieval: Routes a request to the injected vector, database
+      or graph store, or refuses by name when one is absent or unreachable
+    - HandlerQdrant: The production vector store (Qdrant + embedding server)
 
 Ranking:
     - HandlerRankFusion: Relevance gating and rank fusion for search_hybrid.
     - HandlerActivationDecay: Activation decay applied after rank fusion.
+
+Test doubles for the stores are not part of this package; they live under
+``tests/stand_ins`` (OMN-26659).
 
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
@@ -25,13 +23,6 @@ Ranking:
     Rank fusion for hybrid retrieval (OMN-16765).
 """
 
-from ..models import (
-    ModelHandlerDbMockConfig,
-    ModelHandlerGraphMockConfig,
-    ModelHandlerMemoryRetrievalConfig,
-    ModelHandlerQdrantMockConfig,
-)
-from .handler_db_mock import HandlerDbMock
 from .handler_decay import HandlerActivationDecay
 from .handler_fusion import (
     MIN_LEXICAL_TS_RANK,
@@ -39,29 +30,18 @@ from .handler_fusion import (
     RRF_K_DEFAULT,
     HandlerRankFusion,
 )
-from .handler_graph_mock import (
-    HandlerGraphMock,
-)
 from .handler_memory_retrieval import HandlerMemoryRetrieval
-from .handler_qdrant_mock import HandlerQdrantMock
+from .handler_qdrant import HandlerQdrant
 
 __all__ = [
     # Main routing handler
     "HandlerMemoryRetrieval",
-    "ModelHandlerMemoryRetrievalConfig",
+    # Production vector store
+    "HandlerQdrant",
     # Rank fusion - hybrid search (OMN-16765)
     "MIN_LEXICAL_TS_RANK",
     "MIN_VECTOR_COSINE",
     "RRF_K_DEFAULT",
     "HandlerRankFusion",
     "HandlerActivationDecay",
-    # Qdrant - semantic search
-    "HandlerQdrantMock",
-    "ModelHandlerQdrantMockConfig",
-    # Database - full-text search
-    "HandlerDbMock",
-    "ModelHandlerDbMockConfig",
-    # Graph - traversal
-    "HandlerGraphMock",
-    "ModelHandlerGraphMockConfig",
 ]

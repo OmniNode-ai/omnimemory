@@ -25,10 +25,7 @@ _SRC = Path(__file__).resolve().parents[3] / "src" / "omnimemory"
 _SLICE_FILES = (
     "nodes/node_agent_learning_retrieval_effect/adapters/adapter_learning_scoring.py",
     "nodes/node_memory_lifecycle_orchestrator/handlers/handler_memory_tick.py",
-    "nodes/node_memory_retrieval_effect/handlers/handler_db_mock.py",
-    "nodes/node_memory_retrieval_effect/handlers/handler_graph_mock.py",
     "nodes/node_memory_retrieval_effect/handlers/handler_memory_retrieval.py",
-    "nodes/node_memory_retrieval_effect/handlers/handler_qdrant_mock.py",
     "nodes/node_semantic_analyzer_compute/handlers/handler_semantic_compute.py",
     "protocols/protocol_memory_expire_handler.py",
     "runtime/dispatch_handlers.py",

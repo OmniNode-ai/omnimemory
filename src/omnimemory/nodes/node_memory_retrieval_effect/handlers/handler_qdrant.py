@@ -246,15 +246,16 @@ class HandlerQdrant:
                 error_message="search requires query_text or query_embedding",
             )
 
-        hits = await asyncio.to_thread(
-            self._qdrant_client.search,
+        # qdrant-client >= 1.18 has no ``search``; ``query_points`` is its search.
+        response = await asyncio.to_thread(
+            self._qdrant_client.query_points,
             self._config.collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             limit=request.limit,
             score_threshold=request.similarity_threshold,
         )
 
-        if not hits:
+        if not response.points:
             return ModelMemoryRetrievalResponse(
                 status="no_results",
                 results=[],
@@ -268,7 +269,7 @@ class HandlerQdrant:
                 score=hit.score,
                 distance=1.0 - hit.score,
             )
-            for hit in hits
+            for hit in response.points
         ]
         return ModelMemoryRetrievalResponse(
             status="success",

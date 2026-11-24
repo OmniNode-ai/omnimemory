@@ -1,0 +1,119 @@
+---
+schema_version: "1.0.0"
+ticket_id: OMN-26659
+title: Memory search answers from the real stores or refuses by name, and the stand-in handlers live only
+  in tests
+summary: >-
+  omnimemory's retrieval command handler read OMNIMEMORY_USE_STUB_HANDLERS with default "true" and so
+  answered every memory search from in-memory test doubles, which the runtime never seeds, so a search
+  returned no_results whether or not the real store held rows; with the switch off the handler raised
+  NotImplementedError. This change removes the switch and the doubles from src. HandlerMemoryRetrieval
+  is built only from stores injected behind ProtocolVectorStore, ProtocolDatabaseStore and ProtocolGraphStore;
+  the Qdrant vector store is resolved from ModelRetrievalStoreSettings (QDRANT_HOST, QDRANT_PORT, LLM_EMBEDDING_URL).
+  A store that is not configured, or that cannot be reached, answers a typed refusal (status refused,
+  ModelStoreRefusal naming the store and the reason) with no rows. The doubles move to tests/stand_ins.
+  The database and graph stores have no production implementation of their protocols yet, so a search
+  that needs one is refused naming it. AC4 (one real write and one real search on the dev lane) is checked
+  on dev after merge and is not part of this change.
+is_seam_ticket: false
+interface_change: true
+interfaces_touched:
+  - HandlerMemoryRetrieval constructor takes the three stores instead of a config
+  - ModelMemoryRetrievalResponse gains status refused and a refusal field
+  - ModelHandlerMemoryRetrievalConfig and the three stand-in config models are removed
+requirements:
+  - id: req-omn26659-real-stores-or-refusal
+    statement: Memory search is answered from injected real stores or refused by store name, and no stand-in
+      is reachable from src.
+    acceptance:
+      - id: AC1
+        statement: >-
+          AC1: the runtime path builds memory retrieval only from injected stores (vector, database, graph)
+          behind their protocols, resolved from settings -- falsifier: any runtime path constructs a mock
+          handler
+      - id: AC2
+        statement: >-
+          AC2: a store that is not configured or not reachable answers a typed refusal naming it, with
+          no rows -- falsifier: an unconfigured runtime returns any result
+      - id: AC3
+        statement: >-
+          AC3: the environment switch is gone and the stand-ins are importable from tests only -- falsifier:
+          a search of src finds the switch or a mock binding
+      - id: AC5
+        statement: >-
+          AC5: what calls memory search today is listed with file lines, and what it returned under the
+          stand-ins is stated -- falsifier: a caller missing from the list
+evidence_requirements:
+  - kind: manual
+    description: >-
+      The focused tests for AC1 to AC3 fail at the merge base and pass at the head. AC4 is read on the
+      dev lane after merge and is not claimed here.
+emergency_bypass:
+  enabled: false
+  justification: ''
+  follow_up_ticket_id: ''
+dod_evidence:
+  - id: dod-omn26659-ac1-injected-stores
+    description: >-
+      HandlerMemoryRetrieval serves a request from the store injected for its operation, the stores satisfy
+      their protocols, and the settings resolve to the Qdrant vector store only when host and embedding
+      server are set.
+    source: manual
+    binds_ac: [AC1]
+    checks:
+      - check_type: test_passes
+        check_value: >-
+          uv run pytest tests/unit/nodes/test_memory_retrieval_refusal.py -q -n 0 -k "InjectedStoresAnswer
+          or StoresResolveFromSettings"
+        cwd: .
+  - id: dod-omn26659-ac2-typed-refusal
+    description: >-
+      An unconfigured store and an unreachable store each answer status refused with the store named and
+      no rows, for search, search_text, search_graph and search_hybrid, and through the dispatch handler.
+    source: manual
+    binds_ac: [AC2]
+    checks:
+      - check_type: test_passes
+        check_value: >-
+          uv run pytest tests/unit/nodes/test_memory_retrieval_refusal.py -q -n 0 -k "Refuses or Refusal"
+        cwd: .
+  - id: dod-omn26659-ac3-no-switch-no-mock-in-src
+    description: >-
+      A scan of src finds neither the environment switch, the stub flag, a mock handler, a mock binder
+      nor a mock config model, the stand-in modules no longer import from the package, and they import
+      from tests.stand_ins.
+    source: manual
+    binds_ac: [AC3]
+    checks:
+      - check_type: test_passes
+        check_value: uv run pytest tests/unit/test_memory_search_no_stand_ins_in_src.py -q -n 0
+        cwd: .
+  - id: dod-omn26659-ac5-callers-listed
+    description: >-
+      Callers of memory search at origin/dev, with file lines and what each got under the stand-ins. (1)
+      omnimemory src/omnimemory/runtime/dispatch_handlers.py:1185 create_memory_retrieval_dispatch_handler()
+      inside create_memory_dispatch_engine, called from src/omnimemory/runtime/plugin.py:704, serves the
+      memory-retrieval-requested route; the handler config came from build_retrieval_config_from_env at
+      dispatch_handlers.py:452-495 (switch read at :478, default true) and the stores were the unseeded
+      stand-ins, so every search returned status no_results with zero rows (search_graph also an error
+      naming the missing start snapshot); with the switch off HandlerMemoryRetrieval.initialize raised
+      NotImplementedError at handler_memory_retrieval.py:186. (2) omnimarket src/omnimarket/nodes/node_memory_retrieval_effect/contract.yaml:18-20
+      binds omnimemory HandlerMemoryRetrieval as the node handler; constructed with no config it took
+      the default use_stub_handlers=True, so it returned the same empty stand-in answers. (3) Only registries
+      name the command topic and publish nothing to it: omnibase_infra src/omnibase_infra/topics/platform_topic_suffixes.py:505-511
+      and :2290, and scripts/check_contract_topic_parity.py:317,335; no producer of onex.cmd.omnimemory.memory-retrieval-requested.v1
+      exists in any registry repo at its landing branch. Not callers of this node, and so never answered
+      by the stand-ins: omniintelligence src/omniintelligence/nodes/node_gmail_intent_evaluator_effect/handlers/handler_gmail_intent_evaluate.py:241
+      (_query_omnimemory, called at :754) queries Qdrant directly through AsyncQdrantClient.query_points
+      and returns empty hits plus an error string on failure; omniintelligence src/omniintelligence/nodes/node_navigation_retriever_effect/handlers/handler_navigation_retrieve.py:373
+      (_retrieve_paths) queries the navigation_paths collection through its own vector-store protocol
+      and returns an empty list on failure; omniclaude plugins/onex/hooks/lib/memory_fabric_client.py:14-17
+      posts to node_agent_learning_retrieval_effect, a different node.
+    source: manual
+    binds_ac: [AC5]
+    checks:
+      - check_type: command
+        check_value: >-
+          grep -Fq 'dispatch_handlers.py:1185' contracts/OMN-26659.yaml && grep -Fq 'handler_gmail_intent_evaluate.py:241'
+          contracts/OMN-26659.yaml && grep -Fq 'platform_topic_suffixes.py:505-511' contracts/OMN-26659.yaml
+        cwd: .
