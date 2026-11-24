@@ -19,16 +19,13 @@ Example::
     import asyncio
     from omnimemory.nodes.node_memory_retrieval_effect import (
         HandlerMemoryRetrieval,
-        ModelHandlerMemoryRetrievalConfig,
         ModelMemoryRetrievalRequest,
     )
 
     async def main():
-        # Initialize handler
-        handler = HandlerMemoryRetrieval()
-        await handler.initialize()
+        # Stores come from settings (container.registry_memory_retrieval)
+        handler = HandlerMemoryRetrieval(vector_store=vector_store)
 
-        # Semantic search
         request = ModelMemoryRetrievalRequest(
             operation="search",
             query_text="user authentication decisions",
@@ -36,7 +33,7 @@ Example::
             similarity_threshold=0.7,
         )
         response = await handler.execute(request)
-
+        # status "refused" names the store when it is missing or unreachable
         for result in response.results:
             print(f"[{result.score:.2f}] {result.snapshot.subject}")
 
@@ -47,25 +44,23 @@ Example::
 .. versionadded:: 0.1.0
     Initial implementation for OMN-1387.
 
-Status: Implementation complete with mock adapters.
+Status: stores are injected; an absent or unreachable store is refused by name.
 """
 
-from .handlers import (
-    HandlerMemoryRetrieval,
-    ModelHandlerMemoryRetrievalConfig,
-)
+from .handlers import HandlerMemoryRetrieval
 from .models import (
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
+    ModelStoreRefusal,
 )
 
 __all__: list[str] = [
     # Main handler
     "HandlerMemoryRetrieval",
-    "ModelHandlerMemoryRetrievalConfig",
     # Models
     "ModelMemoryRetrievalRequest",
     "ModelMemoryRetrievalResponse",
     "ModelSearchResult",
+    "ModelStoreRefusal",
 ]

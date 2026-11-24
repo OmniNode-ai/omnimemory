@@ -71,19 +71,19 @@ from omnibase_core.models.omnimemory import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-from ..adapters.adapter_embedding_client import (
+from omnimemory.nodes.node_memory_retrieval_effect.adapters.adapter_embedding_client import (
     EmbeddingClient,
     EmbeddingClientError,
     EmbeddingConnectionError,
 )
-from ..adapters.adapter_mock_store import MockRetrievalStore
-from ..models import (
+from omnimemory.nodes.node_memory_retrieval_effect.models import (
     ModelEmbeddingClientConfig,
-    ModelHandlerQdrantMockConfig,
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
 )
+from tests.stand_ins.stand_in_store import MockRetrievalStore
+from tests.stand_ins.stand_in_vector_config import ModelHandlerQdrantMockConfig
 
 logger = logging.getLogger(__name__)
 

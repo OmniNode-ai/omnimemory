@@ -36,15 +36,14 @@ from omnibase_core.models.omnimemory import (
 from omnibase_core.models.primitives.model_semver import ModelSemVer
 
 from omnimemory.nodes.node_memory_retrieval_effect import (
-    HandlerMemoryRetrieval,
-    ModelHandlerMemoryRetrievalConfig,
     ModelMemoryRetrievalRequest,
 )
-from omnimemory.nodes.node_memory_retrieval_effect.handlers import (
-    ModelHandlerDbMockConfig,
-    ModelHandlerGraphMockConfig,
-    ModelHandlerQdrantMockConfig,
+from tests.stand_ins.stand_in_database_config import ModelHandlerDbMockConfig
+from tests.stand_ins.stand_in_graph_config import ModelHandlerGraphMockConfig
+from tests.stand_ins.stand_in_retrieval_handler import (
+    StandInHandlerMemoryRetrieval as HandlerMemoryRetrieval,
 )
+from tests.stand_ins.stand_in_vector_config import ModelHandlerQdrantMockConfig
 
 # =============================================================================
 # Test Fixtures
@@ -58,13 +57,11 @@ def handler() -> HandlerMemoryRetrieval:
     Returns:
         Configured HandlerMemoryRetrieval instance with mock handlers.
     """
-    config = ModelHandlerMemoryRetrievalConfig(
-        use_stub_handlers=True,
-        qdrant_mock_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
-        db_config=ModelHandlerDbMockConfig(case_sensitive=False),
+    return HandlerMemoryRetrieval(
+        vector_config=ModelHandlerQdrantMockConfig(embedding_dimension=1024),
+        database_config=ModelHandlerDbMockConfig(case_sensitive=False),
         graph_config=ModelHandlerGraphMockConfig(bidirectional=True),
     )
-    return HandlerMemoryRetrieval(config)
 
 
 def create_snapshot(

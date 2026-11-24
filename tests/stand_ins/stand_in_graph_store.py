@@ -57,14 +57,14 @@ from omnibase_core.models.omnimemory import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-from ..adapters.adapter_mock_store import MockRetrievalStore
-from ..models import (
-    ModelGraphRelationship,
-    ModelHandlerGraphMockConfig,
+from omnimemory.nodes.node_memory_retrieval_effect.models import (
     ModelMemoryRetrievalRequest,
     ModelMemoryRetrievalResponse,
     ModelSearchResult,
 )
+from tests.stand_ins.stand_in_graph_config import ModelHandlerGraphMockConfig
+from tests.stand_ins.stand_in_graph_relationship import ModelGraphRelationship
+from tests.stand_ins.stand_in_store import MockRetrievalStore
 
 logger = logging.getLogger(__name__)
 

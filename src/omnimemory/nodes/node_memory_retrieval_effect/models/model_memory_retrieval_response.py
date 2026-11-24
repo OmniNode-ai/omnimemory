@@ -26,14 +26,14 @@ Example:
     Initial implementation for OMN-1387.
 """
 
-from __future__ import annotations
-
-from typing import Literal
+from typing import Literal, Self
 
 from omnibase_core.models.omnimemory import (
     ModelMemorySnapshot,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from .model_store_refusal import ModelStoreRefusal
 
 __all__ = ["ModelMemoryRetrievalResponse", "ModelSearchResult"]
 
@@ -89,13 +89,15 @@ class ModelMemoryRetrievalResponse(BaseModel):
     the operation outcome, while results carry the matched snapshots with scores.
 
     Attributes:
-        status: Operation status (success, error, no_results).
+        status: Operation status (success, error, no_results, refused).
         results: List of search results with snapshots and scores, ordered
             by relevance (highest score first).
         total_count: Total number of results returned.
         query_embedding_used: The embedding vector used for semantic search
             (useful for debugging or caching).
         error_message: Detailed error information when status is "error".
+        refusal: The store that could not answer, when status is "refused".
+            A refused response carries no rows.
 
     Example:
         >>> # Successful search with results
@@ -121,9 +123,9 @@ class ModelMemoryRetrievalResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True, from_attributes=True)
 
-    status: Literal["success", "error", "no_results"] = Field(
+    status: Literal["success", "error", "no_results", "refused"] = Field(
         ...,
-        description="Operation status: success, error, or no_results",
+        description="Operation status: success, error, no_results, or refused",
     )
 
     results: list[ModelSearchResult] = Field(
@@ -146,3 +148,28 @@ class ModelMemoryRetrievalResponse(BaseModel):
         default=None,
         description="Error details if status is error",
     )
+
+    refusal: ModelStoreRefusal | None = Field(
+        default=None,
+        description="The store that is not configured or not reachable (refused only)",
+    )
+
+    @model_validator(mode="after")
+    def validate_refusal_carries_no_rows(self) -> Self:
+        """A refused response names its store and carries no rows.
+
+        Returns:
+            Self: The validated model instance.
+
+        Raises:
+            ValueError: If a refusal has no store, rows, or a non-refused
+                response carries a refusal.
+        """
+        if self.status == "refused":
+            if self.refusal is None:
+                raise ValueError("a refused response must name the store (refusal)")
+            if self.results or self.total_count or self.query_embedding_used:
+                raise ValueError("a refused response carries no rows")
+        elif self.refusal is not None:
+            raise ValueError("only a refused response carries a refusal")
+        return self

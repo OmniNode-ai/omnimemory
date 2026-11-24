@@ -28,6 +28,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from omnimemory.nodes.node_memory_retrieval_effect.handlers import (
+    HandlerMemoryRetrieval,
+)
 from omnimemory.runtime.dispatch_handlers import (
     DISPATCH_ALIAS_ARCHIVE_MEMORY,
     DISPATCH_ALIAS_EXPIRE_MEMORY,
@@ -669,6 +672,7 @@ class TestMemoryRetrievalDispatchHandler:
         )
 
         handler = create_memory_retrieval_dispatch_handler(
+            retrieval_handler=HandlerMemoryRetrieval(),
             correlation_id=correlation_id,
         )
 
@@ -690,7 +694,11 @@ class TestMemoryRetrievalDispatchHandler:
         import json
 
         parsed = json.loads(result)
-        assert "status" in parsed
+        # No database store is configured: refused by name, no rows (OMN-26659).
+        assert parsed["status"] == "refused"
+        assert parsed["refusal"]["store"] == "database"
+        assert parsed["refusal"]["reason"] == "not_configured"
+        assert parsed["results"] == []
 
     @pytest.mark.asyncio
     async def test_handler_raises_for_invalid_payload(
@@ -704,6 +712,7 @@ class TestMemoryRetrievalDispatchHandler:
         )
 
         handler = create_memory_retrieval_dispatch_handler(
+            retrieval_handler=HandlerMemoryRetrieval(),
             correlation_id=correlation_id,
         )
 
@@ -731,6 +740,7 @@ class TestMemoryRetrievalDispatchHandler:
         )
 
         handler = create_memory_retrieval_dispatch_handler(
+            retrieval_handler=HandlerMemoryRetrieval(),
             correlation_id=correlation_id,
         )
 

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 # Copyright (c) 2025 OmniNode Team
-"""Unit tests for ModelHandlerQdrantConfig and updated ModelHandlerMemoryRetrievalConfig.
+"""Unit tests for ModelHandlerQdrantConfig.
 
 Tests for OMN-4474.
 """
@@ -13,7 +13,6 @@ import pytest
 from pydantic import ValidationError
 
 from omnimemory.nodes.node_memory_retrieval_effect.models import (
-    ModelHandlerMemoryRetrievalConfig,
     ModelHandlerQdrantConfig,
 )
 
@@ -44,39 +43,6 @@ def test_rejects_invalid_url() -> None:
     """ModelHandlerQdrantConfig raises ValidationError for non-HTTP(S) URL."""
     with pytest.raises(ValidationError):
         ModelHandlerQdrantConfig(embedding_server_url="not-a-url")
-
-
-@pytest.mark.unit
-def test_retrieval_config_requires_qdrant_config_when_not_stub() -> None:
-    """ModelHandlerMemoryRetrievalConfig raises ValidationError when use_stub_handlers=False without qdrant_config."""
-    with pytest.raises(ValidationError):
-        ModelHandlerMemoryRetrievalConfig(
-            use_stub_handlers=False
-        )  # missing qdrant_config
-
-
-@pytest.mark.unit
-def test_retrieval_config_stub_mode_default() -> None:
-    """ModelHandlerMemoryRetrievalConfig defaults to stub mode with no qdrant_config required."""
-    cfg = ModelHandlerMemoryRetrievalConfig()
-    assert cfg.use_stub_handlers is True
-    assert cfg.qdrant_config is None
-
-
-@pytest.mark.unit
-def test_retrieval_config_production_mode_with_qdrant_config() -> None:
-    """ModelHandlerMemoryRetrievalConfig accepts use_stub_handlers=False when qdrant_config provided."""
-    qdrant_cfg = ModelHandlerQdrantConfig(
-        qdrant_host="qdrant.test",
-        embedding_server_url="http://embed.test:8100",
-    )
-    cfg = ModelHandlerMemoryRetrievalConfig(
-        use_stub_handlers=False,
-        qdrant_config=qdrant_cfg,
-    )
-    assert cfg.use_stub_handlers is False
-    assert cfg.qdrant_config is not None
-    assert cfg.qdrant_config.embedding_server_url == "http://embed.test:8100"
 
 
 @pytest.mark.unit

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from omnibase_core.models.omnimemory import ModelMemorySnapshot
 
-    from ..models import ModelGraphRelationship
+    from tests.stand_ins.stand_in_graph_relationship import ModelGraphRelationship
 
 logger = logging.getLogger(__name__)
 

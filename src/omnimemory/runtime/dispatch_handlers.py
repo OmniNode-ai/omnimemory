@@ -30,7 +30,6 @@ import contextlib
 import inspect
 import json
 import logging
-import os
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
@@ -53,8 +52,8 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from omnimemory.enums import EnumLifecycleState
-    from omnimemory.nodes.node_memory_retrieval_effect.models import (
-        ModelHandlerMemoryRetrievalConfig,
+    from omnimemory.nodes.node_memory_retrieval_effect.handlers.handler_memory_retrieval import (
+        HandlerMemoryRetrieval,
     )
     from omnimemory.protocols.protocol_memory_expire_handler import (
         ProtocolMemoryExpireHandler,
@@ -449,56 +448,9 @@ def create_lifecycle_dispatch_handler(
 # =============================================================================
 
 
-def build_retrieval_config_from_env() -> (  # stub-ok: references stub_handlers field name — fully implemented
-    ModelHandlerMemoryRetrievalConfig
-):
-    """Build retrieval config from environment variables.
-
-    Reads ``OMNIMEMORY_USE_STUB_HANDLERS`` (default ``"true"``).  When the
-    value is anything other than ``"false"`` (case-insensitive, whitespace
-    stripped), in-memory test doubles are used.  Otherwise a
-    ``ModelHandlerQdrantConfig`` is constructed from ``QDRANT_HOST``,
-    ``QDRANT_PORT``, and ``LLM_EMBEDDING_URL``.
-
-    Returns:
-        Fully-populated retrieval config ready for ``HandlerMemoryRetrieval``.
-    """
-    from omnimemory.nodes.node_memory_retrieval_effect.contract_descriptor import (
-        contract_qdrant_host,
-        contract_qdrant_port,
-    )
-    from omnimemory.nodes.node_memory_retrieval_effect.models import (
-        ModelHandlerMemoryRetrievalConfig,
-    )
-    from omnimemory.nodes.node_memory_retrieval_effect.models.model_handler_qdrant_config import (
-        ModelHandlerQdrantConfig,
-    )
-
-    use_stubs = (
-        os.getenv("OMNIMEMORY_USE_STUB_HANDLERS", "true").strip().lower() != "false"
-    )
-    qdrant_config = (
-        None
-        if use_stubs
-        # OMN-13562 Wave-1: resolve the Qdrant host/port through the
-        # retrieval node's overlay-declared descriptor (the qdrant owner)
-        # instead of direct os.environ reads. Fails closed on unset QDRANT_HOST.
-        else ModelHandlerQdrantConfig(
-            qdrant_host=contract_qdrant_host(),
-            qdrant_port=contract_qdrant_port(),
-            embedding_server_url=os.environ[
-                "LLM_EMBEDDING_URL"
-            ],  # url-authority-ok: legacy dispatch bootstrap config; Phase-3 DI debt OMN-2584
-        )
-    )
-    return ModelHandlerMemoryRetrievalConfig(
-        use_stub_handlers=use_stubs,
-        qdrant_config=qdrant_config,
-    )
-
-
-def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handlers field name — fully implemented
+def create_memory_retrieval_dispatch_handler(
     *,
+    retrieval_handler: HandlerMemoryRetrieval,
     correlation_id: UUID | None = None,
 ) -> Callable[
     [ModelEventEnvelope[object], ModelDispatchContext],
@@ -506,34 +458,22 @@ def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handle
 ]:
     """Create a dispatch handler for memory-retrieval-requested commands.
 
-    Delegates to HandlerMemoryRetrieval (initialized with stub backends via
-    use_stub_handlers=True). Returns a serialised JSON response string.
-
-    The handler initialises HandlerMemoryRetrieval lazily on first call so
-    that container startup is not blocked by backend initialisation.
+    Delegates to the injected ``HandlerMemoryRetrieval``. The handler answers
+    from the stores it was given; a store that is absent or unreachable comes
+    back as a ``refused`` response naming it, with no rows. Nothing here builds
+    a store or reads the environment (OMN-26659).
 
     Args:
+        retrieval_handler: The retrieval handler, built from settings by
+            ``bind_memory_retrieval`` and owned by the caller.
         correlation_id: Optional fixed correlation ID for tracing.
 
     Returns:
         Async handler function with signature (envelope, context) -> str.
     """
-    from omnimemory.nodes.node_memory_retrieval_effect.handlers import (
-        HandlerMemoryRetrieval,
-    )
     from omnimemory.nodes.node_memory_retrieval_effect.models import (
         ModelMemoryRetrievalRequest,
     )
-
-    _retrieval_handler: HandlerMemoryRetrieval | None = None
-
-    async def _get_retrieval_handler() -> HandlerMemoryRetrieval:
-        nonlocal _retrieval_handler
-        if _retrieval_handler is None:
-            config = build_retrieval_config_from_env()
-            _retrieval_handler = HandlerMemoryRetrieval(config)
-            await _retrieval_handler.initialize()
-        return _retrieval_handler
 
     async def _handle(
         envelope: ModelEventEnvelope[object],
@@ -575,14 +515,15 @@ def create_memory_retrieval_dispatch_handler(  # stub-ok: references stub_handle
             ctx_correlation_id,
         )
 
-        handler = await _get_retrieval_handler()
-        response = await handler.execute(request)
+        response = await retrieval_handler.execute(request)
 
         logger.info(
             "Memory retrieval processed via dispatch engine "
-            "(operation=%s, status=%s, result_count=%d, correlation_id=%s)",
+            "(operation=%s, status=%s, refused_store=%s, result_count=%d, "
+            "correlation_id=%s)",
             request.operation,
             response.status,
+            response.refusal.store.value if response.refusal else None,
             len(response.results),
             ctx_correlation_id,
         )
@@ -1085,6 +1026,7 @@ def create_memory_dispatch_engine(
     navigation_history_handler: object | None = None,
     semantic_compute_handler: object | None = None,
     expire_handler: ProtocolMemoryExpireHandler | None = None,
+    retrieval_handler: HandlerMemoryRetrieval | None = None,
 ) -> MessageDispatchEngine:
     """Create and configure a MessageDispatchEngine for OmniMemory domain.
 
@@ -1119,6 +1061,9 @@ def create_memory_dispatch_engine(
         expire_handler: Optional HandlerMemoryExpire instance. Without one,
             expire-memory commands are answered with a
             lifecycle-transition-failed event instead of being dropped.
+        retrieval_handler: Optional HandlerMemoryRetrieval built from settings.
+            Without one the engine routes retrieval commands to a handler that
+            holds no store, so every search is refused as not configured.
 
     Returns:
         Frozen MessageDispatchEngine ready for dispatch.
@@ -1180,12 +1125,27 @@ def create_memory_dispatch_engine(
     )
 
     # --- Handler 3: memory-retrieval-requested ---
-    # Uses HandlerMemoryRetrieval with mock backends so retrieval commands
-    # are served without external dependencies (OMN-2437).
-    retrieval_handler = create_memory_retrieval_dispatch_handler()
+    # Served from stores behind their protocols only. With no handler injected,
+    # the engine resolves the stores from settings; a store the settings do not
+    # describe refuses the search by name instead of answering from a stand-in
+    # (OMN-26659).
+    from omnimemory.nodes.node_memory_retrieval_effect.container.registry_memory_retrieval import (
+        bind_memory_retrieval,
+    )
+    from omnimemory.nodes.node_memory_retrieval_effect.models.model_retrieval_store_settings import (
+        ModelRetrievalStoreSettings,
+    )
+
+    retrieval_dispatch_handler = create_memory_retrieval_dispatch_handler(
+        retrieval_handler=(
+            bind_memory_retrieval(ModelRetrievalStoreSettings())
+            if retrieval_handler is None
+            else retrieval_handler
+        ),
+    )
     engine.register_dispatcher(
         dispatcher_id="memory-retrieval-handler",
-        dispatcher=retrieval_handler,
+        dispatcher=retrieval_dispatch_handler,
         category=EnumMessageCategory.COMMAND,
         node_kind=EnumNodeKind.EFFECT,
         message_types=None,
@@ -1198,7 +1158,7 @@ def create_memory_dispatch_engine(
             handler_id="memory-retrieval-handler",
             description=(
                 "Routes memory-retrieval-requested commands to "
-                "HandlerMemoryRetrieval (fail-fast until fully wired)."
+                "HandlerMemoryRetrieval (refuses by store name when unconfigured)."
             ),
         )
     )
